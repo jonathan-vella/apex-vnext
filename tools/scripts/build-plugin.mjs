@@ -43,6 +43,23 @@ const manifestShape = {
   assets: ["sourceRoot", "targetRoot"],
 };
 const builtins = new Set(builtinModules.flatMap((name) => [name, `node:${name}`]));
+// camelCase events from the Copilot hooks reference; PascalCase names select the VS Code payload format instead.
+const hookEvents = [
+  "agentStop",
+  "errorOccurred",
+  "notification",
+  "permissionRequest",
+  "postToolUse",
+  "postToolUseFailure",
+  "preCompact",
+  "preToolUse",
+  "sessionEnd",
+  "sessionStart",
+  "subagentStart",
+  "subagentStop",
+  "userPromptSubmitted",
+  "userPromptTransformed",
+];
 
 function bytewise(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
@@ -379,6 +396,66 @@ async function validatePackagedSkills(outputRoot, targetRoot) {
   }
 }
 
+function validateHookCommand(label, entry, event, scripts) {
+  assertKeys(label, entry, ["type", "matcher", "bash", "powershell", "timeoutSec"], ["type", "bash", "powershell"]);
+  if (entry.type !== "command") throw new Error(`${label} type must be command`);
+  for (const shell of ["bash", "powershell"]) {
+    if (typeof entry[shell] !== "string" || entry[shell].trim().length === 0)
+      throw new Error(`${label} ${shell} must be a non-empty command`);
+    if (!new RegExp(`(?:^|[\\s;])node\\s.*\\s${event}(?:[\\s;]|$)`, "u").test(entry[shell]))
+      throw new Error(`${label} ${shell} must run node with the ${event} event argument`);
+  }
+  if (entry.matcher !== undefined) {
+    if (typeof entry.matcher !== "string" || entry.matcher.length === 0)
+      throw new Error(`${label} matcher must be a regex`);
+    new RegExp(`^(?:${entry.matcher})$`, "u");
+  }
+  if (entry.timeoutSec !== undefined && !(Number.isInteger(entry.timeoutSec) && entry.timeoutSec > 0))
+    throw new Error(`${label} timeoutSec must be a positive integer`);
+  const referenced = [...entry.bash.matchAll(/"\$\{PLUGIN_ROOT\}\/([^"$]+)"/gu)].map((match) => match[1]);
+  if (referenced.length !== 1) throw new Error(`${label} bash must quote one "\${PLUGIN_ROOT}/..." script path`);
+  const [script] = referenced;
+  if (!scripts.has(script)) throw new Error(`${label} references a script the package does not ship: ${script}`);
+  const segments = script.split("/").map((segment) => `'${segment}'`);
+  if (!entry.powershell.includes(`[System.IO.Path]::Combine([string]$env:PLUGIN_ROOT, ${segments.join(", ")})`))
+    throw new Error(`${label} powershell must build the same script path from $env:PLUGIN_ROOT`);
+  return script;
+}
+
+/**
+ * Checks hooks.json against the Copilot hook configuration format: version 1, camelCase events, and command entries
+ * with both bash and PowerShell commands that run one shipped, dependency-free Node script from the plugin root.
+ */
+async function validatePackagedHooks(outputRoot, manifest) {
+  if (manifest.hooks.entries.length === 0) return;
+  const hooksRoot = manifest.hooks.targetRoot;
+  const scripts = new Set(
+    manifest.hooks.entries.filter((entry) => entry.endsWith(".mjs")).map((entry) => `${hooksRoot}/${entry}`),
+  );
+  for (const script of scripts) {
+    const source = await readFile(join(outputRoot, script), "utf8");
+    const imports = [...source.matchAll(/^\s*import\s(?:[^"']*\sfrom\s)?["']([^"']+)["']/gmu)].map((match) => match[1]);
+    const external = imports.filter((specifier) => !builtins.has(specifier));
+    if (external.length > 0) throw new Error(`Hook script ${script} must import only Node builtins: ${external[0]}`);
+  }
+  const hooks = JSON.parse(await readFile(join(outputRoot, hooksRoot, "hooks.json"), "utf8"));
+  assertKeys("hooks.json", hooks, ["version", "hooks"]);
+  if (hooks.version !== 1) throw new Error("hooks.json version must be 1");
+  if (!isPlainObject(hooks.hooks) || Object.keys(hooks.hooks).length === 0)
+    throw new Error("hooks.json hooks must map events to entries");
+  const used = new Set();
+  for (const [event, entries] of Object.entries(hooks.hooks)) {
+    if (!hookEvents.includes(event)) throw new Error(`hooks.json has unsupported event ${event}`);
+    if (!Array.isArray(entries) || entries.length === 0)
+      throw new Error(`hooks.json ${event} must be a non-empty array`);
+    entries.forEach((entry, index) =>
+      used.add(validateHookCommand(`hooks.json ${event}[${index}]`, entry, event, scripts)),
+    );
+  }
+  const unused = [...scripts].filter((script) => !used.has(script));
+  if (unused.length > 0) throw new Error(`Hook script is not referenced by hooks.json: ${unused[0]}`);
+}
+
 /**
  * Bundles the MCP entry and its @apexops/* and npm dependencies into one ESM file. Paths in esbuild comments are
  * relative to the repository root, so the output does not depend on the checkout location.
@@ -522,6 +599,7 @@ async function build(
 
   await validatePackagedAgents(outputDirectory, manifest.agents.targetRoot);
   await validatePackagedSkills(outputDirectory, manifest.skills.targetRoot);
+  await validatePackagedHooks(outputDirectory, manifest);
   await setDirectoryTimes(outputDirectory);
   const tree = await hashTree(outputDirectory);
   await writeFile(`${outputDirectory}.sha256`, `${tree.sha256}  ${basename(outputDirectory)}\n`);
@@ -549,4 +627,12 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(p
   }
 }
 
-export { build, hashTree, validateMcpJson, validatePackageManifest, validatePackagedAgents, validatePluginJson };
+export {
+  build,
+  hashTree,
+  validateMcpJson,
+  validatePackageManifest,
+  validatePackagedAgents,
+  validatePackagedHooks,
+  validatePluginJson,
+};
