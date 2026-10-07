@@ -83,6 +83,14 @@
       "proofCommands": ["npm run build:vnext"]
     },
     {
+      "id": "plugin-package",
+      "owner": "Package build engineering",
+      "consumers": ["Copilot CLI", "VS Code Copilot harness", "GitHub Copilot app"],
+      "paths": [],
+      "prefixes": ["plugin/"],
+      "proofCommands": ["npm run test:plugin"]
+    },
+    {
       "id": "runtime-configuration",
       "owner": "Kernel configuration maintainers",
       "consumers": ["kernel", "CLI", "managed projections"],

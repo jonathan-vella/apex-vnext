@@ -105,3 +105,7 @@ jobs:
           (cd packages/kernel && node --test dist/test/*.test.js)
           (cd packages/capabilities && node --test dist/test/*.test.js)
           (cd packages/cli && node --test dist/test/*.test.js)
+
+      - name: Build and test the agent plugin package
+        shell: bash
+        run: npm run test:plugin

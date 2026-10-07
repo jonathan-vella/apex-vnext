@@ -352,6 +352,7 @@ export interface ServiceOptions {
   customizationFailureInjector?: (index: number, destination: string) => void | Promise<void>;
   processRunner?: ProcessRunnerLike;
   improvementPolicy?: ImprovementPolicyV1;
+  diagramRasterizer?: (svg: string) => Uint8Array;
 }
 
 interface DoctorCheck {
@@ -669,6 +670,7 @@ function architectureSubmissionError(issues: ValidationIssue[]): ApexError {
 export class ApexService {
   readonly root: string;
   private readonly clock: () => Date;
+  private readonly diagramRasterizer: (svg: string) => Uint8Array;
   private readonly idSource: () => string;
   private readonly writerLeaseTtlMs: number | undefined;
   private readonly projects: ProjectStore;
@@ -690,6 +692,7 @@ export class ApexService {
     this.root = resolve(root);
     this.workspacePath = canonicalWorkspacePath(options.workspacePath ?? root);
     this.clock = options.clock ?? (() => new Date());
+    this.diagramRasterizer = options.diagramRasterizer ?? rasterizeDiagram;
     this.idSource = options.idSource ?? (() => crypto.randomUUID());
     this.writerLeaseTtlMs = options.writerLeaseTtlMs;
     this.projects = new ProjectStore(this.root, this.clock, this.idSource);
@@ -5013,6 +5016,15 @@ export class ApexService {
     for (const name of files) await this.assertGeneratedReviewUnmodified(join(root, name));
   }
 
+  // Drops a previously generated file that the current render no longer produces, unless it has manual edits.
+  private async removeGeneratedReview(path: string): Promise<void> {
+    await this.assertGeneratedReviewUnmodified(path);
+    await rm(path, { force: true });
+    const basePath = this.generatedReviewBase(path);
+    await this.assertSafeDestination(this.root, basePath);
+    await rm(basePath, { force: true });
+  }
+
   private async writeGeneratedReview(path: string, content: Buffer): Promise<void> {
     await this.assertGeneratedReviewUnmodified(path);
     const current = await this.readOptional(path);
@@ -5190,12 +5202,23 @@ export class ApexService {
       String(decision.quantity),
       this.reviewMarkdownText(decision.rationale),
     ]);
-    const renderDiagram = (name: string, render: () => DiagramSource) => {
+    type RenderedDiagram =
+      | { name: string; error: string }
+      | { name: string; source: DiagramSource; png: Uint8Array }
+      | { name: string; source: DiagramSource; pngError: string };
+    const message = (error: unknown, fallback: string) => (error instanceof Error ? error.message : fallback);
+    // PNG output is optional: the plugin bundle has no native rasterizer but still writes Python and SVG sources.
+    const renderDiagram = (name: string, render: () => DiagramSource): RenderedDiagram => {
+      let source: DiagramSource;
       try {
-        const source = render();
-        return { name, source, png: rasterizeDiagram(source.svg) };
+        source = render();
       } catch (error) {
-        return { name, error: error instanceof Error ? error.message : "Diagram rendering failed" };
+        return { name, error: message(error, "Diagram rendering failed") };
+      }
+      try {
+        return { name, source, png: this.diagramRasterizer(source.svg) };
+      } catch (error) {
+        return { name, source, pngError: message(error, "PNG rendering failed") };
       }
     };
     const diagrams = [
@@ -5208,7 +5231,9 @@ export class ApexService {
       .map((diagram) =>
         "error" in diagram
           ? `- ${this.reviewMarkdownText(diagram.name)}: unavailable (${this.reviewMarkdownText(diagram.error)})`
-          : `- ${this.reviewMarkdownText(diagram.name)}: generated as Python, SVG, and PNG`,
+          : "pngError" in diagram
+            ? `- ${this.reviewMarkdownText(diagram.name)}: generated as Python and SVG; PNG unavailable (${this.reviewMarkdownText(diagram.pngError)})`
+            : `- ${this.reviewMarkdownText(diagram.name)}: generated as Python, SVG, and PNG`,
       )
       .join("\n");
     const architectureImages = diagrams
@@ -5299,7 +5324,9 @@ export class ApexService {
                 join(directory, `${diagram.name}.svg`),
                 Buffer.from(diagram.source.svg, "utf8"),
               ),
-              this.writeGeneratedReview(join(directory, `${diagram.name}.png`), Buffer.from(diagram.png)),
+              "png" in diagram
+                ? this.writeGeneratedReview(join(directory, `${diagram.name}.png`), Buffer.from(diagram.png))
+                : this.removeGeneratedReview(join(directory, `${diagram.name}.png`)),
             ],
       ),
     ]);

@@ -27,6 +27,21 @@ npm run pack:vnext
 
 The command writes matching package tarballs and `release-manifest.json` under `dist/vnext-packages/`.
 
+## Build The Agent Plugin Package
+
+`plugin/package-manifest.json` drives a byte-reproducible Agent Plugins 1.0 build:
+
+```bash
+npm run build:plugin
+npm run test:plugin
+```
+
+The build writes `dist/apex-plugin/` and its tree hash to `dist/apex-plugin.sha256`. The package holds `plugin.json`,
+`mcp.json`, `skills/`, the APEX agent and hidden workers under `com.github.copilot/agents/`, `assets/`, and
+`mcp/apex.mjs`: one esbuild bundle of the MCP server and its npm dependencies, about 3 MB. Clients start it with
+`node ${PLUGIN_ROOT}/mcp/apex.mjs`; it reads `assets/` next to `mcp/` and needs no `node_modules`, `npm` or network.
+PNG diagram rendering needs the native `@resvg/resvg-js` package, so the plugin writes SVG diagrams only.
+
 ## Create A Consumer Repository
 
 ```bash

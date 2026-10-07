@@ -898,9 +898,6 @@ export async function execute(argv: string[], root = process.cwd(), options: Ser
     case "quality prune":
       confirmed(flags, "quality prune");
       return service.improvementPrune();
-    case "mcp serve":
-      await serveMcp(service);
-      return undefined;
     default:
       throw new ApexError("APEX_USAGE", `Unknown command: ${command || "<none>"}`, EXIT_CODES.usage);
   }
@@ -979,5 +976,12 @@ export function formatHumanResult(args: string[], result: unknown): string {
   return typeof result === "string" ? result : JSON.stringify(result, null, 2);
 }
 
-if (process.argv[1] !== undefined && (await realpath(process.argv[1])) === (await realpath(new URL(import.meta.url))))
+// The plugin build defines this as true: its single-file bundle shares one import.meta.url, so this guard would match.
+declare const __APEX_PLUGIN_BUNDLE__: boolean | undefined;
+
+if (
+  typeof __APEX_PLUGIN_BUNDLE__ === "undefined" &&
+  process.argv[1] !== undefined &&
+  (await realpath(process.argv[1])) === (await realpath(new URL(import.meta.url)))
+)
   await main();
