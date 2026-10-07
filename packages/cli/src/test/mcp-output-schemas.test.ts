@@ -386,7 +386,7 @@ test("output schema coverage matches every registered MCP tool", async () => {
       assert.equal(tool.inputSchema.additionalProperties, false, tool.name);
       assert.ok(tool.inputSchema.properties?.workspace, tool.name);
       assert.ok(tool.inputSchema.required?.includes("workspace"), tool.name);
-      const readOnly = tool.name === "status" || tool.name === "projectList";
+      const readOnly = ["status", "projectList", "doctorChecks"].includes(tool.name);
       assert.equal(tool.annotations?.readOnlyHint, readOnly, tool.name);
       assert.equal(tool.annotations?.idempotentHint, readOnly, tool.name);
       assert.equal(tool.annotations?.destructiveHint, !readOnly, tool.name);

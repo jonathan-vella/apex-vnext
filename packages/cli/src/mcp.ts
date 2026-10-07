@@ -155,7 +155,7 @@ const stagingInput = (optional: boolean) =>
       ],
     });
 
-const readOnlyTools = new Set(["status", "projectList"]);
+const readOnlyTools = new Set(["status", "projectList", "doctorChecks"]);
 const externalTools = new Set(["reconcile", "inventory", "diagnose", "doctor", "doctorChecks"]);
 
 function assertBoundedInput(value: unknown): void {
