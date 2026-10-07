@@ -2,10 +2,12 @@ import assert from "node:assert/strict";
 import { resolve } from "node:path";
 import test from "node:test";
 import {
+  exitProblem,
   installedPlugin,
   parseArguments,
   parseCopilotConfig,
   serverLaunch,
+  startServer,
 } from "../../scripts/smoke-plugin-install.mjs";
 
 test("install smoke reads the Copilot CLI config with its leading comment lines", () => {
@@ -56,4 +58,60 @@ test("install smoke accepts only exact Copilot CLI version pins", () => {
   }
   assert.throws(() => parseArguments(["--cli-version"]), /Missing value/u);
   assert.throws(() => parseArguments(["--force"]), /Unknown argument/u);
+});
+
+function fakeServer(source) {
+  return { command: process.execPath, args: ["-e", source], cwd: process.cwd(), env: {} };
+}
+
+const echoServer = `
+const lines = require("node:readline").createInterface({ input: process.stdin });
+lines.on("line", (line) => {
+  const { id } = JSON.parse(line);
+  process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id, result: { ok: id } }) + "\\n");
+});
+`;
+
+test("install smoke stops a server cleanly when it exits on stdin EOF", async () => {
+  const server = startServer(fakeServer(echoServer), { PATH: process.env.PATH });
+  assert.deepEqual(await server.request(1, "ping", {}), { ok: 1 });
+  const exit = await server.close();
+  assert.equal(exitProblem(exit), undefined, JSON.stringify(exit));
+});
+
+test("install smoke kills a server that ignores stdin EOF instead of waiting forever", async () => {
+  const server = startServer(
+    fakeServer(`${echoServer}\nprocess.stdin.on("end", () => {}); setInterval(() => {}, 1000);`),
+    { PATH: process.env.PATH },
+    { shutdownTimeoutMs: 500 },
+  );
+  assert.deepEqual(await server.request(1, "ping", {}), { ok: 1 });
+  const started = Date.now();
+  const exit = await server.close();
+  assert.ok(Date.now() - started < 5_000);
+  assert.equal(exit.timedOut, true);
+  assert.equal(server.child.exitCode !== null || server.child.signalCode !== null, true);
+  assert.match(exitProblem(exit), /did not exit after stdin closed/u);
+});
+
+test("install smoke bounds a silent server's response and shutdown", async () => {
+  const server = startServer(
+    fakeServer("process.stdin.resume(); setInterval(() => {}, 1000);"),
+    { PATH: process.env.PATH },
+    { requestTimeoutMs: 300, shutdownTimeoutMs: 300 },
+  );
+  await assert.rejects(server.request(1, "ping", {}), /Timed out waiting for ping/u);
+  assert.equal((await server.close()).timedOut, true);
+});
+
+test("install smoke reports a server command that cannot be spawned", async () => {
+  const server = startServer(
+    { command: "apex-smoke-missing-command", args: [], cwd: process.cwd(), env: {} },
+    { PATH: process.env.PATH },
+    { shutdownTimeoutMs: 1_000 },
+  );
+  await assert.rejects(server.request(1, "ping", {}), /ENOENT/u);
+  const exit = await server.close();
+  assert.equal(exit.timedOut, false);
+  assert.match(exitProblem(exit), /MCP server could not start: .*ENOENT/u);
 });

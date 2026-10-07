@@ -117,7 +117,20 @@ async function countFiles(root, predicate) {
   return entries.filter((entry) => entry.isFile() && predicate(entry.name)).length;
 }
 
-function startServer(launch, env) {
+async function settleWithin(promise, timeoutMs) {
+  let timer;
+  const timeout = new Promise((resolveTimeout) => {
+    timer = setTimeout(() => resolveTimeout(undefined), timeoutMs);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Spawns the server and bounds every wait, so a stuck or unspawnable server cannot block sandbox cleanup. */
+function startServer(launch, env, { requestTimeoutMs = responseTimeoutMs, shutdownTimeoutMs = 10_000 } = {}) {
   const child = spawn(launch.command, launch.args, {
     cwd: launch.cwd,
     env,
@@ -129,14 +142,21 @@ function startServer(launch, env) {
   child.stderr.setEncoding("utf8").on("data", (chunk) => {
     stderr += chunk;
   });
-  const exited = new Promise((resolveExit) => child.once("exit", (code, signal) => resolveExit({ code, signal })));
+  // A write to a dead child surfaces as EPIPE on stdin; the exit or spawn error reports the real cause.
+  child.stdin.on("error", () => {});
+  // Node emits `error` and `close`, but no `exit`, when the command cannot be spawned.
+  const exited = new Promise((resolveExit) => {
+    child.once("exit", (code, signal) => resolveExit({ code, signal }));
+    child.once("error", (error) => resolveExit({ code: null, signal: null, error }));
+  });
   const spawnFailed = new Promise((_, reject) => child.once("error", reject));
+  spawnFailed.catch(() => {});
   const lines = createInterface({ input: child.stdout })[Symbol.asyncIterator]();
   const request = async (id, method, params) => {
     child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id, method, params })}\n`);
     let timer;
     const timeout = new Promise((_, reject) => {
-      timer = setTimeout(() => reject(new Error(`Timed out waiting for ${method}\n${stderr}`)), responseTimeoutMs);
+      timer = setTimeout(() => reject(new Error(`Timed out waiting for ${method}\n${stderr}`)), requestTimeoutMs);
     });
     try {
       const line = await Promise.race([lines.next(), timeout, spawnFailed]);
@@ -151,9 +171,20 @@ function startServer(launch, env) {
   };
   const close = async () => {
     child.stdin.end();
-    return { ...(await exited), stderr };
+    const exit = await settleWithin(exited, shutdownTimeoutMs);
+    if (exit !== undefined) return { ...exit, stderr, timedOut: false };
+    child.kill("SIGKILL");
+    const killed = await settleWithin(exited, shutdownTimeoutMs);
+    return { ...(killed ?? { code: null, signal: "SIGKILL" }), stderr, timedOut: true };
   };
   return { child, request, close };
+}
+
+function exitProblem(exit) {
+  if (exit.error !== undefined) return `MCP server could not start: ${exit.error.message}`;
+  if (exit.timedOut) return `MCP server did not exit after stdin closed and was killed\n${exit.stderr}`;
+  if (exit.code !== 0 || exit.signal !== null) return `MCP server exited ${exit.code ?? exit.signal}\n${exit.stderr}`;
+  return undefined;
 }
 
 async function smoke({ pluginDirectory, copilot, cliVersion: expectedCliVersion, keep }) {
@@ -253,8 +284,8 @@ async function smoke({ pluginDirectory, copilot, cliVersion: expectedCliVersion,
     } finally {
       exit = await server.close();
     }
-    if (exit.code !== 0 || exit.signal !== null)
-      throw new Error(`MCP server exited ${exit.code ?? exit.signal}\n${exit.stderr}`);
+    const problem = exitProblem(exit);
+    if (problem !== undefined) throw new Error(problem);
 
     return {
       cli: cliVersion,
@@ -292,4 +323,4 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(p
   }
 }
 
-export { installedPlugin, parseArguments, parseCopilotConfig, serverLaunch, smoke };
+export { exitProblem, installedPlugin, parseArguments, parseCopilotConfig, serverLaunch, smoke, startServer };
