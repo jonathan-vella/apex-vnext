@@ -225,6 +225,7 @@ test("hook validation rejects drift from the Copilot hooks format and the shippe
     await writeFile(join(hooksRoot, "hooks.json"), JSON.stringify(hooksJson));
     return validatePackagedHooks(pluginRoot, manifest);
   };
+  const prepend = (lines) => script.replace(/^(#!.*\n)/u, (shebang) => `${shebang}${lines}`);
   const withEntry = (overrides, event = "preToolUse") => ({
     version: 1,
     hooks: { [event]: [{ ...entry, ...overrides }] },
@@ -236,26 +237,44 @@ test("hook validation rejects drift from the Copilot hooks format and the shippe
   await assert.rejects(check(withEntry({}, "PreToolUse")), /unsupported event PreToolUse/u);
   await assert.rejects(check({ version: 1, hooks: { preToolUse: [] } }), /non-empty array/u);
   await assert.rejects(check(withEntry({ powershell: undefined })), /missing fields: powershell/u);
-  await assert.rejects(check(withEntry({ bash: "   " })), /bash must be a non-empty command/u);
+  await assert.rejects(check(withEntry({ bash: "   " })), /bash must start with/u);
   await assert.rejects(check(withEntry({ command: "node x" })), /unsupported fields: command/u);
   await assert.rejects(check(withEntry({ type: "http" })), /type must be command/u);
   await assert.rejects(check(withEntry({ matcher: "(" })), SyntaxError);
   await assert.rejects(check(withEntry({ timeoutSec: 0 })), /timeoutSec/u);
-  await assert.rejects(check(withEntry({}, "postToolUse")), /must run node with the postToolUse event/u);
+  await assert.rejects(check(withEntry({}, "postToolUse")), /bash must be the standard command .* postToolUse/u);
+  await assert.rejects(
+    check(withEntry({ bash: entry.bash.replace('"$f" preToolUse;', '"$f" wrong; echo preToolUse;') })),
+    /bash must be the standard command/u,
+  );
   await assert.rejects(
     check(withEntry({ bash: entry.bash.replaceAll("apex-hook.mjs", "other.mjs") })),
     /does not ship: com\.github\.copilot\/hooks\/other\.mjs/u,
   );
   await assert.rejects(
     check(withEntry({ bash: entry.bash.replace('"${PLUGIN_ROOT}/', '"./') })),
-    /quote one "\$\{PLUGIN_ROOT\}\/\.\.\." script path/u,
+    /bash must start with f="\$\{PLUGIN_ROOT\}\/<script>";/u,
   );
   await assert.rejects(
     check(withEntry({ powershell: entry.powershell.replace("'hooks', ", "") })),
-    /powershell must build the same script path/u,
+    /powershell must be the standard command/u,
   );
-  await assert.rejects(check(hooks, `import "js-yaml";\n${script}`), /must import only Node builtins: js-yaml/u);
-  await assert.rejects(check(hooks, `import { x } from "./helper.mjs";\n${script}`), /only Node builtins/u);
+  await assert.rejects(
+    check(withEntry({ powershell: entry.powershell.replace("& node $f preToolUse", "$input | node $f preToolUse") })),
+    /powershell must be the standard command/u,
+  );
+  for (const [prefix, pattern] of [
+    ['import "js-yaml";\n', /only Node builtins/u],
+    ['import { x } from "./helper.mjs";\n', /only Node builtins/u],
+    ['export * from "./helper.mjs";\n', /only Node builtins/u],
+    ['await import("js-yaml");\n', /only Node builtins/u],
+    ["const name = process.argv[3];\nawait import(name);\n", /only Node builtins: dynamic import/u],
+  ]) {
+    await assert.rejects(check(hooks, prepend(prefix)), pattern, prefix);
+  }
+  await writeFile(join(hooksRoot, "helper.mjs"), "export const x = 1;\n");
+  await assert.rejects(check(hooks, prepend('export * from "./helper.mjs";\n')), /only Node builtins: .*helper\.mjs/u);
+  await check(hooks, prepend('import { createHash } from "node:crypto";\nimport path from "path";\n'));
 });
 
 const hookPayload = (agentType) =>

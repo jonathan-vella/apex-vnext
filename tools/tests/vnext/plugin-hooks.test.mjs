@@ -66,6 +66,11 @@ test("agent IDs normalize plugin namespaces, folders, file suffixes and case", (
   for (const value of ["apex:apex-codegen", "apex-validator", "APEX CodeGen", "explore", "apexx", "", "apex:"]) {
     assert.equal(isApexAgent(value), false, value);
   }
+  assert.equal(normalizeAgentId("apex:APEX-CodeGen.agent.md"), "apex-codegen");
+  for (const value of ["other-plugin:apex", "team/apex", "x\\apex", "apex-tools:apex"]) {
+    assert.equal(normalizeAgentId(value), value.toLowerCase(), value);
+    assert.equal(isApexAgent(value), false, `${value} belongs to another namespace`);
+  }
   for (const value of [undefined, null, 1, {}, ["apex"]]) assert.equal(normalizeAgentId(value), "");
 });
 
@@ -110,6 +115,7 @@ test("preToolUse allows hidden workers, built-in agents and unknown targets", ()
     "code-review",
     "security-review",
     "apex-helper",
+    "other-plugin:apex",
     "",
     42,
   ]) {

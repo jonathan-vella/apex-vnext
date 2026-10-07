@@ -22,14 +22,20 @@ export const APEX_AGENT_ID = "apex";
 // `task` in camelCase payloads; `Agent` (or `Task`) in PascalCase payloads, which use Claude tool names.
 const TASK_TOOLS = new Set(["task", "Task", "Agent"]);
 
-/** Lower-case agent ID without a plugin namespace, folder or file suffix: "apex:APEX.agent.md" becomes "apex". */
+export const APEX_PLUGIN_NAME = "apex";
+
+/**
+ * Lower-case agent ID without the APEX plugin namespace or file suffix: "apex:APEX.agent.md" becomes "apex". Copilot
+ * names plugin agents "<plugin>:<file stem>"; other namespaces stay, so "other-plugin:apex" is not the APEX agent.
+ */
 export function normalizeAgentId(value) {
   if (typeof value !== "string") return "";
   const id = value
     .trim()
     .toLowerCase()
     .replace(/\.agent\.md$/u, "");
-  return id.slice(Math.max(id.lastIndexOf(":"), id.lastIndexOf("/"), id.lastIndexOf("\\")) + 1).trim();
+  const namespace = /^([^:/\\]+)[:/\\](.*)$/u.exec(id);
+  return namespace !== null && namespace[1] === APEX_PLUGIN_NAME ? namespace[2].trim() : id;
 }
 
 export function isApexAgent(value) {
