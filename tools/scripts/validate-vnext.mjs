@@ -99,19 +99,10 @@ const SOURCE_IMPORT = /(?:from\s+|import\s*\()["']([^"']+)["']/g;
 const ARM_MCP_SERVER = "apex-azure-pricing";
 const ARM_MCP_ENDPOINT = "https://mcp.management.azure.com";
 const ARM_MCP_TOOLSET = "CostManagement,Pricing";
-const ARM_MCP_READ_TOOLS = [
-  "get_retail_prices",
-  "query_costs",
-  "query_aks_costs",
-  "forecast_costs",
-  "list_dimensions",
-  "list_budgets",
-  "get_budget",
-  "list_alerts",
-  "list_benefit_utilization",
-  "get_benefit_recommendations",
-  "list_reservation_transactions",
-];
+// One read allowlist for agent tool references, the plugin hook and the registry.
+const ARM_MCP_READ_TOOLS = JSON.parse(
+  readFileSync(new URL("../registry/arm-mcp-cost-pricing.v1.json", import.meta.url), "utf8"),
+).managedPolicy.candidateReadAllowlist;
 const ASK_USER_ARGUMENT_SYNTAX = [
   {
     name: "question",

@@ -19,4 +19,5 @@ First marketplace release of APEX as one Agent Plugins 1.0 plugin.
 - The `apex-azure-pricing` MCP server: Azure Resource Manager MCP over streamable HTTP with the `CostManagement` and
   `Pricing` toolsets. It replaces `azure-resource-manager-mcp` from the retired workspace `.mcp.json`; agent tool
   references use `apex-azure-pricing/<tool>`.
-- Managed hooks that deny the APEX agent as a task target.
+- Managed hooks that deny the APEX agent as a task target, and every `apex-azure-pricing` tool except the read-only
+  pricing and cost tools from `tools/registry/arm-mcp-cost-pricing.v1.json`.

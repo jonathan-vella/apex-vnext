@@ -5,6 +5,12 @@
 Run `apex mcp serve` over standard input/output. Client projections configure this server; users should not add a second
 APEX server with independent state.
 
+The `apex` plugin also declares `apex-azure-pricing`, the remote Azure Resource Manager MCP server with the
+`CostManagement` and `Pricing` toolsets. Agents reference its tools as `apex-azure-pricing/<tool>`. A managed
+`preToolUse` hook allows only the read-only tools in `managedPolicy.candidateReadAllowlist` of
+[`arm-mcp-cost-pricing.v1.json`](../../tools/registry/arm-mcp-cost-pricing.v1.json) and denies writes such as
+`create_budget`, operation tools and unknown tools on that server.
+
 ## Server Instructions
 
 The server sends compact session instructions in its `server/discover` result (and in the `initialize` result for

@@ -63,18 +63,23 @@ deprecated.
 ### Managed Hooks
 
 The plugin ships `com.github.copilot/hooks/hooks.json` and one dependency-free Node script, `apex-hook.mjs`. The
-`preToolUse` entry matches the `task` tool. Its `bash` command runs `node "${PLUGIN_ROOT}/com.github.copilot/hooks/..."`
-and its `powershell` command (Windows PowerShell 5.1 or PowerShell 7) runs the same script from `$env:PLUGIN_ROOT`, so
-paths with spaces stay one argument. The client writes the hook payload to stdin; the script denies a `task` call whose
-`agent_type` names the user-facing APEX agent (`apex:apex`, `APEX`) with `permissionDecision: "deny"` and a reason.
-Hidden workers such as `apex:apex-codegen`, built-in agents and every other tool get no output, so the normal
-permission flow applies.
+`preToolUse` entry matches the `task` tool and the tools of the plugin's `apex-azure-pricing` server. Its `bash` command
+runs `node "${PLUGIN_ROOT}/com.github.copilot/hooks/..."` and its `powershell` command (Windows PowerShell 5.1 or
+PowerShell 7) runs the same script from `$env:PLUGIN_ROOT`, so paths with spaces stay one argument. The client writes
+the hook payload to stdin; the script denies a `task` call whose `agent_type` names the user-facing APEX agent
+(`apex:apex`, `APEX`) with `permissionDecision: "deny"` and a reason. It also denies every `apex-azure-pricing` tool
+except the read-only pricing and cost tools, because a plugin cannot give a remote MCP server a tool allowlist and the
+server's toolsets include writes such as `create_budget`. Copilot CLI names these tools `apex-azure-pricing-<tool>`; the
+script also reads the `/`, `:`, `mcp__<server>__` and `mcp_<server>_` forms and denies names on that server it cannot
+read. `build-plugin.mjs` embeds the read allowlist from `managedPolicy.candidateReadAllowlist` in
+`tools/registry/arm-mcp-cost-pricing.v1.json`; an unbuilt script allows no pricing tool. Hidden workers such as
+`apex:apex-codegen`, built-in agents and every other tool get no output, so the normal permission flow applies.
 
 The script always exits 0, because Copilot denies a `preToolUse` call when a command hook exits non-zero. Input it
-cannot parse is allowed (fail open), unless a raw-text scan still reads a `task` call that targets APEX, which it
-denies (fail closed for that rule). A missing script is allowed with a warning on stderr. A missing `node` makes the
-command fail, so the client denies `task` calls only. Hook timeouts always fail open in Copilot. The hook guards against
-agent mistakes; kernel authorization stays the security boundary.
+cannot parse is allowed (fail open), unless a raw-text scan still reads a `task` call that targets APEX or a call to the
+pricing server that is not a read tool, which it denies (fail closed for those rules). A missing script is allowed with
+a warning on stderr. A missing `node` makes the command fail, so the client denies the matched calls only. Hook timeouts
+always fail open in Copilot. The hook guards against agent mistakes; kernel authorization stays the security boundary.
 
 ## Create A Consumer Repository
 

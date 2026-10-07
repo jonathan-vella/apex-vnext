@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { copyFile, mkdir, mkdtemp, rm } from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -11,11 +11,16 @@ import {
   handlers,
   isApexAgent,
   normalizeAgentId,
+  PRICING_READ_TOOLS,
+  PRICING_SERVER,
+  pricingTool,
   readPayload,
   run,
   scanTaskTargets,
+  scanToolNames,
   serialize,
 } from "../../../plugin/hooks/apex-hook.mjs";
+import { pricingReadTools, renderHookScript } from "../../scripts/build-plugin.mjs";
 
 const root = resolve(import.meta.dirname, "../../..");
 const hookScript = join(root, "plugin/hooks/apex-hook.mjs");
@@ -32,15 +37,41 @@ function taskPayload(agentType, overrides = {}) {
   };
 }
 
+// Copilot CLI 1.0.93 preToolUse payload for a plugin MCP tool, recorded with a probe hook: "<server>-<tool>".
+function pricingPayload(toolName, overrides = {}) {
+  return {
+    sessionId: "7a1c9712-1cd9-4766-bcb1-e785d075e39f",
+    timestamp: 1791406148125,
+    cwd: "/workspace",
+    toolName,
+    toolArgs: {},
+    ...overrides,
+  };
+}
+
+let builtHook;
+/** The hook as build-plugin.mjs packages it, with the registry read allowlist embedded. */
+async function loadBuiltHook() {
+  builtHook ??= (async () => {
+    const folder = await mkdtemp(join(tmpdir(), "apex-hook-built-"));
+    const script = join(folder, "apex-hook.mjs");
+    await writeFile(script, renderHookScript(await readFile(hookScript), await pricingReadTools()));
+    const module = await import(pathToFileURL(script).href);
+    await rm(folder, { recursive: true, force: true });
+    return module;
+  })();
+  return builtHook;
+}
+
 function capture() {
   const lines = [];
   return { stderr: { write: (text) => lines.push(text) }, lines };
 }
 
-function decide(event, payload) {
+function decide(event, payload, hook = { run }) {
   const { stderr, lines } = capture();
   const text = typeof payload === "string" ? payload : JSON.stringify(payload);
-  const output = run(event, text, { stderr });
+  const output = hook.run(event, text, { stderr });
   return { output, decision: output === "" ? null : JSON.parse(output), warnings: lines };
 }
 
@@ -50,6 +81,16 @@ function assertDenied(result, target) {
   assert.match(result.decision.permissionDecisionReason, /^APEX hook: /u);
   assert.ok(result.decision.permissionDecisionReason.includes(`"${target}" is the user-facing APEX agent`));
   assert.match(result.output, /^[\x20-\x7e]+$/u, "decision is one line of ASCII");
+}
+
+function assertPricingDenied(result, toolName) {
+  assert.deepEqual(Object.keys(result.decision), ["permissionDecision", "permissionDecisionReason"]);
+  assert.equal(result.decision.permissionDecision, "deny");
+  assert.equal(
+    result.decision.permissionDecisionReason,
+    `APEX hook: "${toolName}" is not one of the read-only Azure pricing and cost tools. APEX uses only read-only ` +
+      "tools from the apex-azure-pricing server; write, operation and unrecognized tools on it are blocked.",
+  );
 }
 
 function assertAllowed(result) {
@@ -222,4 +263,113 @@ test("the hook script runs as a process from a path with spaces and always exits
   );
   assert.equal(imported.status, 0, imported.stderr);
   assert.equal(imported.stdout, "", "importing the module does not run the hook");
+});
+
+const PRICING_NAME_FORMS = [
+  (tool) => `apex-azure-pricing-${tool}`,
+  (tool) => `apex-azure-pricing/${tool}`,
+  (tool) => `apex-azure-pricing:${tool}`,
+  (tool) => `mcp__apex-azure-pricing__${tool}`,
+  (tool) => `mcp_apex_azure_pricing_${tool}`,
+  (tool) => ` APEX-Azure-Pricing-${tool} `,
+];
+
+test("the generated pricing allowlist is the registry read allowlist", async () => {
+  const registry = JSON.parse(await readFile(join(root, "tools/registry/arm-mcp-cost-pricing.v1.json"), "utf8"));
+  const built = await loadBuiltHook();
+  assert.equal(PRICING_SERVER, "apex-azure-pricing");
+  assert.deepEqual([...built.PRICING_READ_TOOLS], registry.managedPolicy.candidateReadAllowlist);
+  assert.deepEqual(await pricingReadTools(), registry.managedPolicy.candidateReadAllowlist);
+  for (const tool of [...registry.managedPolicy.denyBeforeTransport, ...registry.managedPolicy.deferredTools])
+    assert.ok(!built.PRICING_READ_TOOLS.includes(tool), tool);
+  assert.ok(Object.isFrozen(built.PRICING_READ_TOOLS));
+  assert.deepEqual([...PRICING_READ_TOOLS], [], "the unbuilt hook allows no pricing tool");
+  assert.throws(() => renderHookScript("export const x = 1;\n", ["get_retail_prices"]), /marker exactly once/u);
+});
+
+test("pricingTool reads the server tool from every tool name form", () => {
+  for (const form of PRICING_NAME_FORMS) assert.equal(pricingTool(form("get_retail_prices")), "get_retail_prices");
+  for (const name of [
+    "apex-azure-pricing",
+    "apex-azure-pricing-",
+    "apex-azure-pricing-get prices",
+    "x-apex-azure-pricing-get",
+  ])
+    assert.equal(pricingTool(name), "", name);
+  for (const name of ["bash", "task", "view", "apex/status", "apex-status", "azure-pricing-get_retail_prices", "", 5])
+    assert.equal(pricingTool(name), undefined, String(name));
+});
+
+test("preToolUse allows each read-only pricing tool in every name form", async () => {
+  const built = await loadBuiltHook();
+  for (const tool of built.PRICING_READ_TOOLS)
+    for (const form of PRICING_NAME_FORMS) {
+      const result = decide("preToolUse", pricingPayload(form(tool)), built);
+      assertAllowed(result);
+      assert.deepEqual(result.warnings, []);
+    }
+});
+
+test("preToolUse denies pricing write, operation and unknown tools in every name form", async () => {
+  const built = await loadBuiltHook();
+  for (const tool of [
+    "create_budget",
+    "start_pricesheet_download",
+    "get_pricesheet_status",
+    "create_template_deployment",
+    "cancel_arm_template_deployment",
+    "delete_budget",
+    "GET_RETAIL_PRICES",
+    "get_retail_prices_v2",
+  ])
+    for (const form of PRICING_NAME_FORMS)
+      assertPricingDenied(decide("preToolUse", pricingPayload(form(tool)), built), form(tool));
+  for (const toolName of ["apex-azure-pricing", "apex-azure-pricing-", "apex-azure-pricing-get prices"])
+    assertPricingDenied(decide("preToolUse", pricingPayload(toolName), built), toolName);
+  const vscode = { hook_event_name: "PreToolUse", tool_name: "apex-azure-pricing-create_budget", tool_input: {} };
+  assertPricingDenied(decide("preToolUse", vscode, built), "apex-azure-pricing-create_budget");
+  for (const tool of built.PRICING_READ_TOOLS)
+    assertPricingDenied(
+      decide("preToolUse", pricingPayload(`apex-azure-pricing-${tool}`)),
+      `apex-azure-pricing-${tool}`,
+    );
+});
+
+test("preToolUse leaves unrelated tools alone and keeps the APEX task deny", async () => {
+  const built = await loadBuiltHook();
+  for (const toolName of ["bash", "view", "edit", "web_fetch", "apex-status", "github-mcp-server-get_commit", "task"])
+    assertAllowed(
+      decide("preToolUse", pricingPayload(toolName, { toolArgs: { note: "apex-azure-pricing-create_budget" } }), built),
+    );
+  assertDenied(decide("preToolUse", taskPayload("apex:apex"), built), "apex:apex");
+  assertAllowed(decide("preToolUse", taskPayload("apex:apex-codegen"), built));
+});
+
+test("unreadable pricing payloads fail closed unless they name an allowed read tool", async () => {
+  const built = await loadBuiltHook();
+  const truncated = (toolName) => JSON.stringify(pricingPayload(toolName)).slice(0, -5);
+  const denied = decide("preToolUse", truncated("apex-azure-pricing-create_budget"), built);
+  assertPricingDenied(denied, "apex-azure-pricing-create_budget");
+  assert.match(denied.warnings.join(""), /unreadable preToolUse payload .*denied/u);
+  assertAllowed(decide("preToolUse", truncated("apex-azure-pricing-get_retail_prices"), built));
+  assertPricingDenied(decide("preToolUse", '{"apex-azure-pricing', built), "apex-azure-pricing");
+  assertAllowed(decide("preToolUse", truncated("bash"), built));
+  assert.deepEqual(scanToolNames(JSON.stringify({ toolName: "a", nested: JSON.stringify({ tool_name: "b" }) })), [
+    "a",
+    "b",
+  ]);
+});
+
+test("the built hook script denies a pricing write as a process", async (context) => {
+  const folder = await mkdtemp(join(tmpdir(), "apex hook built "));
+  context.after(() => rm(folder, { recursive: true, force: true }));
+  const script = join(folder, "apex-hook.mjs");
+  await writeFile(script, renderHookScript(await readFile(hookScript), await pricingReadTools()));
+  const invoke = (input) => spawnSync(process.execPath, [script, "preToolUse"], { input, encoding: "utf8" });
+  const denied = invoke(JSON.stringify(pricingPayload("apex-azure-pricing-create_budget")));
+  assert.equal(denied.status, 0, denied.stderr);
+  assert.equal(JSON.parse(denied.stdout).permissionDecision, "deny");
+  const allowed = invoke(JSON.stringify(pricingPayload("apex-azure-pricing-get_retail_prices")));
+  assert.equal(allowed.status, 0, allowed.stderr);
+  assert.equal(allowed.stdout, "");
 });

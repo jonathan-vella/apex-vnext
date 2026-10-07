@@ -15,6 +15,10 @@ projection. `tools/scripts/build-plugin.mjs` renders the agents with the same Co
 with the skills, hooks and MCP servers into the `apex` plugin. Packaged assets are derived output and must match
 canonical source.
 
+The plugin cannot restrict which tools a remote MCP server exposes, and the `CostManagement` toolset includes writes
+such as budget creation. A managed `preToolUse` hook therefore denies every `apex-azure-pricing` tool that is not in
+the read allowlist of `tools/registry/arm-mcp-cost-pricing.v1.json`, for every agent in the session.
+
 ## Consumer Guidance
 
 Managed consumer skills retain Azure design, planning, validation, operations, identity, migration, Terraform, artifact,
