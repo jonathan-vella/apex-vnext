@@ -37,10 +37,27 @@ npm run test:plugin
 ```
 
 The build writes `dist/apex-plugin/` and its tree hash to `dist/apex-plugin.sha256`. The package holds `plugin.json`,
-`mcp.json`, `skills/`, the APEX agent and hidden workers under `com.github.copilot/agents/`, `assets/`, and
-`mcp/apex.mjs`: one esbuild bundle of the MCP server and its npm dependencies, about 3 MB. Clients start it with
-`node ${PLUGIN_ROOT}/mcp/apex.mjs`; it reads `assets/` next to `mcp/` and needs no `node_modules`, `npm` or network.
-PNG diagram rendering needs the native `@resvg/resvg-js` package, so the plugin writes SVG diagrams only.
+`mcp.json`, `skills/`, the APEX agent and hidden workers under `com.github.copilot/agents/`, the managed hooks under
+`com.github.copilot/hooks/`, `assets/`, and `mcp/apex.mjs`: one esbuild bundle of the MCP server and its npm
+dependencies, about 3 MB. Clients start it with `node ${PLUGIN_ROOT}/mcp/apex.mjs`; it reads `assets/` next to
+`mcp/` and needs no `node_modules`, `npm` or network. PNG diagram rendering needs the native `@resvg/resvg-js`
+package, so the plugin writes SVG diagrams only.
+
+### Managed Hooks
+
+The plugin ships `com.github.copilot/hooks/hooks.json` and one dependency-free Node script, `apex-hook.mjs`. The
+`preToolUse` entry matches the `task` tool. Its `bash` command runs `node "${PLUGIN_ROOT}/com.github.copilot/hooks/..."`
+and its `powershell` command (Windows PowerShell 5.1 or PowerShell 7) runs the same script from `$env:PLUGIN_ROOT`, so
+paths with spaces stay one argument. The client writes the hook payload to stdin; the script denies a `task` call whose
+`agent_type` names the user-facing APEX agent (`apex:apex`, `APEX`) with `permissionDecision: "deny"` and a reason.
+Hidden workers such as `apex:apex-codegen`, built-in agents and every other tool get no output, so the normal
+permission flow applies.
+
+The script always exits 0, because Copilot denies a `preToolUse` call when a command hook exits non-zero. Input it
+cannot parse is allowed (fail open), unless a raw-text scan still reads a `task` call that targets APEX, which it
+denies (fail closed for that rule). A missing script is allowed with a warning on stderr. A missing `node` makes the
+command fail, so the client denies `task` calls only. Hook timeouts always fail open in Copilot. The hook guards against
+agent mistakes; kernel authorization stays the security boundary.
 
 ## Create A Consumer Repository
 
