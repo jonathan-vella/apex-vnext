@@ -45,18 +45,26 @@ that project value; omit `expiresAt` to use the 90-day default.
 
 ## Read And Operations Tools
 
-| Tool               | Purpose                                                                |
-| ------------------ | ---------------------------------------------------------------------- |
-| `capabilityList`   | Read capability-pack availability.                                     |
-| `capabilityStatus` | Read one pack's state.                                                 |
-| `preview`          | Read the current operator-created preview; it does not create one.     |
-| `reconcile`        | Reconcile selected-run state.                                          |
-| `inventory`        | Read the accepted resource inventory.                                  |
-| `diagnose`         | Produce bounded diagnostic state.                                      |
-| `render`           | Render status, requirements, preview, approval, or inventory Markdown. |
-| `promote`          | Create a linked environment run.                                       |
-| `doctor`           | Check or repair local managed state.                                   |
-| `submitEvidence`   | Submit bounded JSON evidence for an active task.                       |
+| Tool               | Purpose                                                                      |
+| ------------------ | ---------------------------------------------------------------------------- |
+| `capabilityList`   | Read capability-pack availability.                                           |
+| `capabilityStatus` | Read one pack's state.                                                       |
+| `preview`          | Read the current operator-created preview; it does not create one.           |
+| `reconcile`        | Reconcile selected-run state.                                                |
+| `inventory`        | Read the accepted resource inventory.                                        |
+| `diagnose`         | Produce bounded diagnostic state.                                            |
+| `render`           | Render status, requirements, preview, approval, or inventory Markdown.       |
+| `promote`          | Create a linked environment run.                                             |
+| `doctor`           | Check or repair local managed state; returns a bounded summary.              |
+| `doctorChecks`     | Read every doctor check without repairing; `failedOnly` lists failures only. |
+| `submitEvidence`   | Submit bounded JSON evidence for an active task.                             |
+
+`doctor` (with or without `fix`/`yes`) and the `doctor` field of `diagnose` return a bounded summary rather than one
+check per managed file, which would exceed the result cap in an initialized workspace. The summary carries `healthy`,
+`nextAction`, deduplicated `remedies`, `counts` (`total`, `passed`, `failed`), and up to 32 `checks`: failing checks
+first, then passing checks other than per-file `managed:` hashes. `omitted` counts the passed and failed checks left out
+of the list, and `truncated` is `true` whenever any check is omitted. Call `doctorChecks` (paged on `checks`) for the
+complete list. A repair result is never paged. `apex doctor` and `apex doctor --json` still print the full report.
 
 ## Improvement Tools
 
@@ -130,6 +138,7 @@ oversized non-pageable result fails instead of being silently truncated. Every c
 | `improvementObservations` | `observations` |
 | `improvementProposals`    | `proposals`    |
 | `render`                  | `markdown`     |
+| `doctorChecks`            | `checks`       |
 
 ## Inputs And Lifecycle
 
