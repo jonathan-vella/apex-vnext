@@ -155,7 +155,65 @@ const stagingInput = (optional: boolean) =>
       ],
     });
 
-const readOnlyTools = new Set(["status", "projectList", "doctorChecks"]);
+/**
+ * Effect class of every MCP tool, keyed by the output-schema registry so a new tool cannot be added unclassified.
+ * - `read-only`: never writes state.
+ * - `read`: adds no new effect; it may only finish recovering an already-committed run transaction.
+ * - `repeat-guarded`: changes state; each call runs through the kernel repeat guard, so an identical repeat while the
+ *   selected run is unchanged returns the original result instead of executing again.
+ * - `convergent`: changes workspace installation state outside the run, so the run-scoped guard cannot tell whether a
+ *   repeat is stale; repeating it re-applies the same repair and converges on the same state.
+ */
+export type McpToolEffect = "read-only" | "read" | "repeat-guarded" | "convergent";
+export const MCP_TOOL_EFFECTS = {
+  status: "read-only",
+  projectList: "read-only",
+  doctorChecks: "read-only",
+  capabilityList: "read",
+  capabilityStatus: "read",
+  taskContext: "read",
+  readTaskInput: "read",
+  preview: "read",
+  inventory: "read",
+  diagnose: "read",
+  render: "read",
+  improvementObservations: "read",
+  improvementProposals: "read",
+  releaseWriter: "repeat-guarded",
+  nextTask: "repeat-guarded",
+  recordInput: "repeat-guarded",
+  governanceImport: "repeat-guarded",
+  governanceSelect: "repeat-guarded",
+  projectCreate: "repeat-guarded",
+  projectUse: "repeat-guarded",
+  projectDelete: "repeat-guarded",
+  gateDecide: "repeat-guarded",
+  reviewDecide: "repeat-guarded",
+  stageArtifact: "repeat-guarded",
+  stageFile: "repeat-guarded",
+  generateIac: "repeat-guarded",
+  validateTask: "repeat-guarded",
+  completeTask: "repeat-guarded",
+  requirementsComplete: "repeat-guarded",
+  architectureComplete: "repeat-guarded",
+  reviewComplete: "repeat-guarded",
+  planComplete: "repeat-guarded",
+  reconcile: "repeat-guarded",
+  improvementObserve: "repeat-guarded",
+  promote: "repeat-guarded",
+  submitEvidence: "repeat-guarded",
+  doctor: "convergent",
+} as const satisfies Record<keyof typeof MCP_OUTPUT_SCHEMAS, McpToolEffect>;
+/** Arguments naming workspace files whose content, not only path, identifies a repeated call. */
+const repeatFileArguments: Partial<Record<keyof typeof MCP_OUTPUT_SCHEMAS, readonly string[]>> = {
+  governanceImport: ["path"],
+  governanceSelect: ["path"],
+};
+const readOnlyTools = new Set(
+  Object.entries(MCP_TOOL_EFFECTS)
+    .filter(([, effect]) => effect === "read-only")
+    .map(([name]) => name),
+);
 const externalTools = new Set(["reconcile", "inventory", "diagnose", "doctor", "doctorChecks"]);
 
 function assertBoundedInput(value: unknown): void {
@@ -621,6 +679,9 @@ export function createMcpServerFactory(
     if (tools.has(name)) throw new Error(`Duplicate MCP tool ${name}`);
     const outputSchema = MCP_OUTPUT_SCHEMAS[name as keyof typeof MCP_OUTPUT_SCHEMAS];
     if (outputSchema === undefined) throw new Error(`Missing output schema for ${name}`);
+    const effect: McpToolEffect | undefined = MCP_TOOL_EFFECTS[name as keyof typeof MCP_OUTPUT_SCHEMAS];
+    if (effect === undefined) throw new Error(`Missing effect class for ${name}`);
+    const fileArguments = repeatFileArguments[name as keyof typeof MCP_OUTPUT_SCHEMAS];
     const originalInputSchema =
       config.inputSchema === undefined
         ? z.object({}).strict()
@@ -664,11 +725,23 @@ export function createMcpServerFactory(
         activeService = resolved.service;
         let response: ToolResult;
         try {
-          response = await Reflect.apply(
-            callback,
-            undefined,
-            config.inputSchema === undefined ? [extra] : [toolInput, extra],
-          );
+          const execute = async (): Promise<ToolResult> =>
+            await Reflect.apply(callback, undefined, config.inputSchema === undefined ? [extra] : [toolInput, extra]);
+          // The adapter only describes the call; the kernel repeat guard behind the service decides whether a repeat
+          // is answered from the original result.
+          response =
+            effect === "repeat-guarded"
+              ? result(
+                  await resolved.service.repeatSafe(
+                    {
+                      operation: name,
+                      arguments: toolInput,
+                      ...(fileArguments === undefined ? {} : { fileArguments }),
+                    },
+                    async () => (await execute()).structuredContent,
+                  ),
+                )
+              : await execute();
         } catch (error) {
           const normalized = normalizeError(error);
           const governance =

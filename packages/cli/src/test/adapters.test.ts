@@ -1425,6 +1425,7 @@ test("MCP requires an atomic outputs bundle for every task", async () => {
   const workspace = await tempRoot();
   const service = {
     root: workspace,
+    repeatSafe: async (_call: unknown, execute: () => Promise<unknown>) => execute(),
     completeTaskOutputs: async (_taskId: string, outputs: unknown[]) => {
       completedBundles.push(outputs);
       return { outputHashes: {}, summary: "accepted" };
@@ -1461,6 +1462,7 @@ test("MCP planComplete derives the canonical binding intent hash", async () => {
   const workspace = await tempRoot();
   const service = {
     root: workspace,
+    repeatSafe: async (_call: unknown, execute: () => Promise<unknown>) => execute(),
     completePlan: async (taskId: string, intent: unknown, binding: unknown, environmentInputs: unknown) => {
       return await ApexService.prototype.completePlan.call(
         {

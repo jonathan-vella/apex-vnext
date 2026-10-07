@@ -148,6 +148,9 @@ import {
   WriterTransferStore,
   WorkflowEngine,
   assertTaskCurrent,
+  executeRepeatSafe,
+  repeatStateToken,
+  type RepeatScope,
   atomicWriteBytes,
   atomicWriteJson,
   createTaskEnvelope,
@@ -379,6 +382,15 @@ export interface ServiceOptions {
   processRunner?: ProcessRunnerLike;
   improvementPolicy?: ImprovementPolicyV1;
   diagramRasterizer?: (svg: string) => Uint8Array;
+  repeatWindowMs?: number;
+}
+
+/** Canonical description of one state-changing call submitted through {@link ApexService.repeatSafe}. */
+export interface RepeatSafeCall {
+  operation: string;
+  arguments: Record<string, unknown>;
+  /** Argument names holding workspace-relative file paths; their current content hash joins the call identity. */
+  fileArguments?: readonly string[];
 }
 
 interface DoctorCheck {
@@ -699,6 +711,7 @@ export class ApexService {
   private readonly diagramRasterizer: (svg: string) => Uint8Array;
   private readonly idSource: () => string;
   private readonly writerLeaseTtlMs: number | undefined;
+  private readonly repeatWindowMs: number | undefined;
   private readonly projects: ProjectStore;
   private readonly objects: ObjectStore;
   private readonly cache: ContentCache;
@@ -721,6 +734,7 @@ export class ApexService {
     this.diagramRasterizer = options.diagramRasterizer ?? rasterizeDiagram;
     this.idSource = options.idSource ?? (() => crypto.randomUUID());
     this.writerLeaseTtlMs = options.writerLeaseTtlMs;
+    this.repeatWindowMs = options.repeatWindowMs;
     this.projects = new ProjectStore(this.root, this.clock, this.idSource);
     this.objects = new ObjectStore(this.root);
     this.cache = new ContentCache(this.root);
@@ -2440,6 +2454,85 @@ export class ApexService {
       };
     }
     return this.status();
+  }
+
+  /**
+   * Runs one state-changing call through the kernel repeat guard. An identical call from the same worktree while the
+   * selected run is unchanged since the original succeeded returns the original result and is audited instead of
+   * executing again; anything else executes normally under the usual kernel checks.
+   */
+  async repeatSafe<T extends Record<string, unknown>>(call: RepeatSafeCall, execute: () => Promise<T>): Promise<T> {
+    await this.refreshWorkspacePath();
+    const workspacePath = this.workspacePath;
+    const files: Record<string, string | null> = {};
+    for (const name of call.fileArguments ?? []) {
+      const path = call.arguments[name];
+      if (typeof path === "string") files[name] = await this.repeatFileHash(path);
+    }
+    const outcome = await executeRepeatSafe(
+      {
+        operation: call.operation,
+        workspace: workspacePath,
+        arguments: call.fileArguments === undefined ? call.arguments : { input: call.arguments, files },
+      },
+      {
+        scope: () => this.repeatScope(),
+        assertReplayAllowed: async (scope) =>
+          this.runRepository(scope).assertWriterAvailable({ workspacePath: workspacePath }),
+        execute,
+        validUntil: (value) => {
+          const expiresAt = (value.task as { expiresAt?: unknown } | undefined)?.expiresAt;
+          return typeof expiresAt === "string" ? expiresAt : undefined;
+        },
+      },
+      {
+        clock: this.clock,
+        idSource: this.idSource,
+        ...(this.repeatWindowMs === undefined ? {} : { windowMs: this.repeatWindowMs }),
+      },
+    );
+    return outcome.value;
+  }
+
+  private async repeatScope(): Promise<RepeatScope | undefined> {
+    let selection: Selection;
+    try {
+      selection = await this.selection();
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+      throw error;
+    }
+    const state = await this.runRepository(selection).repeatState();
+    let projects: string[];
+    try {
+      projects = await readdir(join(this.root, ".apex", "projects"));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      projects = [];
+    }
+    return {
+      runDirectory: this.projects.runDirectory(selection.projectId, selection.runId),
+      projectId: selection.projectId,
+      runId: selection.runId,
+      ownerEpoch: state.ownerEpoch,
+      state: repeatStateToken({ selection, projects, ...state }),
+    };
+  }
+
+  private async repeatFileHash(path: string): Promise<string | null> {
+    try {
+      const target = resolve(this.root, path);
+      const metadata = await lstat(target);
+      if (!metadata.isFile() || metadata.isSymbolicLink() || metadata.size > 20_000_000) return null;
+      const handle = await open(target, constants.O_RDONLY | constants.O_NOFOLLOW);
+      try {
+        return sha256Bytes(await handle.readFile());
+      } finally {
+        await handle.close();
+      }
+    } catch {
+      return null;
+    }
   }
 
   async releaseWriter(): Promise<{ released: boolean; projectId: string; runId: string }> {
@@ -10760,7 +10853,31 @@ export class ApexService {
             "runtime",
           );
     let previousLockRef: string | undefined;
-    if (previous !== undefined) {
+    const lockContent = {
+      version: 1 as const,
+      source,
+      clientId,
+      runtime,
+      files: managed,
+      externallyManaged: {
+        class: "externally-managed" as const,
+        owner: `${plugin.name}@${plugin.marketplace}`,
+        files: [...plugin.ownedFiles],
+        directories: [...plugin.ownedDirectories],
+        retained: [...retained]
+          .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+          .map(([path, currentHash]) => ({ path, currentHash })),
+      },
+    };
+    const { previousLockRef: priorLockRef, ...previousContent } = previous ?? {};
+    // A repair that reproduces the current lock keeps its rollback chain, so repeating a repair converges.
+    if (
+      repair &&
+      previous !== undefined &&
+      sha256Json(previousContent as unknown as JsonValue) === sha256Json(lockContent as unknown as JsonValue)
+    ) {
+      previousLockRef = priorLockRef;
+    } else if (previous !== undefined) {
       const previousHash = sha256Json(previous as unknown as JsonValue);
       previousLockRef = join(".apex", "customization-bases", "locks", `${previousHash}.json`).split(sep).join("/");
       const previousLockDestination = join(this.root, previousLockRef);
@@ -10771,20 +10888,7 @@ export class ApexService {
       }
     }
     const nextLock = {
-      version: 1,
-      source,
-      clientId,
-      runtime,
-      files: managed,
-      externallyManaged: {
-        class: "externally-managed",
-        owner: `${plugin.name}@${plugin.marketplace}`,
-        files: [...plugin.ownedFiles],
-        directories: [...plugin.ownedDirectories],
-        retained: [...retained]
-          .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
-          .map(([path, currentHash]) => ({ path, currentHash })),
-      },
+      ...lockContent,
       ...(previousLockRef === undefined ? {} : { previousLockRef }),
     } satisfies CustomizationLock;
     const stagedLock = join(transactionRoot, "customizations.lock.json");
