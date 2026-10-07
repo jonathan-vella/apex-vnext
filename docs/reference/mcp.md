@@ -88,7 +88,7 @@ Existing object results are unchanged. Non-object service results use these enve
 | `stageArtifact` with `outputs` | `{ "artifacts": [] }`    |
 
 Single-artifact staging still returns its existing artifact object. Bundle staging is not an atomic completion;
-use `completeTask` for atomic output acceptance. All 35 tools advertise output schemas derived from the canonical
+use `completeTask` for atomic output acceptance. Every tool advertises output schemas derived from the canonical
 contracts and explicit adapter envelopes. Success and structured error branches are validated, including by SDK clients.
 See [REQ-MCP-001](../vnext/PRD.md#req-mcp-001-predictable-tool-contracts) for acceptance.
 
