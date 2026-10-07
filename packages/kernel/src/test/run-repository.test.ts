@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import { mkdir, mkdtemp, readFile, readdir, writeFile } from "node:fs/promises";
 import { hostname, tmpdir } from "node:os";
+import { syncBuiltinESMExports } from "node:module";
 import { join, resolve } from "node:path";
 import test from "node:test";
-import { ProjectStore, RunRepository, RunWriterConflictError } from "../index.js";
+import { ProjectStore, RunMutationBusyError, RunRepository, RunWriterConflictError } from "../index.js";
 
 test("run repository CAS permits one mutation and rejects a racing stale hash", async () => {
   const root = await mkdtemp(join(tmpdir(), "apex-run-repository-"));
@@ -328,16 +330,168 @@ test("run writer lease publication remains readable under contention", async () 
       }),
     ),
   );
-  assert.ok(attempts.some((attempt) => attempt.status === "fulfilled"));
+  const owners = new Set(
+    attempts.flatMap((attempt) => (attempt.status === "fulfilled" ? [attempt.value.workspacePath] : [])),
+  );
+  assert.equal(owners.size, 1, "an unexpired lease must never change workspace under contention");
   for (const attempt of attempts) {
     if (attempt.status === "rejected") {
-      assert.ok(attempt.reason instanceof RunWriterConflictError);
+      assert.ok(attempt.reason instanceof RunWriterConflictError, String(attempt.reason));
     }
   }
   const lease = JSON.parse(await readFile(join(directory, ".run-writer-lease.json"), "utf8")) as {
     workspacePath?: unknown;
     expiresAt?: unknown;
   };
-  assert.equal(typeof lease.workspacePath, "string");
+  assert.equal(lease.workspacePath, [...owners][0]);
   assert.equal(typeof lease.expiresAt, "string");
+});
+
+test("run writer lease renewal waits out a slow mutation lock holder instead of failing", async () => {
+  const now = { value: new Date("2026-01-01T00:00:00.000Z") };
+  const { directory, repository } = await writerLeaseFixture(now);
+  const owner = { workspacePath: "/workspace/main", sessionId: "session-a" };
+  await repository.acquireWriterLease(owner);
+  let entered!: () => void;
+  const holding = new Promise<void>((done) => (entered = done));
+  // Hold the run mutation lock longer than the former 500 ms writer-lease wait budget, as a slow Windows lock
+  // cycle (or a queue of same-workspace renewals) does under contention.
+  const holder = new RunRepository(directory, {
+    clock: () => now.value,
+    writerLeaseTtlMs: 1_000,
+    faultInjector: async (stage) => {
+      if (stage !== "intent") return;
+      entered();
+      await new Promise((done) => setTimeout(done, 1_200));
+    },
+  });
+  const mutation = holder.mutate({
+    expectedRunHash: await holder.hash(),
+    event: {
+      eventId: "event-slow-holder",
+      projectId: "demo",
+      runId: "run-1",
+      type: "owner-changed",
+      timestamp: "2026-01-01T00:01:00.000Z",
+      ownerEpoch: 2,
+      payload: {},
+    },
+    update: (run) => ({ ...run, ownerEpoch: 2 }),
+  });
+  await holding;
+  let released = false;
+  void mutation.then(
+    () => (released = true),
+    () => (released = true),
+  );
+  await assert.rejects(
+    repository.acquireWriterLease({ workspacePath: "/workspace/worktree", sessionId: "session-b" }),
+    RunWriterConflictError,
+  );
+  assert.equal(released, false, "another worktree must fail fast with a typed conflict while the lock is held");
+  now.value = new Date("2026-01-01T00:00:00.500Z");
+  const renewed = await repository.acquireWriterLease(owner);
+  assert.equal(renewed.workspacePath, resolve(owner.workspacePath));
+  assert.equal(renewed.expiresAt, "2026-01-01T00:00:01.500Z");
+  await mutation;
+});
+
+async function withRunDirectoryMkdirFailure<T>(directory: string, code: string, action: () => Promise<T>): Promise<T> {
+  const promises = fs.promises as unknown as { mkdir: typeof fs.promises.mkdir };
+  const original = promises.mkdir;
+  let failures = 1;
+  promises.mkdir = (async (path: fs.PathLike, options?: fs.MakeDirectoryOptions) => {
+    if (failures > 0 && resolve(String(path)) === resolve(directory)) {
+      failures -= 1;
+      throw Object.assign(new Error(`${code}: injected`), { code });
+    }
+    return await original(path, options);
+  }) as typeof original;
+  syncBuiltinESMExports();
+  try {
+    return await action();
+  } finally {
+    promises.mkdir = original;
+    syncBuiltinESMExports();
+  }
+}
+
+test("a competing worktree gets a typed writer conflict for a transient Windows sharing violation", async () => {
+  const now = { value: new Date("2026-01-01T00:00:00.000Z") };
+  const { directory, repository } = await writerLeaseFixture(now);
+  const owner = { workspacePath: "/workspace/main", sessionId: "session-a" };
+  const competitor = { workspacePath: "/workspace/worktree", sessionId: "session-b" };
+  await repository.acquireWriterLease(owner);
+  const windows = new RunRepository(directory, { clock: () => now.value, writerLeaseTtlMs: 1_000, platform: "win32" });
+  for (const code of ["EPERM", "EACCES", "EBUSY"]) {
+    await assert.rejects(
+      withRunDirectoryMkdirFailure(directory, code, () => windows.acquireWriterLease(competitor)),
+      (error: unknown) =>
+        error instanceof RunWriterConflictError &&
+        error.code === "APEX_WRITER_CONFLICT" &&
+        error.ownerWorktree === resolve(owner.workspacePath) &&
+        (error.cause as NodeJS.ErrnoException).code === code,
+    );
+  }
+  // The same transient failure is not masked when no other worktree holds the lease or off Windows.
+  await assert.rejects(
+    withRunDirectoryMkdirFailure(directory, "EPERM", () => windows.acquireWriterLease(owner)),
+    { code: "EPERM" },
+  );
+  const linux = new RunRepository(directory, { clock: () => now.value, writerLeaseTtlMs: 1_000, platform: "linux" });
+  await assert.rejects(
+    withRunDirectoryMkdirFailure(directory, "EPERM", () => linux.acquireWriterLease(competitor)),
+    { code: "EPERM" },
+  );
+  await assert.rejects(
+    withRunDirectoryMkdirFailure(directory, "ENOSPC", () => windows.acquireWriterLease(competitor)),
+    { code: "ENOSPC" },
+  );
+  assert.equal((await windows.acquireWriterLease(owner)).workspacePath, resolve(owner.workspacePath));
+});
+
+test("a busy run mutation lock is reported as a conflict only when another worktree holds the lease", async () => {
+  const now = { value: new Date("2026-01-01T00:00:00.000Z") };
+  const { directory } = await writerLeaseFixture(now);
+  const lockPath = join(directory, ".run-mutation.lock");
+  await mkdir(lockPath);
+  await writeFile(
+    join(lockPath, "metadata.json"),
+    JSON.stringify({
+      token: "live-lock",
+      pid: process.pid,
+      host: hostname(),
+      createdAt: "2025-12-31T23:59:59.000Z",
+      expiresAt: "2026-01-01T00:00:30.000Z",
+    }),
+  );
+  const repository = new RunRepository(directory, {
+    clock: () => now.value,
+    writerLeaseTtlMs: 1_000,
+    writerLeaseLockWaitMs: 50,
+  });
+  await assert.rejects(
+    repository.acquireWriterLease({ workspacePath: "/workspace/worktree", sessionId: "session-b" }),
+    RunMutationBusyError,
+  );
+  await writeFile(
+    join(directory, ".run-writer-lease.json"),
+    JSON.stringify({
+      version: 1,
+      workspacePath: resolve("/workspace/main"),
+      host: hostname(),
+      pid: process.pid,
+      sessionId: "session-a",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      expiresAt: "2026-01-01T00:00:01.000Z",
+    }),
+  );
+  await assert.rejects(
+    repository.acquireWriterLease({ workspacePath: "/workspace/worktree", sessionId: "session-b" }),
+    RunWriterConflictError,
+  );
+  await assert.rejects(
+    repository.acquireWriterLease({ workspacePath: "/workspace/main", sessionId: "session-a" }),
+    RunMutationBusyError,
+  );
 });

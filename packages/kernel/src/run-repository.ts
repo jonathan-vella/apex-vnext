@@ -5,7 +5,7 @@ import { hostname } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { canonicalJsonBytes, sha256Bytes, sha256Json, type JsonValue } from "./canonical.js";
 import { EventJournal, type AppendEventInput } from "./event-journal.js";
-import { atomicWriteJson, renameWithRetry } from "./files.js";
+import { atomicWriteJson, readPublishedFile, renameWithRetry } from "./files.js";
 
 export interface RunMutation {
   expectedRunHash: string;
@@ -27,6 +27,10 @@ export interface RunRepositoryOptions {
   idSource?: () => string;
   lockTtlMs?: number;
   writerLeaseTtlMs?: number;
+  /** How long a writer lease acquisition waits for the run mutation lock; defaults to 10 seconds. */
+  writerLeaseLockWaitMs?: number;
+  /** Selects Windows transient file-sharing handling; defaults to `process.platform`. */
+  platform?: NodeJS.Platform;
   faultInjector?: (stage: RunTransactionStage) => void | Promise<void>;
 }
 
@@ -78,9 +82,17 @@ export class RunWriterConflictError extends Error {
   constructor(
     readonly ownerWorktree: string,
     readonly expiresAt: string,
+    options?: ErrorOptions,
   ) {
-    super(`Run writer lease is held by ${ownerWorktree} until ${expiresAt}`);
+    super(`Run writer lease is held by ${ownerWorktree} until ${expiresAt}`, options);
     this.name = "RunWriterConflictError";
+  }
+}
+
+export class RunMutationBusyError extends Error {
+  constructor() {
+    super("Run mutation is already in progress");
+    this.name = "RunMutationBusyError";
   }
 }
 
@@ -88,7 +100,9 @@ const LOCK_METADATA_FILE = "metadata.json";
 const MAX_LOCK_METADATA_BYTES = 64 * 1024;
 const WRITER_LEASE_FILE = ".run-writer-lease.json";
 const MAX_WRITER_LEASE_BYTES = 64 * 1024;
-const WRITER_LEASE_LOCK_WAIT_MS = 500;
+// Same-workspace renewals cannot fail fast with a conflict, so they queue on the run mutation lock. The budget must
+// cover a serialized queue of lock cycles on slow file systems (Windows cycles are an order of magnitude slower).
+const WRITER_LEASE_LOCK_WAIT_MS = 10_000;
 const WRITER_LEASE_LOCK_RETRY_MS = 10;
 const TRANSIENT_LOCK_RENAME_CODES = new Set(["EPERM", "EACCES", "EBUSY"]);
 
@@ -162,6 +176,8 @@ export class RunRepository {
   private readonly idSource: () => string;
   private readonly lockTtlMs: number;
   private readonly writerLeaseTtlMs: number;
+  private readonly writerLeaseLockWaitMs: number;
+  private readonly platform: NodeJS.Platform;
   private readonly faultInjector?: RunRepositoryOptions["faultInjector"];
   readonly journal: EventJournal;
 
@@ -176,6 +192,8 @@ export class RunRepository {
     this.idSource = options.idSource ?? (() => crypto.randomUUID());
     this.lockTtlMs = options.lockTtlMs ?? 30_000;
     this.writerLeaseTtlMs = options.writerLeaseTtlMs ?? 120_000;
+    this.writerLeaseLockWaitMs = options.writerLeaseLockWaitMs ?? WRITER_LEASE_LOCK_WAIT_MS;
+    this.platform = options.platform ?? process.platform;
     this.faultInjector = options.faultInjector;
     this.journal = new EventJournal(join(directory, "journal"));
   }
@@ -245,33 +263,54 @@ export class RunRepository {
       }
       return undefined;
     };
-    return this.withLock(
-      async () => {
-        const now = this.clock();
-        const existing = await this.readWriterLease();
-        if (
-          existing !== undefined &&
-          existing.expiresAt > now.getTime() &&
-          !sameWorkspace(existing.metadata.workspacePath, workspacePath)
-        ) {
-          throw new RunWriterConflictError(existing.metadata.workspacePath, existing.metadata.expiresAt);
-        }
-        const lease: RunWriterLease = {
-          version: 1,
-          workspacePath,
-          host: hostname(),
-          pid: process.pid,
-          sessionId: owner.sessionId ?? this.idSource(),
-          createdAt:
-            existing !== undefined && sameWorkspace(existing.metadata.workspacePath, workspacePath)
-              ? existing.metadata.createdAt
-              : now.toISOString(),
-          expiresAt: new Date(now.getTime() + this.writerLeaseTtlMs).toISOString(),
-        };
-        await atomicWriteJson(this.writerLeasePath, lease);
-        return lease;
-      },
-      { onContention: conflictFromPublishedLease, waitMs: WRITER_LEASE_LOCK_WAIT_MS },
+    try {
+      return await this.withLock(
+        async () => {
+          const now = this.clock();
+          const existing = await this.readWriterLease();
+          if (
+            existing !== undefined &&
+            existing.expiresAt > now.getTime() &&
+            !sameWorkspace(existing.metadata.workspacePath, workspacePath)
+          ) {
+            throw new RunWriterConflictError(existing.metadata.workspacePath, existing.metadata.expiresAt);
+          }
+          const lease: RunWriterLease = {
+            version: 1,
+            workspacePath,
+            host: hostname(),
+            pid: process.pid,
+            sessionId: owner.sessionId ?? this.idSource(),
+            createdAt:
+              existing !== undefined && sameWorkspace(existing.metadata.workspacePath, workspacePath)
+                ? existing.metadata.createdAt
+                : now.toISOString(),
+            expiresAt: new Date(now.getTime() + this.writerLeaseTtlMs).toISOString(),
+          };
+          await atomicWriteJson(this.writerLeasePath, lease);
+          return lease;
+        },
+        { onContention: conflictFromPublishedLease, waitMs: this.writerLeaseLockWaitMs },
+      );
+    } catch (error) {
+      if (error instanceof RunWriterConflictError || !this.contended(error)) throw error;
+      // A busy lock or a Windows sharing violation is a contended outcome, not a verdict. Report it as a writer
+      // conflict only when another worktree verifiably holds an unexpired lease; otherwise surface the original error.
+      let conflict: RunWriterConflictError | undefined;
+      try {
+        conflict = await conflictFromPublishedLease();
+      } catch {
+        throw error;
+      }
+      if (conflict === undefined) throw error;
+      throw new RunWriterConflictError(conflict.ownerWorktree, conflict.expiresAt, { cause: error });
+    }
+  }
+
+  private contended(error: unknown): boolean {
+    return (
+      error instanceof RunMutationBusyError ||
+      (this.platform === "win32" && TRANSIENT_LOCK_RENAME_CODES.has((error as NodeJS.ErrnoException).code ?? ""))
     );
   }
 
@@ -320,18 +359,12 @@ export class RunRepository {
   }
 
   private async readWriterLease(): Promise<RunWriterLeaseSnapshot | undefined> {
-    let stat;
-    try {
-      stat = await lstat(this.writerLeasePath);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
-      throw error;
-    }
-    if (!stat.isFile() || stat.isSymbolicLink() || stat.size > MAX_WRITER_LEASE_BYTES) {
-      throw new Error("Run writer lease metadata is unsafe");
-    }
-    const bytes = await readFile(this.writerLeasePath);
-    if (bytes.byteLength > MAX_WRITER_LEASE_BYTES) throw new Error("Run writer lease metadata is unsafe");
+    const bytes = await readPublishedFile(this.writerLeasePath, {
+      maxBytes: MAX_WRITER_LEASE_BYTES,
+      label: "Run writer lease metadata",
+      platform: this.platform,
+    });
+    if (bytes === undefined) return undefined;
     let parsed: unknown;
     try {
       parsed = JSON.parse(bytes.toString("utf8")) as unknown;
@@ -376,9 +409,9 @@ export class RunRepository {
           }
         }
         if (await this.readLock().then((current) => current?.metadata.token === token)) break;
-        throw new Error("Run mutation is already in progress");
+        throw new RunMutationBusyError();
       }
-      if (!(await this.retireLock(existing.recoveryId))) throw new Error("Run mutation is already in progress");
+      if (!(await this.retireLock(existing.recoveryId))) throw new RunMutationBusyError();
     }
     try {
       return await operation();
@@ -395,6 +428,7 @@ export class RunRepository {
   private async acquireLock(metadata: MutationLock): Promise<boolean> {
     const parent = dirname(this.lockPath);
     await mkdir(parent, { recursive: true });
+    if (await this.lockPublished()) return false;
     const staging = await mkdtemp(join(parent, ".run-mutation.pending-"));
     let published = false;
     try {
@@ -409,12 +443,7 @@ export class RunRepository {
       } finally {
         await handle.close();
       }
-      try {
-        await lstat(this.lockPath);
-        return false;
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-      }
+      if (await this.lockPublished()) return false;
       try {
         await renameWithRetry(staging, this.lockPath);
         published = true;
@@ -432,6 +461,17 @@ export class RunRepository {
       }
     } finally {
       if (!published) await rm(staging, { recursive: true, force: true });
+    }
+  }
+
+  /** Cheap pre-check so contended waiters do not stage and fsync lock metadata on every poll. */
+  private async lockPublished(): Promise<boolean> {
+    try {
+      await lstat(this.lockPath);
+      return true;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+      throw error;
     }
   }
 

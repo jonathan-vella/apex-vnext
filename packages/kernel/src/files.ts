@@ -1,5 +1,5 @@
-import { constants } from "node:fs";
-import { link, mkdir, open, rename, rm } from "node:fs/promises";
+import { constants, type Stats } from "node:fs";
+import { link, lstat, mkdir, open, readFile, rename, rm } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { canonicalJsonBytes } from "./canonical.js";
 
@@ -32,6 +32,60 @@ export async function renameWithRetry(from: string, to: string, options: RenameR
       return;
     } catch (error) {
       if (attempt >= attempts || !TRANSIENT_RENAME_CODES.has((error as NodeJS.ErrnoException).code ?? "")) throw error;
+      await sleep(Math.min(10 * 2 ** (attempt - 1), 500));
+    }
+  }
+}
+
+export interface PublishedFileReadOptions {
+  readonly maxBytes: number;
+  /** Prefix of the error thrown when the path is not a regular file within `maxBytes`. */
+  readonly label: string;
+  readonly platform?: NodeJS.Platform;
+  readonly attempts?: number;
+  readonly lstat?: (path: string) => Promise<Pick<Stats, "isFile" | "isSymbolicLink" | "size">>;
+  readonly readFile?: (path: string) => Promise<Buffer>;
+  readonly sleep?: (milliseconds: number) => Promise<void>;
+}
+
+/**
+ * Read a small regular file that writers publish with an atomic replace (see `atomicWriteBytes`). Returns undefined
+ * only when lstat reports the path as absent. A file that vanishes between lstat and read was replaced or removed
+ * mid-read and is re-examined; on Windows, sharing violations (EPERM, EACCES, EBUSY) raised while a writer replaces
+ * the file are retried with the same bounded backoff as `renameWithRetry`. Exhausted retries rethrow, so a transient
+ * failure is never reported as an absent file.
+ */
+export async function readPublishedFile(path: string, options: PublishedFileReadOptions): Promise<Buffer | undefined> {
+  if (
+    options.attempts !== undefined &&
+    (!Number.isSafeInteger(options.attempts) || options.attempts < 1 || options.attempts > 10)
+  )
+    throw new RangeError("Read attempts must be an integer from 1 to 10");
+  const windows = (options.platform ?? process.platform) === "win32";
+  const attempts = options.attempts ?? 10;
+  const inspect = options.lstat ?? lstat;
+  const read = options.readFile ?? readFile;
+  const sleep =
+    options.sleep ?? (async (milliseconds: number) => await new Promise((done) => setTimeout(done, milliseconds)));
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      let stat;
+      try {
+        stat = await inspect(path);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+        throw error;
+      }
+      if (!stat.isFile() || stat.isSymbolicLink() || stat.size > options.maxBytes) {
+        throw new Error(`${options.label} is unsafe`);
+      }
+      const bytes = await read(path);
+      if (bytes.byteLength > options.maxBytes) throw new Error(`${options.label} is unsafe`);
+      return bytes;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code ?? "";
+      const transient = code === "ENOENT" || (windows && TRANSIENT_RENAME_CODES.has(code));
+      if (attempt >= attempts || !transient) throw error;
       await sleep(Math.min(10 * 2 ** (attempt - 1), 500));
     }
   }
