@@ -43,6 +43,23 @@ dependencies, about 3 MB. Clients start it with `node ${PLUGIN_ROOT}/mcp/apex.mj
 `mcp/` and needs no `node_modules`, `npm` or network. PNG diagram rendering needs the native `@resvg/resvg-js`
 package, so the plugin writes SVG diagrams only.
 
+### Install Smoke
+
+`npm run test:plugin-install` builds the package, then installs it with the Copilot CLI (`copilot plugin install
+<absolute path to dist/apex-plugin>`). It runs in a throwaway sandbox under the OS temp directory: `HOME` and
+`COPILOT_HOME` point into it, so your own Copilot configuration is never read or changed, and the sandbox is deleted
+afterwards (`--keep` keeps it). A local-path install needs no Copilot sign-in, token or secret. The CLI copies the
+package verbatim to `$COPILOT_HOME/installed-plugins/_direct/apex-plugin/` and records it in `$COPILOT_HOME/config.json`.
+
+The smoke checks that the installed tree hash equals `dist/apex-plugin.sha256` and that the agents, skills, managed
+hooks and `mcp.json` are present. It then starts the installed server as `mcp.json` declares it, with
+`${PLUGIN_ROOT}` set to the installed folder and only `PATH`, `PLUGIN_ROOT` and `HOME` in the environment. Over stdio it
+sends `server/discover` (protocol `2026-07-28`), `tools/list`, and `tools/call status` for a temporary git workspace,
+and compares the status with `apex status`. The `ci` job runs it on Linux after `npm install --global
+@github/copilot@<exact version>`; `--cli-version` fails the smoke when a different CLI answers. Native Windows Copilot
+CLI is unsupported, so the Windows lane does not run it. The CLI warns that direct (non-marketplace) installs are
+deprecated.
+
 ### Managed Hooks
 
 The plugin ships `com.github.copilot/hooks/hooks.json` and one dependency-free Node script, `apex-hook.mjs`. The
