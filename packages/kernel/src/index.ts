@@ -9,6 +9,7 @@ export * from "./improvement-store.js";
 export * from "./lease-store.js";
 export * from "./object-store.js";
 export * from "./project-store.js";
+export * from "./repeat-guard.js";
 export * from "./run-repository.js";
 export * from "./tasks.js";
 export * from "./validator-registry.js";

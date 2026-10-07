@@ -150,21 +150,26 @@ function writerLeaseExpiry(value: unknown): number | undefined {
     : undefined;
 }
 
+export interface RunRepeatState {
+  runHash: string;
+  journalHead: string | null;
+  ownerEpoch: number;
+  writer: string | null;
+}
+
+/** Resolves a worktree path to the form used for ownership and repeat comparisons (case-folded on Windows). */
+export function canonicalWorktreePath(path: string): string {
+  let canonical = resolve(path);
+  try {
+    canonical = realpathSync(canonical);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
+  return process.platform === "win32" ? canonical.toLocaleLowerCase() : canonical;
+}
+
 function sameWorkspace(left: string, right: string): boolean {
-  const canonical = (path: string) => {
-    const resolved = resolve(path);
-    try {
-      return realpathSync(resolved);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") return resolved;
-      throw error;
-    }
-  };
-  const resolvedLeft = canonical(left);
-  const resolvedRight = canonical(right);
-  return process.platform === "win32"
-    ? resolvedLeft.toLocaleLowerCase() === resolvedRight.toLocaleLowerCase()
-    : resolvedLeft === resolvedRight;
+  return canonicalWorktreePath(left) === canonicalWorktreePath(right);
 }
 
 async function sleep(milliseconds: number): Promise<void> {
@@ -317,6 +322,37 @@ export class RunRepository {
       error instanceof RunMutationBusyError ||
       (this.platform === "win32" && TRANSIENT_LOCK_RENAME_CODES.has((error as NodeJS.ErrnoException).code ?? ""))
     );
+  }
+
+  /**
+   * Reads the run state that decides whether a repeated call may be answered from its original result: the run hash,
+   * the journal head and the writer lease holder's canonical worktree (expiry excluded). Pending transactions are
+   * recovered first, so the snapshot reflects committed state.
+   */
+  async repeatState(): Promise<RunRepeatState> {
+    return this.withLock(async () => {
+      await this.recover();
+      const run = await this.readRaw();
+      const lease = await this.readWriterLease();
+      return {
+        runHash: sha256Json(run as unknown as JsonValue),
+        journalHead: await this.journal.head(),
+        ownerEpoch: run.ownerEpoch,
+        writer: lease === undefined ? null : canonicalWorktreePath(lease.metadata.workspacePath),
+      };
+    });
+  }
+
+  /** Rejects with the writer conflict when another worktree holds a live lease; never writes the lease. */
+  async assertWriterAvailable(owner: RunWriterLeaseOwner): Promise<void> {
+    const existing = await this.readWriterLease();
+    if (
+      existing !== undefined &&
+      existing.expiresAt > this.clock().getTime() &&
+      !sameWorkspace(existing.metadata.workspacePath, resolve(owner.workspacePath))
+    ) {
+      throw new RunWriterConflictError(existing.metadata.workspacePath, existing.metadata.expiresAt);
+    }
   }
 
   async releaseWriterLease(owner: RunWriterLeaseOwner): Promise<boolean> {
