@@ -51,18 +51,16 @@ const REMEDIATION_BY_CODE: Record<ApexErrorCode, string> = {
   APEX_STALE: "Call status to refresh state and use the latest expected head, epoch, task, or cursor before retrying.",
   APEX_AUTHORIZATION: "Call status and obtain the required human approval or decision before retrying.",
   APEX_CURSOR_INVALID:
-    "Discard the cursor, call the same tool again without it, and continue only from the new result.",
+    "Discard the cursor, call the same tool again without it, and continue only from the new result; cursors do not survive an MCP server restart.",
   APEX_RESULT_TOO_LARGE:
     "Request a smaller bounded result, use a paging-capable read tool, or narrow the requested document or collection.",
   APEX_INTERNAL:
     "Report this with the server log; retry only after checking status because side effects may have completed.",
 };
 
+// Remediation is a fixed hint per stable code so error details, causes, and paths never reach MCP clients.
 export function remediationForApexError(error: ApexError): string {
-  const remediation = (error.details as { remediation?: unknown } | undefined)?.remediation;
-  return typeof remediation === "string" && remediation.trim() !== ""
-    ? remediation.slice(0, 2_000)
-    : REMEDIATION_BY_CODE[error.code];
+  return REMEDIATION_BY_CODE[error.code];
 }
 
 export function normalizeError(error: unknown): ApexError {

@@ -101,10 +101,17 @@ Read tools that can return large collections or documents cap the complete seria
 The cap leaves room under common host/client message budgets while preventing token-heavy accidental full-document
 transfers. Paging-capable tools return the normal result shape with a partial top-level field plus `nextCursor`; call the
 same tool with the same `workspace` and `cursor` until `nextCursor` is absent, appending the paged string or array field
-in order. Cursors are opaque, signed for the server process, and bound to tool, workspace, result path, and a hash of
-the source result. A tampered, cross-tool, cross-workspace, or stale cursor fails closed with a stable APEX error and
-remediation. Mutation results are never paged; an oversized non-pageable result fails with `APEX_RESULT_TOO_LARGE`
-instead of silent truncation.
+in order. Cursors are opaque, HMAC-signed with a random secret generated when the server starts, and bound to tool,
+workspace, result path, and a hash of the source result. The secret is never persisted, so cursors do not survive an
+`apex mcp serve` restart or a client reconnect that starts a new server process. Mutation results are never paged; an
+oversized non-pageable result fails instead of being silently truncated. Every cursor failure is fail-closed:
+
+| Condition                                                                           | Code                    | Remediation                                                             |
+| ----------------------------------------------------------------------------------- | ----------------------- | ----------------------------------------------------------------------- |
+| Malformed, tampered, cross-tool, cross-workspace, or issued before a server restart | `APEX_CURSOR_INVALID`   | Discard the cursor and call the same tool without it to restart paging. |
+| Source result changed between pages                                                 | `APEX_STALE`            | Call `status`, then restart paging without a cursor.                    |
+| `cursor` sent to a tool that is not paging-capable                                  | `APEX_VALIDATION`       | Remove `cursor`; only the tools below accept it.                        |
+| Non-pageable result, or a single item/page, exceeds 64 KiB                          | `APEX_RESULT_TOO_LARGE` | Request a smaller bounded result or use a paging-capable read tool.     |
 
 | Tool                      | Paged field    |
 | ------------------------- | -------------- |

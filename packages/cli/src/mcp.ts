@@ -42,7 +42,6 @@ export const MCP_SERVER_INSTRUCTIONS = [
 export const MCP_MAX_SERIALIZED_RESULT_BYTES = 64 * 1024;
 
 const cursorInput = z.string().min(1).max(4096).optional();
-const mcpCursorSecret = randomBytes(32);
 
 const pagePaths: Partial<Record<keyof typeof MCP_OUTPUT_SCHEMAS, readonly string[]>> = {
   taskContext: ["inputs"],
@@ -205,9 +204,9 @@ function tooLargeError(tool: string): ApexError {
   );
 }
 
-function encodeCursor(payload: CursorPayload): string {
+function encodeCursor(secret: Buffer, payload: CursorPayload): string {
   const body = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
-  const mac = createHmac("sha256", mcpCursorSecret).update(body).digest("base64url");
+  const mac = createHmac("sha256", secret).update(body).digest("base64url");
   return `${body}.${mac}`;
 }
 
@@ -218,11 +217,11 @@ function decodeBase64urlCursorPart(value: string, part: string): Buffer {
   return decoded;
 }
 
-function decodeCursor(cursor: string): CursorPayload {
+function decodeCursor(secret: Buffer, cursor: string): CursorPayload {
   const [body, mac, extra] = cursor.split(".");
   if (body === undefined || mac === undefined || extra !== undefined) throw cursorError("Malformed cursor");
   const rawBody = decodeBase64urlCursorPart(body, "payload");
-  const expected = createHmac("sha256", mcpCursorSecret).update(body).digest();
+  const expected = createHmac("sha256", secret).update(body).digest();
   const actual = decodeBase64urlCursorPart(mac, "signature");
   if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) throw cursorError("Tampered cursor");
   let decoded: CursorPayload;
@@ -269,6 +268,7 @@ function withPageTarget(
 }
 
 function applyResultPaging(
+  secret: Buffer,
   tool: string,
   workspace: string,
   input: Record<string, unknown>,
@@ -285,7 +285,9 @@ function applyResultPaging(
   if (cursor === undefined && resultEnvelopeBytes(value) <= MCP_MAX_SERIALIZED_RESULT_BYTES) return value;
   const hash = resultHash(value);
   const payload =
-    cursor === undefined ? { v: 1 as const, tool, workspace, hash, path: [...path], offset: 0 } : decodeCursor(cursor);
+    cursor === undefined
+      ? { v: 1 as const, tool, workspace, hash, path: [...path], offset: 0 }
+      : decodeCursor(secret, cursor);
   if (payload.tool !== tool || payload.workspace !== workspace || payload.path.join("/") !== path.join("/")) {
     throw cursorError("Cursor belongs to a different tool, workspace, or result path");
   }
@@ -309,7 +311,7 @@ function applyResultPaging(
     const count = Math.floor((low + high) / 2);
     const end = payload.offset + count;
     const page = typeof target === "string" ? target.slice(payload.offset, end) : target.slice(payload.offset, end);
-    const nextCursor = end < total ? encodeCursor({ ...payload, offset: end }) : undefined;
+    const nextCursor = end < total ? encodeCursor(secret, { ...payload, offset: end }) : undefined;
     const candidate = {
       ...withPageTarget(value, path, page),
       ...(nextCursor === undefined ? {} : { nextCursor }),
@@ -493,6 +495,8 @@ export function createMcpServer(
   if (!Number.isSafeInteger(queueTimeoutMs) || queueTimeoutMs < 1 || queueTimeoutMs > 30_000)
     throw new Error("Invalid MCP queue timeout");
   const server = new McpServer({ name: "apex", version: APEX_VERSION }, { instructions: MCP_SERVER_INSTRUCTIONS });
+  // Cursors are only valid for the server instance that issued them; a restart invalidates every outstanding cursor.
+  const cursorSecret = randomBytes(32);
   const result = (value: unknown) => {
     if (value === null || typeof value !== "object" || Array.isArray(value))
       throw new Error("MCP success results require an object envelope");
@@ -618,6 +622,7 @@ export function createMcpServer(
         }
         if (response.structuredContent === undefined) throw new Error("MCP success results require structuredContent");
         response.structuredContent = applyResultPaging(
+          cursorSecret,
           name,
           resolved.workspace,
           toolInput,

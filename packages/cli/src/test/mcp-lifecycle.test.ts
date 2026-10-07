@@ -118,7 +118,9 @@ test("MCP errors include structured remediation for stable error classes", async
     new ApexError("APEX_STALE", "expired expected head", EXIT_CODES.stale),
     new ApexError("APEX_VALIDATION", "schema failed", EXIT_CODES.validation),
     new ApexError("APEX_WRITER_CONFLICT", "writer lease is owned elsewhere", EXIT_CODES.conflict),
-    new Error("private stack frame"),
+    new ApexError("APEX_INTERNAL", "private stack frame", EXIT_CODES.internal, {
+      remediation: "read /home/private/secret.txt",
+    }),
   ];
   const session = await connect(context, {
     workspaceStatus: async () => {
@@ -138,10 +140,12 @@ test("MCP errors include structured remediation for stable error classes", async
     assertError(await session.call("status"), "APEX_WRITER_CONFLICT", "writer lease is owned elsewhere").remediation!,
     /owning worktree/u,
   );
+  const internal = await session.call("status");
   assert.match(
-    assertError(await session.call("status"), "APEX_INTERNAL", "APEX could not complete the operation.").remediation!,
+    assertError(internal, "APEX_INTERNAL", "APEX could not complete the operation.").remediation!,
     /server log/u,
   );
+  assert.doesNotMatch(JSON.stringify(internal), /private stack frame|\/home\/private|secret\.txt/u);
   const otherWorkspace = await tempRoot();
   const unsupported = await session.client.callTool({ name: "status", arguments: { workspace: otherWorkspace } });
   assert.equal(unsupported.isError, true);
@@ -294,6 +298,86 @@ test("oversize non-pageable results fail with a stable remediation error", async
     "MCP result exceeded the bounded result size and cannot be paged safely.",
   );
   assert.match(error.remediation!, /paging-capable read tool/u);
+});
+
+test("paging cursors do not survive an MCP server restart", async (context) => {
+  const projects = Array.from({ length: 120 }, (_, index) => ({
+    projectId: `project-${index}`,
+    displayName: `Project ${index} ${"x".repeat(900)}`,
+  }));
+  const workspace = await tempRoot();
+  const service = Object.assign(new ApexService(workspace), { listProjects: async () => projects });
+  const start = async () => {
+    const server = createMcpServer({
+      defaultService: service,
+      resolve: async (path) => ({ service, workspace: path }),
+    });
+    const client = new Client({ name: "restart-test", version: "1.0.0" });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    context.after(async () => {
+      await client.close();
+      await server.close();
+    });
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+    return (args: Record<string, unknown> = {}) =>
+      client.callTool({ name: "projectList", arguments: { workspace, ...args } });
+  };
+  const before = await start();
+  const page = assertSuccess("projectList", await before()) as { nextCursor?: string };
+  assert.ok(page.nextCursor);
+  const after = await start();
+  const error = assertError(
+    await after({ cursor: page.nextCursor }),
+    "APEX_CURSOR_INVALID",
+    "Cursor is invalid for this tool, workspace, or server session.",
+  );
+  assert.match(error!.remediation!, /without it/u);
+  assert.match(error!.remediation!, /restart/u);
+  assert.ok((assertSuccess("projectList", await after()) as { nextCursor?: string }).nextCursor);
+});
+
+test("only bounded read tools accept cursors and mutations are never paged", async (context) => {
+  const pageable = [
+    "improvementObservations",
+    "improvementProposals",
+    "inventory",
+    "preview",
+    "projectList",
+    "readTaskInput",
+    "render",
+    "taskContext",
+  ];
+  let created = 0;
+  const session = await connect(context, {
+    createProject: async () => {
+      created += 1;
+      throw new Error("must not run");
+    },
+  });
+  const { tools } = await session.client.listTools();
+  const hasProperty = (schema: unknown, key: string): boolean => {
+    if (schema === null || typeof schema !== "object") return false;
+    const record = schema as { properties?: Record<string, unknown>; anyOf?: unknown[] };
+    return (
+      Object.hasOwn(record.properties ?? {}, key) || (record.anyOf ?? []).some((branch) => hasProperty(branch, key))
+    );
+  };
+  assert.deepEqual(
+    tools
+      .filter((tool) => hasProperty(tool.inputSchema, "cursor"))
+      .map(({ name }) => name)
+      .sort(),
+    pageable,
+  );
+  for (const tool of tools)
+    assert.equal(hasProperty(tool.outputSchema, "nextCursor"), pageable.includes(tool.name), tool.name);
+  const rejected = await session.call("projectCreate", { projectId: "demo", displayName: "Demo", cursor: "abc.def" });
+  assert.equal(rejected.isError, true);
+  const rejectedError = (rejected.structuredContent as { error: { code: string; message: string } }).error;
+  assert.equal(rejectedError.code, "APEX_VALIDATION");
+  assert.match(rejectedError.message, /cursor/u);
+  assert.equal(created, 0);
 });
 
 test("unknown no-argument and raw-shape arguments never invoke the service", { timeout: 10_000 }, async (context) => {
