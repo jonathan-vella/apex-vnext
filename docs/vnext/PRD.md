@@ -431,8 +431,8 @@ receipt. Separately authorized maintenance remains bounded by its manifest and h
 ### REQ-MCP-001: Predictable Tool Contracts
 
 The CLI MCP adapter exposes kernel-authorized operations, not a second workflow engine. Under DECISION-034 it uses
-the MCP TypeScript SDK v2 (`@modelcontextprotocol/server`) with a low-level `Server` over stdio and targets protocol
-`2026-07-28`, which all supported Copilot clients negotiate. Acceptance:
+the MCP TypeScript SDK v2 (`@modelcontextprotocol/server`) with a low-level `Server` served by `serveStdio` and
+targets protocol `2026-07-28`, which all supported Copilot clients negotiate. Acceptance:
 
 1. Every successful tool result validates through the supported SDK. Preserve existing object responses; wrap Markdown
    and lists in named objects. Retain serialized text alongside structured results for compatible clients.
