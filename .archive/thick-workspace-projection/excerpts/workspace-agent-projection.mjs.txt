@@ -1,4 +1,5 @@
-// Removed in CP-11 from packages/cli/scripts/prepare-assets.mjs (prepareClientProjections), last live at f6fc9b79.
+// Removed in CP-11 from packages/cli/scripts/prepare-assets.mjs (prepareClientProjections).
+// It was last live in the parent of the CP-11 merge on main.
 // It rendered each manifest role into the workspace projection at client-projections/github-copilot-cli/.github/agents/.
 // tools/scripts/build-plugin.mjs now renders the same agents into the plugin with renderClientAgentProjection.
 

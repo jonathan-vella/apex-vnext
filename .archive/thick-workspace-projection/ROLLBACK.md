@@ -4,7 +4,7 @@ CP-11 ([issue #377](https://github.com/jonathan-vella/apex-vnext/issues/377)) re
 workspace `.mcp.json` from the `apex init` projection under DECISION-033 and the DECISION-015 gates (see
 [DECISIONS.md](../../docs/vnext/DECISIONS.md)). The apex plugin now ships them. This folder is provenance only: no
 build, test, package or runtime path reads it, and `tools/registry/retired-paths.v1.json` keeps
-`customizations/.mcp.json` absent. The last commit with the thick projection is `f6fc9b79`.
+`customizations/.mcp.json` absent. The last commit with the thick projection is the parent of the CP-11 merge on `main`.
 
 ## Contents
 
