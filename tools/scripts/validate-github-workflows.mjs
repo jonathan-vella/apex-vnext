@@ -407,6 +407,31 @@ export function validateGithubWorkflowContract({ contract, schema, workflowTexts
   if (pythonSetup.length !== 1 || pythonCommands.length !== 2) {
     errors.push("ci workflow must retain pinned Python lint and test coverage");
   }
+  const copilotInstalls = ciSteps
+    .map((step, index) => ({
+      index,
+      version: /^npm install --global --ignore-scripts @github\/copilot@(\d+\.\d+\.\d+)$/u.exec(
+        String(step?.run ?? "").trim(),
+      )?.[1],
+    }))
+    .filter((install) => install.version !== undefined);
+  const pluginSmokes = ciSteps
+    .map((step, index) => ({
+      index,
+      version: /^npm run test:plugin-install -- --cli-version (\d+\.\d+\.\d+)$/u.exec(
+        String(step?.run ?? "").trim(),
+      )?.[1],
+    }))
+    .filter((smoke) => smoke.version !== undefined);
+  if (
+    copilotInstalls.length !== 1 ||
+    pluginSmokes.length !== 1 ||
+    pluginSmokes[0].index <= copilotInstalls[0].index ||
+    pluginSmokes[0].version !== copilotInstalls[0].version ||
+    ciSteps.some((step) => /@github\/copilot(?!@\d+\.\d+\.\d+$)/u.test(String(step?.run ?? "").trim()))
+  ) {
+    errors.push("ci workflow must install an exact Copilot CLI version and then run the plugin install smoke");
+  }
   const windowsJob = ci?.jobs?.["windows-package-tests"];
   const windowsSteps = Array.isArray(windowsJob?.steps) ? windowsJob.steps : [];
   const windowsScripts = windowsSteps.map((step) => String(step?.run ?? "")).join("\n");

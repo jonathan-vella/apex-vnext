@@ -244,6 +244,35 @@ test("rejects protected Python lane and canonical Terraform pin drift", () => {
   }
 });
 
+test("rejects an unpinned or missing Copilot CLI plugin install smoke after rebaselining", () => {
+  const ciPath = ".github/workflows/ci.yml";
+  const install = "npm install --global --ignore-scripts @github/copilot@1.0.93";
+  const smoke = "npm run test:plugin-install -- --cli-version 1.0.93";
+  for (const [search, replacement] of [
+    [install, "npm install --global --ignore-scripts @github/copilot@latest"],
+    [install, "npm install --global --ignore-scripts @github/copilot@^1.0.93"],
+    [install, "npm install --global @github/copilot@1.0.93"],
+    [smoke, "npm run test:plugin-install -- --cli-version 1.0.92"],
+    [smoke, "npx --yes @github/copilot plugin install ./dist/apex-plugin"],
+    [`        run: ${smoke}\n`, "        run: npm run test:plugin\n"],
+  ]) {
+    const texts = mutate(ciPath, search, replacement);
+    const errors = validate(texts, rebaseline(ciPath, texts));
+    assert.ok(
+      errors.includes("ci workflow must install an exact Copilot CLI version and then run the plugin install smoke"),
+      `expected Copilot CLI smoke error for ${replacement}`,
+    );
+  }
+  const installStep = `      - name: Install the Copilot CLI\n        if: steps.scope.outputs.docs_only != 'true'\n        run: ${install}\n\n`;
+  const reordered = mutate(ciPath, installStep, "");
+  reordered[ciPath] = reordered[ciPath].replace(`        run: ${smoke}\n`, `        run: ${smoke}\n\n${installStep}`);
+  assert.ok(
+    validate(reordered, rebaseline(ciPath, reordered)).includes(
+      "ci workflow must install an exact Copilot CLI version and then run the plugin install smoke",
+    ),
+  );
+});
+
 test("rejects Windows package-test lane weakening after rebaselining", () => {
   const ciPath = ".github/workflows/ci.yml";
   for (const [search, replacement, expected] of [
