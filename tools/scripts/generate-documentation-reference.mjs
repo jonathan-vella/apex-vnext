@@ -48,7 +48,7 @@ function repositoryPath(path) {
 const cliSource = "packages/cli/src/cli.ts";
 const mcpSource = "packages/cli/src/mcp.ts";
 const commands = uniqueMatches(readFileSync(join(root, cliSource), "utf8"), /case "([^"]+)":/gu);
-const tools = uniqueMatches(readFileSync(join(root, mcpSource), "utf8"), /server\.registerTool\(\s*"([^"]+)"/gu);
+const tools = uniqueMatches(readFileSync(join(root, mcpSource), "utf8"), /\bregisterTool\(\s*"([^"]+)"/gu);
 
 emit(
   "docs/reference/cli-commands.generated.md",
