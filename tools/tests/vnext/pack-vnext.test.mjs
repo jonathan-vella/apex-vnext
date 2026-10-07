@@ -4,6 +4,7 @@ import { cp, mkdir, mkdtemp, readFile, readdir, rm, stat, symlink, writeFile } f
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawn } from "node:child_process";
+import { createRequire } from "node:module";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
 import { parseNpmPackResult, releaseSbomArguments } from "../../scripts/pack-vnext.mjs";
@@ -576,12 +577,17 @@ test("packs and clean-installs the vNext runtime reproducibly", { timeout: 240_0
   assert.deepEqual([mcpConfig.command, ...mcpConfig.args], ["npx", "--no", "apex", "mcp", "serve"]);
   const sessionDirectory = join(project, "infra");
   await mkdir(sessionDirectory);
-  const sdkRoot = join(project, "node_modules", "@modelcontextprotocol", "sdk", "dist", "esm", "client");
+  // The packed CLI ships only @modelcontextprotocol/server; load the v2 client from the CLI workspace dev dependency.
+  const cliRequire = createRequire(join(root, "packages", "cli", "package.json"));
+  const clientModule = (specifier) => pathToFileURL(cliRequire.resolve(specifier).replace(/\.cjs$/u, ".mjs")).href;
   const [{ Client }, { StdioClientTransport }] = await Promise.all([
-    import(pathToFileURL(join(sdkRoot, "index.js")).href),
-    import(pathToFileURL(join(sdkRoot, "stdio.js")).href),
+    import(clientModule("@modelcontextprotocol/client")),
+    import(clientModule("@modelcontextprotocol/client/stdio")),
   ]);
-  const mcpClient = new Client({ name: "packed-consumer-test", version: "1.0.0" });
+  const mcpClient = new Client(
+    { name: "packed-consumer-test", version: "1.0.0" },
+    { versionNegotiation: { mode: { pin: "2026-07-28" } } },
+  );
   const mcpTransport = new StdioClientTransport({
     command: mcpConfig.command,
     args: mcpConfig.args,

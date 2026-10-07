@@ -9,9 +9,7 @@ import test from "node:test";
 import { CONTRACT_VERSION, type ArchetypeSourceProposalV1, type ArchetypeBatchPlanV1 } from "@apexops/contracts";
 import type { ProcessRequest } from "@apexops/capabilities";
 import { sha256Json } from "@apexops/kernel";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { createMcpServer } from "../mcp.js";
+import { connectMcp } from "./mcp-client.js";
 import { execute, formatHumanResult } from "../cli.js";
 import { ApexService } from "../service.js";
 import { ApexError, EXIT_CODES } from "../errors.js";
@@ -654,11 +652,7 @@ test("workspace installation leaves first project creation to APEX", async () =>
   await assert.rejects(readFile(join(root, ".apex/config.json")), { code: "ENOENT" });
   const emptyStatus = await execute(["status"], root);
   assert.equal((emptyStatus as { status: string }).status, "needs_project");
-  const server = createMcpServer(service);
-  const client = new Client({ name: "empty-workspace", version: "1.0.0" });
-  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-  await server.connect(serverTransport);
-  await client.connect(clientTransport);
+  const { client, close } = await connectMcp(service, { name: "empty-workspace" });
   try {
     const response = await client.callTool({ name: "status", arguments: { workspace: root } });
     assert.equal(response.isError, undefined);
@@ -666,8 +660,7 @@ test("workspace installation leaves first project creation to APEX", async () =>
     const projects = await client.callTool({ name: "projectList", arguments: { workspace: root } });
     assert.equal(projects.isError, undefined);
   } finally {
-    await client.close();
-    await server.close();
+    await close();
   }
   await readFile(join(root, ".mcp.json"));
   for (const retired of [".vscode/mcp.json", ".github/mcp.json"])
@@ -1044,11 +1037,7 @@ test("MCP preserves valid result envelopes and sanitized execution errors", asyn
   service.status = async () => {
     throw new Error("Bearer synthetic-private-token");
   };
-  const server = createMcpServer(service);
-  const client = new Client({ name: "response-contract-test", version: "1.0.0" });
-  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-  await server.connect(serverTransport);
-  await client.connect(clientTransport);
+  const { client, close } = await connectMcp(service, { name: "response-contract-test" });
   try {
     for (const [name, args, expected] of [
       ["render", { kind: "status" }, { markdown: "# Run status" }],
@@ -1118,19 +1107,14 @@ test("MCP preserves valid result envelopes and sanitized execution errors", asyn
     for (const name of ["render", "recordInput"])
       assert.ok(tools.tools.find((tool) => tool.name === name)?.outputSchema);
   } finally {
-    await client.close();
-    await server.close();
+    await close();
   }
 });
 
 test("MCP registers only narrow tools and calls the service", async () => {
   const service = new ApexService(await tempRoot());
   await service.init({ projectId: "demo", riskOwner: "partner" });
-  const server = createMcpServer(service);
-  const client = new Client({ name: "test", version: "1.0.0" });
-  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-  await server.connect(serverTransport);
-  await client.connect(clientTransport);
+  const { client, close } = await connectMcp(service, { name: "test" });
   const call = (name: string, args: Record<string, unknown> = {}) =>
     client.callTool({ name, arguments: { workspace: service.root, ...args } });
   const tools = await client.listTools();
@@ -1408,8 +1392,7 @@ test("MCP registers only narrow tools and calls the service", async () => {
     tools.tools.map(({ name }) => name).filter((name) => forbidden.includes(name)),
     [],
   );
-  await client.close();
-  await server.close();
+  await close();
 });
 
 test("project deletion validates a replacement run before mutating selection", async () => {
@@ -1440,11 +1423,7 @@ test("MCP requires an atomic outputs bundle for every task", async () => {
       return { outputHashes: {}, summary: "accepted" };
     },
   } as unknown as ApexService;
-  const server = createMcpServer(service);
-  const client = new Client({ name: "test", version: "1.0.0" });
-  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-  await server.connect(serverTransport);
-  await client.connect(clientTransport);
+  const { client, close } = await connectMcp(service, { name: "test" });
 
   const single = await client.callTool({
     name: "completeTask",
@@ -1467,8 +1446,7 @@ test("MCP requires an atomic outputs bundle for every task", async () => {
   });
   assert.equal(bundle.isError, undefined);
   assert.equal(completedBundles.length, 1);
-  await client.close();
-  await server.close();
+  await close();
 });
 
 test("MCP planComplete derives the canonical binding intent hash", async () => {
@@ -1492,11 +1470,7 @@ test("MCP planComplete derives the canonical binding intent hash", async () => {
       );
     },
   } as unknown as ApexService;
-  const server = createMcpServer(service);
-  const client = new Client({ name: "test", version: "1.0.0" });
-  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-  await server.connect(serverTransport);
-  await client.connect(clientTransport);
+  const { client, close } = await connectMcp(service, { name: "test" });
   const result = await client.callTool({
     name: "planComplete",
     arguments: {
@@ -1513,8 +1487,7 @@ test("MCP planComplete derives the canonical binding intent hash", async () => {
     (completedOutputs?.find(({ kind }) => kind === "iac-binding")?.value as { intentHash: string }).intentHash,
     sha256Json({ schemaVersion: "1.0.0", projectId: "demo", runId: "run", resources: [], outputs: [] }),
   );
-  await client.close();
-  await server.close();
+  await close();
 });
 
 test("CLI completes an artifact bundle from JSON", async () => {

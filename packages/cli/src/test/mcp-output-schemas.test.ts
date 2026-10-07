@@ -3,14 +3,13 @@ import test from "node:test";
 import { z } from "zod";
 import { ResourceInventoryV1Schema } from "@apexops/contracts";
 import { Ajv } from "ajv";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { Ajv2020 } from "ajv/dist/2020.js";
+import { McpServer } from "@modelcontextprotocol/server";
 import { MCP_OUTPUT_SCHEMAS } from "../mcp-output-schemas.js";
-import { createMcpServer } from "../mcp.js";
 import { ApexService } from "../service.js";
 import { ApexError, EXIT_CODES, normalizeError, remediationForApexError } from "../errors.js";
 import { nextTaskAfterInput, requirements, tempRoot } from "./helpers.js";
+import { connectMcp, connectMcpFactory } from "./mcp-client.js";
 
 const hash = "a".repeat(64);
 const timestamp = "2026-09-18T00:00:00.000Z";
@@ -369,11 +368,7 @@ test("canonical inventory contract remains precise after the Zod bridge", () => 
 });
 
 test("output schema coverage matches every registered MCP tool", async () => {
-  const server = createMcpServer(new ApexService(await tempRoot()));
-  const client = new Client({ name: "output-coverage", version: "1.0.0" });
-  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-  await server.connect(serverTransport);
-  await client.connect(clientTransport);
+  const { client, close } = await connectMcp(new ApexService(await tempRoot()), { name: "output-coverage" });
   try {
     const { tools } = await client.listTools();
     assert.equal(tools.length, Object.keys(MCP_OUTPUT_SCHEMAS).length);
@@ -424,8 +419,7 @@ test("output schema coverage matches every registered MCP tool", async () => {
       assert.equal(validate({ workspace: "/workspace", taskId: "task-1" }), name === "validateTask");
     }
   } finally {
-    await client.close();
-    await server.close();
+    await close();
   }
 });
 
@@ -545,11 +539,7 @@ test("actual MCP handlers wrap service fixtures and sanitize failures for every 
       }
     });
   }
-  const server = createMcpServer(service);
-  const client = new Client({ name: "actual-output-consumer", version: "1.0.0" });
-  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-  await server.connect(serverTransport);
-  await client.connect(clientTransport);
+  const { client, close } = await connectMcp(service, { name: "actual-output-consumer" });
   try {
     const { tools } = await client.listTools();
     const names = tools.map(({ name }) => name).sort();
@@ -559,7 +549,7 @@ test("actual MCP handlers wrap service fixtures and sanitize failures for every 
     const validators = new Map(
       tools.map((tool) => {
         assert.ok(tool.outputSchema, tool.name);
-        return [tool.name, ajv.compile(tool.outputSchema)];
+        return [tool.name, ajv.compile(tool.outputSchema as Record<string, unknown>)];
       }),
     );
     const invoked = new Set<string>();
@@ -677,14 +667,12 @@ test("actual MCP handlers wrap service fixtures and sanitize failures for every 
       assert.deepEqual(calls, [], name);
     }
   } finally {
-    await client.close();
-    await server.close();
+    await close();
   }
 });
 
 test("SDK publishes and enforces all result contracts while bypassing error results", async () => {
   const server = new McpServer({ name: "output-contracts", version: "1.0.0" });
-  const client = new Client({ name: "output-consumer", version: "1.0.0" });
   const responses = { ...fixtures };
   let isError = false;
   for (const name of Object.keys(MCP_OUTPUT_SCHEMAS) as ToolName[]) {
@@ -694,19 +682,18 @@ test("SDK publishes and enforces all result contracts while bypassing error resu
       ...(isError ? { isError: true } : {}),
     }));
   }
-  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-  await server.connect(serverTransport);
-  await client.connect(clientTransport);
+  const { client, close } = await connectMcpFactory(() => server, "output-consumer");
   try {
     const { tools } = await client.listTools();
-    const ajv = new Ajv({ strict: false, allErrors: true });
+    // The v2 SDK McpServer publishes zod schemas as JSON Schema 2020-12.
+    const ajv = new Ajv2020({ strict: false, allErrors: true });
     ajv.addFormat("date-time", (value: string) => Number.isFinite(Date.parse(value)));
     const validators = new Map(
       tools.map((tool) => {
         assert.equal(tool.outputSchema?.type, "object", tool.name);
         assert.equal(tool.outputSchema.additionalProperties, false, tool.name);
         assert.ok(MCP_OUTPUT_SCHEMAS[tool.name as ToolName] instanceof z.ZodObject);
-        return [tool.name, ajv.compile(tool.outputSchema)];
+        return [tool.name, ajv.compile(tool.outputSchema as Record<string, unknown>)];
       }),
     );
     for (const [name, value] of [...Object.entries(fixtures), ...validVariants] as Array<
@@ -742,8 +729,7 @@ test("SDK publishes and enforces all result contracts while bypassing error resu
     assert.equal(error.isError, true);
     assert.deepEqual(error.structuredContent, responses.status);
   } finally {
-    await client.close();
-    await server.close();
+    await close();
   }
 });
 
