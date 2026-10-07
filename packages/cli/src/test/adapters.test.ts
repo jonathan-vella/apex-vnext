@@ -662,8 +662,8 @@ test("workspace installation leaves first project creation to APEX", async () =>
   } finally {
     await close();
   }
-  await readFile(join(root, ".mcp.json"));
-  for (const retired of [".vscode/mcp.json", ".github/mcp.json"])
+  await readFile(join(root, ".github/copilot/settings.json"));
+  for (const retired of [".mcp.json", ".github/agents", ".github/skills", ".vscode/mcp.json", ".github/mcp.json"])
     await assert.rejects(readFile(join(root, retired)), { code: "ENOENT" });
   assert.equal((await service.doctor()).healthy, true);
   assert.match((await service.doctor()).nextAction, /first project/);
@@ -901,7 +901,7 @@ test("bootstrap reruns reuse matching intact state without commands or new runs"
   }
   await assert.rejects(service.bootstrap({ ...input, clientId: "github-copilot-vscode" as never }), /malformed/);
   assert.deepEqual(await service.status(), before);
-  const managedPath = join(root, ".github", "agents", "apex.agent.md");
+  const managedPath = join(root, ".github", "copilot-instructions.md");
   const managed = await readFile(managedPath, "utf8");
   await writeFile(managedPath, managed + "\nManual edit\n");
   await assert.rejects(service.bootstrap(input), /resume is blocked/);
@@ -941,10 +941,11 @@ test("init rejects retired clients and the CLI projection keeps one managed life
   await execute(["init", "--project", "demo", "--risk-owner", "partner", "--target", "local"], root);
   const service = new ApexService(root);
   const before = await service.status();
-  const agent = join(root, ".github/agents/apex.agent.md");
-  assert.match(await readFile(agent, "utf8"), /name: APEX\n/);
-  await assert.rejects(readFile(join(root, ".github/agents/apex-cli.agent.md")), { code: "ENOENT" });
-  await readFile(join(root, ".mcp.json"));
+  const agent = join(root, ".github/copilot-instructions.md");
+  assert.match(await readFile(agent, "utf8"), /## APEX Workspace\n/);
+  for (const retired of [".github/agents", ".mcp.json"])
+    await assert.rejects(readFile(join(root, retired)), { code: "ENOENT" });
+  assert.match(await readFile(join(root, ".github/copilot/settings.json"), "utf8"), /"apex@apex-plugins": true/u);
   const lock = JSON.parse(await readFile(join(root, ".apex/customizations.lock.json"), "utf8"));
   assert.equal(lock.clientId, "github-copilot-cli");
   assert.equal(new Set(lock.files.map(({ path }: { path: string }) => path)).size, lock.files.length);
@@ -980,18 +981,23 @@ test("a retired VS Code install stops until init explicitly selects the CLI proj
     execute(["init", "--project", "demo", "--risk-owner", "partner", "--target", "local"], root),
     retired,
   );
-  const edited = join(root, ".github/agents/apex.agent.md");
+  const edited = join(root, ".github/copilot-instructions.md");
   await writeFile(edited, "Manual edit\n");
   await assert.rejects(execute(["init", "--client", "github-copilot-cli"], root), (error: ApexError) => {
     const details = error.details as { removed: string[]; conflicts: string[] };
     assert.equal(error.code, "APEX_CONFLICT");
-    assert.deepEqual(details.conflicts, [".github/agents/apex.agent.md"]);
+    assert.deepEqual(details.conflicts, [".github/copilot-instructions.md"]);
     return true;
   });
   await assert.rejects(service.update(), retired);
   await rm(edited);
   const replaced = (await execute(["init", "--client", "github-copilot-cli"], root)) as { installed: string[] };
-  assert.ok(replaced.installed.includes(".github/agents/apex.agent.md"));
+  assert.ok(replaced.installed.includes(".github/copilot-instructions.md"));
+  assert.ok(replaced.installed.includes(".github/copilot/settings.json"));
+  assert.equal(
+    replaced.installed.some((path) => path.startsWith(".github/agents/") || path === ".mcp.json"),
+    false,
+  );
   assert.equal(JSON.parse(await readFile(selectionPath, "utf8")).clientId, "github-copilot-cli");
   assert.equal((await service.status()).run.runId, before.run.runId);
   await service.update();

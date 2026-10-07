@@ -35,7 +35,7 @@ test("native skills are internal, packaged, structured, and wired to their prima
     for (const heading of ["## Prerequisites", "## Workflow", "## Boundaries", "## Output"]) {
       assert.match(source, new RegExp(`^${heading}$`, "mu"));
     }
-    assert.ok(manifest.managedFiles.includes(packagedPath), `${skill} must be packaged`);
+    assert.ok(manifest.plugin.files.includes(packagedPath), `${skill} must be packaged in the plugin`);
     assert.match(agentSource, new RegExp(`\\.github/skills/${skill}/SKILL\\.md`, "u"));
   }
 });
@@ -51,7 +51,7 @@ test("apex-next is a packaged, user-invocable routing skill used by the coordina
   for (const heading of ["## Prerequisites", "## Workflow", "## Boundaries", "## Output"]) {
     assert.match(source, new RegExp(`^${heading}$`, "mu"));
   }
-  assert.ok(manifest.managedFiles.includes(".github/skills/apex-next/SKILL.md"), "apex-next must be packaged");
+  assert.ok(manifest.plugin.files.includes(".github/skills/apex-next/SKILL.md"), "apex-next must be packaged");
   assert.match(coordinator, /\.github\/skills\/apex-next\/SKILL\.md/u);
   assert.doesNotMatch(source, /\/agent\s/u);
   assert.doesNotMatch(source, /ready-to-paste scope prompt/u);
@@ -82,17 +82,14 @@ test("apex-next maps every workflow owner role to a skill or worker", async () =
   }
 });
 
-test("native skills are copied to the bundle and the CLI projection", async () => {
+test("native skills ship in the bundled sources and stay out of the CLI projection", async () => {
   await execFile(process.execPath, ["packages/cli/scripts/prepare-assets.mjs"], { cwd: root });
-  const assetRoots = [
-    resolve(root, "packages", "cli", "assets", "customizations"),
-    resolve(root, "packages", "cli", "assets", "client-projections", "github-copilot-cli"),
-  ];
+  const sourceAssets = resolve(root, "packages", "cli", "assets", "customizations");
+  const projection = resolve(root, "packages", "cli", "assets", "client-projections", "github-copilot-cli");
 
   for (const skill of [...skills.map(([name]) => name), "apex-next"]) {
     const source = await readFile(skillPath(skill), "utf8");
-    for (const assetRoot of assetRoots) {
-      assert.equal(await readFile(assetSkillPath(assetRoot, skill), "utf8"), source);
-    }
+    assert.equal(await readFile(assetSkillPath(sourceAssets, skill), "utf8"), source);
+    await assert.rejects(readFile(assetSkillPath(projection, skill), "utf8"), { code: "ENOENT" });
   }
 });

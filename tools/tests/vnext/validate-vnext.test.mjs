@@ -196,11 +196,18 @@ test("rejects unknown managed agent tool names while accepting the central inven
       ...Object.values(model.customization.toolInventory.interactiveTools),
       ...model.customization.toolInventory.agentReadTools,
       "web_fetch",
-      "azure-resource-manager-mcp/get_retail_prices",
+      "apex-azure-pricing/get_retail_prices",
     ];
   });
   assert.ok(!hasRule(inventoryResult, "customization.unknown-tool"));
   assert.ok(!hasRule(inventoryResult, "customization.mcp-tool"));
+
+  const retiredServerResult = mutate((model) => {
+    model.customization.agents
+      .find(({ frontmatter }) => frontmatter.name === "APEX")
+      .frontmatter.tools.push("azure-resource-manager-mcp/get_retail_prices");
+  });
+  assert.ok(hasRule(retiredServerResult, "customization.mcp-tool"));
 });
 
 test("rejects ask_user on an autonomous subagent", () => {
@@ -301,32 +308,79 @@ test("rejects a missing MCP tool", () => {
   assert.ok(hasRule(result, "customization.mcp-tool"));
 });
 
-test("rejects a PATH-dependent MCP launch", () => {
+test("rejects plugin MCP launch drift", () => {
   const result = mutate((model) => {
-    model.customization.cliMcp.mcpServers.apex.command = "apex";
-    model.customization.cliMcp.mcpServers.apex.args = ["mcp", "serve"];
+    model.customization.pluginMcp.mcpServers.apex.command = "npx";
+    model.customization.pluginMcp.mcpServers.apex.args = ["--no", "apex", "mcp", "serve"];
   });
-  assert.ok(hasRule(result, "mcp.cli-launch"));
+  assert.ok(hasRule(result, "mcp.plugin-launch"));
+
+  const extraServer = mutate((model) => {
+    model.customization.pluginMcp.mcpServers["azure-resource-manager-mcp"] = { type: "streamable-http", url: "x" };
+  });
+  assert.ok(hasRule(extraServer, "mcp.plugin-launch"));
 });
 
 test("rejects ARM MCP launch drift", () => {
   const endpointResult = mutate((model) => {
-    model.customization.cliMcp.mcpServers["azure-resource-manager-mcp"].url = "https://example.invalid";
+    model.customization.pluginMcp.mcpServers["apex-azure-pricing"].url = "https://example.invalid";
   });
-  assert.ok(hasRule(endpointResult, "mcp.cli-arm-launch"));
+  assert.ok(hasRule(endpointResult, "mcp.plugin-arm-launch"));
 
   const toolsetResult = mutate((model) => {
-    model.customization.cliMcp.mcpServers["azure-resource-manager-mcp"].headers["x-mcp-toolset"] = "Pricing";
+    model.customization.pluginMcp.mcpServers["apex-azure-pricing"].headers["x-mcp-toolset"] = "Pricing";
   });
-  assert.ok(hasRule(toolsetResult, "mcp.cli-arm-launch"));
+  assert.ok(hasRule(toolsetResult, "mcp.plugin-arm-launch"));
 
-  const allowlistResult = mutate((model) => {
-    model.customization.cliMcp.mcpServers["azure-resource-manager-mcp"].tools.push("create_budget");
+  const transportResult = mutate((model) => {
+    model.customization.pluginMcp.mcpServers["apex-azure-pricing"].type = "http";
   });
-  assert.ok(hasRule(allowlistResult, "mcp.cli-arm-launch"));
+  assert.ok(hasRule(transportResult, "mcp.plugin-arm-launch"));
 });
 
-test("rejects client projection declaration and CLI allowlist drift", () => {
+test("rejects plugin settings drift", () => {
+  const marketplace = mutate((model) => {
+    model.customization.pluginSettings.extraKnownMarketplaces["apex-plugins"].source.repo = "someone/else";
+  });
+  assert.ok(hasRule(marketplace, "customization.plugin-settings"));
+
+  const extra = mutate((model) => {
+    model.customization.pluginSettings.model = "gpt-5";
+  });
+  assert.ok(hasRule(extra, "customization.plugin-settings"));
+
+  const disabled = mutate((model) => {
+    model.customization.pluginSettings.enabledPlugins["apex@apex-plugins"] = false;
+  });
+  assert.ok(hasRule(disabled, "customization.plugin-settings"));
+});
+
+test("rejects reintroducing plugin-owned agents, skills or MCP config into the workspace projection", () => {
+  for (const path of [".github/agents/apex.agent.md", ".github/skills/apex-next/SKILL.md", ".mcp.json"]) {
+    const managed = mutate((model) => {
+      model.customization.manifest.managedFiles.push(path);
+    });
+    assert.ok(hasRule(managed, "customization.plugin-reintroduced"), path);
+  }
+  const directory = mutate((model) => {
+    model.customization.manifest.sharedDirectories.push(".github/skills");
+  });
+  assert.ok(hasRule(directory, "customization.plugin-reintroduced"));
+  const projection = mutate((model) => {
+    model.customization.manifest.clientProjections[0].files.push(".mcp.json");
+  });
+  assert.ok(hasRule(projection, "customization.plugin-reintroduced"));
+  const source = mutate((model) => {
+    model.customization.retiredWorkspaceMcp = true;
+  });
+  assert.ok(hasRule(source, "customization.plugin-reintroduced"));
+  const coverage = mutate((model) => {
+    model.customization.manifest.plugin.files.pop();
+  });
+  assert.ok(hasRule(coverage, "customization.plugin-coverage"));
+});
+
+test("rejects client projection declaration drift", () => {
   const projectionResult = mutate((model) => {
     model.customization.manifest.clientProjections[0].files = [".github/mcp.json"];
   });
@@ -342,16 +396,6 @@ test("rejects client projection declaration and CLI allowlist drift", () => {
     });
     assert.ok(hasRule(retiredResult, "customization.schema"));
   }
-
-  const allowlistResult = mutate((model) => {
-    model.customization.cliMcp.mcpServers.apex.tools.pop();
-  });
-  assert.ok(hasRule(allowlistResult, "mcp.cli-launch"));
-
-  const launchResult = mutate((model) => {
-    model.customization.cliMcp.mcpServers.apex.args = ["node_modules/@apexops/cli/dist/cli.js", "mcp", "serve"];
-  });
-  assert.ok(hasRule(launchResult, "mcp.cli-launch"));
 });
 
 test("rejects an unsafe managed path", () => {

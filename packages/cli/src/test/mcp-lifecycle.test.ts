@@ -375,8 +375,8 @@ async function initializedDoctorWorkspace(context: TestContext) {
 test("doctor over MCP stays within the result cap in a fully initialized workspace", async (context) => {
   const { service, call, allChecks } = await initializedDoctorWorkspace(context);
   const report = await service.doctor();
-  // The complete report is the CLI contract; over MCP it would exceed the cap once serialized into the envelope.
-  assert.ok(resultEnvelopeBytes(report) > MCP_MAX_SERIALIZED_RESULT_BYTES);
+  // The complete report is the CLI contract. The thin projection keeps it under the cap, but it still has more managed
+  // checks than the MCP summary carries, so the summary truncates and doctorChecks pages the rest.
   const managed = report.checks.filter(({ id }) => id.startsWith("managed:"));
   assert.ok(managed.length > MCP_DOCTOR_CHECK_LIMIT);
 
@@ -402,8 +402,9 @@ test("doctor over MCP stays within the result cap in a fully initialized workspa
   const diagnose = (await call("diagnose")) as { doctor: DoctorSummary };
   assert.deepEqual(diagnose.doctor.counts, summary.counts);
 
+  // The thin projection's full list fits one doctorChecks page; cursor paging is covered by the paging tests.
   const full = await allChecks();
-  assert.ok(full.pages > 1);
+  assert.equal(full.pages, 1);
   assert.deepEqual(full.checks, report.checks);
 
   const repaired = (await call("doctor", { fix: true, yes: true })) as DoctorSummary & { nextCursor?: string };
@@ -415,8 +416,14 @@ test("doctor over MCP lists problems first and counts truncated failures explici
   const { root, service, call, allChecks } = await initializedDoctorWorkspace(context);
   const lock = JSON.parse(await readFile(join(root, ".apex", "customizations.lock.json"), "utf8")) as {
     files: Array<{ path: string }>;
+    runtime: Array<{ path: string }>;
   };
-  const broken = lock.files.slice(0, MCP_DOCTOR_CHECK_LIMIT + 8);
+  // Workspace and runtime files together exceed the summary limit in the thin projection.
+  const broken = [
+    ...lock.files.map(({ path }) => ({ path })),
+    ...lock.runtime.map(({ path }) => ({ path: `.apex/runtime/${path}` })),
+  ];
+  assert.ok(broken.length > MCP_DOCTOR_CHECK_LIMIT);
   for (const file of broken) await writeFile(join(root, file.path), "tampered\n", "utf8");
   const report = await service.doctor();
   const failed = report.checks.filter(({ ok }) => !ok);

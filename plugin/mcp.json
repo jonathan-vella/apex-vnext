@@ -5,6 +5,13 @@
       "type": "stdio",
       "command": "node",
       "args": ["${PLUGIN_ROOT}/mcp/apex.mjs"]
+    },
+    "apex-azure-pricing": {
+      "type": "streamable-http",
+      "url": "https://mcp.management.azure.com",
+      "headers": {
+        "x-mcp-toolset": "CostManagement,Pricing"
+      }
     }
   }
 }

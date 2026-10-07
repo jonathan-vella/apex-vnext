@@ -50,9 +50,13 @@ npm install --ignore-scripts --no-audit --no-fund \
 npx apex version --json
 ```
 
-Initialize the workspace with `apex init`. It installs the Copilot CLI projection and `.mcp.json`, which standalone
-Copilot CLI and the VS Code Copilot harness both use; `github-copilot-cli` is the only client value. Start APEX with
-`copilot --agent apex`.
+Initialize the workspace with `apex init`. It writes the thin workspace projection: `.github/copilot/settings.json`,
+instructions, the governance workflow and scripts, and `.apex/`. The settings file enables `apex@apex-plugins`, so
+Copilot installs the plugin that carries the agents, skills and MCP servers; standalone Copilot CLI and the VS Code
+Copilot harness both use it. `github-copilot-cli` is the only client value. Start APEX with `copilot --agent apex`.
+
+Run `apex update` once in a workspace created before the plugin. It removes the copied agents, skills and `.mcp.json`
+you did not edit and lists edited copies under `conflicts`; move or delete those so they do not shadow the plugin.
 
 For an approved registry release, follow [Publish npm Packages](publish-npm.md) before using the published bootstrap
 route.
@@ -121,7 +125,7 @@ change the selected run, adopt conflicting files or repair partial state automat
 ## Use The Projection In VS Code
 
 Open the workspace in VS Code, start a chat with the session target set to Copilot, and pick an APEX agent in the Agent
-picker. The VS Code Copilot harness reads the workspace `.mcp.json`. Over WSL, VS Code `1.139.0` with Copilot Chat
+picker. The VS Code Copilot harness uses the plugin's MCP servers. Over WSL, VS Code `1.139.0` with Copilot Chat
 `0.67.0` does not apply a picked agent yet; use standalone Copilot CLI there.
 
 The release-blocking end-user lifecycle scenarios are listed in the
@@ -155,8 +159,9 @@ npx apex customizations rollback --json
 npx apex doctor --json
 ```
 
-Rollback restores the prior managed bundle. It does not downgrade persisted contracts, project journals, or deployment
-evidence. Restore package and `.apex` state from a matching checkpoint if a package rollback is required.
+Rollback restores the prior managed bundle and removes unedited files only the current bundle installed; it reports
+edited ones as conflicts. It does not downgrade persisted contracts, project journals, or deployment evidence. Restore
+package and `.apex` state from a matching checkpoint if a package rollback is required.
 
 ## Uninstall Or Reinstall
 

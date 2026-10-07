@@ -3,13 +3,19 @@
  * APEX plugin hook. One dependency-free script for every hook event: hooks.json runs it from a bash and a PowerShell
  * command entry with the event name as the only argument, and the client writes the camelCase hook payload to stdin.
  *
- * preToolUse: deny the user-facing APEX agent as a `task` target. A person selects APEX in the agent picker; it never
- * runs as a subagent. Hidden workers, built-in agents and every other tool are left to the normal permission flow.
+ * preToolUse:
+ * - Deny the user-facing APEX agent as a `task` target. A person selects APEX in the agent picker; it never runs as a
+ *   subagent. Hidden workers and built-in agents are left to the normal permission flow.
+ * - Deny every tool on the plugin's `apex-azure-pricing` server (Azure Resource Manager MCP) except the read-only
+ *   pricing and cost tools. The plugin cannot give a remote server a tool allowlist, so without this rule its write
+ *   tools, such as budget creation, would reach every agent. Unknown or unparseable tool names on that server are
+ *   denied. Every other tool is left to the normal permission flow.
  *
  * Failure rule: the script always exits 0, because the client denies a preToolUse call when a command hook exits
  * non-zero. Input it cannot parse therefore allows the call (fail open), except that a raw-text scan still denies a
- * `task` call whose target it can read as APEX (fail closed for the deny rule). Allowing means writing nothing:
- * empty output keeps the client's default behaviour, while `permissionDecision: "allow"` could bypass its prompt.
+ * `task` call whose target it can read as APEX and any call it can read as aimed at the pricing server, unless the
+ * tool is an allowed read tool (fail closed for the deny rules). Allowing means writing nothing: empty output keeps
+ * the client's default behaviour, while `permissionDecision: "allow"` could bypass its prompt.
  *
  * New handlers (CP-16: postToolUse rubber-duck capture, preToolUse deny of APEX state-changing tools during
  * rubber-duck calls) are added to `handlers` without changing the runner.
@@ -23,6 +29,16 @@ export const APEX_AGENT_ID = "apex";
 const TASK_TOOLS = new Set(["task", "Task", "Agent"]);
 
 export const APEX_PLUGIN_NAME = "apex";
+
+export const PRICING_SERVER = "apex-azure-pricing";
+// build-plugin.mjs replaces this line with managedPolicy.candidateReadAllowlist from
+// tools/registry/arm-mcp-cost-pricing.v1.json. Unbuilt, the hook allows no pricing tool.
+export const PRICING_READ_TOOLS = Object.freeze([]); // @apex-build: pricing-read-tools
+// The server name, with "-" or "_" between its words, anywhere in a tool name.
+const PRICING_SERVER_MARK = /apex[-_]azure[-_]pricing/iu;
+// Copilot CLI sends "apex-azure-pricing-<tool>" (probed with 1.0.93). Also accepted: "/", ":" or "." separators and
+// the "mcp__<server>__<tool>" and "mcp_<server>_<tool>" forms other hosts use.
+const PRICING_TOOL_NAME = /^(?:mcp_{1,2})?apex[-_]azure[-_]pricing(?:-|_{1,2}|\/|:|\.)([A-Za-z0-9_.-]+)$/iu;
 
 /**
  * Lower-case agent ID without the APEX plugin namespace or file suffix: "apex:APEX.agent.md" becomes "apex". Copilot
@@ -53,6 +69,30 @@ function apexTaskDenial(target) {
   );
 }
 
+/**
+ * Returns the tool on the pricing server that a tool name addresses: a tool name, "" when the name addresses the server
+ * but no tool can be read from it, or undefined when the name is not for the pricing server.
+ */
+export function pricingTool(toolName) {
+  if (typeof toolName !== "string") return undefined;
+  const name = toolName.trim();
+  if (!PRICING_SERVER_MARK.test(name)) return undefined;
+  return PRICING_TOOL_NAME.exec(name)?.[1] ?? "";
+}
+
+function pricingDenial(toolName) {
+  return deny(
+    `"${toolName}" is not one of the read-only Azure pricing and cost tools. APEX uses only read-only tools from the ` +
+      `${PRICING_SERVER} server; write, operation and unrecognized tools on it are blocked.`,
+  );
+}
+
+function denyPricingWrite({ toolName }) {
+  const tool = pricingTool(toolName);
+  if (tool === undefined) return null;
+  return PRICING_READ_TOOLS.includes(tool) ? null : pricingDenial(toolName);
+}
+
 function isObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
@@ -69,6 +109,11 @@ export function readPayload(text) {
   return { payload, toolName: String(payload.toolName ?? payload.tool_name ?? ""), args: isObject(args) ? args : {} };
 }
 
+/** Finds tool names in text that is not valid JSON, including JSON-escaped payloads. */
+export function scanToolNames(text) {
+  return [...text.matchAll(/\\*"(?:toolName|tool_name)\\*"\s*:\s*\\*"([^"\\]*)\\*"/gu)].map((match) => match[1]);
+}
+
 /** Finds agent_type values in text that is not valid JSON, including JSON-escaped toolArgs strings. */
 export function scanTaskTargets(text) {
   if (!/\\*"(?:toolName|tool_name)\\*"\s*:\s*\\*"(?:task|Task|Agent)\\*"/u.test(text)) return [];
@@ -83,14 +128,24 @@ function denyApexTaskTarget({ toolName, args }) {
 
 /** Handlers per event. The first handler that returns a decision wins. */
 export const handlers = Object.freeze({
-  preToolUse: Object.freeze([denyApexTaskTarget]),
+  preToolUse: Object.freeze([denyApexTaskTarget, denyPricingWrite]),
 });
 
-/** Fallback for unreadable input: only the deny rule applies, and only to a target it can read as APEX. */
+/**
+ * Fallback for unreadable input: the deny rules apply to what the raw text shows. A task target readable as APEX is
+ * denied. A pricing-server tool name is denied unless it is an allowed read tool, and so is text that names the
+ * pricing server without any readable tool name.
+ */
 function failSafe(event, text) {
   if (event !== "preToolUse") return null;
   const target = scanTaskTargets(text).find(isApexAgent);
-  return target === undefined ? null : apexTaskDenial(target);
+  if (target !== undefined) return apexTaskDenial(target);
+  const names = scanToolNames(text);
+  for (const name of names) {
+    const decision = denyPricingWrite({ toolName: name });
+    if (decision) return decision;
+  }
+  return names.length === 0 && PRICING_SERVER_MARK.test(text) ? pricingDenial(PRICING_SERVER) : null;
 }
 
 /** One-line JSON with every non-ASCII character escaped, so a shell that re-encodes stdout cannot corrupt it. */

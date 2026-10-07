@@ -58,11 +58,12 @@ npx apex init \
   --json
 ```
 
-For Terraform, replace `--iac bicep` with `--iac terraform`. The initialized workspace contains the CLI projection and
-`.mcp.json`.
+For Terraform, replace `--iac bicep` with `--iac terraform`. The initialized workspace contains
+`.github/copilot/settings.json`, which installs the `apex` plugin, plus the instructions, the governance workflow and
+`.apex/`.
 
 Start Copilot CLI in the same directory with `copilot --agent apex` and continue the project. Ask APEX what is next at
-any point; it names the owning agent and prints `/agent <name>` with a scope prompt to paste after you switch.
+any point; it reads kernel state, continues in the same APEX agent and delegates only to its hidden workers.
 
 ## Verify The Workspace
 

@@ -1,16 +1,15 @@
 ## Managed Workspace Source
 
-This directory is the versioned source bundle installed into consumer repositories by `apex init` and updated by
-`apex update`. Its payload uses supported workspace discovery paths:
+This directory is the versioned source for two outputs:
 
-- `.github/agents/`
-- `.github/skills/`
-- `.github/copilot-instructions.md`
-- `.mcp.json`
+- The thin workspace projection that `apex init` installs and `apex update` updates: `.github/copilot/settings.json`,
+  `.github/copilot-instructions.md`, `.github/instructions/`, and the governance workflow and scripts.
+- The `apex` plugin built by `tools/scripts/build-plugin.mjs`: agents from `.github/agents/` and skills from
+  `.github/skills/`. The plugin owns these paths, so they are never copied into a consumer workspace.
 
-`manifest.json` records the bundle version, managed files, agent roles, supported targets, invocation edges, interaction
-types, and recommended models. A client projection omits roles that do not declare its target; unsupported roles are
-never installed or added to the managed lock.
+`manifest.json` records the bundle version, managed workspace files, the plugin declaration and the files it owns,
+agent roles, supported targets, invocation edges and interaction types. The plugin renders only roles that declare the
+`github-copilot` target.
 
 ## Editing Policy
 

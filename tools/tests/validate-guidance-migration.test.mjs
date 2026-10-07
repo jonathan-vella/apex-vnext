@@ -236,5 +236,5 @@ test("completed design guidance mappings retain only packaged or deferred owners
       ),
   );
   const manifest = JSON.parse(await readFile(resolve(root, "customizations/manifest.json"), "utf8"));
-  assert.ok(manifest.managedFiles.includes(".github/skills/apex-azure-defaults/references/decision-boundaries.md"));
+  assert.ok(manifest.plugin.files.includes(".github/skills/apex-azure-defaults/references/decision-boundaries.md"));
 });

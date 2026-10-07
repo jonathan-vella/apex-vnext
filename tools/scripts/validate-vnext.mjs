@@ -13,7 +13,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import Ajv2020 from "ajv/dist/2020.js";
 import * as yaml from "js-yaml";
-import { GENERATED_SHARED_FILES } from "../../packages/cli/scripts/prepare-assets.mjs";
+import {
+  GENERATED_SHARED_FILES,
+  renderClientAgentProjection,
+  roleDelegatesOnClient,
+} from "../../packages/cli/scripts/prepare-assets.mjs";
+import { MARKETPLACE_NAME, MARKETPLACE_REPOSITORY, PLUGIN_NAME } from "./publish-plugin.mjs";
 
 const REQUIRED_PACKAGES = ["contracts", "kernel", "capabilities", "renderers", "testkit", "cli"];
 const CORE_PACKAGES = new Set(["kernel", "capabilities", "renderers"]);
@@ -91,21 +96,13 @@ const RETIRED_AGENT_TOOLS = ["vscode/askQuestions", "agent"];
 const EXPLICIT_WEB_TOOLS = ["web_fetch"];
 const SECRET_KEY = /(secret|password|passwd|token|privateKey|clientSecret|connectionString)/i;
 const SOURCE_IMPORT = /(?:from\s+|import\s*\()["']([^"']+)["']/g;
+const ARM_MCP_SERVER = "apex-azure-pricing";
 const ARM_MCP_ENDPOINT = "https://mcp.management.azure.com";
 const ARM_MCP_TOOLSET = "CostManagement,Pricing";
-const ARM_MCP_READ_TOOLS = [
-  "get_retail_prices",
-  "query_costs",
-  "query_aks_costs",
-  "forecast_costs",
-  "list_dimensions",
-  "list_budgets",
-  "get_budget",
-  "list_alerts",
-  "list_benefit_utilization",
-  "get_benefit_recommendations",
-  "list_reservation_transactions",
-];
+// One read allowlist for agent tool references, the plugin hook and the registry.
+const ARM_MCP_READ_TOOLS = JSON.parse(
+  readFileSync(new URL("../registry/arm-mcp-cost-pricing.v1.json", import.meta.url), "utf8"),
+).managedPolicy.candidateReadAllowlist;
 const ASK_USER_ARGUMENT_SYNTAX = [
   {
     name: "question",
@@ -349,7 +346,14 @@ export function loadRepositoryModel(root = process.cwd()) {
         path: relative(path.join(root, "customizations"), file),
         content: readFileSync(file, "utf8"),
       })),
-      cliMcp: readJson(path.join(root, "customizations", ".mcp.json")),
+      pluginMcp: readJson(path.join(root, "plugin", "mcp.json")),
+      pluginSettings: readJson(path.join(root, "customizations", ".github", "copilot", "settings.json")),
+      retiredWorkspaceMcp: existsSync(path.join(root, "customizations", ".mcp.json")),
+      pluginSourceFiles: ["agents", "skills"].flatMap((directory) =>
+        walk(path.join(root, "customizations", ".github", directory), () => true).map((file) =>
+          relative(path.join(root, "customizations"), file),
+        ),
+      ),
       toolInventory: readJson(path.join(root, "tools", "registry", "copilot-cli-agent-tools.json")),
     },
     contracts: {
@@ -685,22 +689,55 @@ function validateCustomizations(model, findings) {
     }
     return;
   }
-  const expectedSharedFiles = new Set([
-    ...GENERATED_SHARED_FILES,
-    ...customization.skills.map(({ path: file }) => file),
-    ".github/copilot-instructions.md",
-  ]);
+  const expectedSharedFiles = new Set([...GENERATED_SHARED_FILES, ".github/copilot-instructions.md"]);
   const sharedDirectories = array(customization.manifest.sharedDirectories);
   const skillCoveredByDirectory = (file) => sharedDirectories.some((directory) => file.startsWith(`${directory}/`));
   const expectedProjectionFiles = new Map([
-    ["github-copilot-cli", { files: [".mcp.json"], generatedRoot: "client-projections/github-copilot-cli" }],
+    [
+      "github-copilot-cli",
+      { files: [".github/copilot/settings.json"], generatedRoot: "client-projections/github-copilot-cli" },
+    ],
   ]);
   const expectedAgentFiles = new Set(customization.agents.map(({ path: file }) => file));
   const expectedFiles = new Set([
     ...expectedSharedFiles,
-    ...expectedAgentFiles,
     ...[...expectedProjectionFiles.values()].flatMap(({ files }) => files),
   ]);
+  const plugin = object(customization.manifest.plugin) ? customization.manifest.plugin : {};
+  const ownedFiles = array(plugin.ownedFiles);
+  const ownedDirectories = array(plugin.ownedDirectories);
+  const pluginOwned = (file) =>
+    ownedFiles.includes(file) ||
+    ownedDirectories.some(
+      (directory) => file === directory || file.startsWith(`${directory}/`) || directory.startsWith(`${file}/`),
+    );
+  const expectedPluginFiles = [...array(customization.pluginSourceFiles)].sort();
+  if (
+    JSON.stringify(ownedFiles) !== JSON.stringify([".mcp.json"]) ||
+    JSON.stringify(ownedDirectories) !== JSON.stringify([".github/agents", ".github/skills"]) ||
+    JSON.stringify([...array(plugin.files)].sort()) !== JSON.stringify(expectedPluginFiles)
+  )
+    finding(
+      findings,
+      "customization.plugin-coverage",
+      "The plugin declaration must own agents, skills and .mcp.json and list exactly the agent and skill sources",
+      "customizations/manifest.json",
+    );
+  const reintroduced = [
+    ...array(customization.manifest.managedFiles),
+    ...array(customization.manifest.sharedFiles),
+    ...sharedDirectories,
+    ...array(customization.manifest.clientProjections).flatMap(({ files }) => array(files)),
+  ].filter(pluginOwned);
+  if (reintroduced.length > 0 || customization.retiredWorkspaceMcp)
+    finding(
+      findings,
+      "customization.plugin-reintroduced",
+      `Plugin-owned files must not return to the workspace projection: ${[
+        ...new Set([...reintroduced, ...(customization.retiredWorkspaceMcp ? ["customizations/.mcp.json"] : [])]),
+      ].join(", ")}`,
+      "customizations/manifest.json",
+    );
   const managedFiles = array(customization.manifest.managedFiles);
   if (
     managedFiles.length !== new Set(managedFiles).size ||
@@ -712,7 +749,7 @@ function validateCustomizations(model, findings) {
     finding(
       findings,
       "customization.coverage",
-      "Managed-file manifest must exactly cover agents, skills, instructions, and MCP config",
+      "Managed-file manifest must exactly cover instructions, governance files and plugin settings",
       "customizations/manifest.json",
     );
   const sharedFiles = array(customization.manifest.sharedFiles);
@@ -724,7 +761,7 @@ function validateCustomizations(model, findings) {
     finding(
       findings,
       "customization.shared-coverage",
-      "Shared files must exactly cover client-neutral skills and managed guidance once",
+      "Shared files must exactly cover the governance files and managed guidance once",
       "customizations/manifest.json",
     );
   const projections = array(customization.manifest.clientProjections);
@@ -806,7 +843,7 @@ function validateCustomizations(model, findings) {
   const agents = new Map(customization.agents.map((agent) => [agent.frontmatter?.name, agent]));
   const allowedMcp = new Set([
     ...model.mcpTools.map((tool) => `apex/${tool}`),
-    ...ARM_MCP_READ_TOOLS.map((tool) => `azure-resource-manager-mcp/${tool}`),
+    ...ARM_MCP_READ_TOOLS.map((tool) => `${ARM_MCP_SERVER}/${tool}`),
   ]);
   const inventory = customization.toolInventory;
   const clientAgentTools = new Set([
@@ -966,11 +1003,34 @@ function validateCustomizations(model, findings) {
   }
 
   const cliRoot = path.join(model.root, "packages", "cli", "assets", "client-projections", "github-copilot-cli");
-  const cliAgents = walk(path.join(cliRoot, ".github", "agents"), (file) => file.endsWith(".agent.md"));
-  for (const file of cliAgents) {
-    const projectionPath = relative(cliRoot, file);
-    const repositoryPath = relative(model.root, file);
-    const content = readFileSync(file, "utf8");
+  for (const retired of [".github/agents", ".github/skills", ".mcp.json"])
+    if (existsSync(path.join(cliRoot, retired)))
+      finding(
+        findings,
+        "customization.plugin-reintroduced",
+        `The bundled workspace projection must not carry plugin-owned ${retired}`,
+        relative(model.root, path.join(cliRoot, retired)),
+      );
+  for (const sourceAgent of customization.agents) {
+    const projectionPath = sourceAgent.path;
+    const repositoryPath = `customizations/${projectionPath}`;
+    const sourceRole = array(customization.manifest.roles).find(({ source }) => source === projectionPath);
+    let content;
+    try {
+      content = renderClientAgentProjection(sourceAgent.content, "github-copilot-cli", inventory, {
+        delegates:
+          sourceRole !== undefined &&
+          roleDelegatesOnClient(
+            sourceRole,
+            "github-copilot-cli",
+            array(customization.manifest.roles),
+            array(customization.manifest.invocationEdges),
+          ),
+      });
+    } catch (error) {
+      finding(findings, "customization.cli-agent", `${projectionPath}: ${error.message}`, repositoryPath);
+      continue;
+    }
     const prescribed = findAskUserArgumentPrescription(content);
     if (prescribed)
       finding(
@@ -1006,7 +1066,6 @@ function validateCustomizations(model, findings) {
       continue;
     }
     const interactive = role.interactionType === "interactive-handoff";
-    const sourceAgent = customization.agents.find(({ path: sourcePath }) => sourcePath === projectionPath);
     const expectedDisableModelInvocation = sourceAgent?.frontmatter?.["disable-model-invocation"] ?? false;
     if (
       frontmatter["user-invocable"] !== interactive ||
@@ -1106,35 +1165,53 @@ function validateCustomizations(model, findings) {
 }
 
 function validateMcp(model, findings) {
-  const cliServers = model.customization.cliMcp.mcpServers;
-  const cliApex = cliServers && Object.keys(cliServers).length === 2 ? cliServers.apex : undefined;
-  const cliArmMcp = cliServers?.["azure-resource-manager-mcp"];
+  const servers = object(model.customization.pluginMcp?.mcpServers) ? model.customization.pluginMcp.mcpServers : {};
+  const apex = servers.apex;
+  const pricing = servers[ARM_MCP_SERVER];
   if (
-    !cliApex ||
-    cliApex.type !== "local" ||
-    cliApex.command !== "npx" ||
-    JSON.stringify(cliApex.args) !== JSON.stringify(["--no", "apex", "mcp", "serve"]) ||
-    Object.keys(cliApex.env ?? {}).length > 0 ||
-    JSON.stringify(cliApex.tools) !== JSON.stringify(model.mcpTools)
+    JSON.stringify(Object.keys(servers)) !== JSON.stringify(["apex", ARM_MCP_SERVER]) ||
+    !apex ||
+    apex.type !== "stdio" ||
+    apex.command !== "node" ||
+    JSON.stringify(apex.args) !== JSON.stringify(["${PLUGIN_ROOT}/mcp/apex.mjs"]) ||
+    apex.env !== undefined
   )
     finding(
       findings,
-      "mcp.cli-launch",
-      "Managed Copilot CLI MCP config must launch the workspace-local APEX CLI with the exact tool allowlist",
-      "customizations/.mcp.json",
+      "mcp.plugin-launch",
+      `The plugin MCP config must declare exactly apex (node \${PLUGIN_ROOT}/mcp/apex.mjs) and ${ARM_MCP_SERVER}`,
+      "plugin/mcp.json",
     );
   if (
-    !cliArmMcp ||
-    cliArmMcp.type !== "http" ||
-    cliArmMcp.url !== ARM_MCP_ENDPOINT ||
-    JSON.stringify(cliArmMcp.headers) !== JSON.stringify({ "x-mcp-toolset": ARM_MCP_TOOLSET }) ||
-    JSON.stringify(cliArmMcp.tools) !== JSON.stringify(ARM_MCP_READ_TOOLS)
+    !pricing ||
+    pricing.type !== "streamable-http" ||
+    pricing.url !== ARM_MCP_ENDPOINT ||
+    JSON.stringify(pricing.headers) !== JSON.stringify({ "x-mcp-toolset": ARM_MCP_TOOLSET })
   )
     finding(
       findings,
-      "mcp.cli-arm-launch",
-      "Managed Copilot CLI config must connect directly to ARM MCP with the exact read-only tool allowlist",
-      "customizations/.mcp.json",
+      "mcp.plugin-arm-launch",
+      `The plugin MCP config must connect ${ARM_MCP_SERVER} directly to ARM MCP with the ${ARM_MCP_TOOLSET} toolsets`,
+      "plugin/mcp.json",
+    );
+  const plugin = object(model.customization.manifest.plugin) ? model.customization.manifest.plugin : {};
+  const expectedSettings = {
+    enabledPlugins: { [`${PLUGIN_NAME}@${MARKETPLACE_NAME}`]: true },
+    extraKnownMarketplaces: {
+      [MARKETPLACE_NAME]: { source: { source: "github", repo: MARKETPLACE_REPOSITORY } },
+    },
+  };
+  if (
+    plugin.name !== PLUGIN_NAME ||
+    plugin.marketplace !== MARKETPLACE_NAME ||
+    plugin.marketplaceRepository !== MARKETPLACE_REPOSITORY ||
+    JSON.stringify(model.customization.pluginSettings) !== JSON.stringify(expectedSettings)
+  )
+    finding(
+      findings,
+      "customization.plugin-settings",
+      `Workspace settings must enable ${PLUGIN_NAME}@${MARKETPLACE_NAME} from ${MARKETPLACE_REPOSITORY} and nothing else`,
+      "customizations/.github/copilot/settings.json",
     );
 }
 

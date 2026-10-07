@@ -252,7 +252,10 @@ export function collectGuidanceMigrationInputs(root = process.cwd()) {
   );
   const matrix = JSON.parse(readFileSync(matrixPath, "utf8"));
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
-  const managedFiles = Array.isArray(manifest.managedFiles) ? new Set(manifest.managedFiles) : null;
+  // Skills ship in the apex plugin; instructions stay in the workspace projection. Both count as managed delivery.
+  const managedFiles = Array.isArray(manifest.managedFiles)
+    ? new Set([...manifest.managedFiles, ...(Array.isArray(manifest.plugin?.files) ? manifest.plugin.files : [])])
+    : null;
   const sourceInstructions = (matrix.instructionDispositions ?? [])
     .map((entry) => entry?.source)
     .filter(isNonEmptyString);

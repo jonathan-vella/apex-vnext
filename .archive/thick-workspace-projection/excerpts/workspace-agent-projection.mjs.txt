@@ -1,0 +1,67 @@
+// Removed in CP-11 from packages/cli/scripts/prepare-assets.mjs (prepareClientProjections).
+// It was last live in the parent of the CP-11 merge on main.
+// It rendered each manifest role into the workspace projection at client-projections/github-copilot-cli/.github/agents/.
+// tools/scripts/build-plugin.mjs now renders the same agents into the plugin with renderClientAgentProjection.
+
+    for (const role of roles) {
+      if (!roleSupportsClient(role, client)) continue;
+      const sourcePath = join(repositoryRoot, "customizations", role.source);
+      const source = (await readSourceFile(pinnedCustomizations.resolvedRoot, sourcePath)).toString("utf8");
+      const sourceHash = createHash("sha256").update(source).digest("hex");
+      const delegates = roleDelegatesOnClient(role, client, roles, customizationManifest.invocationEdges);
+      const rendered = Buffer.from(renderClientAgentProjection(source, client, toolInventory, { delegates }), "utf8");
+      const destination = join(generatedRoot, role.source);
+      assertContained(generatedRoot, destination);
+      await mkdir(dirname(destination), { recursive: true });
+      await writeFile(destination, rendered);
+      inventory.push({
+        path: portablePath(relative(assetsRoot, destination)),
+        source: {
+          kind: "generated",
+          composition: "client-projections",
+          roleId: role.id,
+          sourcePath: role.source,
+          sourceHash,
+          clientId: client,
+          target: role.source,
+          adapterVersion: CLIENT_ADAPTER_VERSION,
+        },
+        sha256: createHash("sha256").update(rendered).digest("hex"),
+        bytes: rendered.byteLength,
+      });
+    }
+
+// Removed in CP-11 from tools/scripts/validate-vnext.mjs; plugin/mcp.json checks replace it.
+
+function validateMcp(model, findings) {
+  const cliServers = model.customization.cliMcp.mcpServers;
+  const cliApex = cliServers && Object.keys(cliServers).length === 2 ? cliServers.apex : undefined;
+  const cliArmMcp = cliServers?.["azure-resource-manager-mcp"];
+  if (
+    !cliApex ||
+    cliApex.type !== "local" ||
+    cliApex.command !== "npx" ||
+    JSON.stringify(cliApex.args) !== JSON.stringify(["--no", "apex", "mcp", "serve"]) ||
+    Object.keys(cliApex.env ?? {}).length > 0 ||
+    JSON.stringify(cliApex.tools) !== JSON.stringify(model.mcpTools)
+  )
+    finding(
+      findings,
+      "mcp.cli-launch",
+      "Managed Copilot CLI MCP config must launch the workspace-local APEX CLI with the exact tool allowlist",
+      "customizations/.mcp.json",
+    );
+  if (
+    !cliArmMcp ||
+    cliArmMcp.type !== "http" ||
+    cliArmMcp.url !== ARM_MCP_ENDPOINT ||
+    JSON.stringify(cliArmMcp.headers) !== JSON.stringify({ "x-mcp-toolset": ARM_MCP_TOOLSET }) ||
+    JSON.stringify(cliArmMcp.tools) !== JSON.stringify(ARM_MCP_READ_TOOLS)
+  )
+    finding(
+      findings,
+      "mcp.cli-arm-launch",
+      "Managed Copilot CLI config must connect directly to ARM MCP with the exact read-only tool allowlist",
+      "customizations/.mcp.json",
+    );
+}

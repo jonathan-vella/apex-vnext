@@ -5,12 +5,19 @@
 
 ## Canonical Source
 
-The managed source under `customizations/.github` defines the single foreground APEX agent, hidden workers, skills and
-instructions; `customizations/.mcp.json` defines workspace MCP. `customizations/manifest.json` records files, roles,
-the supported target, interaction types and invocation edges.
+The managed source under `customizations/.github` defines the single foreground APEX agent, hidden workers, skills,
+instructions and the plugin settings file. `plugin/mcp.json` defines the plugin's MCP servers: `apex` and
+`apex-azure-pricing`. `customizations/manifest.json` records workspace files, the plugin declaration and the files it
+owns, roles, the supported target, interaction types and invocation edges.
 
-`packages/cli/scripts/prepare-assets.mjs` validates the sources and renders the single `github-copilot-cli` projection.
-Packaged assets are derived output and must match canonical source.
+`packages/cli/scripts/prepare-assets.mjs` validates the sources and generates the thin `github-copilot-cli` workspace
+projection. `tools/scripts/build-plugin.mjs` renders the agents with the same Copilot CLI renderer and packages them
+with the skills, hooks and MCP servers into the `apex` plugin. Packaged assets are derived output and must match
+canonical source.
+
+The plugin cannot restrict which tools a remote MCP server exposes, and the `CostManagement` toolset includes writes
+such as budget creation. A managed `preToolUse` hook therefore denies every `apex-azure-pricing` tool that is not in
+the read allowlist of `tools/registry/arm-mcp-cost-pricing.v1.json`, for every agent in the session.
 
 ## Consumer Guidance
 
@@ -47,17 +54,27 @@ completes a task or approves a gate.
 
 ## Installation Lifecycle
 
-`apex init` installs the CLI projection and records it in the managed lock. `apex update` performs a managed three-way
-update. Rollback, uninstall, and reinstall preserve unrelated files and report conflicts rather than overwriting user
-content silently.
+`apex init` writes a thin workspace projection and records it in the managed lock:
+
+- `.github/copilot/settings.json`, whose `enabledPlugins` and `extraKnownMarketplaces` entries make Copilot install
+  `apex@apex-plugins` from the [apex-plugins](https://github.com/jonathan-vella/apex-plugins) marketplace;
+- instructions with `applyTo` globs and `.github/copilot-instructions.md`;
+- the governance workflow, script and schema;
+- `.apex/` with the runtime, lock and project state.
+
+The plugin owns the agents, skills and MCP servers, so `apex init` copies no `.github/agents/`, `.github/skills/` or
+`.mcp.json`. The lock records them in an `externally-managed` class: `doctor` neither checks nor repairs them, and a
+customization source that tries to copy one is rejected. `apex update` performs a managed three-way update. Rollback,
+uninstall, and reinstall preserve unrelated files and report conflicts rather than overwriting user content silently.
+
+`apex update` and `apex doctor --fix --yes` migrate a workspace from the earlier thick projection. They remove copied
+agents, skills and `.mcp.json` the user did not edit. Edited copies stay in place, are listed in `conflicts` and in the
+lock's `retained` entries, and `doctor` reports each one until you move or delete it, because a workspace copy would
+shadow the plugin's file. The [archive](../../.archive/thick-workspace-projection/ROLLBACK.md) records the retired
+surface and its rollback.
 
 `apex bootstrap` is the common onboarding path for global CLI, one-shot `npx`, and Copilot-agent entry points. It pins
-the runtime that `.mcp.json` launches, then delegates projection installation to `apex init`.
-
-This is the current npm-managed mechanism. [The roadmap](../vnext/ROADMAP.md#phase-6-distribution-last) defers Agent
-Plugins evaluation until feature completion and couples it with APEX MCP redistribution. A plugin format alone does
-not prove workspace selection, credential handling, runtime compatibility or rollback. Do not maintain a second set of
-editable agents/skills or introduce duplicate MCP registrations during a future migration.
+the runtime, then delegates projection installation to `apex init`.
 
 ## Support Versus Qualification
 

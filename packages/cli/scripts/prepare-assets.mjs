@@ -11,7 +11,7 @@ const repositoryRoot = resolve(packageRoot, "../..");
 const assetsRoot = join(packageRoot, "assets");
 const LOCK_DOMAIN = "apex-bundled-assets-v1\0";
 const PROJECTION_DOMAIN = "apex-client-projection-v1\0";
-const CLIENT_ADAPTER_VERSION = "1.10.0";
+const CLIENT_ADAPTER_VERSION = "1.11.0";
 export const ASSET_GENERATION_LOCK_ENV = "APEX_ASSET_GENERATION_LOCK_HELD";
 const ASSET_GENERATION_LOCK_TTL_MS = 5 * 60 * 1000;
 const ASSET_GENERATION_LOCK_RETRY_MS = 50;
@@ -338,7 +338,48 @@ export function validateClientProjectionDeclarations(customizationManifest) {
   ) {
     throw new Error("Client projection declarations are invalid");
   }
-  return { sharedFiles, sharedDirectories, clientProjections, roles };
+  const plugin = validatePluginDeclaration(customizationManifest.plugin);
+  const workspacePaths = [
+    ...sharedFiles,
+    ...sharedDirectories,
+    ...(customizationManifest.managedFiles ?? []),
+    ...clientProjections.flatMap(({ files }) => files),
+  ];
+  const reintroduced = workspacePaths.find(
+    (path) =>
+      pluginOwnsPath(plugin, path) || plugin.ownedDirectories.some((directory) => directory.startsWith(`${path}/`)),
+  );
+  if (reintroduced !== undefined) {
+    throw new Error(`Plugin-owned path must not return to the workspace projection: ${reintroduced}`);
+  }
+  return { sharedFiles, sharedDirectories, clientProjections, roles, plugin };
+}
+
+export function validatePluginDeclaration(plugin) {
+  if (
+    plugin === null ||
+    typeof plugin !== "object" ||
+    Array.isArray(plugin) ||
+    plugin.name !== "apex" ||
+    plugin.marketplace !== "apex-plugins" ||
+    plugin.marketplaceRepository !== "jonathan-vella/apex-plugins" ||
+    [plugin.ownedFiles, plugin.ownedDirectories, plugin.files].some(
+      (paths) =>
+        !Array.isArray(paths) || paths.length !== new Set(paths).size || paths.some((path) => !safeRelativePath(path)),
+    ) ||
+    plugin.ownedDirectories.length === 0 ||
+    plugin.files.some((path) => !plugin.ownedDirectories.some((directory) => path.startsWith(`${directory}/`)))
+  ) {
+    throw new Error("Plugin declaration is invalid");
+  }
+  return plugin;
+}
+
+export function pluginOwnsPath(plugin, path) {
+  return (
+    plugin.ownedFiles.includes(path) ||
+    plugin.ownedDirectories.some((directory) => path === directory || path.startsWith(`${directory}/`))
+  );
 }
 
 export function roleSupportsClient(role, clientId) {
@@ -356,7 +397,7 @@ export function roleDelegatesOnClient(role, clientId, roles, invocationEdges) {
   );
 }
 
-function validateCliToolInventory(value) {
+export function validateCliToolInventory(value) {
   const maintenanceAllowlist = ["bash", "view", "glob", "rg", "apply_patch"];
   const maintenanceDenylist = [
     "ask_user",
@@ -400,10 +441,10 @@ function validateCliToolInventory(value) {
 }
 
 async function prepareClientProjections(customizationManifest, pinnedCustomizations, inventory, generatedSharedFiles) {
-  const { sharedFiles, sharedDirectories, clientProjections, roles } =
+  const { sharedFiles, sharedDirectories, clientProjections, plugin } =
     validateClientProjectionDeclarations(customizationManifest);
   const toolInventoryPath = join(repositoryRoot, "tools", "registry", "copilot-cli-agent-tools.json");
-  const toolInventory = validateCliToolInventory(JSON.parse(await readFile(toolInventoryPath, "utf8")));
+  validateCliToolInventory(JSON.parse(await readFile(toolInventoryPath, "utf8")));
   const metadataDestination = join(assetsRoot, "client-projection-metadata", "copilot-cli-agent-tools.json");
   await mkdir(dirname(metadataDestination), { recursive: true });
   const metadataBytes = await readFile(toolInventoryPath);
@@ -435,10 +476,11 @@ async function prepareClientProjections(customizationManifest, pinnedCustomizati
     const client = projection.id;
     const generatedRoot = join(assetsRoot, projection.generatedRoot);
     assertContained(assetsRoot, generatedRoot);
-    const roleSources = new Set(roles.filter((role) => roleSupportsClient(role, client)).map(({ source }) => source));
-    const sources = [...new Set([...sharedFiles, ...sharedDirectoryFiles, ...projection.files])].filter(
-      (path) => !roleSources.has(path),
-    );
+    const sources = [...new Set([...sharedFiles, ...sharedDirectoryFiles, ...projection.files])];
+    const reintroduced = sources.find((path) => pluginOwnsPath(plugin, path));
+    if (reintroduced !== undefined) {
+      throw new Error(`Plugin-owned path must not return to the workspace projection: ${reintroduced}`);
+    }
     for (const relativePath of sources) {
       const bytes =
         generatedSharedFiles.get(relativePath) ??
@@ -461,33 +503,6 @@ async function prepareClientProjections(customizationManifest, pinnedCustomizati
         },
         sha256: createHash("sha256").update(bytes).digest("hex"),
         bytes: bytes.byteLength,
-      });
-    }
-    for (const role of roles) {
-      if (!roleSupportsClient(role, client)) continue;
-      const sourcePath = join(repositoryRoot, "customizations", role.source);
-      const source = (await readSourceFile(pinnedCustomizations.resolvedRoot, sourcePath)).toString("utf8");
-      const sourceHash = createHash("sha256").update(source).digest("hex");
-      const delegates = roleDelegatesOnClient(role, client, roles, customizationManifest.invocationEdges);
-      const rendered = Buffer.from(renderClientAgentProjection(source, client, toolInventory, { delegates }), "utf8");
-      const destination = join(generatedRoot, role.source);
-      assertContained(generatedRoot, destination);
-      await mkdir(dirname(destination), { recursive: true });
-      await writeFile(destination, rendered);
-      inventory.push({
-        path: portablePath(relative(assetsRoot, destination)),
-        source: {
-          kind: "generated",
-          composition: "client-projections",
-          roleId: role.id,
-          sourcePath: role.source,
-          sourceHash,
-          clientId: client,
-          target: role.source,
-          adapterVersion: CLIENT_ADAPTER_VERSION,
-        },
-        sha256: createHash("sha256").update(rendered).digest("hex"),
-        bytes: rendered.byteLength,
       });
     }
   }

@@ -36,7 +36,7 @@ review or task.
 4. Keep identity, networking, diagnostics, recovery, data and lifecycle decisions explicit. For material alternatives,
    include decision records with stable IDs, context, decision, accepted requirement IDs, at least two alternatives,
    consequences, WAF impacts, compliance considerations and implementation notes.
-5. After selecting candidate SKUs, call `azure-resource-manager-mcp/get_retail_prices` directly for every cost line.
+5. After selecting candidate SKUs, call `apex-azure-pricing/get_retail_prices` directly for every cost line.
    Do not infer pricing unavailability from APEX task grants. A well-scoped no-result query becomes a partial estimate
    and `unpricedItems` entry with attempted timestamp and reason. Never submit synthetic zero prices, placeholders or
    invented prices through `apex/architectureComplete`.
