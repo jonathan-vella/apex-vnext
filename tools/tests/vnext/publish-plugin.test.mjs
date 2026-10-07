@@ -11,6 +11,7 @@ import {
   changelogSection,
   compareVersions,
   formatPlan,
+  planJson,
   publishPlugin,
   pullRequestBody,
   repositorySlug,
@@ -170,6 +171,11 @@ async function assertRefused(state, checkId, pattern, options = {}) {
     assert.match(error.message, new RegExp(`- ${checkId}: `, "u"));
     assert.match(error.message, pattern);
     assert.ok(failedChecks(error.plan).includes(checkId));
+    const json = JSON.parse(planJson(error.plan, { apply: true }));
+    assert.equal(json.mode, "apply");
+    assert.equal(json.ready, false);
+    assert.equal(json.built, undefined);
+    assert.ok(json.checks.some((check) => check.id === checkId && !check.ok));
     return true;
   });
   assert.deepEqual(state.gh, [], "gh must not run when a check fails");
@@ -200,6 +206,9 @@ test("compareVersions follows SemVer 2.0 precedence", () => {
     assert.equal(compareVersions(ordered[index - 1], ordered[index]), -1);
   }
   assert.equal(compareVersions("1.0.0+build.1", "1.0.0"), 0);
+  const huge = "9".repeat(400);
+  assert.equal(compareVersions(`1.0.0-next.${huge}1`, `1.0.0-next.${huge}0`), 1, "no Number rounding or Infinity");
+  assert.equal(compareVersions(`${huge}0.0.0`, `${huge}1.0.0`), -1);
   assert.throws(() => compareVersions("v1.0.0", "1.0.0"), /Not a semantic version: v1\.0\.0/u);
 });
 
@@ -214,7 +223,17 @@ test("changelogSection requires an exact, non-empty version section", () => {
 test("repositorySlug reads HTTPS and SSH GitHub remotes", () => {
   assert.equal(repositorySlug("https://github.com/jonathan-vella/apex-plugins.git"), "jonathan-vella/apex-plugins");
   assert.equal(repositorySlug("git@github.com:jonathan-vella/apex-vnext.git\n"), "jonathan-vella/apex-vnext");
-  assert.equal(repositorySlug("/srv/git/apex-plugins.git"), null);
+  assert.equal(repositorySlug("ssh://git@github.com/jonathan-vella/apex-plugins"), "jonathan-vella/apex-plugins");
+  for (const lookalike of [
+    "/srv/git/apex-plugins.git",
+    "https://evilgithub.com/jonathan-vella/apex-plugins.git",
+    "https://github.com.evil.test/jonathan-vella/apex-plugins.git",
+    "https://evil.test/github.com/jonathan-vella/apex-plugins.git",
+    "git@evilgithub.com:jonathan-vella/apex-plugins.git",
+    "http://github.com/jonathan-vella/apex-plugins.git",
+    "https://github.com/jonathan-vella/apex-plugins/extra",
+  ])
+    assert.equal(repositorySlug(lookalike), null, lookalike);
 });
 
 test("updateMarketplace adds or replaces only the apex entry with documented fields", () => {

@@ -44,14 +44,21 @@ const SEMVER =
   /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/u;
 const FULL_SHA = /^[0-9a-f]{40}$/u;
 
+/** Numeric identifiers have no size limit in SemVer, so compare them exactly. */
+function compareNumeric(left, right) {
+  const l = BigInt(left);
+  const r = BigInt(right);
+  return l < r ? -1 : l > r ? 1 : 0;
+}
+
 /** SemVer 2.0 precedence: negative when left < right, zero when equal, positive when left > right. */
 export function compareVersions(left, right) {
   const a = SEMVER.exec(left);
   const b = SEMVER.exec(right);
   if (!a || !b) throw new Error(`Not a semantic version: ${a ? right : left}`);
   for (let index = 1; index <= 3; index += 1) {
-    const difference = Number(a[index]) - Number(b[index]);
-    if (difference !== 0) return Math.sign(difference);
+    const difference = compareNumeric(a[index], b[index]);
+    if (difference !== 0) return difference;
   }
   if (a[4] === b[4]) return 0;
   if (a[4] === undefined) return 1;
@@ -66,7 +73,7 @@ export function compareVersions(left, right) {
     if (l === r) continue;
     const lNumeric = /^\d+$/u.test(l);
     const rNumeric = /^\d+$/u.test(r);
-    if (lNumeric && rNumeric) return Math.sign(Number(l) - Number(r));
+    if (lNumeric && rNumeric) return compareNumeric(l, r);
     if (lNumeric) return -1;
     if (rNumeric) return 1;
     return l < r ? -1 : 1;
@@ -87,9 +94,12 @@ export function changelogSection(text, version) {
   return section.split("\n").slice(1).join("\n").trim() === "" ? null : section;
 }
 
-/** `owner/name` from an HTTPS or SSH GitHub remote URL, or null. */
+/** `owner/name` from a github.com HTTPS, SCP-style SSH or ssh:// remote URL, or null for any other host. */
 export function repositorySlug(url) {
-  const match = /github\.com[/:]([^/\s]+\/[^/\s]+?)(?:\.git)?\/?$/u.exec(url.trim());
+  const match =
+    /^(?:https:\/\/github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)([A-Za-z0-9-]+\/[A-Za-z0-9._-]+?)(?:\.git)?\/?$/u.exec(
+      url.trim(),
+    );
   return match ? match[1] : null;
 }
 
@@ -481,6 +491,14 @@ export function formatPlan(plan, { apply = false, listFiles = false } = {}) {
   return `${lines.join("\n")}\n`;
 }
 
+/** The plan as JSON for --json output; the same shape for dry runs, refusals and successful applies. */
+export function planJson(plan, { apply = false, pullRequest } = {}) {
+  const { built: _built, ...summary } = plan;
+  const output = { mode: apply ? "apply" : "dry-run", ...summary };
+  if (pullRequest) output.pullRequest = pullRequest;
+  return `${JSON.stringify(output, null, 2)}\n`;
+}
+
 export async function publishPlugin({ apply = false, ...options } = {}) {
   const plan = await planRelease(options);
   if (!apply) return { plan, dryRun: true };
@@ -526,16 +544,18 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(p
         const result = await publishPlugin(options);
         const { plan } = result;
         if (values.json) {
-          const { built: _built, ...summary } = plan;
-          const output = { mode: values.apply ? "apply" : "dry-run", ...summary };
-          if (result.pullRequest) Object.assign(output, { pullRequest: result.pullRequest });
-          process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
+          process.stdout.write(planJson(plan, { apply: values.apply, pullRequest: result.pullRequest }));
         } else {
           process.stdout.write(formatPlan(plan, { apply: values.apply, listFiles: values.files }));
           if (result.pullRequest) process.stdout.write(`\nOpened ${result.pullRequest} from ${result.branch}\n`);
         }
       } catch (error) {
-        if (error.plan) process.stdout.write(formatPlan(error.plan, { apply: true, listFiles: values.files }));
+        if (error.plan)
+          process.stdout.write(
+            values.json
+              ? planJson(error.plan, { apply: true })
+              : formatPlan(error.plan, { apply: true, listFiles: values.files }),
+          );
         throw error;
       }
     }
