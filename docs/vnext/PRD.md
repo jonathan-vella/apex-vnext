@@ -57,9 +57,10 @@ subscription so the application team can deploy its existing code.
 APEX ships as one Agent Plugins 1.0 plugin under DECISION-033, published from a separate vNext marketplace repository.
 Installs and release provenance pin an immutable commit SHA; tags are release labels only. The plugin carries the
 skills, the APEX agent and hidden workers, hooks, and an MCP server that runs the bundled `@apexops/cli` runtime with
-`node` from the plugin folder; starting it must not need a registry download. `@apexops/cli` stays on npm for the
-terminal at the same exact version the plugin bundles. Clients install the plugin through one channel, the Copilot CLI
-store, which VS Code reads; installing through more than one channel is unsupported.
+`node` from the plugin folder as one esbuild bundle (DECISION-034); starting it must not need a registry download.
+`@apexops/cli` stays on npm for the terminal at the same exact version the plugin bundles. Clients install the plugin
+through one channel, the Copilot CLI store, which VS Code reads; installing through more than one channel is
+unsupported.
 
 `apex init` and bootstrap write a thin workspace projection: `.github/copilot/settings.json` with `enabledPlugins` and
 `extraKnownMarketplaces`, instructions with `applyTo` globs, the governance workflow and scripts, and `.apex/`. Init,
@@ -429,8 +430,9 @@ receipt. Separately authorized maintenance remains bounded by its manifest and h
 
 ### REQ-MCP-001: Predictable Tool Contracts
 
-The CLI MCP adapter exposes kernel-authorized operations, not a second workflow engine. Improve the current pinned
-SDK before considering a protocol migration. Acceptance:
+The CLI MCP adapter exposes kernel-authorized operations, not a second workflow engine. Under DECISION-034 it uses
+the MCP TypeScript SDK v2 (`@modelcontextprotocol/server`) with a low-level `Server` over stdio and targets protocol
+`2026-07-28`, which all supported Copilot clients negotiate. Acceptance:
 
 1. Every successful tool result validates through the supported SDK. Preserve existing object responses; wrap Markdown
    and lists in named objects. Retain serialized text alongside structured results for compatible clients.
@@ -442,8 +444,9 @@ SDK before considering a protocol migration. Acceptance:
    mark task issuance or terminal bookkeeping as read-only or retry-safe. Prefer a genuinely read-only status path.
 5. Bound requests and propagate cancellation at safe operation boundaries. Test disconnects, committed partial effects
    and recovery; a timeout must not imply rollback or permit blind mutation retries.
-6. Verify stdio cleanliness, initialization, negotiated versions and exact-client behavior. The current SDK supports
-   protocols through 2025-11-25; July 2026 SDK/protocol migration requires separate compatibility evidence in both clients.
+6. Verify stdio cleanliness, `server/discover`, the negotiated `2026-07-28` version and exact-client behavior in each
+   supported client. APEX code and tests do not target the `2025-11-25` era; the SDK answers its `initialize` only
+   because Copilot clients fall back to it when a discovery probe times out.
 
 Progressive discovery, definition caching and programmatic tool calling belong to the host. Do not add a server-side
 search platform, arbitrary script execution or generic dispatch to implement client advice. Keep role-scoped tools.

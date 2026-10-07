@@ -281,3 +281,26 @@ install, plugin agents, plugin MCP through `${PLUGIN_ROOT}`, hooks with bash and
 isolation and hook deny). The separate Windows probe was skipped; sandbox, Azure sign-in and worktree behavior are
 proven during final qualification. The [client pivot plan](ROADMAP.md#client-pivot) owns delivery and
 [REQ-HOST-001](PRD.md#req-host-001-supported-hosts-and-clients) owns acceptance.
+
+## DECISION-034: Serve APEX MCP With The MCP TypeScript SDK v2
+
+Maintainer direction on 2026-10-07 amends REQ-MCP-001 and the CP-22 scope. The supported clients are all Copilot SDK
+clients: the VS Code Copilot harness, the GitHub Copilot app and Copilot CLI. They negotiate MCP `2026-07-28` and probe
+stdio servers with `server/discover`. VS Code's classic Copilot Chat is not a target.
+
+- **SDK.** APEX MCP uses `@modelcontextprotocol/server`, with `@modelcontextprotocol/client` for tests only, both at
+  exact versions. The v1 package `@modelcontextprotocol/sdk`, the `server-legacy` package and the v1-only `hono`
+  dependencies are removed. Dependabot proposes upgrades, which must pass the MCP tests and the Windows job.
+- **Server.** A low-level `Server` with explicit `tools/list` and `tools/call` handlers keeps APEX's own schemas,
+  validation and error envelopes. The server connects with `server.connect(new StdioServerTransport())` and exits when
+  stdin ends.
+- **Protocol.** APEX targets `2026-07-28`. The SDK still answers a `2025-11-25` `initialize`, because Copilot clients
+  fall back to it when a `server/discover` probe times out; APEX code and tests do not target that era.
+- **Packaging.** The plugin ships the MCP server as one esbuild bundle with its assets, instead of a copied
+  `node_modules` tree.
+- **Order.** CP-09 lands first, then the SDK migration (CP-23), then the plugin package (CP-06).
+
+Evidence: the v1 line receives only fixes until at least 2027-01-27 and implements no new protocol revisions; Copilot
+CLI added `2026-07-28` support in 1.0.81, and VS Code 1.140 states the Copilot harness runs on the Copilot SDK. The
+apex-jon server moved to the v2 SDK on 2026-10-04 and its `apex-plugin` build serves all three clients with a bundled
+v2 `Server` over stdio. Live client evidence is recorded in CP-20.
