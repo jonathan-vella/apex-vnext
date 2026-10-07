@@ -728,7 +728,8 @@ export function createMcpServerFactory(
           const execute = async (): Promise<ToolResult> =>
             await Reflect.apply(callback, undefined, config.inputSchema === undefined ? [extra] : [toolInput, extra]);
           // The adapter only describes the call; the kernel repeat guard behind the service decides whether a repeat
-          // is answered from the original result.
+          // is answered from the original result. A result that would fail the contract checks below is rejected
+          // before the guard can store it, so a failed call is never replayed.
           response =
             effect === "repeat-guarded"
               ? result(
@@ -738,7 +739,12 @@ export function createMcpServerFactory(
                       arguments: toolInput,
                       ...(fileArguments === undefined ? {} : { fileArguments }),
                     },
-                    async () => (await execute()).structuredContent,
+                    async () => {
+                      const value = (await execute()).structuredContent;
+                      if (!outputSchema.safeParse(value).success) throw new Error("Invalid MCP result contract");
+                      if (resultEnvelopeBytes(value) > MCP_MAX_SERIALIZED_RESULT_BYTES) throw tooLargeError(name);
+                      return value;
+                    },
                   ),
                 )
               : await execute();

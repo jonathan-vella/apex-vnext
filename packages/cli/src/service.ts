@@ -2464,11 +2464,18 @@ export class ApexService {
   async repeatSafe<T extends Record<string, unknown>>(call: RepeatSafeCall, execute: () => Promise<T>): Promise<T> {
     await this.refreshWorkspacePath();
     const workspacePath = this.workspacePath;
-    const files: Record<string, string | null> = {};
-    for (const name of call.fileArguments ?? []) {
-      const path = call.arguments[name];
-      if (typeof path === "string") files[name] = await this.repeatFileHash(path);
-    }
+    const fileBindings = async () => {
+      const bindings: Record<string, { sha256: string; identity: string } | null> = {};
+      for (const name of call.fileArguments ?? []) {
+        const path = call.arguments[name];
+        if (typeof path === "string") bindings[name] = await this.repeatFileBinding(path);
+      }
+      return bindings;
+    };
+    const bindings = await fileBindings();
+    const files = Object.fromEntries(
+      Object.entries(bindings).map(([name, binding]) => [name, binding?.sha256 ?? null]),
+    );
     const outcome = await executeRepeatSafe(
       {
         operation: call.operation,
@@ -2484,6 +2491,10 @@ export class ApexService {
           const expiresAt = (value.task as { expiresAt?: unknown } | undefined)?.expiresAt;
           return typeof expiresAt === "string" ? expiresAt : undefined;
         },
+        // The operation reads bound files itself; store its result only if they did not change while it ran.
+        ...(call.fileArguments === undefined
+          ? {}
+          : { identityStable: async () => sha256Json(await fileBindings()) === sha256Json(bindings) }),
       },
       {
         clock: this.clock,
@@ -2519,14 +2530,19 @@ export class ApexService {
     };
   }
 
-  private async repeatFileHash(path: string): Promise<string | null> {
+  /** Content hash plus the inode, size and change times that any later modification of the file would alter. */
+  private async repeatFileBinding(path: string): Promise<{ sha256: string; identity: string } | null> {
     try {
       const target = resolve(this.root, path);
-      const metadata = await lstat(target);
-      if (!metadata.isFile() || metadata.isSymbolicLink() || metadata.size > 20_000_000) return null;
+      const metadata = await lstat(target, { bigint: true });
+      if (!metadata.isFile() || metadata.isSymbolicLink() || metadata.size > 20_000_000n) return null;
       const handle = await open(target, constants.O_RDONLY | constants.O_NOFOLLOW);
       try {
-        return sha256Bytes(await handle.readFile());
+        const opened = await handle.stat({ bigint: true });
+        const bytes = await handle.readFile();
+        const identity = [opened.dev, opened.ino, opened.size, opened.mtimeNs, opened.ctimeNs].join(":");
+        if (opened.ino !== metadata.ino || opened.dev !== metadata.dev) return null;
+        return { sha256: sha256Bytes(bytes), identity };
       } finally {
         await handle.close();
       }

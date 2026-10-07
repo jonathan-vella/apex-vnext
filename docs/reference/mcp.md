@@ -203,14 +203,16 @@ It is not deduplicated; a repair that reproduces the current customization lock 
 
 For a `repeat-guarded` tool, the kernel identifies a call by the tool name, the canonical worktree (real path,
 case-folded on Windows) and the validated arguments as canonical JSON with sorted keys and undefined members dropped.
-`governanceImport` and `governanceSelect` add the SHA-256 of the referenced file, so an edited baseline is a new call.
+`governanceImport` and `governanceSelect` add the SHA-256 of the referenced file, so an edited baseline is a new call;
+a result is not stored when that file changed while the call ran.
 The run state is a hash of the selection, the project set, the selected run document, its journal head and the writer
 lease holder (lease renewals do not change it). The recorded fingerprint binds the call to the state it applied to.
 
 An identical call is answered from the original result only when all of these hold:
 
-1. The original call succeeded. Failures are not stored, so a repeat re-runs validation and stale-state checks, and a
-   failure after a partial commit, such as bundle staging, is not deduplicated.
+1. The original call succeeded and its result passed the output contract and size checks. Failures are not stored, so
+   a repeat re-runs validation and stale-state checks, and a failure after a partial commit, such as bundle staging, is
+   not deduplicated.
 2. The run state equals the state right after the original call. Any change to that state, whether from another tool,
    the CLI or another worktree, makes the call a new request that normal kernel checks decide and may reject as stale.
 3. Fewer than 10 minutes have passed, and a returned task has not reached its `expiresAt`.

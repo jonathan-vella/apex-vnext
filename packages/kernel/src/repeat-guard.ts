@@ -54,6 +54,11 @@ export interface RepeatSafeHooks<T> {
   execute(): Promise<T>;
   /** Optional instant after which the original result must not be returned, such as a task expiry. */
   validUntil?(value: T): string | undefined;
+  /**
+   * Optional check after execution that the call identity still describes what executed, for example that a file
+   * bound by content was not modified meanwhile. When it resolves false the result is returned but not stored.
+   */
+  identityStable?(): Promise<boolean>;
 }
 
 export interface RepeatSafeOptions {
@@ -279,6 +284,8 @@ export async function executeRepeatSafe<T extends object>(
   }
   const value = await hooks.execute();
   try {
+    if (hooks.identityStable !== undefined && !(await hooks.identityStable()))
+      return { value, repeated: false, fingerprint };
     const after = await hooks.scope();
     if (after === undefined) return { value, repeated: false, fingerprint };
     const now = clock();

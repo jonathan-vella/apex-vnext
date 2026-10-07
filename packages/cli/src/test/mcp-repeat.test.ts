@@ -6,7 +6,7 @@ import { join, relative } from "node:path";
 import test, { type TestContext } from "node:test";
 import { promisify } from "node:util";
 import type { Client } from "@modelcontextprotocol/client";
-import { EventJournal, REPEAT_EVENT_TYPE, RunRepository, readRepeatEvents } from "@apexops/kernel";
+import { EventJournal, REPEAT_EVENT_TYPE, RunRepository, readRepeatEvents, readRepeatRecords } from "@apexops/kernel";
 import { resolveMcpWorkspace } from "../cli.js";
 import { MCP_TOOL_EFFECTS, type McpServiceResolver } from "../mcp.js";
 import { ApexService } from "../service.js";
@@ -241,6 +241,48 @@ test("a duplicate call to every state-changing MCP tool has no extra effect", as
     assertSuccess(third, name);
     assert.equal(invocations.get(name), 2, `${name} was answered after an intervening state change`);
   }
+});
+
+test("a result that fails the MCP contract is not stored and its repeat executes again", async (context) => {
+  const { service, runDirectory } = await initializedWorkspace();
+  let invocations = 0;
+  context.mock.method(service, "use", async () => {
+    invocations += 1;
+    return invocations === 1 ? { unexpected: true } : serviceValue("projectUse");
+  });
+  const { client } = await connect(context, service, "repeat-invalid-result");
+  const call = () => client.callTool({ name: "projectUse", arguments: { workspace: service.root, projectId: "demo" } });
+  const failed = await call();
+  assert.equal(failed.isError, true);
+  assert.deepEqual(await readRepeatRecords(runDirectory), []);
+  assertSuccess(await call(), "projectUse");
+  assert.equal(invocations, 2);
+});
+
+test("a governance file replaced while the call runs never binds the result to other bytes", async (context) => {
+  const { service, runDirectory } = await initializedWorkspace();
+  const baseline = join(service.root, "baseline.json");
+  await writeFile(baseline, '{"version":"a"}\n');
+  let invocations = 0;
+  context.mock.method(service, "selectGovernanceBaseline", async () => {
+    invocations += 1;
+    if (invocations === 1) await writeFile(baseline, '{"version":"b"}\n');
+    return serviceValue("governanceSelect");
+  });
+  const { client } = await connect(context, service, "repeat-file-binding");
+  const call = () =>
+    client.callTool({ name: "governanceSelect", arguments: { workspace: service.root, path: "baseline.json" } });
+  assertSuccess(await call(), "governanceSelect");
+  assert.deepEqual(await readRepeatRecords(runDirectory), []);
+  await writeFile(baseline, '{"version":"a"}\n');
+  assertSuccess(await call(), "governanceSelect");
+  assert.equal(invocations, 2);
+  const stored = await call();
+  assertSuccess(stored, "governanceSelect");
+  assert.equal(invocations, 2);
+  await writeFile(baseline, '{"version":"c"}\n');
+  assertSuccess(await call(), "governanceSelect");
+  assert.equal(invocations, 3);
 });
 
 test("read tools are never answered from a stored result", async (context) => {

@@ -244,6 +244,26 @@ test("failed calls are not recorded and a repeat re-runs normal checks", async (
   assert.equal(executions(), 2);
 });
 
+test("a call whose identity changed while it ran is returned but not stored", async () => {
+  const { runDirectory, repository, worktree, scope } = await fixture();
+  let executions = 0;
+  const run = (stable: boolean) =>
+    executeRepeatSafe(
+      { operation: "governanceImport", workspace: worktree, arguments: { path: "baseline.json" } },
+      {
+        scope,
+        assertReplayAllowed: async () => repository.assertWriterAvailable({ workspacePath: worktree }),
+        execute: async () => ({ executions: ++executions }),
+        identityStable: async () => stable,
+      },
+    );
+  assert.deepEqual((await run(false)).value, { executions: 1 });
+  assert.deepEqual(await readRepeatRecords(runDirectory), []);
+  assert.equal((await run(true)).repeated, false);
+  assert.equal((await run(true)).repeated, true);
+  assert.equal(executions, 2);
+});
+
 test("repeat records survive a restart because they are stored with the run", async () => {
   const { call, runDirectory, worktree } = await fixture();
   const first = await call();
