@@ -5,6 +5,15 @@
 Run `apex mcp serve` over standard input/output. Client projections configure this server; users should not add a second
 APEX server with independent state.
 
+## Server Instructions
+
+The server sends compact session instructions during MCP initialization. They identify APEX as the governed Azure
+workload lifecycle server, require the absolute `workspace` path on every tool call, direct clients to call `status`
+first, preserve kernel ownership of state/gates/authorization/evidence, warn against blind mutation retries after
+timeouts or cancellations, route human decisions through `ask_user`, and explain that large read results continue with
+`nextCursor` on the same tool and workspace. The canonical text lives in
+[`packages/cli/src/mcp.ts`](../../packages/cli/src/mcp.ts).
+
 ## Workflow Tools
 
 | Tool                   | Purpose                                                                                       |
@@ -77,14 +86,43 @@ use `completeTask` for atomic output acceptance. All 35 tools advertise output s
 contracts and explicit adapter envelopes. Success and structured error branches are validated, including by SDK clients.
 See [REQ-MCP-001](../vnext/PRD.md#req-mcp-001-predictable-tool-contracts) for acceptance.
 
-Handler failures return `isError: true` with `{ "error": { "code": "APEX_STALE", "message": "..." } }` in both
-structured and text content. Messages are allowlisted recovery guidance, not raw exception messages. The exception is
-an `APEX_VALIDATION` failure raised by the kernel service: its authored reason, plus up to five schema issue paths,
+Handler failures return `isError: true` with
+`{ "error": { "code": "APEX_STALE", "message": "...", "remediation": "..." } }` in both structured and text content.
+Messages are allowlisted recovery guidance, not raw exception messages. `remediation` is a structured hint derived from
+the stable APEX error class; internal and unknown failures use a generic safe hint. The exception is an
+`APEX_VALIDATION` failure raised by the kernel service: its authored reason, plus up to five schema issue paths,
 truncated to 1,000 characters, is returned so the agent can correct the typed input. Reasons that look like secrets
-stay generic. Stacks and causes are omitted. Tool
-argument-validation failures use the generic sanitized envelope; malformed JSON-RPC
-requests and unknown methods remain SDK concerns. Clients must inspect `isError`,
-refresh stale state and avoid blindly retrying mutations; an error does not imply that all side effects were rolled back.
+stay generic. Stacks and causes are omitted. Tool argument-validation failures use the generic sanitized envelope;
+malformed JSON-RPC requests and unknown methods remain SDK concerns. Clients must inspect `isError`, follow
+`remediation`, refresh stale state and avoid blindly retrying mutations; an error does not imply that all side effects
+were rolled back.
+
+Read tools that can return large collections or documents cap the complete serialized MCP result envelope at 64 KiB.
+The cap leaves room under common host/client message budgets while preventing token-heavy accidental full-document
+transfers. Paging-capable tools return the normal result shape with a partial top-level field plus `nextCursor`; call the
+same tool with the same `workspace` and `cursor` until `nextCursor` is absent, appending the paged string or array field
+in order. Cursors are opaque, HMAC-signed with a random secret generated when the server starts, and bound to tool,
+workspace, result path, and a hash of the source result. The secret is never persisted, so cursors do not survive an
+`apex mcp serve` restart or a client reconnect that starts a new server process. Mutation results are never paged; an
+oversized non-pageable result fails instead of being silently truncated. Every cursor failure is fail-closed:
+
+| Condition                                                                           | Code                    | Remediation                                                             |
+| ----------------------------------------------------------------------------------- | ----------------------- | ----------------------------------------------------------------------- |
+| Malformed, tampered, cross-tool, cross-workspace, or issued before a server restart | `APEX_CURSOR_INVALID`   | Discard the cursor and call the same tool without it to restart paging. |
+| Source result changed between pages                                                 | `APEX_STALE`            | Call `status`, then restart paging without a cursor.                    |
+| `cursor` sent to a tool that is not paging-capable                                  | `APEX_VALIDATION`       | Remove `cursor`; only the tools below accept it.                        |
+| Non-pageable result, or a single item/page, exceeds 64 KiB                          | `APEX_RESULT_TOO_LARGE` | Request a smaller bounded result or use a paging-capable read tool.     |
+
+| Tool                      | Paged field    |
+| ------------------------- | -------------- |
+| `taskContext`             | `inputs`       |
+| `readTaskInput`           | `content`      |
+| `projectList`             | `projects`     |
+| `preview`                 | `markdown`     |
+| `inventory`               | `resources`    |
+| `improvementObservations` | `observations` |
+| `improvementProposals`    | `proposals`    |
+| `render`                  | `markdown`     |
 
 ## Inputs And Lifecycle
 
@@ -92,12 +130,14 @@ Tool arguments are strict objects: unknown fields and ambiguous staging forms ar
 Every tool requires `workspace`, an absolute path to the current checkout or git worktree. The server resolves git
 worktrees through their common directory so they share the main checkout's `.apex/` state; non-git folders keep the
 nearest existing `.apex/` ancestor behavior. Stage a single `kind`/`value` or a nonempty `outputs` bundle, never both.
-Bundle kinds must be unique; bundles have at most 32 items. Validation-only calls may omit both forms.
+Bundle kinds must be unique; bundles have at most 32 items. Validation-only calls may omit both forms. Only the
+paging-capable read tools listed above accept `cursor`; strict input validation rejects `cursor` on every other tool.
 
-The adapter limits argument and structured-result JSON to 4 MiB, depth 64 and 100,000 nodes. These are transport-facing
-safeguards, not replacements for smaller locked task/evidence budgets. Each server permits 240 tool calls per minute
-and at most 32 active/queued calls; excess work returns a conflict without executing. Dispatch is serialized per server.
-Queued calls expire after 30 seconds and cancellation/disconnect reclaims their slots before execution.
+The adapter limits argument JSON to 4 MiB, depth 64 and 100,000 nodes, and limits serialized MCP results to the 64 KiB
+cap described above. These are transport-facing safeguards, not replacements for smaller locked task/evidence budgets.
+Each server permits 240 tool calls per minute and at most 32 active/queued calls; excess work returns a conflict without
+executing. Dispatch is serialized per server. Queued calls expire after 30 seconds and cancellation/disconnect reclaims
+their slots before execution.
 
 An active mutation is allowed to settle; cancellation is not rollback. Staging/validation bundles check cancellation
 between items and preserve already-written items on later failure. The adapter never retries mutations automatically.

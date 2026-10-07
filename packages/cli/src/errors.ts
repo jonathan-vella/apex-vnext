@@ -21,6 +21,8 @@ export type ApexErrorCode =
   | "APEX_VALIDATION"
   | "APEX_STALE"
   | "APEX_AUTHORIZATION"
+  | "APEX_CURSOR_INVALID"
+  | "APEX_RESULT_TOO_LARGE"
   | "APEX_INTERNAL";
 
 export class ApexError extends Error {
@@ -34,6 +36,31 @@ export class ApexError extends Error {
     super(message, options);
     this.name = "ApexError";
   }
+}
+
+const REMEDIATION_BY_CODE: Record<ApexErrorCode, string> = {
+  APEX_USAGE: "Fix the tool arguments to match the input schema, then call the tool again.",
+  APEX_NOT_FOUND: "Call status first, refresh the identifiers, and retry only with an existing project, run, or task.",
+  APEX_CONFLICT:
+    "Call status and retry only if the refreshed state still requires this action; never retry mutations blindly after cancellation or timeout.",
+  APEX_WRITER_CONFLICT:
+    "Continue from the owning worktree, release the writer lease there, or wait for the lease to expire before retrying.",
+  APEX_WORKSPACE_UNSUPPORTED:
+    "Use the absolute path of a supported APEX checkout or git worktree, or start a workspace-aware MCP server.",
+  APEX_VALIDATION: "Correct the validation issues against the current tool contract, then call the tool again.",
+  APEX_STALE: "Call status to refresh state and use the latest expected head, epoch, task, or cursor before retrying.",
+  APEX_AUTHORIZATION: "Call status and obtain the required human approval or decision before retrying.",
+  APEX_CURSOR_INVALID:
+    "Discard the cursor, call the same tool again without it, and continue only from the new result; cursors do not survive an MCP server restart.",
+  APEX_RESULT_TOO_LARGE:
+    "Request a smaller bounded result, use a paging-capable read tool, or narrow the requested document or collection.",
+  APEX_INTERNAL:
+    "Report this with the server log; retry only after checking status because side effects may have completed.",
+};
+
+// Remediation is a fixed hint per stable code so error details, causes, and paths never reach MCP clients.
+export function remediationForApexError(error: ApexError): string {
+  return REMEDIATION_BY_CODE[error.code];
 }
 
 export function normalizeError(error: unknown): ApexError {

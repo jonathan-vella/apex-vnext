@@ -1066,15 +1066,21 @@ test("MCP preserves valid result envelopes and sanitized execution errors", asyn
       arguments: { workspace: service.root, taskId: "expired" },
     });
     assert.equal(stale.isError, true);
-    assert.deepEqual(stale.structuredContent, {
-      error: { code: "APEX_STALE", message: "Task is stale or expired; refresh status before retrying." },
-    });
+    assert.equal((stale.structuredContent as { error: { code: string } }).error.code, "APEX_STALE");
+    assert.equal(
+      (stale.structuredContent as { error: { message: string } }).error.message,
+      "Task is stale or expired; refresh status before retrying.",
+    );
+    assert.match((stale.structuredContent as { error: { remediation: string } }).error.remediation, /Call status/u);
     assert.doesNotMatch(JSON.stringify(stale), /private-detail/);
     const unexpected = await client.callTool({ name: "status", arguments: { workspace: service.root } });
     assert.equal(unexpected.isError, true);
-    assert.deepEqual(unexpected.structuredContent, {
-      error: { code: "APEX_INTERNAL", message: "APEX could not complete the operation." },
-    });
+    assert.equal((unexpected.structuredContent as { error: { code: string } }).error.code, "APEX_INTERNAL");
+    assert.equal(
+      (unexpected.structuredContent as { error: { message: string } }).error.message,
+      "APEX could not complete the operation.",
+    );
+    assert.match((unexpected.structuredContent as { error: { remediation: string } }).error.remediation, /server log/u);
     assert.doesNotMatch(JSON.stringify(unexpected), /synthetic-private-token|Bearer/);
     for (const code of [
       "APEX_VALIDATION",
