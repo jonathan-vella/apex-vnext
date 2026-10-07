@@ -188,12 +188,12 @@ Session models can issue the same tool call twice. Every tool has an effect clas
 [`packages/cli/src/mcp.ts`](../../packages/cli/src/mcp.ts), and a test fails when a state-changing tool lacks a
 duplicate-call case:
 
-| Class            | Tools                            | Repeat behavior                                                                          |
-| ---------------- | -------------------------------- | ---------------------------------------------------------------------------------------- |
-| `read-only`      | `status`, `projectList`          | Never writes.                                                                            |
-| `read`           | The read tools listed below      | Always executes; at most finishes an already-committed transaction recovery.             |
-| `repeat-guarded` | Every other tool except `doctor` | The kernel repeat guard below decides.                                                   |
-| `convergent`     | `doctor`                         | Always executes; a repeated repair rewrites the same files and keeps the rollback chain. |
+| Class            | Tools                                   | Repeat behavior                                        |
+| ---------------- | --------------------------------------- | ------------------------------------------------------ |
+| `read-only`      | `status`, `projectList`, `doctorChecks` | Never writes.                                          |
+| `read`           | The read tools listed below             | Always executes; may only finish a committed recovery. |
+| `repeat-guarded` | Every other tool except `doctor`        | The kernel repeat guard below decides.                 |
+| `convergent`     | `doctor`                                | Always executes; a repeat re-applies the same repair.  |
 
 The `read` tools are `capabilityList`, `capabilityStatus`, `taskContext`, `readTaskInput`, `preview`, `inventory`,
 `diagnose`, `render`, `improvementObservations` and `improvementProposals`.
