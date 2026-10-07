@@ -12,7 +12,11 @@ When you prepare a release, rename `## [Unreleased]` to the new version.
 
 First marketplace release of APEX as one Agent Plugins 1.0 plugin.
 
-- The APEX agent, hidden workers and skills from the managed customizations.
+- The APEX agent, hidden workers and skills from the managed customizations. Agents are rendered with the Copilot CLI
+  client mechanics the workspace copies carried before `apex init` stopped copying them (CP-11).
 - The `apex` MCP server: the bundled `@apexops/cli` runtime as one esbuild bundle on the MCP TypeScript SDK v2, started
   with `node` from the plugin folder and needing no registry download.
+- The `apex-azure-pricing` MCP server: Azure Resource Manager MCP over streamable HTTP with the `CostManagement` and
+  `Pricing` toolsets. It replaces `azure-resource-manager-mcp` from the retired workspace `.mcp.json`; agent tool
+  references use `apex-azure-pricing/<tool>`.
 - Managed hooks that deny the APEX agent as a task target.

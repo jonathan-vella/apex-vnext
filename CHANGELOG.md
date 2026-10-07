@@ -14,6 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `apex init` writes a thin workspace projection: `.github/copilot/settings.json` enabling `apex@apex-plugins`,
+  instructions, the governance workflow and scripts, and `.apex/`. Agents, skills and MCP servers come from the
+  `apex` plugin; `apex update` and `apex doctor --fix --yes` retire unedited workspace copies and report edited ones.
+  The ARM MCP server is now the plugin's `apex-azure-pricing` server.
+
 - Rebaseline product requirements, roadmap and supporting documentation around COE archetype reuse, conversational
   adaptation, ALZ-backed and standalone lab profiles, rich output quality and WSL2 without a devcontainer.
 - Keep input efficiency simple and DRY without a token-baseline project; defer Agent Plugins and APEX MCP distribution

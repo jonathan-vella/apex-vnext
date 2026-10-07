@@ -93,8 +93,9 @@ npx --yes @apexops/cli@next bootstrap \
   --yes
 ```
 
-The command installs the exact APEX CLI as a workspace dependency, creates `.apex` state, and writes the Copilot
-CLI projection and `.mcp.json`. Do not edit `.apex` directly.
+The command installs the exact APEX CLI as a workspace dependency, creates `.apex` state, and writes the thin
+workspace projection with `.github/copilot/settings.json`, which installs the `apex` plugin. Do not edit `.apex`
+directly.
 
 ## Add Workloads To The Consumer
 
@@ -175,7 +176,8 @@ The initial local workflow does not require Azure credentials. Before an Azure-r
 Authenticate only to the intended subscription and confirm the required role before requesting a real deployment
 preview.
 
-APEX agents use only their explicit read-only ARM pricing and cost tools from the workspace `.mcp.json`.
+APEX agents use only their explicit read-only ARM pricing and cost tools from the plugin's `apex-azure-pricing`
+server.
 
 ## Update Or Remove APEX
 

@@ -103,7 +103,9 @@ npx apex init \
   --json
 ```
 
-This installs the Copilot CLI projection. To select Terraform, replace `--iac bicep` with `--iac terraform`.
+This writes `.github/copilot/settings.json`, the instructions, the governance workflow and scripts, and `.apex/`. The
+settings file tells Copilot to install the `apex` plugin, which carries the APEX agent, skills and MCP servers; trust
+the folder when Copilot asks. To select Terraform, replace `--iac bicep` with `--iac terraform`.
 
 ## Check Readiness
 
