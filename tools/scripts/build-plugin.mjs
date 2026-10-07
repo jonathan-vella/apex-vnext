@@ -1,15 +1,48 @@
 #!/usr/bin/env node
+/**
+ * Build the APEX Agent Plugins 1.0 package from plugin/package-manifest.json.
+ *
+ * Usage: node tools/scripts/build-plugin.mjs [--manifest <path>] [--output-dir <dir>]
+ * Default output: dist/apex-plugin/ plus dist/apex-plugin.sha256. The output folder is deleted first.
+ *
+ * The MCP server ships as one esbuild bundle at mcp/apex.mjs with no node_modules. The CLI reads its bundled assets
+ * from new URL("../assets/", import.meta.url), so assets/ sits beside mcp/ under the plugin root.
+ */
 import { createHash } from "node:crypto";
 import { constants } from "node:fs";
-import { chmod, lstat, mkdir, open, readFile, readdir, realpath, rm, stat, utimes, writeFile } from "node:fs/promises";
-import { dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { pathToFileURL } from "node:url";
-import { fileURLToPath } from "node:url";
+import { chmod, lstat, mkdir, open, readFile, readdir, realpath, rm, utimes, writeFile } from "node:fs/promises";
+import { builtinModules } from "node:module";
+import { basename, dirname, extname, isAbsolute, join, posix, relative, resolve, sep } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { build as esbuild } from "esbuild";
 import { load as loadYaml } from "js-yaml";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const fixedTime = new Date("2000-01-01T00:00:00.000Z");
-const workspaceScope = "@apexops/";
+const pluginSchema = "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json";
+const mcpSchema = "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json";
+const pluginNamePattern = /^(?!.*(?:--|\.\.))[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/u;
+const maxAgentBodyCharacters = 30_000;
+const forbiddenAgentFields = ["model", "model-policy", "reasoning-effort"];
+const forbiddenBundleText = "@modelcontextprotocol/sdk";
+// Copilot CLI reads Agent Plugins 1.0 components from these fixed locations.
+const fixedTargets = {
+  plugin: "plugin.json",
+  mcp: "mcp.json",
+  skills: "skills",
+  agents: "com.github.copilot/agents",
+  hooks: "com.github.copilot/hooks",
+};
+const manifestShape = {
+  plugin: ["source", "target", "versionFrom"],
+  mcp: ["source", "target", "server"],
+  server: ["entry", "target", "nodeTarget"],
+  agents: ["sourceRoot", "targetRoot"],
+  skills: ["sourceRoot", "targetRoot"],
+  hooks: ["sourceRoot", "targetRoot", "entries"],
+  assets: ["sourceRoot", "targetRoot"],
+};
+const builtins = new Set(builtinModules.flatMap((name) => [name, `node:${name}`]));
 
 function bytewise(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
@@ -36,6 +69,18 @@ function safeRelativePath(path) {
   );
 }
 
+function isPlainObject(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function assertKeys(label, value, allowed, required = allowed) {
+  if (!isPlainObject(value)) throw new Error(`${label} must be an object`);
+  const unknown = Object.keys(value).filter((key) => !allowed.includes(key));
+  if (unknown.length > 0) throw new Error(`${label} has unsupported fields: ${unknown.sort(bytewise).join(", ")}`);
+  const missing = required.filter((key) => !Object.hasOwn(value, key));
+  if (missing.length > 0) throw new Error(`${label} is missing fields: ${missing.join(", ")}`);
+}
+
 function parseArguments(argv) {
   let manifestPath = join(repositoryRoot, "plugin/package-manifest.json");
   let outputDirectory;
@@ -60,41 +105,73 @@ async function readJson(path) {
   return JSON.parse(await readFile(path, "utf8"));
 }
 
+function validatePackageManifest(manifest) {
+  assertKeys("Plugin package manifest", manifest, ["schemaVersion", "outputDirectory", ...Object.keys(manifestShape)]);
+  if (manifest.schemaVersion !== "1.0.0") throw new Error("Plugin package manifest schemaVersion must be 1.0.0");
+  for (const [section, fields] of Object.entries(manifestShape)) {
+    assertKeys(`Plugin package manifest ${section}`, manifest[section], fields);
+  }
+  for (const [label, path] of [
+    ["plugin.source", manifest.plugin.source],
+    ["plugin.versionFrom", manifest.plugin.versionFrom],
+    ["mcp.source", manifest.mcp.source],
+    ["server.entry", manifest.server.entry],
+    ["server.target", manifest.server.target],
+    ["agents.sourceRoot", manifest.agents.sourceRoot],
+    ["skills.sourceRoot", manifest.skills.sourceRoot],
+    ["hooks.sourceRoot", manifest.hooks.sourceRoot],
+    ["assets.sourceRoot", manifest.assets.sourceRoot],
+    ["assets.targetRoot", manifest.assets.targetRoot],
+  ]) {
+    if (!safeRelativePath(path)) throw new Error(`Plugin package manifest ${label} must be a safe relative path`);
+  }
+  for (const [section, target] of Object.entries(fixedTargets)) {
+    const actual = manifest[section].target ?? manifest[section].targetRoot;
+    if (actual !== target) throw new Error(`Plugin package manifest ${section} target must be ${target}`);
+  }
+  if (!/^node\d+$/u.test(manifest.server.nodeTarget)) throw new Error("Plugin server nodeTarget must look like node24");
+  const assetRoot = posix.normalize(posix.join(posix.dirname(manifest.server.target), "../assets"));
+  if (manifest.assets.targetRoot !== assetRoot) {
+    throw new Error(`Plugin assets must ship at ${assetRoot}, where the bundled CLI resolves ../assets/`);
+  }
+  if (
+    !Array.isArray(manifest.hooks.entries) ||
+    !manifest.hooks.entries.every(safeRelativePath) ||
+    (manifest.hooks.entries.length > 0 && !manifest.hooks.entries.includes("hooks.json"))
+  ) {
+    throw new Error("Plugin hooks entries must be safe relative paths and include hooks.json when present");
+  }
+}
+
 async function readManifest(manifestPath, outputDirectoryOverride) {
   if (!contained(repositoryRoot, manifestPath))
     throw new Error(`Manifest path is outside the repository: ${manifestPath}`);
   const manifest = await readJson(manifestPath);
-  if (manifest.schemaVersion !== "1.0.0") throw new Error("Plugin package manifest schemaVersion must be 1.0.0");
+  validatePackageManifest(manifest);
   const outputDirectory = resolve(repositoryRoot, outputDirectoryOverride ?? manifest.outputDirectory ?? "");
   if (dirname(outputDirectory) === outputDirectory)
     throw new Error("Plugin output directory must not be a filesystem root");
-  if (outputDirectory === repositoryRoot) throw new Error("Plugin output directory must not be the repository root");
+  if (contained(outputDirectory, repositoryRoot))
+    throw new Error("Plugin output directory must not contain the repository");
   for (const protectedPath of ["customizations", "packages", "plugin", "tools", ".github"]) {
-    const protectedRoot = join(repositoryRoot, protectedPath);
-    if (contained(repositoryRoot, outputDirectory) && contained(protectedRoot, outputDirectory)) {
+    if (contained(join(repositoryRoot, protectedPath), outputDirectory)) {
       throw new Error(`Plugin output directory must not be inside source directory ${protectedPath}`);
     }
   }
   return { manifest, outputDirectory };
 }
 
-function nonBinary(buffer) {
-  return !buffer.includes(0);
-}
-
 function shouldNormalizeText(path, buffer) {
   return (
-    nonBinary(buffer) &&
+    !buffer.includes(0) &&
     new Set([
       ".bat",
       ".cjs",
       ".cmd",
       ".css",
-      ".d.ts",
       ".html",
       ".js",
       ".json",
-      ".map",
       ".md",
       ".mjs",
       ".ps1",
@@ -123,186 +200,247 @@ async function readSourceFile(path) {
   }
 }
 
-async function writeOutputFile(outputRoot, target, content, mode = 0o644) {
+async function writeOutputFile(outputRoot, target, content) {
   if (!safeRelativePath(target)) throw new Error(`Unsafe plugin target path: ${target}`);
   const destination = join(outputRoot, target);
   if (!contained(outputRoot, destination)) throw new Error(`Plugin target escapes output: ${target}`);
   await mkdir(dirname(destination), { recursive: true });
-  await writeFile(destination, content);
-  await chmod(destination, mode);
+  await writeFile(destination, content, { flag: "wx" });
+  await chmod(destination, 0o644);
   await utimes(destination, fixedTime, fixedTime);
 }
 
-async function copyFileToOutput(source, outputRoot, target) {
-  await writeOutputFile(outputRoot, target, await readSourceFile(source));
+async function writeJsonOutput(outputRoot, target, value) {
+  await writeOutputFile(outputRoot, target, Buffer.from(`${JSON.stringify(value, null, 2)}\n`));
 }
 
 async function sortedDirectoryEntries(root) {
   return (await readdir(root, { withFileTypes: true })).sort((left, right) => bytewise(left.name, right.name));
 }
 
-async function copyDirectory(sourceRoot, outputRoot, targetRoot, options = {}) {
+async function copyDirectory(sourceRoot, outputRoot, targetRoot) {
   const root = resolve(repositoryRoot, sourceRoot);
   const info = await lstat(root);
   if (!info.isDirectory() || info.isSymbolicLink()) throw new Error(`Source directory is invalid: ${sourceRoot}`);
-  const copied = [];
-  async function visit(current, relativeDirectory = "") {
+  async function visit(current, relativeDirectory) {
     for (const entry of await sortedDirectoryEntries(current)) {
-      if (options.skip?.(entry.name, join(relativeDirectory, entry.name))) continue;
       const source = join(current, entry.name);
-      const relativeTarget = portablePath(join(targetRoot, relativeDirectory, entry.name));
-      if (entry.isDirectory()) await visit(source, join(relativeDirectory, entry.name));
-      else if (entry.isFile()) {
-        await copyFileToOutput(source, outputRoot, relativeTarget);
-        copied.push(relativeTarget);
-      } else {
-        throw new Error(`Unsupported source entry: ${source}`);
-      }
+      const target = relativeDirectory === "" ? entry.name : `${relativeDirectory}/${entry.name}`;
+      if (entry.isDirectory()) await visit(source, target);
+      else if (entry.isFile())
+        await writeOutputFile(outputRoot, `${targetRoot}/${target}`, await readSourceFile(source));
+      else throw new Error(`Unsupported source entry: ${source}`);
     }
   }
-  await visit(root);
-  return copied.sort(bytewise);
+  await visit(root, "");
 }
 
-function parseAgentFrontmatter(path, source) {
-  const match = /^---\n([\s\S]*?)\n---\n/u.exec(source.replaceAll("\r\n", "\n"));
-  if (match === null) throw new Error(`Agent file must contain YAML frontmatter: ${path}`);
+function validatePluginJson(plugin) {
+  assertKeys(
+    "plugin.json",
+    plugin,
+    [
+      "$schema",
+      "name",
+      "version",
+      "description",
+      "author",
+      "homepage",
+      "repository",
+      "license",
+      "keywords",
+      "extensions",
+    ],
+    ["$schema", "name"],
+  );
+  if (plugin.$schema !== pluginSchema) throw new Error(`plugin.json $schema must be ${pluginSchema}`);
+  if (typeof plugin.name !== "string" || plugin.name.length > 64 || !pluginNamePattern.test(plugin.name)) {
+    throw new Error("plugin.json name violates the Agent Plugins 1.0 name constraints");
+  }
+  for (const field of ["version", "description", "homepage", "repository", "license"]) {
+    if (plugin[field] !== undefined && typeof plugin[field] !== "string")
+      throw new Error(`plugin.json ${field} must be a string`);
+  }
+  if (plugin.author !== undefined) {
+    assertKeys("plugin.json author", plugin.author, ["name", "email", "url"], []);
+    if (!Object.values(plugin.author).every((value) => typeof value === "string"))
+      throw new Error("plugin.json author fields must be strings");
+  }
+  if (
+    plugin.keywords !== undefined &&
+    (!Array.isArray(plugin.keywords) || !plugin.keywords.every((keyword) => typeof keyword === "string"))
+  ) {
+    throw new Error("plugin.json keywords must be an array of strings");
+  }
+  if (plugin.extensions !== undefined && !Object.values(plugin.extensions ?? {}).every(isPlainObject)) {
+    throw new Error("plugin.json extensions must map namespaces to objects");
+  }
+}
+
+function validateMcpJson(mcp, manifest) {
+  assertKeys("mcp.json", mcp, ["$schema", "mcpServers"]);
+  if (mcp.$schema !== mcpSchema) throw new Error(`mcp.json $schema must be ${mcpSchema}`);
+  if (!isPlainObject(mcp.mcpServers)) throw new Error("mcp.json mcpServers must be an object");
+  for (const [name, server] of Object.entries(mcp.mcpServers)) {
+    if (!isPlainObject(server)) throw new Error(`mcp.json server ${name} must be an object`);
+    if (server.type === "stdio") {
+      assertKeys(`mcp.json server ${name}`, server, ["type", "command", "args", "env", "cwd"], ["type", "command"]);
+      if (typeof server.command !== "string" || server.command.length === 0 || /\s/u.test(server.command))
+        throw new Error(`mcp.json server ${name} command must be one executable token`);
+      if (server.args !== undefined && !(Array.isArray(server.args) && server.args.every((a) => typeof a === "string")))
+        throw new Error(`mcp.json server ${name} args must be strings`);
+      if (server.env !== undefined) {
+        if (!isPlainObject(server.env) || !Object.values(server.env).every((value) => typeof value === "string"))
+          throw new Error(`mcp.json server ${name} env must map names to strings`);
+        if (Object.keys(server.env).some((key) => ["PLUGIN_ROOT", "PLUGIN_DATA"].includes(key.toUpperCase())))
+          throw new Error(`mcp.json server ${name} env must not set PLUGIN_ROOT or PLUGIN_DATA`);
+      }
+      if (
+        server.cwd !== undefined &&
+        !/^(?:\.\/|\$\{PLUGIN_ROOT\}(?:\/|$)|\$\{PLUGIN_DATA\}(?:\/|$))/u.test(String(server.cwd))
+      ) {
+        throw new Error(`mcp.json server ${name} cwd must be plugin-relative or rooted in a plugin variable`);
+      }
+    } else if (server.type === "streamable-http" || server.type === "sse") {
+      assertKeys(`mcp.json server ${name}`, server, ["type", "url", "headers"], ["type", "url"]);
+    } else {
+      throw new Error(`mcp.json server ${name} has unsupported type ${String(server.type)}`);
+    }
+  }
+  const apex = mcp.mcpServers[manifest.mcp.server];
+  const expectedArgs = [`\${PLUGIN_ROOT}/${manifest.server.target}`];
+  if (
+    apex?.type !== "stdio" ||
+    apex.command !== "node" ||
+    JSON.stringify(apex.args) !== JSON.stringify(expectedArgs) ||
+    apex.env !== undefined ||
+    apex.cwd !== undefined
+  ) {
+    throw new Error(`mcp.json server ${manifest.mcp.server} must run node ${expectedArgs[0]}`);
+  }
+}
+
+function parseFrontmatter(path, source) {
+  const match = /^---\n([\s\S]*?)\n---\n?/u.exec(source.replaceAll("\r\n", "\n"));
+  if (match === null) throw new Error(`File must start with YAML frontmatter: ${path}`);
   const frontmatter = loadYaml(match[1]);
-  if (frontmatter === null || typeof frontmatter !== "object" || Array.isArray(frontmatter)) {
-    throw new Error(`Agent frontmatter must be an object: ${path}`);
-  }
-  for (const field of ["model", "model-policy", "reasoning-effort"]) {
-    if (Object.hasOwn(frontmatter, field)) throw new Error(`Agent must not pin ${field}: ${path}`);
-  }
-  if (typeof frontmatter.name !== "string" || frontmatter.name.length === 0) {
-    throw new Error(`Agent is missing name: ${path}`);
-  }
+  if (!isPlainObject(frontmatter)) throw new Error(`Frontmatter must be an object: ${path}`);
+  return { frontmatter, body: source.replaceAll("\r\n", "\n").slice(match[0].length) };
 }
 
 async function validatePackagedAgents(outputRoot, targetRoot) {
   const agentsRoot = join(outputRoot, targetRoot);
-  const agentFiles = (await sortedDirectoryEntries(agentsRoot)).filter(
-    (entry) => entry.isFile() && entry.name.endsWith(".md"),
-  );
-  if (agentFiles.length === 0) throw new Error("Plugin package must contain at least one agent");
+  const entries = await sortedDirectoryEntries(agentsRoot);
+  const agentFiles = entries.filter((entry) => entry.isFile() && entry.name.endsWith(".agent.md"));
+  if (agentFiles.length === 0 || agentFiles.length !== entries.length)
+    throw new Error("Plugin agents must be one or more *.agent.md files");
   for (const entry of agentFiles) {
-    const path = portablePath(join(targetRoot, entry.name));
-    parseAgentFrontmatter(path, await readFile(join(agentsRoot, entry.name), "utf8"));
+    const path = `${targetRoot}/${entry.name}`;
+    const { frontmatter, body } = parseFrontmatter(path, await readFile(join(agentsRoot, entry.name), "utf8"));
+    for (const field of forbiddenAgentFields) {
+      if (Object.hasOwn(frontmatter, field)) throw new Error(`Agent must not pin ${field}: ${path}`);
+    }
+    for (const field of ["name", "description"]) {
+      if (typeof frontmatter[field] !== "string" || frontmatter[field].length === 0)
+        throw new Error(`Agent is missing ${field}: ${path}`);
+    }
+    if (body.length > maxAgentBodyCharacters)
+      throw new Error(`Agent body exceeds ${maxAgentBodyCharacters} characters: ${path}`);
   }
 }
 
 async function validatePackagedSkills(outputRoot, targetRoot) {
   const skillsRoot = join(outputRoot, targetRoot);
-  const skillDirectories = (await sortedDirectoryEntries(skillsRoot)).filter((entry) => entry.isDirectory());
-  if (skillDirectories.length === 0) throw new Error("Plugin package must contain at least one skill");
-  for (const entry of skillDirectories) {
-    const skillPath = join(skillsRoot, entry.name, "SKILL.md");
-    const info = await stat(skillPath).catch((error) => {
-      if (error.code === "ENOENT") return undefined;
+  const entries = await sortedDirectoryEntries(skillsRoot);
+  if (entries.length === 0 || !entries.every((entry) => entry.isDirectory()))
+    throw new Error("Plugin skills must be one or more skill directories");
+  for (const entry of entries) {
+    const path = `${targetRoot}/${entry.name}/SKILL.md`;
+    const source = await readFile(join(skillsRoot, entry.name, "SKILL.md"), "utf8").catch((error) => {
+      if (error.code === "ENOENT") throw new Error(`Packaged skill is missing SKILL.md: ${entry.name}`);
       throw error;
     });
-    if (!info?.isFile()) throw new Error(`Packaged skill is missing SKILL.md: ${entry.name}`);
+    const { frontmatter } = parseFrontmatter(path, source);
+    if (frontmatter.name !== entry.name) throw new Error(`Skill name must match its directory: ${path}`);
+    if (typeof frontmatter.description !== "string" || frontmatter.description.length === 0)
+      throw new Error(`Skill is missing description: ${path}`);
   }
 }
 
-async function workspacePackageManifest(packageId) {
-  return readJson(join(repositoryRoot, "packages", packageId, "package.json"));
-}
-
-async function copyWorkspacePackage(packageId, outputRoot, targetRoot) {
-  const manifest = await workspacePackageManifest(packageId);
-  const packageTarget = `${targetRoot}/${manifest.name}`;
-  await writeOutputFile(
-    outputRoot,
-    `${packageTarget}/package.json`,
-    Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`),
-  );
-  const includes = [
-    ...new Set(
-      (manifest.files ?? ["dist"])
-        .filter((entry) => !entry.startsWith("!"))
-        .map((entry) => entry.split("/**", 1)[0])
-        .sort(bytewise),
-    ),
-  ];
-  for (const entry of includes) {
-    await copyDirectory(join("packages", packageId, entry), outputRoot, `${packageTarget}/${entry}`, {
-      skip: (_name, relativePath) => relativePath === "test" || relativePath.startsWith(`test${sep}`),
-    });
-  }
-  return manifest;
-}
-
-function packageRootFromName(packageName) {
-  return join(repositoryRoot, "node_modules", ...packageName.split("/"));
-}
-
-async function optionalPackageInstalled(packageName) {
-  const info = await lstat(packageRootFromName(packageName)).catch((error) => {
-    if (error.code === "ENOENT") return undefined;
-    throw error;
-  });
-  return info?.isDirectory() === true && !info.isSymbolicLink();
-}
-
-async function collectRuntimeDependencies(workspaceManifests) {
-  const pending = workspaceManifests.flatMap((manifest) => Object.keys(manifest.dependencies ?? {}));
-  const external = new Set();
-  for (let index = 0; index < pending.length; index += 1) {
-    const packageName = pending[index];
-    if (packageName.startsWith(workspaceScope) || external.has(packageName)) continue;
-    const packageRoot = packageRootFromName(packageName);
-    const info = await lstat(packageRoot);
-    if (!info.isDirectory() || info.isSymbolicLink())
-      throw new Error(`Runtime dependency is not installed: ${packageName}`);
-    external.add(packageName);
-    const manifest = await readJson(join(packageRoot, "package.json"));
-    pending.push(...Object.keys(manifest.dependencies ?? {}));
-    for (const optionalName of Object.keys(manifest.optionalDependencies ?? {})) {
-      if (await optionalPackageInstalled(optionalName)) pending.push(optionalName);
-    }
-  }
-  return [...external].sort(bytewise);
-}
-
-async function copyExternalPackage(packageName, outputRoot, targetRoot) {
-  await copyDirectory(
-    relative(repositoryRoot, packageRootFromName(packageName)),
-    outputRoot,
-    `${targetRoot}/${packageName}`,
-    {
-      skip: (name, relativePath) =>
-        name === "node_modules" ||
-        relativePath.includes(`${sep}node_modules${sep}`) ||
-        name === ".cache" ||
-        name === ".DS_Store",
+/**
+ * Bundles the MCP entry and its @apexops/* and npm dependencies into one ESM file. Paths in esbuild comments are
+ * relative to the repository root, so the output does not depend on the checkout location.
+ */
+async function bundleServer(manifest, outputRoot) {
+  const result = await esbuild({
+    absWorkingDir: repositoryRoot,
+    entryPoints: [join(repositoryRoot, manifest.server.entry)],
+    outfile: join(outputRoot, manifest.server.target),
+    bundle: true,
+    platform: "node",
+    format: "esm",
+    target: manifest.server.nodeTarget,
+    // Disables the CLI's "run main when executed directly" guard, which would match the shared bundle URL.
+    define: { __APEX_PLUGIN_BUNDLE__: "true" },
+    // CommonJS dependencies such as ajv call require(); ESM output needs a real one.
+    banner: {
+      js: [
+        'import { createRequire as __apexCreateRequire } from "node:module";',
+        "const require = __apexCreateRequire(import.meta.url);",
+      ].join("\n"),
     },
-  );
+    legalComments: "eof",
+    sourcemap: false,
+    minify: false,
+    metafile: true,
+    write: false,
+    logLevel: "silent",
+  });
+  if (result.warnings.length > 0) {
+    throw new Error(`esbuild reported warnings:\n${result.warnings.map(({ text }) => `- ${text}`).join("\n")}`);
+  }
+  const inputs = Object.keys(result.metafile.inputs).sort(bytewise);
+  const sdkInputs = inputs.filter((input) => input.includes("node_modules/@modelcontextprotocol/sdk/"));
+  if (sdkInputs.length > 0) throw new Error(`MCP bundle must not include the v1 SDK: ${sdkInputs[0]}`);
+  const externals = Object.values(result.metafile.outputs)
+    .flatMap(({ imports }) => imports)
+    .filter(({ external }) => external)
+    .map(({ path }) => path);
+  const unbundled = externals.filter((path) => !builtins.has(path));
+  if (unbundled.length > 0) throw new Error(`MCP bundle has non-builtin runtime imports: ${unbundled.join(", ")}`);
+  if (result.outputFiles.length !== 1) throw new Error("MCP bundle must produce exactly one file");
+  const contents = Buffer.from(result.outputFiles[0].contents);
+  if (contents.includes(forbiddenBundleText)) throw new Error(`MCP bundle must not reference ${forbiddenBundleText}`);
+  if (contents.includes(repositoryRoot) || contents.includes(portablePath(repositoryRoot)))
+    throw new Error("MCP bundle must not embed the absolute repository path");
+  await writeOutputFile(outputRoot, manifest.server.target, contents);
+  return {
+    path: manifest.server.target,
+    bytes: contents.length,
+    sha256: createHash("sha256").update(contents).digest("hex"),
+    inputs: inputs.length,
+  };
 }
 
 async function setDirectoryTimes(root) {
-  async function visit(directory) {
-    for (const entry of await sortedDirectoryEntries(directory)) {
-      const child = join(directory, entry.name);
-      if (entry.isDirectory()) await visit(child);
-    }
-    await utimes(directory, fixedTime, fixedTime);
+  for (const entry of await sortedDirectoryEntries(root)) {
+    if (entry.isDirectory()) await setDirectoryTimes(join(root, entry.name));
   }
-  await visit(root);
+  await utimes(root, fixedTime, fixedTime);
 }
 
 async function hashTree(root) {
   const files = [];
-  async function visit(directory, relativeDirectory = "") {
+  async function visit(directory, relativeDirectory) {
     for (const entry of await sortedDirectoryEntries(directory)) {
       const child = join(directory, entry.name);
-      const relativePath = portablePath(join(relativeDirectory, entry.name));
+      const relativePath = relativeDirectory === "" ? entry.name : `${relativeDirectory}/${entry.name}`;
       if (entry.isDirectory()) await visit(child, relativePath);
       else if (entry.isFile()) files.push(relativePath);
       else throw new Error(`Unsupported output entry: ${child}`);
     }
   }
-  await visit(root);
+  await visit(root, "");
   const hash = createHash("sha256");
   for (const file of files.sort(bytewise)) {
     hash.update(file);
@@ -321,48 +459,34 @@ async function build(
   await mkdir(outputDirectory, { recursive: true });
 
   const plugin = await readJson(join(repositoryRoot, manifest.plugin.source));
-  const versionSource = await readJson(join(repositoryRoot, manifest.plugin.versionFrom));
-  await writeOutputFile(
-    outputDirectory,
-    manifest.plugin.target,
-    Buffer.from(`${JSON.stringify({ ...plugin, version: versionSource.version }, null, 2)}\n`),
-  );
-  await copyFileToOutput(join(repositoryRoot, manifest.mcp.source), outputDirectory, manifest.mcp.target);
-  await copyFileToOutput(
-    join(repositoryRoot, manifest.runtime.entry.source),
-    outputDirectory,
-    manifest.runtime.entry.target,
-  );
+  const { version } = await readJson(join(repositoryRoot, manifest.plugin.versionFrom));
+  const { $schema, name, ...rest } = plugin;
+  const packagedPlugin = { $schema, name, version, ...rest };
+  validatePluginJson(packagedPlugin);
+  await writeJsonOutput(outputDirectory, manifest.plugin.target, packagedPlugin);
+
+  const mcp = await readJson(join(repositoryRoot, manifest.mcp.source));
+  validateMcpJson(mcp, manifest);
+  await writeJsonOutput(outputDirectory, manifest.mcp.target, mcp);
+
+  const bundle = await bundleServer(manifest, outputDirectory);
   await copyDirectory(manifest.agents.sourceRoot, outputDirectory, manifest.agents.targetRoot);
   await copyDirectory(manifest.skills.sourceRoot, outputDirectory, manifest.skills.targetRoot);
-  if (manifest.hooks.entries.length > 0) {
-    for (const entry of manifest.hooks.entries) {
-      await copyFileToOutput(
-        join(repositoryRoot, manifest.hooks.sourceRoot, entry),
-        outputDirectory,
-        portablePath(join(manifest.hooks.targetRoot, entry)),
-      );
-    }
+  for (const entry of [...manifest.hooks.entries].sort(bytewise)) {
+    await writeOutputFile(
+      outputDirectory,
+      `${manifest.hooks.targetRoot}/${entry}`,
+      await readSourceFile(join(repositoryRoot, manifest.hooks.sourceRoot, entry)),
+    );
   }
   await copyDirectory(manifest.assets.sourceRoot, outputDirectory, manifest.assets.targetRoot);
-
-  const workspaceManifests = [];
-  for (const packageId of manifest.runtime.workspacePackages) {
-    workspaceManifests.push(await copyWorkspacePackage(packageId, outputDirectory, manifest.runtime.targetRoot));
-  }
-  for (const dependency of await collectRuntimeDependencies(workspaceManifests)) {
-    await copyExternalPackage(dependency, outputDirectory, manifest.runtime.targetRoot);
-  }
 
   await validatePackagedAgents(outputDirectory, manifest.agents.targetRoot);
   await validatePackagedSkills(outputDirectory, manifest.skills.targetRoot);
   await setDirectoryTimes(outputDirectory);
   const tree = await hashTree(outputDirectory);
-  await writeFile(
-    `${outputDirectory}.sha256`,
-    `${tree.sha256}  ${portablePath(relative(repositoryRoot, outputDirectory))}\n`,
-  );
-  return { outputDirectory, ...tree };
+  await writeFile(`${outputDirectory}.sha256`, `${tree.sha256}  ${basename(outputDirectory)}\n`);
+  return { outputDirectory, bundle, ...tree };
 }
 
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
@@ -374,6 +498,7 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(p
           outputDirectory: portablePath(relative(repositoryRoot, result.outputDirectory)),
           files: result.files.length,
           sha256: result.sha256,
+          bundle: result.bundle,
         },
         null,
         2,
@@ -385,4 +510,4 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(p
   }
 }
 
-export { build, hashTree };
+export { build, hashTree, validateMcpJson, validatePackageManifest, validatePackagedAgents, validatePluginJson };

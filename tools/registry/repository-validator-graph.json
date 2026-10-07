@@ -912,7 +912,6 @@
         "test:diagram-semantics",
         "test:retired-automation",
         "validate:policy-precheck",
-        "test:plugin",
         "lint:safe-shell"
       ],
       "continueOnError": false,

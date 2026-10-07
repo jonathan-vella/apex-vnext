@@ -1,5 +1,4 @@
 {
-  "$schema": "./package-manifest.schema.json",
   "schemaVersion": "1.0.0",
   "outputDirectory": "dist/apex-plugin",
   "plugin": {
@@ -10,9 +9,12 @@
   "mcp": {
     "source": "plugin/mcp.json",
     "target": "mcp.json",
-    "server": "apex",
-    "command": "node",
-    "entry": "${PLUGIN_ROOT}/mcp/apex.mjs"
+    "server": "apex"
+  },
+  "server": {
+    "entry": "plugin/mcp/apex.mjs",
+    "target": "mcp/apex.mjs",
+    "nodeTarget": "node24"
   },
   "agents": {
     "sourceRoot": "customizations/.github/agents",
@@ -30,13 +32,5 @@
   "assets": {
     "sourceRoot": "packages/cli/assets",
     "targetRoot": "assets"
-  },
-  "runtime": {
-    "targetRoot": "runtime/node_modules",
-    "workspacePackages": ["contracts", "kernel", "capabilities", "renderers", "cli"],
-    "entry": {
-      "source": "plugin/mcp/apex.mjs",
-      "target": "mcp/apex.mjs"
-    }
   }
 }
