@@ -22,6 +22,8 @@ node_modules/.cache/
 *.tsbuildinfo
 packages/*/dist/
 packages/cli/assets/
+# Captured MCP tools/list wire baseline: one tool per line, compared structurally by tests.
+packages/cli/src/test/fixtures/mcp-tools-list.json
 
 # AI-author markdown — Prettier's markdown printer collapses mixed-marker
 # numbered lists (6a. / 7. / 8. / 9a.) with 4-space sub-paragraph
