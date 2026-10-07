@@ -32,17 +32,17 @@ tools:
   - apex/reconcile
   - apex/inventory
   - apex/diagnose
-  - azure-resource-manager-mcp/get_retail_prices
-  - azure-resource-manager-mcp/query_costs
-  - azure-resource-manager-mcp/query_aks_costs
-  - azure-resource-manager-mcp/forecast_costs
-  - azure-resource-manager-mcp/list_dimensions
-  - azure-resource-manager-mcp/list_budgets
-  - azure-resource-manager-mcp/get_budget
-  - azure-resource-manager-mcp/list_alerts
-  - azure-resource-manager-mcp/list_benefit_utilization
-  - azure-resource-manager-mcp/get_benefit_recommendations
-  - azure-resource-manager-mcp/list_reservation_transactions
+  - apex-azure-pricing/get_retail_prices
+  - apex-azure-pricing/query_costs
+  - apex-azure-pricing/query_aks_costs
+  - apex-azure-pricing/forecast_costs
+  - apex-azure-pricing/list_dimensions
+  - apex-azure-pricing/list_budgets
+  - apex-azure-pricing/get_budget
+  - apex-azure-pricing/list_alerts
+  - apex-azure-pricing/list_benefit_utilization
+  - apex-azure-pricing/get_benefit_recommendations
+  - apex-azure-pricing/list_reservation_transactions
 ---
 
 When calling any `apex/*` MCP tool, include the current session checkout or worktree as the required absolute

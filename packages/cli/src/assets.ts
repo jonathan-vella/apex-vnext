@@ -18,7 +18,6 @@ export interface BundledAssetSource {
   path?: string;
   mapping?: string;
   composition?: string;
-  roleId?: string;
   sourcePath?: string;
   sourceHash?: string;
   clientId?: string;
@@ -57,9 +56,19 @@ export interface BundledAssetManifest {
   };
 }
 
+/** The apex Agent Plugin; files it owns are never copied into or checked in a consumer workspace. */
+export interface BundledPluginDeclaration {
+  name: "apex";
+  marketplace: "apex-plugins";
+  marketplaceRepository: "jonathan-vella/apex-plugins";
+  ownedFiles: string[];
+  ownedDirectories: string[];
+}
+
 export interface BundledAssets {
   root: string;
   customizations: string;
+  plugin: BundledPluginDeclaration;
   clientProjections: Readonly<Record<BundledClientProjection["id"], string>>;
   config: string;
   capabilityPacks: string;
@@ -383,7 +392,8 @@ export async function verifyBundledAssetManifest(root: string, manifest: Bundled
         const expectedPrefix = `${mapping.generatedRoot}/${file.source.clientId}/`;
         if (
           file.source.clientId !== "github-copilot-cli" ||
-          file.source.adapterVersion !== "1.10.0" ||
+          file.source.adapterVersion !== "1.11.0" ||
+          "roleId" in file.source ||
           !safeRelativePath(file.source.target ?? "") ||
           !file.path.startsWith(expectedPrefix) ||
           file.path !== `${expectedPrefix}${file.source.target}` ||
@@ -436,12 +446,7 @@ export async function verifyBundledAssetManifest(root: string, manifest: Bundled
   verifyBundleDeclarations(manifest, customizationManifest, runtimeBundle);
   const sharedFiles = customizationManifest.sharedFiles as string[];
   const sharedDirectories = (customizationManifest.sharedDirectories ?? []) as string[];
-  const roles = customizationManifest.roles as Array<{
-    id: string;
-    source: string;
-    agent: string;
-    supportedTargets: string[];
-  }>;
+  const plugin = pluginDeclaration(customizationManifest.plugin);
   const declarations = customizationManifest.clientProjections as Array<{
     id: string;
     generatedRoot: string;
@@ -454,7 +459,6 @@ export async function verifyBundledAssetManifest(root: string, manifest: Bundled
     sharedDirectories.length !== new Set(sharedDirectories).size ||
     sharedDirectories.some((path) => typeof path !== "string" || !safeRelativePath(path)) ||
     !Array.isArray(declarations) ||
-    !Array.isArray(roles) ||
     declarations.length !== manifest.projections.length ||
     declarations.length !== new Set(declarations.map(({ id }) => id)).size
   ) {
@@ -464,18 +468,12 @@ export async function verifyBundledAssetManifest(root: string, manifest: Bundled
   for (const file of manifest.files.filter(
     ({ source }) => source.kind === "generated" && source.composition === "client-projections",
   )) {
-    const target = projectionTarget(file.source.clientId);
-    const role = file.source.roleId === undefined ? undefined : roles.find(({ id }) => id === file.source.roleId);
+    projectionTarget(file.source.clientId);
     const canonical = sourceMetadata.get(`customizations/${file.source.sourcePath}`);
     if (
-      (file.source.roleId !== undefined &&
-        (role === undefined ||
-          role.source !== file.source.sourcePath ||
-          !role.supportedTargets.includes(target) ||
-          file.source.target !== role.source)) ||
       canonical?.source.kind !== "repository-file" ||
       canonical.sha256 !== file.source.sourceHash ||
-      (file.source.roleId === undefined && canonical.sha256 !== file.sha256)
+      canonical.sha256 !== file.sha256
     ) {
       throw new Error(`Generated client projection source binding mismatch: ${file.path}`);
     }
@@ -488,19 +486,17 @@ export async function verifyBundledAssetManifest(root: string, manifest: Bundled
     )
     .map(({ path }) => path.slice("customizations/".length));
   for (const declaration of declarations) {
+    projectionTarget(declaration.id);
     const projection = manifest.projections.find(({ id }) => id === declaration.id);
     if (!Array.isArray(declaration.files) || declaration.files.length !== new Set(declaration.files).size) {
       throw new Error(`Bundled client projection disagrees with its declaration: ${declaration.id}`);
     }
-    const expectedTargets = [
-      ...sharedFiles,
-      ...sharedDirectoryFiles,
-      ...declaration.files,
-      ...roles
-        .filter(({ supportedTargets }) => supportedTargets.includes(projectionTarget(declaration.id)))
-        .map(({ source }) => source),
-    ];
-    const expected = [...new Set(expectedTargets)].map((path) => `${declaration.generatedRoot}/${path}`).sort();
+    const expectedTargets = [...new Set([...sharedFiles, ...sharedDirectoryFiles, ...declaration.files])];
+    const reintroduced = expectedTargets.find((path) => pluginOwnsPath(plugin, path));
+    if (reintroduced !== undefined) {
+      throw new Error(`Bundled client projection carries a plugin-owned file: ${reintroduced}`);
+    }
+    const expected = expectedTargets.map((path) => `${declaration.generatedRoot}/${path}`).sort();
     if (
       !safeRelativePath(declaration.generatedRoot) ||
       projection === undefined ||
@@ -514,13 +510,60 @@ export async function verifyBundledAssetManifest(root: string, manifest: Bundled
   }
 }
 
+function pluginDeclaration(value: unknown): BundledPluginDeclaration {
+  const plugin = value as Partial<BundledPluginDeclaration> | null;
+  const paths = (entries: unknown): entries is string[] =>
+    Array.isArray(entries) &&
+    entries.length === new Set(entries).size &&
+    entries.every((entry) => typeof entry === "string" && safeRelativePath(entry));
+  if (
+    plugin === null ||
+    typeof plugin !== "object" ||
+    plugin.name !== "apex" ||
+    plugin.marketplace !== "apex-plugins" ||
+    plugin.marketplaceRepository !== "jonathan-vella/apex-plugins" ||
+    !paths(plugin.ownedFiles) ||
+    !paths(plugin.ownedDirectories) ||
+    plugin.ownedDirectories.length === 0
+  ) {
+    throw new Error("Bundled plugin declaration is invalid");
+  }
+  return {
+    name: plugin.name,
+    marketplace: plugin.marketplace,
+    marketplaceRepository: plugin.marketplaceRepository,
+    ownedFiles: [...plugin.ownedFiles],
+    ownedDirectories: [...plugin.ownedDirectories],
+  };
+}
+
+/** True when the apex plugin, not the workspace projection, owns this workspace-relative path. */
+export function pluginOwnsPath(plugin: BundledPluginDeclaration, path: string): boolean {
+  return (
+    plugin.ownedFiles.includes(path) ||
+    plugin.ownedDirectories.some((directory) => path === directory || path.startsWith(`${directory}/`))
+  );
+}
+
+/** Reads only the plugin declaration from the bundled manifest; full asset verification stays in resolveBundledAssets. */
+export async function readBundledPluginDeclaration(): Promise<BundledPluginDeclaration> {
+  const root = fileURLToPath(new URL("../assets/", import.meta.url));
+  return pluginDeclaration(
+    JSON.parse((await readBundledFile(root, "customizations/manifest.json")).toString("utf8")).plugin,
+  );
+}
+
 export async function resolveBundledAssets(): Promise<BundledAssets> {
   const root = fileURLToPath(new URL("../assets/", import.meta.url));
   const manifest = JSON.parse(await readFile(join(root, "manifest.json"), "utf8")) as BundledAssetManifest;
   await verifyBundledAssetManifest(root, manifest);
+  const customizationManifest = JSON.parse(
+    (await readBundledFile(root, "customizations/manifest.json")).toString("utf8"),
+  ) as Record<string, unknown>;
   return {
     root: dirname(join(root, "manifest.json")),
     customizations: join(root, "customizations"),
+    plugin: pluginDeclaration(customizationManifest.plugin),
     clientProjections: {
       "github-copilot-cli": join(root, "client-projections", "github-copilot-cli"),
     },

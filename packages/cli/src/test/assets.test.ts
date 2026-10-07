@@ -16,10 +16,11 @@ async function fixture(): Promise<{ root: string; manifest: BundledAssetManifest
   const root = await tempRoot();
   await mkdir(join(root, "config"), { recursive: true });
   await mkdir(join(root, "customizations", ".github", "agents"), { recursive: true });
-  await mkdir(join(root, "client-projections", "github-copilot-cli", ".github", "agents"), { recursive: true });
+  await mkdir(join(root, "customizations", ".github", "copilot"), { recursive: true });
+  await mkdir(join(root, "client-projections", "github-copilot-cli", ".github", "copilot"), { recursive: true });
   const bytes = Buffer.from('{"schemaVersion":"1.0.0"}\n', "utf8");
   const sharedBytes = Buffer.from("shared\n", "utf8");
-  const mcpBytes = Buffer.from('{"mcpServers":{}}\n', "utf8");
+  const settingsBytes = Buffer.from('{"enabledPlugins":{"apex@apex-plugins":true}}\n', "utf8");
   const agentBytes = Buffer.from("---\nname: APEX\ndescription: Test\n---\n\nBody\n", "utf8");
   await writeFile(join(root, "config", "example.json"), bytes);
   const customizationBytes = Buffer.from(
@@ -37,9 +38,17 @@ async function fixture(): Promise<{ root: string; manifest: BundledAssetManifest
         {
           id: "github-copilot-cli",
           generatedRoot: "client-projections/github-copilot-cli",
-          files: [".mcp.json"],
+          files: [".github/copilot/settings.json"],
         },
       ],
+      plugin: {
+        name: "apex",
+        marketplace: "apex-plugins",
+        marketplaceRepository: "jonathan-vella/apex-plugins",
+        ownedFiles: [".mcp.json"],
+        ownedDirectories: [".github/agents", ".github/skills"],
+        files: [".github/agents/apex.agent.md"],
+      },
       roles: [
         {
           id: "coordinator",
@@ -66,11 +75,10 @@ async function fixture(): Promise<{ root: string; manifest: BundledAssetManifest
   );
   await writeFile(join(root, "customizations", "manifest.json"), customizationBytes);
   await writeFile(join(root, "customizations", "README.md"), sharedBytes);
-  await writeFile(join(root, "customizations", ".mcp.json"), mcpBytes);
+  await writeFile(join(root, "customizations", ".github", "copilot", "settings.json"), settingsBytes);
   await writeFile(join(root, "customizations", ".github", "agents", "apex.agent.md"), agentBytes);
   const projectionRoot = join(root, "client-projections", "github-copilot-cli");
-  await writeFile(join(projectionRoot, ".mcp.json"), mcpBytes);
-  await writeFile(join(projectionRoot, ".github", "agents", "apex.agent.md"), agentBytes);
+  await writeFile(join(projectionRoot, ".github", "copilot", "settings.json"), settingsBytes);
   await writeFile(join(projectionRoot, "README.md"), sharedBytes);
   await writeFile(join(root, "config", "runtime-bundle.v1.json"), runtimeBytes);
   const sources = { customizations: "0.10.0-next.5", config: "1.0.0" };
@@ -109,16 +117,14 @@ async function fixture(): Promise<{ root: string; manifest: BundledAssetManifest
     repositoryFile("customizations/.github/agents/apex.agent.md", "customizations", agentBytes),
     repositoryFile("config/example.json", "config", bytes),
     repositoryFile("config/runtime-bundle.v1.json", "config", runtimeBytes),
-    repositoryFile("customizations/.mcp.json", "customizations", mcpBytes),
+    repositoryFile("customizations/.github/copilot/settings.json", "customizations", settingsBytes),
     repositoryFile("customizations/README.md", "customizations", sharedBytes),
     repositoryFile("customizations/manifest.json", "customizations", customizationBytes),
   ];
   for (const [target, content] of [
-    [".mcp.json", mcpBytes],
-    [".github/agents/apex.agent.md", agentBytes],
+    [".github/copilot/settings.json", settingsBytes],
     ["README.md", sharedBytes],
   ] as const) {
-    const agent = target === ".github/agents/apex.agent.md";
     files.push({
       path: `client-projections/github-copilot-cli/${target}`,
       source: {
@@ -126,10 +132,9 @@ async function fixture(): Promise<{ root: string; manifest: BundledAssetManifest
         composition: "client-projections",
         clientId: "github-copilot-cli",
         target,
-        adapterVersion: "1.10.0",
+        adapterVersion: "1.11.0",
         sourcePath: target,
         sourceHash: sha256Bytes(content),
-        ...(agent ? { roleId: "coordinator" } : {}),
       },
       sha256: sha256Bytes(content),
       bytes: content.byteLength,
@@ -172,10 +177,10 @@ test("rejects retired VS Code and combined projections after rehashing", async (
   const { root, manifest } = await fixture();
   context.after(() => rm(root, { recursive: true, force: true }));
   const relabelled = structuredClone(manifest);
-  const agent = relabelled.files.find(
-    ({ path }) => path.endsWith(".github/agents/apex.agent.md") && path.startsWith("client-projections/"),
+  const settings = relabelled.files.find(
+    ({ path }) => path.endsWith(".github/copilot/settings.json") && path.startsWith("client-projections/"),
   )!;
-  agent.source.clientId = "github-copilot-vscode";
+  settings.source.clientId = "github-copilot-vscode";
   relabelled.lock.digest = bundleLockDigest(relabelled);
   await assert.rejects(verifyBundledAssetManifest(root, relabelled), /Invalid generated client projection provenance/);
   const combined = structuredClone(manifest);
@@ -284,22 +289,53 @@ test("rejects client projection digest and declaration drift after aggregate reb
   await assert.rejects(verifyBundledAssetManifest(root, declarationDrift), /declarations are missing/);
 });
 
-test("rejects a generated role in an unsupported client projection", async (context) => {
+test("rejects plugin-owned agents, skills or MCP config in the workspace projection", async (context) => {
   const { root, manifest } = await fixture();
   context.after(() => rm(root, { recursive: true, force: true }));
-  const changedManifest = structuredClone(manifest);
+  const agentBytes = await import("node:fs/promises").then(({ readFile }) =>
+    readFile(join(root, "customizations", ".github", "agents", "apex.agent.md")),
+  );
+  const target = ".github/agents/apex.agent.md";
+  await mkdir(join(root, "client-projections", "github-copilot-cli", ".github", "agents"), { recursive: true });
+  await writeFile(join(root, "client-projections", "github-copilot-cli", target), agentBytes);
+  const reintroduced = structuredClone(manifest);
+  reintroduced.files.push({
+    path: `client-projections/github-copilot-cli/${target}`,
+    source: {
+      kind: "generated",
+      composition: "client-projections",
+      clientId: "github-copilot-cli",
+      target,
+      adapterVersion: "1.11.0",
+      sourcePath: target,
+      sourceHash: sha256Bytes(agentBytes),
+    },
+    sha256: sha256Bytes(agentBytes),
+    bytes: agentBytes.byteLength,
+  });
+  reintroduced.files.sort((left, right) => (left.path < right.path ? -1 : left.path > right.path ? 1 : 0));
+  reintroduced.projections[0]!.files = reintroduced.files
+    .filter(({ path }) => path.startsWith("client-projections/"))
+    .map(({ path }) => path);
+  reintroduced.projections[0]!.digest = clientProjectionDigest(reintroduced.projections[0]!, reintroduced.files);
   const declarationPath = join(root, "customizations", "manifest.json");
   const declaration = JSON.parse(
     await import("node:fs/promises").then(({ readFile }) => readFile(declarationPath, "utf8")),
   );
-  declaration.roles[0].supportedTargets = ["vscode"];
+  declaration.clientProjections[0].files.push(target);
   const changed = Buffer.from(`${JSON.stringify(declaration)}\n`);
   await writeFile(declarationPath, changed);
-  const entry = changedManifest.files.find(({ path }) => path === "customizations/manifest.json")!;
+  const entry = reintroduced.files.find(({ path }) => path === "customizations/manifest.json")!;
   entry.sha256 = sha256Bytes(changed);
   entry.bytes = changed.byteLength;
-  changedManifest.lock.digest = bundleLockDigest(changedManifest);
-  await assert.rejects(verifyBundledAssetManifest(root, changedManifest), /source binding mismatch/);
+  reintroduced.lock.digest = bundleLockDigest(reintroduced);
+  await assert.rejects(verifyBundledAssetManifest(root, reintroduced), /carries a plugin-owned file/);
+
+  const rendered = structuredClone(manifest);
+  const generated = rendered.files.find(({ source }) => source.kind === "generated")!;
+  Object.assign(generated.source, { roleId: "coordinator" });
+  rendered.lock.digest = bundleLockDigest(rendered);
+  await assert.rejects(verifyBundledAssetManifest(root, rendered), /Invalid generated client projection provenance/);
 });
 
 test("rejects unknown client projection IDs before target-dependent binding", async (context) => {
@@ -307,7 +343,7 @@ test("rejects unknown client projection IDs before target-dependent binding", as
   context.after(() => rm(root, { recursive: true, force: true }));
   const changedManifest = structuredClone(manifest);
   const generated = changedManifest.files.find(
-    ({ source }) => source.kind === "generated" && source.roleId === "coordinator",
+    ({ source }) => source.kind === "generated" && source.target === ".github/copilot/settings.json",
   )!;
   generated.source.clientId = "unknown-client";
   changedManifest.lock.digest = bundleLockDigest(changedManifest);

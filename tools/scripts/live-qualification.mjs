@@ -171,7 +171,7 @@ async function installQualifiedRuntime(workspace, options, root = ROOT) {
 
 // Both evidence identities, standalone CLI and the VS Code Copilot harness, run the single Copilot CLI projection.
 const PROJECTION_CLIENT_ID = "github-copilot-cli";
-const PROJECTION_MCP_FILE = ".mcp.json";
+const PROJECTION_SETTINGS_FILE = ".github/copilot/settings.json";
 
 function evidenceClientId(options) {
   const clientId = options.client ?? PROJECTION_CLIENT_ID;
@@ -247,7 +247,7 @@ async function prepareClient(root, clientId, projectId, serviceFactory, installR
   const projection = await collectManagedProjection(
     root,
     PROJECTION_CLIENT_ID,
-    PROJECTION_MCP_FILE,
+    PROJECTION_SETTINGS_FILE,
     "Prepared workspace",
   );
   if (projection.files.some(({ matches }) => !matches)) {
@@ -407,7 +407,7 @@ async function verifyPreparedWorkspace(root, expected) {
   const projection = await collectManagedProjection(
     root,
     PROJECTION_CLIENT_ID,
-    PROJECTION_MCP_FILE,
+    PROJECTION_SETTINGS_FILE,
     "Prepared cleanup workspace",
   );
   const selection = parseStrictJson(
@@ -1223,7 +1223,7 @@ export async function collectCliSurfaceEvidence(
   const projection = await collectManagedProjection(
     workspace,
     PROJECTION_CLIENT_ID,
-    PROJECTION_MCP_FILE,
+    PROJECTION_SETTINGS_FILE,
     "Copilot CLI",
   );
   const { files } = projection;
@@ -1362,7 +1362,12 @@ export async function collectVscodeSurfaceEvidence(
   const builtInExtension = listedExtensionVersion === null ? await builtinCopilotChat(host, observedVersion) : null;
   const observedExtensionVersion = listedExtensionVersion ?? builtInExtension?.version ?? null;
   const extensionInventorySha256 = builtInExtension?.digest ?? sha256(Buffer.from(extensionOutput));
-  const projection = await collectManagedProjection(workspace, PROJECTION_CLIENT_ID, PROJECTION_MCP_FILE, "VS Code");
+  const projection = await collectManagedProjection(
+    workspace,
+    PROJECTION_CLIENT_ID,
+    PROJECTION_SETTINGS_FILE,
+    "VS Code",
+  );
   const drift = projection.files.some(({ matches }) => !matches);
   const disposition =
     observedExtensionVersion === null
@@ -1601,7 +1606,7 @@ export async function collectClientInputEvidence(
   const projection = await collectManagedProjection(
     workspace,
     PROJECTION_CLIENT_ID,
-    PROJECTION_MCP_FILE,
+    PROJECTION_SETTINGS_FILE,
     "Input workspace",
   );
   if (projection.files.some(({ matches }) => !matches)) {
@@ -1756,7 +1761,7 @@ export async function collectRestartEvidence(
   const projection = await collectManagedProjection(
     workspace,
     PROJECTION_CLIENT_ID,
-    PROJECTION_MCP_FILE,
+    PROJECTION_SETTINGS_FILE,
     "Restart workspace",
   );
   if (projection.files.some(({ matches }) => !matches)) {
@@ -1951,7 +1956,7 @@ export async function collectTransferEvidence(
   const projection = await collectManagedProjection(
     workspace,
     PROJECTION_CLIENT_ID,
-    PROJECTION_MCP_FILE,
+    PROJECTION_SETTINGS_FILE,
     "Transfer workspace",
   );
   if (projection.files.some(({ matches }) => !matches)) {

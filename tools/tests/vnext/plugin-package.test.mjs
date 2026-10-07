@@ -8,6 +8,7 @@ import { createInterface } from "node:readline";
 import { pathToFileURL } from "node:url";
 import test from "node:test";
 import { load as loadYaml } from "js-yaml";
+import { renderClientAgentProjection } from "../../../packages/cli/scripts/prepare-assets.mjs";
 import {
   build,
   hashTree,
@@ -97,7 +98,13 @@ test("plugin layout, manifests, agents, skills and bundle are valid", async (con
 
   const mcp = await readJson(join(outputDirectory, "mcp.json"));
   validateMcpJson(mcp, manifest);
+  assert.deepEqual(Object.keys(mcp.mcpServers), ["apex", "apex-azure-pricing"]);
   assert.deepEqual(mcp.mcpServers.apex, { type: "stdio", command: "node", args: ["${PLUGIN_ROOT}/mcp/apex.mjs"] });
+  assert.deepEqual(mcp.mcpServers["apex-azure-pricing"], {
+    type: "streamable-http",
+    url: "https://mcp.management.azure.com",
+    headers: { "x-mcp-toolset": "CostManagement,Pricing" },
+  });
   const entry = mcp.mcpServers.apex.args[0].replace("${PLUGIN_ROOT}/", "");
   assert.ok((await stat(join(outputDirectory, entry))).isFile(), "MCP entry exists in the package");
 
@@ -114,7 +121,27 @@ test("plugin layout, manifests, agents, skills and bundle are valid", async (con
     for (const field of ["model", "model-policy", "reasoning-effort"]) assert.equal(frontmatter[field], undefined);
     assert.ok(body.length <= 30_000, `${file} body is ${body.length} characters`);
     assert.equal(frontmatter["user-invocable"], file === "apex.agent.md", `${file} visibility`);
+    assert.equal(frontmatter.target, "github-copilot", `${file} target`);
+    assert.ok(
+      frontmatter.tools.every((tool) => !tool.startsWith("azure-resource-manager-mcp/")),
+      `${file} uses the plugin server name`,
+    );
   }
+
+  const customizationManifest = await readJson(join(root, "customizations/manifest.json"));
+  for (const path of customizationManifest.plugin.files) {
+    const packaged = path.startsWith(".github/agents/")
+      ? `com.github.copilot/agents/${path.slice(".github/agents/".length)}`
+      : `skills/${path.slice(".github/skills/".length)}`;
+    assert.ok(files.includes(packaged), `plugin replaces the retired workspace copy ${path}`);
+  }
+  const projectionAssets = files.filter((path) => path.startsWith("assets/client-projections/github-copilot-cli/"));
+  assert.ok(projectionAssets.includes("assets/client-projections/github-copilot-cli/.github/copilot/settings.json"));
+  assert.deepEqual(
+    projectionAssets.filter((path) => /\/\.github\/(?:agents|skills)\/|\/\.mcp\.json$/u.test(path)),
+    [],
+    "the bundled CLI projection carries no plugin-owned copies",
+  );
 
   const skills = (await readdir(join(outputDirectory, "skills"))).sort();
   assert.deepEqual(skills, (await readdir(join(root, "customizations/.github/skills"))).sort());
@@ -160,6 +187,88 @@ test("plugin layout, manifests, agents, skills and bundle are valid", async (con
   assert.deepEqual(
     staticImports.filter((specifier) => !builtins.has(specifier)),
     [],
+  );
+});
+
+test("plugin agents and skills carry the guidance the retired workspace copies carried", async (context) => {
+  const { outputDirectory } = await buildInto(context, "replacement");
+  const toolInventory = await readJson(join(root, "tools/registry/copilot-cli-agent-tools.json"));
+  const agentsRoot = join(outputDirectory, "com.github.copilot/agents");
+  const apexAgent = await readFile(join(agentsRoot, "apex.agent.md"), "utf8");
+  assert.equal(
+    apexAgent,
+    renderClientAgentProjection(
+      await readFile(join(root, "customizations/.github/agents/apex.agent.md"), "utf8"),
+      "github-copilot-cli",
+      toolInventory,
+      { delegates: true },
+    ),
+  );
+  const { frontmatter } = frontmatterOf(apexAgent);
+  assert.deepEqual(frontmatter.tools, [
+    "ask_user",
+    "task",
+    "view",
+    "glob",
+    "rg",
+    "web_fetch",
+    "apex/status",
+    "apex/releaseWriter",
+    "apex/nextTask",
+    "apex/projectCreate",
+    "apex/projectList",
+    "apex/projectUse",
+    "apex/projectDelete",
+    "apex/recordInput",
+    "apex/taskContext",
+    "apex/readTaskInput",
+    "apex/requirementsComplete",
+    "apex/architectureComplete",
+    "apex/planComplete",
+    "apex/completeTask",
+    "apex/reviewDecide",
+    "apex/gateDecide",
+    "apex/governanceImport",
+    "apex/governanceSelect",
+    "apex/preview",
+    "apex/reconcile",
+    "apex/inventory",
+    "apex/diagnose",
+    "apex-azure-pricing/get_retail_prices",
+    "apex-azure-pricing/query_costs",
+    "apex-azure-pricing/query_aks_costs",
+    "apex-azure-pricing/forecast_costs",
+    "apex-azure-pricing/list_dimensions",
+    "apex-azure-pricing/list_budgets",
+    "apex-azure-pricing/get_budget",
+    "apex-azure-pricing/list_alerts",
+    "apex-azure-pricing/list_benefit_utilization",
+    "apex-azure-pricing/get_benefit_recommendations",
+    "apex-azure-pricing/list_reservation_transactions",
+  ]);
+  assert.doesNotMatch(apexAgent, /vscode\/askQuestions|handoffs:|agents:/u);
+  assert.match(apexAgent, /## Client Mechanics/u);
+  assert.match(apexAgent, /Route through the `apex-next` skill in this same APEX agent/u);
+  assert.match(apexAgent, /Use `ask_user` for project lifecycle choices/u);
+  assert.match(apexAgent, /Reuse values the user already stated/u);
+  assert.match(apexAgent, /Carry the user's requested outcome, stop point and prohibited operations/u);
+  assert.match(apexAgent, /If a gate is pending, report it and stop/u);
+  assert.match(apexAgent, /worker to call `apex\/taskContext`/u);
+  for (const worker of ["apex-codegen.agent.md", "apex-reviewer.agent.md", "apex-validator.agent.md"]) {
+    const profile = await readFile(join(agentsRoot, worker), "utf8");
+    assert.match(profile, /user-invocable: false/u);
+    assert.doesNotMatch(profile, /- ask_user/u);
+  }
+  const skill = (...path) => readFile(join(outputDirectory, "skills", ...path), "utf8");
+  const apexNext = await skill("apex-next", "SKILL.md");
+  assert.match(apexNext, /^name: apex-next$/mu);
+  assert.match(apexNext, /No `\/agent` switching/u);
+  assert.match(await skill("apex-planning", "SKILL.md"), /kernel derives the canonical intent hash/u);
+  assert.match(await skill("apex-architecture", "SKILL.md"), /`apex-azure-pricing\/get_retail_prices`/u);
+  assert.match(await skill("apex-azure-defaults", "references", "security-baseline.md"), /Core Controls/u);
+  assert.match(
+    await skill("apex-artifacts", "templates", "requirements.md"),
+    /Derived from accepted APEX requirements/u,
   );
 });
 

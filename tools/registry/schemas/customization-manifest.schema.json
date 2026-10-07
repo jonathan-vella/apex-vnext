@@ -3,7 +3,16 @@
   "$id": "https://schemas.apexops.dev/repository/customization-manifest-v1.json",
   "title": "APEX customization manifest",
   "type": "object",
-  "required": ["version", "bundle", "managedFiles", "sharedFiles", "clientProjections", "roles", "invocationEdges"],
+  "required": [
+    "version",
+    "bundle",
+    "managedFiles",
+    "sharedFiles",
+    "clientProjections",
+    "plugin",
+    "roles",
+    "invocationEdges"
+  ],
   "additionalProperties": false,
   "properties": {
     "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z][0-9A-Za-z.-]*)?$" },
@@ -35,6 +44,20 @@
           "generatedRoot": { "type": "string", "pattern": "^client-projections/[a-z0-9-]+$" },
           "files": { "$ref": "#/$defs/uniquePaths" }
         }
+      }
+    },
+    "plugin": {
+      "description": "The apex Agent Plugin that delivers agents, skills and MCP servers. Files it owns are never copied into or checked in a consumer workspace.",
+      "type": "object",
+      "required": ["name", "marketplace", "marketplaceRepository", "ownedFiles", "ownedDirectories", "files"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "const": "apex" },
+        "marketplace": { "const": "apex-plugins" },
+        "marketplaceRepository": { "const": "jonathan-vella/apex-plugins" },
+        "ownedFiles": { "$ref": "#/$defs/uniquePaths" },
+        "ownedDirectories": { "$ref": "#/$defs/uniquePaths" },
+        "files": { "$ref": "#/$defs/uniquePaths" }
       }
     },
     "roles": {

@@ -7,25 +7,6 @@ import { ApexError } from "../errors.js";
 import { ApexService } from "../service.js";
 import { tempRoot } from "./helpers.js";
 
-async function treeDigest(root: string): Promise<string> {
-  const hash = createHash("sha256");
-  const visit = async (directory: string): Promise<void> => {
-    const entries = (await readdir(directory, { withFileTypes: true })).sort((left, right) =>
-      left.name < right.name ? -1 : left.name > right.name ? 1 : 0,
-    );
-    for (const entry of entries) {
-      const path = join(directory, entry.name);
-      const name = relative(root, path).split(sep).join("/");
-      const metadata = await lstat(path);
-      hash.update(metadata.isDirectory() ? `d:${name}\0` : `f:${name}\0`);
-      if (metadata.isDirectory()) await visit(path);
-      else hash.update(await readFile(path));
-    }
-  };
-  await visit(root);
-  return hash.digest("hex");
-}
-
 test("init installs and update refreshes managed customizations", async () => {
   const root = await tempRoot();
   const source = await tempRoot();
@@ -67,128 +48,120 @@ test("init installs and update refreshes managed customizations", async () => {
   assert.equal((await service.nextTask()).status, "needs_input");
 });
 
-test("init installs bundled customizations and runtime config by default", async () => {
+const THIN_PROJECTION = [
+  ".github/copilot-instructions.md",
+  ".github/copilot/settings.json",
+  ".github/instructions/apex-agent-authoring.instructions.md",
+  ".github/instructions/apex-artifact-contracts.instructions.md",
+  ".github/instructions/apex-automation.instructions.md",
+  ".github/instructions/apex-azure-yaml.instructions.md",
+  ".github/instructions/apex-bicep.instructions.md",
+  ".github/instructions/apex-code-quality.instructions.md",
+  ".github/instructions/apex-context.instructions.md",
+  ".github/instructions/apex-documentation.instructions.md",
+  ".github/instructions/apex-governance.instructions.md",
+  ".github/instructions/apex-instruction-authoring.instructions.md",
+  ".github/instructions/apex-javascript.instructions.md",
+  ".github/instructions/apex-json.instructions.md",
+  ".github/instructions/apex-markdown.instructions.md",
+  ".github/instructions/apex-powershell.instructions.md",
+  ".github/instructions/apex-prompt-authoring.instructions.md",
+  ".github/instructions/apex-python.instructions.md",
+  ".github/instructions/apex-safe-file-edits.instructions.md",
+  ".github/instructions/apex-safe-shell.instructions.md",
+  ".github/instructions/apex-shell.instructions.md",
+  ".github/instructions/apex-skill-authoring.instructions.md",
+  ".github/instructions/apex-terraform.instructions.md",
+  ".github/workflows/governance-policy-baseline.yml",
+  "tools/schemas/governance-baseline.schema.json",
+  "tools/scripts/collect-governance-baseline.ps1",
+];
+
+const PLUGIN_SETTINGS = {
+  enabledPlugins: { "apex@apex-plugins": true },
+  extraKnownMarketplaces: {
+    "apex-plugins": { source: { source: "github", repo: "jonathan-vella/apex-plugins" } },
+  },
+};
+
+interface TestLock {
+  clientId?: string;
+  files: Array<{ path: string; sourceHash: string; baseHash: string; currentHash: string; baseRef?: string }>;
+  runtime: Array<{ sourceHash: string }>;
+  externallyManaged?: {
+    class: string;
+    owner: string;
+    files: string[];
+    directories: string[];
+    retained: Array<{ path: string; currentHash: string }>;
+  };
+  previousLockRef?: string;
+}
+
+async function workspaceFiles(root: string): Promise<string[]> {
+  const files: string[] = [];
+  const visit = async (directory: string): Promise<void> => {
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      const path = join(directory, entry.name);
+      const name = relative(root, path).split(sep).join("/");
+      if (name === ".apex" || name === ".git") continue;
+      if (entry.isDirectory()) await visit(path);
+      else files.push(name);
+    }
+  };
+  await visit(root);
+  return files.sort();
+}
+
+async function readLock(root: string): Promise<TestLock> {
+  return JSON.parse(await readFile(join(root, ".apex", "customizations.lock.json"), "utf8")) as TestLock;
+}
+
+const sha256 = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
+
+/** Rewrites a thin workspace into the shape the previous (thick) projection installed: copies plus lock entries. */
+async function simulateThickProjection(root: string, copies: Record<string, string>): Promise<void> {
+  const lockPath = join(root, ".apex", "customizations.lock.json");
+  const lock = await readLock(root);
+  for (const [path, content] of Object.entries(copies)) {
+    const hash = sha256(content);
+    const baseRef = `.apex/customization-bases/${hash}/customization/${path}`;
+    await mkdir(join(root, path, ".."), { recursive: true });
+    await writeFile(join(root, path), content);
+    await mkdir(join(root, baseRef, ".."), { recursive: true });
+    await writeFile(join(root, baseRef), content);
+    lock.files.push({ path, sourceHash: hash, baseHash: hash, currentHash: hash, baseRef });
+  }
+  lock.files = lock.files.filter(({ path }) => path !== ".github/copilot/settings.json");
+  await rm(join(root, ".github", "copilot", "settings.json"));
+  delete lock.externallyManaged;
+  await writeFile(lockPath, `${JSON.stringify(lock, null, 2)}\n`);
+}
+
+const THICK_COPIES = {
+  ".github/agents/apex.agent.md": "---\nname: APEX\ndescription: Thick copy\n---\n\nBody\n",
+  ".github/agents/apex-codegen.agent.md": "---\nname: APEX CodeGen\ndescription: Thick copy\n---\n\nBody\n",
+  ".github/skills/apex-next/SKILL.md": "---\nname: apex-next\ndescription: Thick copy\n---\n\nBody\n",
+  ".mcp.json": '{"mcpServers":{"apex":{"type":"local","command":"npx"}}}\n',
+};
+
+test("init writes only the thin projection with plugin settings and no plugin-owned copies", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
   await service.init({ projectId: "demo", riskOwner: "partner" });
-  const coordinatorAgent = await readFile(join(root, ".github", "agents", "apex.agent.md"), "utf8");
-  assert.match(coordinatorAgent, /name: APEX/u);
-  assert.match(coordinatorAgent, /target: github-copilot/u);
-  assert.match(
-    await readFile(join(root, ".github", "agents", "apex-validator.agent.md"), "utf8"),
-    /target: github-copilot/u,
+  assert.deepEqual(await workspaceFiles(root), THIN_PROJECTION);
+  assert.deepEqual(
+    JSON.parse(await readFile(join(root, ".github", "copilot", "settings.json"), "utf8")),
+    PLUGIN_SETTINGS,
   );
-  const installedAgents = (await readdir(join(root, ".github", "agents"))).sort();
-  assert.deepEqual(installedAgents, [
-    "apex-codegen.agent.md",
-    "apex-reviewer.agent.md",
-    "apex-validator.agent.md",
-    "apex.agent.md",
-  ]);
-  const apexAgent = await readFile(join(root, ".github", "agents", "apex.agent.md"), "utf8");
-  assert.match(apexAgent, /Route through the `apex-next` skill in this same APEX agent/u);
-  assert.match(apexAgent, /Reuse values the user already stated/u);
-  assert.match(apexAgent, /Carry the user's requested outcome/u);
-  assert.match(apexAgent, /If a gate is pending, report it and stop/u);
-  assert.match(apexAgent, /while a gate is pending/u);
-  assert.match(apexAgent, /- apex\/requirementsComplete/u);
-  assert.match(apexAgent, /- apex\/architectureComplete/u);
-  assert.match(apexAgent, /- apex\/planComplete/u);
-  assert.match(apexAgent, /- apex\/preview/u);
-  assert.match(apexAgent, /- azure-resource-manager-mcp\/get_retail_prices/u);
-  await readFile(join(root, ".mcp.json"));
-  assert.match(
-    await readFile(join(root, ".github", "instructions", "apex-agent-authoring.instructions.md"), "utf8"),
-    /APEX Agent Boundaries/u,
-  );
+  for (const retired of [".mcp.json", ".github/agents", ".github/skills", ".vscode/mcp.json", ".github/mcp.json"])
+    await assert.rejects(lstat(join(root, retired)), { code: "ENOENT" });
+  for (const path of THIN_PROJECTION.filter((file) => file.startsWith(".github/instructions/")))
+    assert.match(await readFile(join(root, path), "utf8"), /^---\n[\s\S]*?^applyTo: "[^"]+"$/mu, path);
   assert.match(
     await readFile(join(root, ".github", "instructions", "apex-terraform.instructions.md"), "utf8"),
     /APEX Terraform Rules/u,
   );
-  assert.match(
-    await readFile(join(root, ".github", "skills", "apex-azure-defaults", "SKILL.md"), "utf8"),
-    /APEX Azure Defaults/u,
-  );
-  assert.match(
-    await readFile(
-      join(root, ".github", "skills", "apex-azure-defaults", "references", "security-baseline.md"),
-      "utf8",
-    ),
-    /Core Controls/u,
-  );
-  assert.match(
-    await readFile(
-      join(root, ".github", "skills", "apex-azure-defaults", "references", "decision-boundaries.md"),
-      "utf8",
-    ),
-    /Decision Boundaries And Fallbacks/u,
-  );
-  assert.match(
-    await readFile(join(root, ".github", "skills", "apex-microsoft-docs", "SKILL.md"), "utf8"),
-    /APEX Microsoft Documentation/u,
-  );
-  assert.match(
-    await readFile(
-      join(root, ".github", "skills", "apex-bicep-patterns", "references", "network-and-observability.md"),
-      "utf8",
-    ),
-    /Private endpoint intent/u,
-  );
-  assert.match(
-    await readFile(
-      join(root, ".github", "skills", "apex-bicep-patterns", "references", "compiler-and-provider-gotchas.md"),
-      "utf8",
-    ),
-    /Exact Module Schema Wins/u,
-  );
-  assert.match(
-    await readFile(
-      join(root, ".github", "skills", "apex-terraform-patterns", "references", "plan-and-change-assessment.md"),
-      "utf8",
-    ),
-    /Stateful and Drift Signals/u,
-  );
-  assert.match(
-    await readFile(
-      join(root, ".github", "skills", "apex-terraform-test", "references", "plan-mode-and-mock-design.md"),
-      "utf8",
-    ),
-    /Plan-Mode and Mock Design/u,
-  );
-  assert.match(
-    await readFile(
-      join(root, ".github", "skills", "apex-terraform-import", "references", "mapping-and-adoption-attestation.md"),
-      "utf8",
-    ),
-    /Mapping and Adoption Attestation/u,
-  );
-  assert.match(
-    await readFile(join(root, ".github", "skills", "apex-artifacts", "SKILL.md"), "utf8"),
-    /APEX Artifact Presentations/u,
-  );
-  assert.match(
-    await readFile(join(root, ".github", "skills", "apex-artifacts", "templates", "requirements.md"), "utf8"),
-    /Derived from accepted APEX requirements artifact/u,
-  );
-  assert.match(
-    await readFile(
-      join(root, ".github", "skills", "apex-artifacts", "references", "reference-only-outlines.md"),
-      "utf8",
-    ),
-    /Reference-Only Document Outlines/u,
-  );
-  const mcp = JSON.parse(await readFile(join(root, ".mcp.json"), "utf8")) as {
-    mcpServers: Record<string, { type: string; command?: string; args?: string[]; url?: string; tools: string[] }>;
-  };
-  assert.deepEqual(Object.keys(mcp.mcpServers).sort(), ["apex", "azure-resource-manager-mcp"]);
-  assert.deepEqual(
-    { type: mcp.mcpServers.apex!.type, command: mcp.mcpServers.apex!.command, args: mcp.mcpServers.apex!.args },
-    { type: "local", command: "npx", args: ["--no", "apex", "mcp", "serve"] },
-  );
-  assert.ok(mcp.mcpServers.apex!.tools.includes("recordInput"));
-  assert.equal(mcp.mcpServers["azure-resource-manager-mcp"]!.url, "https://mcp.management.azure.com");
-  for (const retired of [join(".vscode", "mcp.json"), join(".github", "mcp.json")])
-    await assert.rejects(readFile(join(root, retired), "utf8"), /ENOENT/u);
   assert.equal(
     await readFile(join(root, ".apex", ".gitignore"), "utf8"),
     "/cache/\n/local/\n/work/\n/runtime/capability-packs/\n",
@@ -196,244 +169,148 @@ test("init installs bundled customizations and runtime config by default", async
   assert.match(await readFile(join(root, ".apex", "runtime", "workflow.v1.json"), "utf8"), /apex-workflow-v1/);
   const registry = JSON.parse(
     await readFile(join(root, ".apex", "runtime", "capability-packs.registry.json"), "utf8"),
-  ) as {
-    packs: Array<{
-      id: string;
-      artifact: { spec: string; digest: string };
-      lock: { path?: string; digest: string; directDigest: string; transitiveDigest: string };
-      script?: string;
-      scriptDigest?: string;
-    }>;
-  };
-  assert.deepEqual(
-    registry.packs.map(({ id }) => id),
-    [],
-  );
-  for (const pack of registry.packs) {
-    const source = join(root, ".apex", "runtime", pack.artifact.spec);
-    assert.equal(await treeDigest(source), pack.artifact.digest);
-    assert.ok(
-      [pack.artifact.digest, pack.lock.digest, pack.lock.directDigest, pack.lock.transitiveDigest].every((digest) =>
-        /^[a-f0-9]{64}$/.test(digest),
-      ),
-    );
-    if (pack.lock.path !== undefined) {
-      const lockBytes = await readFile(join(root, ".apex", "runtime", pack.lock.path));
-      assert.equal(createHash("sha256").update(lockBytes).digest("hex"), pack.lock.digest);
-    }
-    if (pack.script !== undefined) {
-      const scriptBytes = await readFile(join(source, pack.script));
-      assert.equal(createHash("sha256").update(scriptBytes).digest("hex"), pack.scriptDigest);
-    }
-  }
-  const lock = JSON.parse(await readFile(join(root, ".apex", "customizations.lock.json"), "utf8")) as {
-    clientId?: string;
-    files: Array<{ path: string; sourceHash: string }>;
-    runtime: Array<{ sourceHash: string }>;
-  };
+  ) as { packs: Array<{ id: string }> };
+  assert.deepEqual(registry.packs, []);
+  const lock = await readLock(root);
+  assert.equal(lock.clientId, "github-copilot-cli");
+  assert.deepEqual(lock.files.map(({ path }) => path).sort(), THIN_PROJECTION);
   assert.ok([...lock.files, ...lock.runtime].every(({ sourceHash }) => /^[a-f0-9]{64}$/.test(sourceHash)));
-  assert.ok(lock.files.some(({ path }) => path === ".mcp.json"));
-  assert.ok(!lock.files.some(({ path }) => path === ".vscode/mcp.json" || path === ".github/mcp.json"));
-  assert.equal(lock.clientId, "github-copilot-cli");
-});
-
-test("init installs only the selected Copilot CLI projection and records it in the lock", async () => {
-  const root = await tempRoot();
-  const service = new ApexService(root);
-  await service.init({ projectId: "demo", riskOwner: "partner", clientId: "github-copilot-cli" });
-  for (const retired of [join(".vscode", "mcp.json"), join(".github", "mcp.json")])
-    await assert.rejects(readFile(join(root, retired), "utf8"), /ENOENT/u);
-  assert.match(await readFile(join(root, ".mcp.json"), "utf8"), /"recordInput"/u);
-  const installedAgents = (await readdir(join(root, ".github", "agents"))).sort();
-  assert.deepEqual(installedAgents, [
-    "apex-codegen.agent.md",
-    "apex-reviewer.agent.md",
-    "apex-validator.agent.md",
-    "apex.agent.md",
-  ]);
-  assert.match(
-    await readFile(join(root, ".github", "instructions", "apex-agent-authoring.instructions.md"), "utf8"),
-    /APEX Agent Boundaries/u,
-  );
-  const apexAgent = await readFile(join(root, ".github", "agents", "apex.agent.md"), "utf8");
-  const apexTools = [...apexAgent.matchAll(/^  - (.+)$/gmu)].map(([, tool]) => tool);
-  assert.deepEqual(apexTools, [
-    "ask_user",
-    "task",
-    "view",
-    "glob",
-    "rg",
-    "web_fetch",
-    "apex/status",
-    "apex/releaseWriter",
-    "apex/nextTask",
-    "apex/projectCreate",
-    "apex/projectList",
-    "apex/projectUse",
-    "apex/projectDelete",
-    "apex/recordInput",
-    "apex/taskContext",
-    "apex/readTaskInput",
-    "apex/requirementsComplete",
-    "apex/architectureComplete",
-    "apex/planComplete",
-    "apex/completeTask",
-    "apex/reviewDecide",
-    "apex/gateDecide",
-    "apex/governanceImport",
-    "apex/governanceSelect",
-    "apex/preview",
-    "apex/reconcile",
-    "apex/inventory",
-    "apex/diagnose",
-    "azure-resource-manager-mcp/get_retail_prices",
-    "azure-resource-manager-mcp/query_costs",
-    "azure-resource-manager-mcp/query_aks_costs",
-    "azure-resource-manager-mcp/forecast_costs",
-    "azure-resource-manager-mcp/list_dimensions",
-    "azure-resource-manager-mcp/list_budgets",
-    "azure-resource-manager-mcp/get_budget",
-    "azure-resource-manager-mcp/list_alerts",
-    "azure-resource-manager-mcp/list_benefit_utilization",
-    "azure-resource-manager-mcp/get_benefit_recommendations",
-    "azure-resource-manager-mcp/list_reservation_transactions",
-  ]);
-  assert.match(apexAgent, /target: github-copilot/u);
-  assert.doesNotMatch(apexAgent, /^(?:model|model-policy|reasoning-effort):/mu);
-  assert.match(apexAgent, /- ask_user/u);
-  assert.match(apexAgent, /\n\s+- task\s*\n/u);
-  assert.doesNotMatch(apexAgent, /vscode\/askQuestions|handoffs:|agents:/u);
-  assert.match(apexAgent, /- apex\/projectCreate/u);
-  assert.match(apexAgent, /- apex\/requirementsComplete/u);
-  assert.match(apexAgent, /- apex\/architectureComplete/u);
-  assert.match(apexAgent, /- apex\/planComplete/u);
-  assert.match(apexAgent, /Reuse project values the user already stated.*Ask only for missing project values/su);
-  assert.match(apexAgent, /never invent, default or silently\s+substitute project ID/u);
-  assert.match(apexAgent, /Carry the user's requested outcome, stop point and prohibited operations/u);
-  assert.match(apexAgent, /Do not print `\/agent` switches/u);
-  assert.match(apexAgent, /several values, use native\s+checkboxes/u);
-  assert.match(apexAgent, /numbered options in the exact kernel order/u);
-  assert.match(apexAgent, /If a gate is pending, report it and stop/u);
-  assert.match(apexAgent, /Do not call\s+`apex\/nextTask` after `apex\/reviewDecide` or `apex\/reviewComplete`/u);
-  assert.match(apexAgent, /worker to call `apex\/taskContext`/u);
-  assert.match(apexAgent, /- apex\/gateDecide/u);
-  assert.match(await readFile(join(root, ".github", "skills", "apex-next", "SKILL.md"), "utf8"), /^name: apex-next$/mu);
-  const apexNext = await readFile(join(root, ".github", "skills", "apex-next", "SKILL.md"), "utf8");
-  assert.match(apexNext, /No `\/agent` switching/u);
-  assert.match(apexNext, /\| `requirements`\s+\| `apex-requirements`/u);
-  assert.match(apexNext, /\| `quality-owner`\s+\| `apex-operations`/u);
-  assert.match(apexNext, /reviewer tasks or review roles\s+\| worker `APEX Reviewer`/u);
-  const planningSkill = await readFile(join(root, ".github", "skills", "apex-planning", "SKILL.md"), "utf8");
-  assert.match(planningSkill, /kernel derives the canonical intent hash/u);
-  assert.match(
-    await readFile(join(root, ".github", "skills", "apex-azure-defaults", "SKILL.md"), "utf8"),
-    /APEX Azure Defaults/u,
-  );
-  assert.match(
-    await readFile(
-      join(root, ".github", "skills", "apex-azure-defaults", "references", "security-baseline.md"),
-      "utf8",
-    ),
-    /Core Controls/u,
-  );
-  assert.match(
-    await readFile(
-      join(root, ".github", "skills", "apex-azure-defaults", "references", "decision-boundaries.md"),
-      "utf8",
-    ),
-    /Decision Boundaries And Fallbacks/u,
-  );
-  assert.match(
-    await readFile(join(root, ".github", "skills", "apex-microsoft-docs", "SKILL.md"), "utf8"),
-    /APEX Microsoft Documentation/u,
-  );
-  assert.match(
-    await readFile(
-      join(root, ".github", "skills", "apex-bicep-patterns", "references", "network-and-observability.md"),
-      "utf8",
-    ),
-    /Private endpoint intent/u,
-  );
-  assert.match(
-    await readFile(
-      join(root, ".github", "skills", "apex-bicep-patterns", "references", "compiler-and-provider-gotchas.md"),
-      "utf8",
-    ),
-    /Exact Module Schema Wins/u,
-  );
-  assert.match(
-    await readFile(
-      join(root, ".github", "skills", "apex-terraform-patterns", "references", "plan-and-change-assessment.md"),
-      "utf8",
-    ),
-    /Stateful and Drift Signals/u,
-  );
-  assert.match(
-    await readFile(
-      join(root, ".github", "skills", "apex-terraform-test", "references", "plan-mode-and-mock-design.md"),
-      "utf8",
-    ),
-    /Plan-Mode and Mock Design/u,
-  );
-  assert.match(
-    await readFile(
-      join(root, ".github", "skills", "apex-terraform-import", "references", "mapping-and-adoption-attestation.md"),
-      "utf8",
-    ),
-    /Mapping and Adoption Attestation/u,
-  );
-  assert.match(
-    await readFile(join(root, ".github", "skills", "apex-artifacts", "SKILL.md"), "utf8"),
-    /APEX Artifact Presentations/u,
-  );
-  assert.match(
-    await readFile(join(root, ".github", "skills", "apex-artifacts", "templates", "requirements.md"), "utf8"),
-    /Derived from accepted APEX requirements artifact/u,
-  );
-  assert.match(
-    await readFile(
-      join(root, ".github", "skills", "apex-artifacts", "references", "reference-only-outlines.md"),
-      "utf8",
-    ),
-    /Reference-Only Document Outlines/u,
-  );
-  for (const worker of ["apex-codegen.agent.md", "apex-reviewer.agent.md", "apex-validator.agent.md"]) {
-    const profile = await readFile(join(root, ".github", "agents", worker), "utf8");
-    assert.doesNotMatch(profile, /^(?:model|model-policy|reasoning-effort):/mu);
-    assert.match(profile, /user-invocable: false/u);
-    assert.doesNotMatch(profile, /- ask_user/u);
-  }
-  const lock = JSON.parse(await readFile(join(root, ".apex", "customizations.lock.json"), "utf8")) as {
-    clientId?: string;
-    files: Array<{ path: string }>;
-  };
-  assert.equal(lock.clientId, "github-copilot-cli");
-  assert.ok(lock.files.some(({ path }) => path === ".mcp.json"));
-  assert.ok(!lock.files.some(({ path }) => path === ".vscode/mcp.json" || path === ".github/mcp.json"));
+  assert.deepEqual(lock.externallyManaged, {
+    class: "externally-managed",
+    owner: "apex@apex-plugins",
+    files: [".mcp.json"],
+    directories: [".github/agents", ".github/skills"],
+    retained: [],
+  });
+  const doctor = await service.doctor();
+  assert.ok(doctor.checks.filter(({ id }) => id.startsWith("managed:")).every(({ ok }) => ok));
   assert.equal(
-    lock.files.filter(({ path }) => /apex-(?:codegen|reviewer|validator)\.agent\.md$/u.test(path)).length,
-    3,
+    doctor.checks.some(({ id }) => id.startsWith("plugin-owned:")),
+    false,
   );
   await writeFile(join(root, "unrelated.txt"), "preserve\n");
-  await service.update();
-  const updatedLock = JSON.parse(await readFile(join(root, ".apex", "customizations.lock.json"), "utf8")) as {
-    clientId?: string;
-  };
-  assert.equal(updatedLock.clientId, "github-copilot-cli");
+  assert.deepEqual(await service.update(), { updated: lock.files.map(({ path }) => path), retired: [], conflicts: [] });
   assert.deepEqual((await service.rollbackCustomizations()).conflicts, []);
-  const rolledBackLock = JSON.parse(await readFile(join(root, ".apex", "customizations.lock.json"), "utf8")) as {
-    clientId?: string;
-  };
-  assert.equal(rolledBackLock.clientId, "github-copilot-cli");
   assert.deepEqual((await service.uninstallCustomizations()).conflicts, []);
   assert.equal(await readFile(join(root, "unrelated.txt"), "utf8"), "preserve\n");
-  await assert.rejects(readFile(join(root, ".mcp.json"), "utf8"), /ENOENT/u);
-  const reinstalled = await service.reinstallCustomizations();
-  assert.equal(reinstalled.clientId, "github-copilot-cli");
-  assert.match(await readFile(join(root, ".mcp.json"), "utf8"), /"recordInput"/u);
-  assert.match(
-    await readFile(join(root, ".github", "agents", "apex-validator.agent.md"), "utf8"),
-    /user-invocable: false/u,
+  await assert.rejects(lstat(join(root, ".github", "copilot", "settings.json")), { code: "ENOENT" });
+  assert.equal((await service.reinstallCustomizations()).clientId, "github-copilot-cli");
+  assert.deepEqual(
+    (await workspaceFiles(root)).filter((path) => path !== "unrelated.txt"),
+    THIN_PROJECTION,
+  );
+});
+
+test("customization sources cannot reintroduce plugin-owned agents, skills or MCP config", async () => {
+  for (const path of [".github/agents/apex.agent.md", ".github/skills/apex-next/SKILL.md", ".mcp.json"]) {
+    const root = await tempRoot();
+    const source = await tempRoot();
+    await mkdir(join(source, path, ".."), { recursive: true });
+    await writeFile(join(source, path), "copy\n");
+    await assert.rejects(
+      new ApexService(root).init({ projectId: "demo", riskOwner: "partner", customizationsSource: source }),
+      (error: unknown) =>
+        error instanceof ApexError && error.code === "APEX_VALIDATION" && error.message.includes("plugin provides it"),
+    );
+    await assert.rejects(lstat(join(root, path)), { code: "ENOENT" });
+    await assert.rejects(lstat(join(root, ".apex")), { code: "ENOENT" });
+  }
+});
+
+test("update retires untouched thick-projection copies and keeps edited ones as reported conflicts", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  await service.init({ projectId: "demo", riskOwner: "partner" });
+  await simulateThickProjection(root, THICK_COPIES);
+  const edited = ".github/agents/apex-codegen.agent.md";
+  const editedContent = `${THICK_COPIES[edited]}\nMy local edit\n`;
+  await writeFile(join(root, edited), editedContent);
+  await mkdir(join(root, ".github", "agents"), { recursive: true });
+  await writeFile(join(root, ".github", "agents", "my-own.agent.md"), "user agent\n");
+
+  const before = await service.doctor();
+  assert.deepEqual(
+    before.checks
+      .filter(({ id, ok }) => id.startsWith("plugin-owned:") && !ok)
+      .map(({ id }) => id)
+      .sort(),
+    Object.keys(THICK_COPIES)
+      .map((path) => `plugin-owned:${path}`)
+      .sort(),
+  );
+
+  const result = await service.update();
+  assert.deepEqual(result.retired, [".github/agents/apex.agent.md", ".github/skills/apex-next/SKILL.md", ".mcp.json"]);
+  assert.deepEqual(result.conflicts, [edited]);
+  for (const path of result.retired) await assert.rejects(lstat(join(root, path)), { code: "ENOENT" });
+  assert.equal(await readFile(join(root, edited), "utf8"), editedContent);
+  assert.equal(await readFile(join(root, ".github", "agents", "my-own.agent.md"), "utf8"), "user agent\n");
+  assert.deepEqual(
+    JSON.parse(await readFile(join(root, ".github", "copilot", "settings.json"), "utf8")),
+    PLUGIN_SETTINGS,
+  );
+  const lock = await readLock(root);
+  assert.deepEqual(lock.files.map(({ path }) => path).sort(), THIN_PROJECTION);
+  assert.equal(lock.externallyManaged?.class, "externally-managed");
+  assert.deepEqual(lock.externallyManaged?.retained, [{ path: edited, currentHash: sha256(editedContent) }]);
+
+  const rollback = await service.rollbackCustomizations();
+  assert.deepEqual(rollback.conflicts, []);
+  assert.equal(
+    await readFile(join(root, ".github", "agents", "apex.agent.md"), "utf8"),
+    THICK_COPIES[".github/agents/apex.agent.md"],
+  );
+  assert.equal(await readFile(join(root, edited), "utf8"), editedContent);
+  assert.equal((await readLock(root)).externallyManaged, undefined);
+  assert.deepEqual((await service.update()).conflicts, [edited]);
+
+  const doctor = await service.doctor(true, true);
+  for (const path of result.retired) await assert.rejects(lstat(join(root, path)), { code: "ENOENT" });
+  assert.equal(await readFile(join(root, edited), "utf8"), editedContent);
+  const pluginChecks = doctor.checks.filter(({ id }) => id.startsWith("plugin-owned:"));
+  assert.deepEqual(
+    pluginChecks.map(({ id, ok }) => ({ id, ok })),
+    [{ id: `plugin-owned:${edited}`, ok: false }],
+  );
+  assert.match(pluginChecks[0]!.remedy ?? "", /plugin provides this file/u);
+  assert.ok(doctor.checks.filter(({ id }) => id.startsWith("managed:")).every(({ ok }) => ok));
+
+  await rm(join(root, edited));
+  const cleared = await service.update();
+  assert.deepEqual(cleared.conflicts, []);
+  assert.deepEqual((await readLock(root)).externallyManaged?.retained, []);
+  assert.equal(
+    (await service.doctor()).checks.some(({ id }) => id.startsWith("plugin-owned:")),
+    false,
+  );
+  const uninstall = await service.uninstallCustomizations();
+  assert.deepEqual(uninstall.conflicts, []);
+  assert.equal(await readFile(join(root, ".github", "agents", "my-own.agent.md"), "utf8"), "user agent\n");
+});
+
+test("doctor --fix migrates a thick workspace without recopying plugin-owned files", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  await service.initializeWorkspace({});
+  await simulateThickProjection(root, THICK_COPIES);
+  const edited = ".mcp.json";
+  await writeFile(join(root, edited), '{"mcpServers":{"mine":{}}}\n');
+  await rm(join(root, ".github", "agents", "apex.agent.md"));
+  const doctor = await service.doctor(true, true);
+  assert.deepEqual(await workspaceFiles(root), [...THIN_PROJECTION, edited].sort());
+  assert.equal(await readFile(join(root, edited), "utf8"), '{"mcpServers":{"mine":{}}}\n');
+  assert.deepEqual(
+    doctor.checks.filter(({ id }) => id.startsWith("plugin-owned:")).map(({ id }) => id),
+    [`plugin-owned:${edited}`],
+  );
+  const lock = await readLock(root);
+  assert.deepEqual(
+    lock.externallyManaged?.retained.map(({ path }) => path),
+    [edited],
+  );
+  assert.equal(
+    lock.files.some(({ path }) => path.startsWith(".github/agents/") || path === edited),
+    false,
   );
 });
 
@@ -445,7 +322,7 @@ test("missing customization selection fails closed and custom sources require ex
   await assert.rejects(service.update(), /Customization selection is missing/);
   await assert.rejects(service.reinstallCustomizations(), /Customization selection is missing/);
   await assert.rejects(service.doctor(true, true), /Customization selection is missing/);
-  assert.ok(await stat(join(root, ".mcp.json")));
+  assert.ok(await stat(join(root, ".github", "copilot", "settings.json")));
 
   const customRoot = await tempRoot();
   const customSource = await tempRoot();
@@ -493,10 +370,10 @@ test("update rejects lock-controlled customization base escapes", async () => {
   const lock = JSON.parse(await readFile(lockPath, "utf8")) as {
     files: Array<{ path: string; baseRef?: string }>;
   };
-  const agent = lock.files.find(({ path }) => path === ".github/agents/apex.agent.md")!;
-  agent.baseRef = "../outside-review.txt";
+  const instructions = lock.files.find(({ path }) => path === ".github/copilot-instructions.md")!;
+  instructions.baseRef = "../outside-review.txt";
   await writeFile(lockPath, `${JSON.stringify(lock)}\n`);
-  await writeFile(join(root, ".github", "agents", "apex.agent.md"), "local edit\n");
+  await writeFile(join(root, ".github", "copilot-instructions.md"), "local edit\n");
   await assert.rejects(
     service.update(),
     (error: unknown) => error instanceof ApexError && error.code === "APEX_VALIDATION",

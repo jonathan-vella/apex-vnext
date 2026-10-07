@@ -187,7 +187,14 @@ import { constants, realpathSync } from "node:fs";
 import { cp, lstat, mkdir, open, readFile, readdir, realpath, rm, stat } from "node:fs/promises";
 import { userInfo } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { readBundledFile, resolveBundledAssets, type BundledClientProjection } from "./assets.js";
+import {
+  pluginOwnsPath,
+  readBundledFile,
+  readBundledPluginDeclaration,
+  resolveBundledAssets,
+  type BundledClientProjection,
+  type BundledPluginDeclaration,
+} from "./assets.js";
 import { dependencyRevision as calculateDependencyRevision } from "./dependency-revision.js";
 import { ApexError, EXIT_CODES, governanceBaselineApexError, retiredProjectionError } from "./errors.js";
 import { APEX_VERSION, meetsMinimumVersion, MINIMUM_NODE_VERSION } from "./version.js";
@@ -252,13 +259,32 @@ interface ManagedFile {
   baseRef?: string;
 }
 
+/**
+ * Lock class for files the apex plugin owns. APEX never copies, checks or repairs them in the workspace; `retained`
+ * lists former workspace copies the user edited, which retirement leaves in place and reports as conflicts.
+ */
+interface ExternallyManagedFiles {
+  class: "externally-managed";
+  owner: string;
+  files: string[];
+  directories: string[];
+  retained: Array<{ path: string; currentHash: string }>;
+}
+
 interface CustomizationLock {
   version: 1;
   source: string;
   clientId?: BundledClientProjection["id"];
   runtime: ManagedFile[];
   files: ManagedFile[];
+  externallyManaged?: ExternallyManagedFiles;
   previousLockRef?: string;
+}
+
+interface CustomizationInstallResult {
+  installed: string[];
+  retired: string[];
+  conflicts: string[];
 }
 
 interface CustomizationSelection {
@@ -860,6 +886,7 @@ export class ApexService {
         assets.config,
         false,
         clientId,
+        assets.plugin,
       );
       await this.installCapabilityAssets(assets);
       const runtimeLock = await this.createRuntimeLock(assets);
@@ -1741,7 +1768,7 @@ export class ApexService {
     return { projectId: input.projectId, runId: run.runId };
   }
 
-  async update(customizationsSource?: string): Promise<{ updated: string[] }> {
+  async update(customizationsSource?: string): Promise<{ updated: string[]; retired: string[]; conflicts: string[] }> {
     const selection = (await this.workspaceHasNoProjects()) ? undefined : await this.selection();
     if (selection !== undefined) await this.acquireRunWriterLease(await this.run(selection, { readOnly: true }));
     await this.ensureLocalGitBoundary();
@@ -1756,7 +1783,11 @@ export class ApexService {
       throw new ApexError("APEX_USAGE", "Custom-source updates require --customizations-source", EXIT_CODES.usage);
     }
     const source = customizationsSource ?? assets.clientProjections[clientId];
-    const updated = await this.installCustomizations(source, true, assets.config, false, clientId);
+    const {
+      installed: updated,
+      retired,
+      conflicts,
+    } = await this.installCustomizations(source, true, assets.config, false, clientId, assets.plugin);
     await this.installCapabilityAssets(assets);
     const runtimeLock = await this.createRuntimeLock(assets);
     await atomicWriteJson(join(this.root, ".apex", "apex.lock.json"), runtimeLock);
@@ -1764,7 +1795,7 @@ export class ApexService {
     await this.installRuntimeGeneration(runtimeLock);
     if (selection !== undefined)
       await this.append(await this.run(selection), "customizations.updated", { source: resolve(source), updated });
-    return { updated };
+    return { updated, retired, conflicts };
   }
 
   async rollbackCustomizations(): Promise<{ restored: string[]; conflicts: string[] }> {
@@ -1781,6 +1812,7 @@ export class ApexService {
     const previous = JSON.parse(await readFile(previousPath, "utf8")) as CustomizationLock;
     const restored: string[] = [];
     const conflicts: string[] = [];
+    const retained = new Set((current.externallyManaged?.retained ?? []).map(({ path }) => path));
     for (const [root, desired, installed] of [
       [this.root, previous.files, current.files],
       [join(this.root, ".apex", "runtime"), previous.runtime, current.runtime],
@@ -1791,6 +1823,10 @@ export class ApexService {
         }
         const destination = resolve(root, file.path);
         await this.assertSafeDestination(root, destination);
+        if (root === this.root && retained.has(file.path) && (await this.pathExistsLstat(destination))) {
+          restored.push(file.path);
+          continue;
+        }
         const installedFile = installed.find(({ path }) => path === file.path);
         const incoming = await this.readManagedBase(file.baseRef);
         if (incoming === undefined) {
@@ -1837,6 +1873,10 @@ export class ApexService {
       }
       await rm(destination);
       removed.push(file.path);
+    }
+    for (const { path } of lock.externallyManaged?.retained ?? []) {
+      if (this.safeManagedRelativePath(path) && (await this.pathExistsLstat(join(this.root, path))))
+        conflicts.push(path);
     }
     await rm(lockPath, { force: true });
     return { removed, conflicts };
@@ -1897,7 +1937,14 @@ export class ApexService {
     }
     const assets = await resolveBundledAssets();
     const source = customizationsSource ?? assets.clientProjections[selection.clientId];
-    const installed = await this.installCustomizations(source, false, assets.config, false, selection.clientId);
+    const { installed } = await this.installCustomizations(
+      source,
+      false,
+      assets.config,
+      false,
+      selection.clientId,
+      assets.plugin,
+    );
     return { installed, clientId: selection.clientId };
   }
 
@@ -6804,7 +6851,14 @@ export class ApexService {
         );
       }
       const clientId = selection.clientId;
-      await this.installCustomizations(assets.clientProjections[clientId], true, assets.config, true, clientId);
+      await this.installCustomizations(
+        assets.clientProjections[clientId],
+        true,
+        assets.config,
+        true,
+        clientId,
+        assets.plugin,
+      );
       await this.installCapabilityAssets(assets);
       await atomicWriteJson(join(this.root, ".apex", "apex.lock.json"), await this.createRuntimeLock(assets));
     }
@@ -10479,10 +10533,33 @@ export class ApexService {
     const path = join(this.root, ".apex", "customizations.lock.json");
     try {
       const lock = JSON.parse(await readFile(path, "utf8")) as CustomizationLock;
+      const plugin = await readBundledPluginDeclaration();
       const workspaceFiles = lock.files.map((file) => ({ ...file, root: this.root }));
       const runtimeRoot = join(this.root, ".apex", "runtime");
       const runtimeFiles = lock.runtime.map((file) => ({ ...file, root: runtimeRoot }));
-      return await Promise.all(
+      const pluginChecks: DoctorCheck[] = [];
+      for (const file of lock.files.filter(({ path: filePath }) => pluginOwnsPath(plugin, filePath)))
+        pluginChecks.push({
+          id: `plugin-owned:${file.path}`,
+          ok: false,
+          value: "copied",
+          remedy: `Run apex update to retire workspace copies the ${plugin.name} plugin now provides`,
+        });
+      for (const file of lock.externallyManaged?.retained ?? []) {
+        if (!this.safeManagedRelativePath(file.path)) {
+          throw new ApexError("APEX_VALIDATION", "Managed customization path is unsafe", EXIT_CODES.validation);
+        }
+        const destination = join(this.root, file.path);
+        await this.assertSafeDestination(this.root, destination);
+        if (!(await this.pathExistsLstat(destination))) continue;
+        pluginChecks.push({
+          id: `plugin-owned:${file.path}`,
+          ok: false,
+          value: sha256Bytes(await readFile(destination)),
+          remedy: `Move or delete your edited copy; the ${plugin.name} plugin provides this file`,
+        });
+      }
+      const fileChecks = await Promise.all(
         [...workspaceFiles, ...runtimeFiles].map(async (file): Promise<DoctorCheck> => {
           if (!this.safeManagedRelativePath(file.path)) {
             throw new ApexError("APEX_VALIDATION", "Managed customization path is unsafe", EXIT_CODES.validation);
@@ -10501,6 +10578,7 @@ export class ApexService {
           };
         }),
       );
+      return [...fileChecks, ...pluginChecks];
     } catch (error) {
       return [
         {
@@ -10543,10 +10621,11 @@ export class ApexService {
   private async installCustomizations(
     sourcePath: string,
     update: boolean,
-    runtimeSource?: string,
-    repair = false,
-    clientId: BundledClientProjection["id"] = "github-copilot-cli",
-  ): Promise<string[]> {
+    runtimeSource: string | undefined,
+    repair: boolean,
+    clientId: BundledClientProjection["id"],
+    plugin: BundledPluginDeclaration,
+  ): Promise<CustomizationInstallResult> {
     await this.recoverCustomizationTransaction();
     const source = resolve(sourcePath);
     const sourceStat = await lstat(source);
@@ -10558,6 +10637,15 @@ export class ApexService {
     if (update) previous = JSON.parse(await readFile(lockPath, "utf8")) as CustomizationLock;
     const transactionRoot = join(this.root, ".apex", "local", `update-${this.idSource()}`);
     const entries: CustomizationTransactionEntry[] = [];
+    const retired: string[] = [];
+    const retained = new Map<string, string>();
+    for (const file of previous?.externallyManaged?.retained ?? []) {
+      if (!this.safeManagedRelativePath(file.path))
+        throw new ApexError("APEX_VALIDATION", "Managed customization path is unsafe", EXIT_CODES.validation);
+      const destination = join(this.root, file.path);
+      await this.assertSafeDestination(this.root, destination);
+      if (await this.pathExistsLstat(destination)) retained.set(file.path, sha256Bytes(await readFile(destination)));
+    }
     const prepare = async (
       sourceRoot: string,
       destinationRoot: string,
@@ -10569,6 +10657,12 @@ export class ApexService {
       const incomingPaths = new Set<string>();
       for (const absoluteSource of sourceFiles) {
         const path = relative(sourceRoot, absoluteSource).split(sep).join("/");
+        if (label === "customization" && pluginOwnsPath(plugin, path))
+          throw new ApexError(
+            "APEX_VALIDATION",
+            `Customization source must not copy ${path}; the ${plugin.name} plugin provides it`,
+            EXIT_CODES.validation,
+          );
         incomingPaths.add(path);
         const destination = resolve(destinationRoot, path);
         if (destination !== destinationRoot && !destination.startsWith(`${destinationRoot}${sep}`))
@@ -10615,8 +10709,17 @@ export class ApexService {
       for (const old of oldFiles.filter((file) => !incomingPaths.has(file.path))) {
         const destination = resolve(destinationRoot, old.path);
         await this.assertSafeDestination(destinationRoot, destination);
-        if (!(await this.pathExistsLstat(destination))) continue;
+        const pluginOwned = label === "customization" && pluginOwnsPath(plugin, old.path);
+        if (!(await this.pathExistsLstat(destination))) {
+          if (pluginOwned) retired.push(old.path);
+          continue;
+        }
         const currentHash = sha256Bytes(await readFile(destination));
+        if (pluginOwned && currentHash !== old.currentHash && currentHash !== old.baseHash) {
+          retained.set(old.path, currentHash);
+          continue;
+        }
+        if (pluginOwned) retired.push(old.path);
         if (currentHash !== old.currentHash && currentHash !== old.baseHash)
           throw new ApexError(
             "APEX_CONFLICT",
@@ -10656,6 +10759,15 @@ export class ApexService {
       clientId,
       runtime,
       files: managed,
+      externallyManaged: {
+        class: "externally-managed",
+        owner: `${plugin.name}@${plugin.marketplace}`,
+        files: [...plugin.ownedFiles],
+        directories: [...plugin.ownedDirectories],
+        retained: [...retained]
+          .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+          .map(([path, currentHash]) => ({ path, currentHash })),
+      },
       ...(previousLockRef === undefined ? {} : { previousLockRef }),
     } satisfies CustomizationLock;
     const stagedLock = join(transactionRoot, "customizations.lock.json");
@@ -10687,7 +10799,11 @@ export class ApexService {
       }
       await rm(join(this.root, ".apex", "local", "customization-transaction.json"), { force: true });
       await rm(transactionRoot, { recursive: true, force: true });
-      return managed.map(({ path }) => path);
+      return {
+        installed: managed.map(({ path }) => path),
+        retired: retired.sort(),
+        conflicts: nextLock.externallyManaged.retained.map(({ path }) => path),
+      };
     } catch (error) {
       await this.rollbackCustomizationTransaction({ version: 1, status: "applying", entries });
       await rm(join(this.root, ".apex", "local", "customization-transaction.json"), { force: true });

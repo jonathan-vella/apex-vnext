@@ -7,6 +7,9 @@
  *
  * The MCP server ships as one esbuild bundle at mcp/apex.mjs with no node_modules. The CLI reads its bundled assets
  * from new URL("../assets/", import.meta.url), so assets/ sits beside mcp/ under the plugin root.
+ *
+ * Agents are rendered with the same Copilot CLI renderer the workspace projection used before CP-11, so the plugin
+ * carries the client mechanics (ask_user, task delegation and Explore rules) the retired workspace copies carried.
  */
 import { createHash } from "node:crypto";
 import { constants } from "node:fs";
@@ -16,6 +19,12 @@ import { basename, dirname, extname, isAbsolute, join, posix, relative, resolve,
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { build as esbuild } from "esbuild";
 import { load as loadYaml } from "js-yaml";
+import {
+  renderClientAgentProjection,
+  roleDelegatesOnClient,
+  roleSupportsClient,
+  validateCliToolInventory,
+} from "../../packages/cli/scripts/prepare-assets.mjs";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const fixedTime = new Date("2000-01-01T00:00:00.000Z");
@@ -250,6 +259,43 @@ async function copyDirectory(sourceRoot, outputRoot, targetRoot) {
     }
   }
   await visit(root, "");
+}
+
+/**
+ * Render every managed agent for the Copilot CLI agent format. Each agent file needs a manifest role that targets
+ * github-copilot, and each such role needs its agent file, so the plugin and the manifest cannot drift apart.
+ */
+export async function renderPluginAgents(sourceRoot) {
+  const clientId = "github-copilot-cli";
+  const customizationsRoot = join(repositoryRoot, "customizations");
+  const customizationManifest = JSON.parse(await readSourceFile(join(customizationsRoot, "manifest.json")));
+  const toolInventory = validateCliToolInventory(
+    JSON.parse(await readSourceFile(join(repositoryRoot, "tools/registry/copilot-cli-agent-tools.json"))),
+  );
+  const roles = customizationManifest.roles.filter((role) => roleSupportsClient(role, clientId));
+  const root = resolve(repositoryRoot, sourceRoot);
+  const info = await lstat(root);
+  if (!info.isDirectory() || info.isSymbolicLink()) throw new Error(`Source directory is invalid: ${sourceRoot}`);
+  const rendered = new Map();
+  for (const entry of await sortedDirectoryEntries(root)) {
+    if (!entry.isFile() || !entry.name.endsWith(".agent.md"))
+      throw new Error(`Unsupported agent source entry: ${sourceRoot}/${entry.name}`);
+    const sourcePath = join(root, entry.name);
+    const roleSource = portablePath(relative(customizationsRoot, sourcePath));
+    const role = roles.find(({ source }) => source === roleSource);
+    if (role === undefined) throw new Error(`Plugin agent has no github-copilot manifest role: ${roleSource}`);
+    const delegates = roleDelegatesOnClient(
+      role,
+      clientId,
+      customizationManifest.roles,
+      customizationManifest.invocationEdges,
+    );
+    const source = (await readSourceFile(sourcePath)).toString("utf8");
+    rendered.set(entry.name, renderClientAgentProjection(source, clientId, toolInventory, { delegates }));
+  }
+  const missing = roles.find(({ source }) => ![...rendered.keys()].some((name) => source.endsWith(`/${name}`)));
+  if (missing !== undefined) throw new Error(`Manifest role has no plugin agent: ${missing.source}`);
+  return rendered;
 }
 
 function validatePluginJson(plugin) {
@@ -632,7 +678,9 @@ async function build(
   await writeJsonOutput(outputDirectory, manifest.mcp.target, mcp);
 
   const bundle = await bundleServer(manifest, outputDirectory);
-  await copyDirectory(manifest.agents.sourceRoot, outputDirectory, manifest.agents.targetRoot);
+  for (const [name, content] of await renderPluginAgents(manifest.agents.sourceRoot)) {
+    await writeOutputFile(outputDirectory, `${manifest.agents.targetRoot}/${name}`, Buffer.from(content, "utf8"));
+  }
   await copyDirectory(manifest.skills.sourceRoot, outputDirectory, manifest.skills.targetRoot);
   for (const entry of [...manifest.hooks.entries].sort(bytewise)) {
     await writeOutputFile(

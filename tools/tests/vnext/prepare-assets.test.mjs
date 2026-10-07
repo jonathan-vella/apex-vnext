@@ -3,7 +3,7 @@ import { execFile as execFileCallback } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readFile, readdir, rename, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { promisify } from "node:util";
 import test from "node:test";
 import { load } from "js-yaml";
@@ -17,8 +17,22 @@ import {
   validateBundleDeclarations,
   validateClientProjectionDeclarations,
 } from "../../../packages/cli/scripts/prepare-assets.mjs";
+import { renderPluginAgents } from "../../scripts/build-plugin.mjs";
 
 const execFile = promisify(execFileCallback);
+let pluginAgents;
+const pluginAgent = async (source) => {
+  pluginAgents ??= renderPluginAgents("customizations/.github/agents");
+  return (await pluginAgents).get(basename(source));
+};
+const PLUGIN = {
+  name: "apex",
+  marketplace: "apex-plugins",
+  marketplaceRepository: "jonathan-vella/apex-plugins",
+  ownedFiles: [".mcp.json"],
+  ownedDirectories: [".github/agents", ".github/skills"],
+  files: [".github/agents/apex.agent.md"],
+};
 const root = join(import.meta.dirname, "../../..");
 const assessmentSkills = [
   "apex-azure-cloud-migrate",
@@ -80,7 +94,7 @@ test("governance collection files ship from canonical sources to both client pro
   }
 });
 
-test("the bundle ships only the Copilot CLI projection with a workspace .mcp.json", async () => {
+test("the bundle ships only the thin Copilot CLI projection with plugin settings", async () => {
   await execFile(process.execPath, ["packages/cli/scripts/prepare-assets.mjs"], { cwd: root });
   const assets = join(root, "packages/cli/assets");
   const manifest = JSON.parse(await readFile(join(assets, "manifest.json"), "utf8"));
@@ -91,23 +105,79 @@ test("the bundle ships only the Copilot CLI projection with a workspace .mcp.jso
   );
   assert.deepEqual(await readdir(join(assets, "client-projections")), ["github-copilot-cli"]);
   const [projection] = manifest.projections;
-  assert.ok(projection.files.includes("client-projections/github-copilot-cli/.mcp.json"));
-  assert.ok(!projection.files.some((path) => /\/(?:\.vscode|\.github)\/mcp\.json$|apex-cli/u.test(path)));
-  for (const role of customization.roles) {
-    if (!roleSupportsClient(role, "github-copilot-cli")) continue;
-    const entry = manifest.files.find(({ path }) => path === `client-projections/github-copilot-cli/${role.source}`);
-    assert.equal(entry.source.clientId, "github-copilot-cli");
-    assert.equal(entry.source.installationId, undefined);
+  const prefix = "client-projections/github-copilot-cli/";
+  assert.deepEqual(
+    projection.files.map((path) => path.slice(prefix.length)),
+    [...customization.managedFiles].sort(),
+  );
+  assert.ok(projection.files.includes(`${prefix}.github/copilot/settings.json`));
+  assert.ok(
+    !projection.files.some((path) =>
+      /\/(?:\.vscode|\.github)\/mcp\.json$|\/\.mcp\.json$|\/\.github\/(?:agents|skills)\//u.test(path),
+    ),
+  );
+  for (const file of manifest.files.filter(({ path }) => path.startsWith(prefix))) {
+    assert.equal(file.source.clientId, "github-copilot-cli");
+    assert.equal(file.source.roleId, undefined);
+    assert.equal(file.source.adapterVersion, "1.11.0");
   }
 });
 
-test("assessment skill mappings ship to managed client projections", async () => {
-  await execFile(process.execPath, ["packages/cli/scripts/prepare-assets.mjs"], { cwd: root });
+test("plugin ownership rejects workspace copies of agents, skills or MCP config", () => {
+  const declaration = (change) => {
+    const manifest = {
+      sharedFiles: [".github/copilot-instructions.md"],
+      sharedDirectories: [".github/instructions"],
+      managedFiles: [".github/copilot-instructions.md"],
+      clientProjections: [
+        { id: "github-copilot-cli", generatedRoot: "client-projections/github-copilot-cli", files: [] },
+      ],
+      plugin: {
+        name: "apex",
+        marketplace: "apex-plugins",
+        marketplaceRepository: "jonathan-vella/apex-plugins",
+        ownedFiles: [".mcp.json"],
+        ownedDirectories: [".github/agents", ".github/skills"],
+        files: [".github/agents/apex.agent.md"],
+      },
+      roles: [
+        {
+          id: "coordinator",
+          source: ".github/agents/apex.agent.md",
+          agent: "APEX",
+          supportedTargets: ["github-copilot"],
+        },
+      ],
+    };
+    change(manifest);
+    return () => validateClientProjectionDeclarations(manifest);
+  };
+  declaration(() => {})();
+  for (const change of [
+    (manifest) => manifest.sharedDirectories.push(".github/skills"),
+    (manifest) => manifest.sharedDirectories.push(".github"),
+    (manifest) => manifest.sharedFiles.push(".github/agents/apex.agent.md"),
+    (manifest) => manifest.managedFiles.push(".github/skills/apex-next/SKILL.md"),
+    (manifest) => manifest.clientProjections[0].files.push(".mcp.json"),
+  ])
+    assert.throws(declaration(change), /Plugin-owned path must not return/u);
+  assert.throws(
+    declaration((manifest) => manifest.plugin.files.push("README.md")),
+    /Plugin declaration is invalid/u,
+  );
+  assert.throws(
+    declaration((manifest) => delete manifest.plugin),
+    /Plugin declaration is invalid/u,
+  );
+});
+
+test("assessment skill mappings ship through the plugin", async () => {
   const manifest = JSON.parse(await readFile(join(root, "customizations", "manifest.json"), "utf8"));
-  assert.ok(manifest.sharedDirectories.includes(".github/skills"), "managed skills must ship as a shared directory");
+  assert.ok(manifest.plugin.ownedDirectories.includes(".github/skills"), "managed skills must ship in the plugin");
   for (const skill of assessmentSkills) {
     const skillPath = `.github/skills/${skill}/SKILL.md`;
-    assert.ok(manifest.managedFiles.includes(skillPath), `${skillPath} must be manifest-owned`);
+    assert.ok(manifest.plugin.files.includes(skillPath), `${skillPath} must be plugin-owned`);
+    assert.ok(!manifest.managedFiles.includes(skillPath), `${skillPath} must not be copied into the workspace`);
   }
 });
 
@@ -263,25 +333,24 @@ test("managed role projections retain required tools and exclude unrelated grant
   assert.deepEqual(manifest.roles.map(({ id }) => id).sort(), Object.keys(requiredApex).sort());
   for (const client of ["github-copilot-cli"]) {
     for (const role of manifest.roles) {
-      const path = join(root, "packages/cli/assets/client-projections", client, role.source);
       if (["code-generation", "review", "validation"].includes(role.id)) {
         assert.deepEqual(role.supportedTargets, ["github-copilot"], `${role.id} must ship to Copilot CLI`);
       }
       if (!roleSupportsClient(role, client)) {
-        await assert.rejects(readFile(path), { code: "ENOENT" });
+        assert.equal(await pluginAgent(role.source), undefined);
         continue;
       }
-      const content = await readFile(path, "utf8");
+      const content = await pluginAgent(role.source);
       const metadata = load(content.match(/^---\r?\n([\s\S]*?)\r?\n---/u)[1]);
       const label = `${client}/${role.id}`;
       if (role.id === "coordinator") {
         assert.match(content, /apex\/governanceImport/u, label);
       }
       const apexTools = requiredApex[role.id].map((tool) => `apex/${tool}`);
-      const armTools = requiredArm[role.id].map((tool) => `azure-resource-manager-mcp/${tool}`);
+      const armTools = requiredArm[role.id].map((tool) => `apex-azure-pricing/${tool}`);
       assert.deepEqual(metadata.tools.filter((tool) => tool.startsWith("apex/")).sort(), apexTools.sort(), label);
       assert.deepEqual(
-        metadata.tools.filter((tool) => tool.startsWith("azure-resource-manager-mcp/")).sort(),
+        metadata.tools.filter((tool) => tool.startsWith("apex-azure-pricing/")).sort(),
         armTools.sort(),
         label,
       );
@@ -322,10 +391,7 @@ test("managed role projections retain required tools and exclude unrelated grant
       const allowed = new Set([...apexTools, ...armTools, ...interactive, ...nativeRead, ...(webTools[role.id] ?? [])]);
       for (const tool of metadata.tools) assert.ok(allowed.has(tool), `${label}: unexpected tool ${tool}`);
       for (const tool of [...arm.managedPolicy.denyBeforeTransport, ...arm.managedPolicy.deferredTools]) {
-        assert.ok(
-          !metadata.tools.includes(`azure-resource-manager-mcp/${tool}`),
-          `${label}: forbidden ARM tool ${tool}`,
-        );
+        assert.ok(!metadata.tools.includes(`apex-azure-pricing/${tool}`), `${label}: forbidden ARM tool ${tool}`);
       }
       if (role.interactionType === "autonomous-subagent") {
         assert.equal(metadata["user-invocable"], false, label);
@@ -347,8 +413,7 @@ test("managed routing distinguishes input, review dispositions, and exact task c
     "apex-operations",
   ];
   for (const client of ["github-copilot-cli"]) {
-    const projection = join(root, "packages/cli/assets/client-projections", client);
-    const apex = await readFile(join(projection, ".github/agents/apex.agent.md"), "utf8");
+    const apex = await pluginAgent(".github/agents/apex.agent.md");
     const mechanics = apex.split("<!-- apex-shared-body -->")[0];
     assert.match(mechanics, /same APEX agent/);
     assert.match(mechanics, /kernel-owned input or review decisions/);
@@ -362,11 +427,11 @@ test("managed routing distinguishes input, review dispositions, and exact task c
       assert.match(mechanics, /Route through the `apex-next` skill/);
       assert.match(mechanics, /Use `task` only for the hidden workers it names, never for interactive intake/);
     }
-    const reviewer = await readFile(join(projection, ".github/agents/apex-reviewer.agent.md"), "utf8");
+    const reviewer = await pluginAgent(".github/agents/apex-reviewer.agent.md");
     assert.match(reviewer, /Do not create blocking findings or\s+owner-assignment requests solely/);
     assert.match(reviewer, /violated\s+Azure Policy constraints/);
     for (const agent of agents) {
-      const content = await readFile(join(projection, ".github/agents", `${agent}.agent.md`), "utf8");
+      const content = await pluginAgent(`${agent}.agent.md`);
       for (const state of ["status=needs_input", "status=needs_review", "status=task", "task.taskId"]) {
         assert.ok(content.includes(state), `${client}/${agent}: missing ${state} routing`);
       }
@@ -375,8 +440,7 @@ test("managed routing distinguishes input, review dispositions, and exact task c
     }
     for (const skill of skills) {
       const relative = `.github/skills/${skill}/SKILL.md`;
-      const content = await readFile(join(projection, relative), "utf8");
-      assert.equal(content, await readFile(join(root, "customizations", relative), "utf8"));
+      const content = await readFile(join(root, "customizations", relative), "utf8");
       if (skill === "apex-operations") {
         assert.match(content, /For governance candidate selection, call `apex\/governanceSelect`/u);
         assert.match(content, /Return the service's `outputHash` and `summary`, never baseline bytes/u);
@@ -495,9 +559,10 @@ test("asset generator rejects malformed and duplicate client projection declarat
       {
         id: "github-copilot-cli",
         generatedRoot: "client-projections/github-copilot-cli",
-        files: [".mcp.json"],
+        files: [".github/copilot/settings.json"],
       },
     ],
+    plugin: PLUGIN,
     roles: [
       {
         id: "coordinator",
@@ -507,13 +572,13 @@ test("asset generator rejects malformed and duplicate client projection declarat
       },
     ],
   };
-  assert.deepEqual(validateClientProjectionDeclarations(valid), valid);
+  assert.deepEqual(validateClientProjectionDeclarations(valid), { ...valid, plugin: PLUGIN });
   for (const mutate of [
     (manifest) => {
       manifest.sharedFiles.push(manifest.sharedFiles[0]);
     },
     (manifest) => {
-      manifest.clientProjections[0].files = ".mcp.json";
+      manifest.clientProjections[0].files = ".github/copilot/settings.json";
     },
     (manifest) => {
       manifest.clientProjections[0].files.push(manifest.clientProjections[0].files[0]);
@@ -525,7 +590,7 @@ test("asset generator rejects malformed and duplicate client projection declarat
       manifest.clientProjections.push({
         id: "both",
         generatedRoot: "client-projections/both",
-        files: [".vscode/mcp.json", ".mcp.json"],
+        files: [".vscode/mcp.json", ".github/copilot/settings.json"],
       });
     },
     (manifest) => {
@@ -555,9 +620,10 @@ test("asset generator accepts a role supported by only one client target", () =>
       {
         id: "github-copilot-cli",
         generatedRoot: "client-projections/github-copilot-cli",
-        files: [".mcp.json"],
+        files: [".github/copilot/settings.json"],
       },
     ],
+    plugin: PLUGIN,
     roles: [
       {
         id: "validator",
@@ -567,7 +633,7 @@ test("asset generator accepts a role supported by only one client target", () =>
       },
     ],
   };
-  assert.deepEqual(validateClientProjectionDeclarations(manifest), manifest);
+  assert.deepEqual(validateClientProjectionDeclarations(manifest), { ...manifest, plugin: PLUGIN });
   assert.equal(roleSupportsClient(manifest.roles[0], "github-copilot-cli"), true);
   assert.throws(() => roleSupportsClient(manifest.roles[0], "github-copilot-vscode"), /Unsupported client projection/u);
 });
@@ -686,9 +752,10 @@ test("asset generator rejects unsafe projection roots before generation", () => 
       {
         id: "github-copilot-cli",
         generatedRoot: "client-projections/github-copilot-cli",
-        files: [".mcp.json"],
+        files: [".github/copilot/settings.json"],
       },
     ],
+    plugin: PLUGIN,
     roles: [
       {
         id: "coordinator",
@@ -756,34 +823,25 @@ Coordinate.
   assert.match(rendered, /Route through the `apex-next` skill/);
 });
 
-test("asset lifecycle carries restored managed skills to the CLI projection", async () => {
+test("restored managed skills ship through the plugin, not the workspace projection", async () => {
   await execFile(process.execPath, ["packages/cli/scripts/prepare-assets.mjs"], { cwd: root });
-  const restoredSkills = ["apex-azure-adr", "apex-azure-defaults", "apex-azure-rbac", "apex-microsoft-docs"];
-  const clients = ["github-copilot-cli"];
-
-  for (const skill of restoredSkills) {
-    const source = await readFile(join("customizations", ".github", "skills", skill, "SKILL.md"));
-    for (const client of clients) {
-      const projection = await readFile(
-        join("packages", "cli", "assets", "client-projections", client, ".github", "skills", skill, "SKILL.md"),
-      );
-      assert.deepEqual(projection, source, `${skill} should be available to ${client}`);
-    }
+  const manifest = JSON.parse(await readFile(join(root, "customizations/manifest.json"), "utf8"));
+  for (const skill of ["apex-azure-adr", "apex-azure-defaults", "apex-azure-rbac", "apex-microsoft-docs"]) {
+    const skillPath = `.github/skills/${skill}/SKILL.md`;
+    assert.ok(manifest.plugin.files.includes(skillPath), `${skill} should ship in the plugin`);
+    await assert.rejects(readFile(join(root, "packages/cli/assets/client-projections/github-copilot-cli", skillPath)), {
+      code: "ENOENT",
+    });
   }
 });
 
-test("asset preparation includes operational skill references in the CLI projection", async () => {
-  const relativePaths = [
+test("plugin skills include operational references", async () => {
+  const manifest = JSON.parse(await readFile(join(root, "customizations/manifest.json"), "utf8"));
+  for (const relativePath of [
     ".github/skills/apex-azure-governance/references/operational-checklist.md",
     ".github/skills/apex-azure-deploy/references/operational-checklist.md",
-  ];
-  for (const client of ["github-copilot-cli"]) {
-    for (const relativePath of relativePaths) {
-      const content = await readFile(
-        join(process.cwd(), "packages", "cli", "assets", "client-projections", client, relativePath),
-        "utf8",
-      );
-      assert.match(content, /Operational Checklist/u);
-    }
+  ]) {
+    assert.ok(manifest.plugin.files.includes(relativePath));
+    assert.match(await readFile(join(root, "customizations", relativePath), "utf8"), /Operational Checklist/u);
   }
 });

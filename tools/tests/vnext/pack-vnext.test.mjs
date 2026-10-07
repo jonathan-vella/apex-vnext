@@ -563,18 +563,16 @@ test("packs and clean-installs the vNext runtime reproducibly", { timeout: 240_0
     ["init", "--project", "demo", "--risk-owner", "partner", "--target", "local", "--json"],
     project,
   );
-  await readFile(join(project, ".github", "agents", "apex.agent.md"));
-  const sharedSkillReferences = [
-    "apex-azure-compute/references/recommendation-and-scale-rules.md",
-    "apex-azure-storage/references/service-auth-and-sdk-boundary.md",
-    "apex-entra-app-registration/references/design-and-diagnostics.md",
-  ];
-  for (const reference of sharedSkillReferences) {
-    const contents = await readFile(join(project, ".github", "skills", reference), "utf8");
-    assert.ok(contents.length > 0, `consumer package is missing ${reference}`);
-  }
-  const mcpConfig = JSON.parse(await readFile(join(project, ".mcp.json"), "utf8")).mcpServers.apex;
-  assert.deepEqual([mcpConfig.command, ...mcpConfig.args], ["npx", "--no", "apex", "mcp", "serve"]);
+  assert.deepEqual(
+    Object.keys(
+      JSON.parse(await readFile(join(project, ".github", "copilot", "settings.json"), "utf8")).enabledPlugins,
+    ),
+    ["apex@apex-plugins"],
+  );
+  for (const retired of [".mcp.json", join(".github", "agents"), join(".github", "skills")])
+    await assert.rejects(readFile(join(project, retired)), { code: "ENOENT" });
+  // The plugin starts its own MCP server; the terminal CLI still serves the same tools for this packed smoke.
+  const mcpConfig = { command: "npx", args: ["--no", "apex", "mcp", "serve"] };
   const sessionDirectory = join(project, "infra");
   await mkdir(sessionDirectory);
   // The packed CLI ships only @modelcontextprotocol/server; load the v2 client from the CLI workspace dev dependency.
@@ -649,8 +647,8 @@ test("packs and clean-installs the vNext runtime reproducibly", { timeout: 240_0
       assert.equal(repeated.projectCreated, false);
       await cli(["project", "create", "--project", "demo", "--risk-owner", "partner", "--target", "local"]);
     }
-    await readFile(join(consumer, ".mcp.json"));
-    for (const retired of [".vscode/mcp.json", ".github/mcp.json", ".github/agents/apex-cli.agent.md"])
+    await readFile(join(consumer, ".github", "copilot", "settings.json"));
+    for (const retired of [".mcp.json", ".vscode/mcp.json", ".github/mcp.json", ".github/agents/apex.agent.md"])
       await assert.rejects(readFile(join(consumer, retired)), { code: "ENOENT" });
     const before = await cli(["status"]);
     const resumed = await cli([

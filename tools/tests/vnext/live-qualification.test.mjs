@@ -286,13 +286,13 @@ function fakePreparationService(root, calls, failWorkspace, driftWorkspace) {
       calls.push(clientId);
       const workspace = basename(root);
       if (workspace === failWorkspace) throw new Error("injected preparation failure");
-      const managedPath = join(root, ".mcp.json");
+      const managedPath = join(root, ".github", "copilot", "settings.json");
       const managedBytes = Buffer.from("{}\n");
-      const agentBytes = Buffer.from("agent\n");
+      const agentBytes = Buffer.from("instructions\n");
       await mkdir(join(root, ".apex"), { recursive: true });
-      await mkdir(join(root, ".github", "agents"), { recursive: true });
+      await mkdir(join(root, ".github", "copilot"), { recursive: true });
       await writeFile(managedPath, managedBytes);
-      await writeFile(join(root, ".github", "agents", "apex.agent.md"), agentBytes);
+      await writeFile(join(root, ".github", "copilot-instructions.md"), agentBytes);
       await writeFile(
         join(root, ".apex", "customizations.lock.json"),
         `${JSON.stringify({
@@ -300,11 +300,11 @@ function fakePreparationService(root, calls, failWorkspace, driftWorkspace) {
           clientId,
           files: [
             {
-              path: ".mcp.json",
+              path: ".github/copilot/settings.json",
               currentHash: createHash("sha256").update(managedBytes).digest("hex"),
             },
             {
-              path: ".github/agents/apex.agent.md",
+              path: ".github/copilot-instructions.md",
               currentHash: createHash("sha256").update(agentBytes).digest("hex"),
             },
           ],
@@ -521,7 +521,7 @@ test("restart evidence rejects state changes and managed projection drift", asyn
     ),
     /Restart changed persisted workspace state/,
   );
-  await writeFile(join(root, ".mcp.json"), "{}\n");
+  await writeFile(join(root, ".github", "copilot", "settings.json"), "{}\n");
   await assert.rejects(collectRestartEvidence({ workspace: "." }, { root }), /managed files do not match/);
   assert.match(initialized.runId, /^[A-Za-z0-9_-]+$/u);
 });
@@ -689,7 +689,7 @@ test("writer transfer evidence rejects claim, ownership, and projection tamperin
   );
 
   const drift = await create("drift");
-  await writeFile(join(drift.root, ".mcp.json"), "{}\n");
+  await writeFile(join(drift.root, ".github", "copilot", "settings.json"), "{}\n");
   await assert.rejects(collectTransferEvidence({ workspace: "." }, { root: drift.root }), /managed files do not match/);
 
   const malformedTerminal = await create("malformed-terminal");
@@ -937,7 +937,7 @@ test("input evidence rejects malformed, replayed, and drifted source state", asy
   );
 
   const drifted = await create("drifted");
-  await writeFile(join(drifted.root, ".mcp.json"), "{}\n");
+  await writeFile(join(drifted.root, ".github", "copilot", "settings.json"), "{}\n");
   await assert.rejects(
     collectClientInputEvidence({ workspace: "." }, { root: drifted.root }),
     /managed files do not match/,
@@ -1063,7 +1063,7 @@ test("cleanup refuses substituted or changed prepared roots", async (context) =>
   assert.equal((await lstat(tampered.root)).isDirectory(), true);
 
   const drifted = await prepare("drifted");
-  await writeFile(join(drifted.root, "vscode", ".mcp.json"), "drift\n");
+  await writeFile(join(drifted.root, "vscode", ".github", "copilot", "settings.json"), "drift\n");
   await assert.rejects(
     cleanupWorkspacePreparation({ root: drifted.root, preparation: drifted.preparationPath }),
     /no longer matches its receipt/,
@@ -1855,7 +1855,8 @@ async function vscodeSurfaceFixture(context, { managedHash, policy = rollingClie
       clientQualificationPolicy: policy,
     })}\n`,
   );
-  await writeFile(join(workspace, ".mcp.json"), managed);
+  await mkdir(join(workspace, ".github", "copilot"), { recursive: true });
+  await writeFile(join(workspace, ".github", "copilot", "settings.json"), managed);
   await writeFile(join(root, "bin", "remote-cli", "code"), "code-host");
   await writeFile(
     join(workspace, ".apex", "customizations.lock.json"),
@@ -1866,7 +1867,7 @@ async function vscodeSurfaceFixture(context, { managedHash, policy = rollingClie
       runtime: [],
       files: [
         {
-          path: ".mcp.json",
+          path: ".github/copilot/settings.json",
           sourceHash: digest(managed),
           baseHash: digest(managed),
           currentHash: managedHash ?? digest(managed),
@@ -2090,7 +2091,8 @@ async function cliSurfaceFixture(context, { characterizationHash, managedHash, p
   await mkdir(join(workspace, "bin"), { recursive: true });
   await mkdir(join(workspace, ".apex"), { recursive: true });
   await writeFile(join(workspace, "bin", "copilot"), binary);
-  await writeFile(join(workspace, ".mcp.json"), managed);
+  await mkdir(join(workspace, ".github", "copilot"), { recursive: true });
+  await writeFile(join(workspace, ".github", "copilot", "settings.json"), managed);
   await writeFile(
     join(contractRoot, "tools", "registry", "copilot-cli-agent-tools.json"),
     `${JSON.stringify({
@@ -2114,7 +2116,7 @@ async function cliSurfaceFixture(context, { characterizationHash, managedHash, p
       runtime: [],
       files: [
         {
-          path: ".mcp.json",
+          path: ".github/copilot/settings.json",
           sourceHash: digest(managed),
           baseHash: digest(managed),
           currentHash: managedHash ?? digest(managed),
@@ -2254,13 +2256,13 @@ test("CLI surface export reports managed drift and rejects unsafe lock paths", a
   const linkedLockPath = join(linked.workspace, ".apex", "customizations.lock.json");
   const linkedLock = JSON.parse(await readFile(linkedLockPath, "utf8"));
   linkedLock.files.push({
-    path: ".github/agents/apex.agent.md",
+    path: "linked/agents/apex.agent.md",
     sourceHash: outsideAgentHash,
     baseHash: outsideAgentHash,
     currentHash: outsideAgentHash,
   });
   await writeFile(linkedLockPath, JSON.stringify(linkedLock));
-  await symlink(outsideDirectory, join(linked.workspace, ".github"));
+  await symlink(outsideDirectory, join(linked.workspace, "linked"));
   await assert.rejects(
     collectCliSurfaceEvidence(
       { workspace: "consumer", binary: "bin/copilot" },
@@ -2278,7 +2280,7 @@ test("CLI surface export reports managed drift and rejects unsafe lock paths", a
   const oversizedLock = JSON.parse(await readFile(oversizedLockPath, "utf8"));
   oversizedLock.files = Array.from({ length: 257 }, (_, index) => ({
     ...oversizedLock.files[0],
-    path: index === 0 ? ".mcp.json" : `.github/agents/agent-${index}.md`,
+    path: index === 0 ? ".github/copilot/settings.json" : `.github/instructions/agent-${index}.md`,
   }));
   await writeFile(oversizedLockPath, JSON.stringify(oversizedLock));
   await assert.rejects(
@@ -2296,7 +2298,7 @@ test("CLI surface export reports managed drift and rejects unsafe lock paths", a
   const duplicate = await cliSurfaceFixture(context);
   const duplicateLockPath = join(duplicate.workspace, ".apex", "customizations.lock.json");
   const duplicateLock = JSON.parse(await readFile(duplicateLockPath, "utf8"));
-  duplicateLock.files.push({ ...duplicateLock.files[0], path: "./.mcp.json" });
+  duplicateLock.files.push({ ...duplicateLock.files[0], path: "./.github/copilot/settings.json" });
   await writeFile(duplicateLockPath, JSON.stringify(duplicateLock));
   await assert.rejects(
     collectCliSurfaceEvidence(
