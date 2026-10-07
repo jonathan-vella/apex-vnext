@@ -14,6 +14,7 @@ import {
   validateMcpJson,
   validatePackageManifest,
   validatePackagedAgents,
+  validatePackagedHooks,
   validatePluginJson,
 } from "../../scripts/build-plugin.mjs";
 
@@ -122,8 +123,30 @@ test("plugin layout, manifests, agents, skills and bundle are valid", async (con
     assert.equal(frontmatter.name, skill);
   }
 
-  assert.deepEqual(manifest.hooks.entries, []);
-  await assert.rejects(stat(join(outputDirectory, "com.github.copilot/hooks")), { code: "ENOENT" });
+  assert.deepEqual(manifest.hooks.entries, ["apex-hook.mjs", "hooks.json"]);
+  assert.deepEqual(
+    files.filter((path) => path.startsWith("com.github.copilot/hooks/")),
+    ["com.github.copilot/hooks/apex-hook.mjs", "com.github.copilot/hooks/hooks.json"],
+  );
+  assert.equal(
+    await readFile(join(outputDirectory, "com.github.copilot/hooks/apex-hook.mjs"), "utf8"),
+    (await readFile(join(root, "plugin/hooks/apex-hook.mjs"), "utf8")).replaceAll("\r\n", "\n"),
+    "the dependency-free hook script ships unbundled",
+  );
+  const hooks = await readJson(join(outputDirectory, "com.github.copilot/hooks/hooks.json"));
+  assert.deepEqual(Object.keys(hooks), ["version", "hooks"]);
+  assert.equal(hooks.version, 1);
+  assert.deepEqual(Object.keys(hooks.hooks), ["preToolUse"]);
+  assert.equal(hooks.hooks.preToolUse.length, 1);
+  const [hook] = hooks.hooks.preToolUse;
+  assert.equal(hook.type, "command");
+  assert.equal(hook.matcher, "task");
+  assert.match(hook.bash, /exec node "\$f" preToolUse;/u);
+  assert.ok(hook.bash.includes('f="${PLUGIN_ROOT}/com.github.copilot/hooks/apex-hook.mjs"'));
+  assert.match(hook.powershell, /& node \$f preToolUse/u);
+  assert.ok(hook.powershell.includes("$env:PLUGIN_ROOT, 'com.github.copilot', 'hooks', 'apex-hook.mjs'"));
+  assert.ok(hook.timeoutSec > 0 && hook.timeoutSec <= 30);
+  await validatePackagedHooks(outputDirectory, manifest);
   const assetFiles = files.filter((path) => path.startsWith("assets/")).map((path) => path.slice("assets/".length));
   assert.ok(assetFiles.includes("manifest.json"));
   assert.deepEqual(assetFiles, (await hashTree(join(root, "packages/cli/assets"))).files);
@@ -187,6 +210,128 @@ test("plugin validators reject drift from the Agent Plugins 1.0 and APEX contrac
   await assert.rejects(validatePackagedAgents(agentsRoot, "."), /exceeds 30000 characters/u);
   await writeFile(join(agentsRoot, "pinned.agent.md"), agent("", "x".repeat(30_000)));
   await validatePackagedAgents(agentsRoot, ".");
+});
+
+test("hook validation rejects drift from the Copilot hooks format and the shipped script", async (context) => {
+  const manifest = await readManifest();
+  const pluginRoot = await temporaryDirectory(context, "hooks");
+  const hooksRoot = join(pluginRoot, "com.github.copilot/hooks");
+  await mkdir(hooksRoot, { recursive: true });
+  const script = await readFile(join(root, "plugin/hooks/apex-hook.mjs"), "utf8");
+  const hooks = await readJson(join(root, "plugin/hooks/hooks.json"));
+  const [entry] = hooks.hooks.preToolUse;
+  const check = async (hooksJson, source = script) => {
+    await writeFile(join(hooksRoot, "apex-hook.mjs"), source);
+    await writeFile(join(hooksRoot, "hooks.json"), JSON.stringify(hooksJson));
+    return validatePackagedHooks(pluginRoot, manifest);
+  };
+  const withEntry = (overrides, event = "preToolUse") => ({
+    version: 1,
+    hooks: { [event]: [{ ...entry, ...overrides }] },
+  });
+
+  await check(hooks);
+  await assert.rejects(check({ ...hooks, version: 2 }), /version must be 1/u);
+  await assert.rejects(check({ version: 1, hooks: {} }), /map events/u);
+  await assert.rejects(check(withEntry({}, "PreToolUse")), /unsupported event PreToolUse/u);
+  await assert.rejects(check({ version: 1, hooks: { preToolUse: [] } }), /non-empty array/u);
+  await assert.rejects(check(withEntry({ powershell: undefined })), /missing fields: powershell/u);
+  await assert.rejects(check(withEntry({ bash: "   " })), /bash must be a non-empty command/u);
+  await assert.rejects(check(withEntry({ command: "node x" })), /unsupported fields: command/u);
+  await assert.rejects(check(withEntry({ type: "http" })), /type must be command/u);
+  await assert.rejects(check(withEntry({ matcher: "(" })), SyntaxError);
+  await assert.rejects(check(withEntry({ timeoutSec: 0 })), /timeoutSec/u);
+  await assert.rejects(check(withEntry({}, "postToolUse")), /must run node with the postToolUse event/u);
+  await assert.rejects(
+    check(withEntry({ bash: entry.bash.replaceAll("apex-hook.mjs", "other.mjs") })),
+    /does not ship: com\.github\.copilot\/hooks\/other\.mjs/u,
+  );
+  await assert.rejects(
+    check(withEntry({ bash: entry.bash.replace('"${PLUGIN_ROOT}/', '"./') })),
+    /quote one "\$\{PLUGIN_ROOT\}\/\.\.\." script path/u,
+  );
+  await assert.rejects(
+    check(withEntry({ powershell: entry.powershell.replace("'hooks', ", "") })),
+    /powershell must build the same script path/u,
+  );
+  await assert.rejects(check(hooks, `import "js-yaml";\n${script}`), /must import only Node builtins: js-yaml/u);
+  await assert.rejects(check(hooks, `import { x } from "./helper.mjs";\n${script}`), /only Node builtins/u);
+});
+
+const hookPayload = (agentType) =>
+  JSON.stringify({
+    sessionId: "44904b8e-e9ce-470b-911f-8bc7a45eadf3",
+    timestamp: 1791378238675,
+    cwd: "/workspace",
+    toolName: "task",
+    toolArgs: { description: "Delegate", prompt: "Résumé ✓", agent_type: agentType, name: "probe", mode: "sync" },
+  });
+
+function hookShells() {
+  const shells = [];
+  if (process.platform !== "win32") shells.push({ name: "bash", field: "bash", args: (command) => ["-c", command] });
+  const powershellArgs = (command) => ["-NoProfile", "-NonInteractive", "-Command", command];
+  for (const name of process.platform === "win32" ? ["powershell.exe", "pwsh"] : ["pwsh"]) {
+    const probe = spawnSync(name, powershellArgs("exit 0"), { encoding: "utf8", windowsHide: true });
+    if (probe.status === 0) shells.push({ name, field: "powershell", args: powershellArgs });
+  }
+  return shells;
+}
+
+test("packaged hook commands run end to end through bash and PowerShell", async (context) => {
+  const { outputDirectory } = await buildInto(context, "hooks-build");
+  const pluginRoot = join(await temporaryDirectory(context, "hooks-run"), "installed plugins", "apex");
+  await cp(outputDirectory, pluginRoot, { recursive: true });
+  const [entry] = (await readJson(join(pluginRoot, "com.github.copilot/hooks/hooks.json"))).hooks.preToolUse;
+  const pathKey = Object.keys(process.env).find((key) => key.toUpperCase() === "PATH") ?? "PATH";
+  const env = (overrides) => ({
+    ...process.env,
+    [pathKey]: [dirname(process.execPath), process.env[pathKey]].filter(Boolean).join(delimiter),
+    ...overrides,
+  });
+  const shells = hookShells();
+  const expected = process.platform === "win32" ? ["powershell.exe", "pwsh"] : ["bash", "pwsh"];
+  assert.ok(shells.length > 0, "bash or PowerShell is available");
+  if (process.platform === "win32" || process.env.CI === "true") {
+    assert.deepEqual(
+      shells.map(({ name }) => name),
+      expected,
+      "CI runners provide every hook shell",
+    );
+  }
+  for (const shell of shells) {
+    const invoke = (input, overrides = { PLUGIN_ROOT: pluginRoot }) =>
+      spawnSync(shell.name, shell.args(entry[shell.field]), {
+        cwd: pluginRoot,
+        env: env(overrides),
+        input,
+        encoding: "utf8",
+        windowsHide: true,
+      });
+    for (const target of ["apex:apex", "APEX"]) {
+      const denied = invoke(hookPayload(target));
+      assert.equal(denied.status, 0, `${shell.name}: ${denied.stderr}`);
+      assert.deepEqual(
+        JSON.parse(denied.stdout),
+        {
+          permissionDecision: "deny",
+          permissionDecisionReason:
+            `APEX hook: "${target}" is the user-facing APEX agent and cannot run as a task subagent. ` +
+            "Continue in the APEX agent selected in the agent picker; delegate kernel tasks only to hidden APEX workers.",
+        },
+        shell.name,
+      );
+    }
+    for (const input of [hookPayload("apex:apex-codegen"), hookPayload("explore"), "{broken"]) {
+      const allowed = invoke(input);
+      assert.equal(allowed.status, 0, `${shell.name}: ${allowed.stderr}`);
+      assert.equal(allowed.stdout.trim(), "", `${shell.name} allows ${input}`);
+    }
+    const missing = invoke(hookPayload("apex:apex"), { PLUGIN_ROOT: join(pluginRoot, "missing") });
+    assert.equal(missing.status, 0, `${shell.name}: ${missing.stderr}`);
+    assert.equal(missing.stdout.trim(), "", `${shell.name} fails open without the script`);
+    assert.match(missing.stderr, /APEX hook: .* is missing; reinstall the APEX plugin\. Call allowed\./u);
+  }
 });
 
 const guardHook = `import { registerHooks } from "node:module";
