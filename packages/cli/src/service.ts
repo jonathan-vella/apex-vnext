@@ -5190,12 +5190,23 @@ export class ApexService {
       String(decision.quantity),
       this.reviewMarkdownText(decision.rationale),
     ]);
-    const renderDiagram = (name: string, render: () => DiagramSource) => {
+    type RenderedDiagram =
+      | { name: string; error: string }
+      | { name: string; source: DiagramSource; png: Uint8Array }
+      | { name: string; source: DiagramSource; pngError: string };
+    const message = (error: unknown, fallback: string) => (error instanceof Error ? error.message : fallback);
+    // PNG output is optional: the plugin bundle has no native rasterizer but still writes Python and SVG sources.
+    const renderDiagram = (name: string, render: () => DiagramSource): RenderedDiagram => {
+      let source: DiagramSource;
       try {
-        const source = render();
+        source = render();
+      } catch (error) {
+        return { name, error: message(error, "Diagram rendering failed") };
+      }
+      try {
         return { name, source, png: rasterizeDiagram(source.svg) };
       } catch (error) {
-        return { name, error: error instanceof Error ? error.message : "Diagram rendering failed" };
+        return { name, source, pngError: message(error, "PNG rendering failed") };
       }
     };
     const diagrams = [
@@ -5208,7 +5219,9 @@ export class ApexService {
       .map((diagram) =>
         "error" in diagram
           ? `- ${this.reviewMarkdownText(diagram.name)}: unavailable (${this.reviewMarkdownText(diagram.error)})`
-          : `- ${this.reviewMarkdownText(diagram.name)}: generated as Python, SVG, and PNG`,
+          : "pngError" in diagram
+            ? `- ${this.reviewMarkdownText(diagram.name)}: generated as Python and SVG; PNG unavailable (${this.reviewMarkdownText(diagram.pngError)})`
+            : `- ${this.reviewMarkdownText(diagram.name)}: generated as Python, SVG, and PNG`,
       )
       .join("\n");
     const architectureImages = diagrams
@@ -5299,7 +5312,9 @@ export class ApexService {
                 join(directory, `${diagram.name}.svg`),
                 Buffer.from(diagram.source.svg, "utf8"),
               ),
-              this.writeGeneratedReview(join(directory, `${diagram.name}.png`), Buffer.from(diagram.png)),
+              ...("png" in diagram
+                ? [this.writeGeneratedReview(join(directory, `${diagram.name}.png`), Buffer.from(diagram.png))]
+                : []),
             ],
       ),
     ]);
