@@ -230,9 +230,9 @@ Kernel-enforced user stop scopes require a separate explicit authorization desig
 
 Implementation checkpoint: slices 1-3 have server code and focused regressions, including all 34 actual handlers,
 canonical output schemas, strict staging forms, omitted-argument compatibility, read-only status and cancellation
-before/after mutation. The stdio test negotiated 2025-11-25 on the v1 SDK; CP-23 replaces it with a `2026-07-28`
-discovery test. Slice 4 still requires exact supported-client evidence; no client-parity claim follows from automated
-checks.
+before/after mutation. CP-23 replaced the v1 SDK `2025-11-25` stdio test with a `2026-07-28` discovery test, a
+discover-then-`initialize` fallback test and a `tools/list` equality check against the v1 baseline. Slice 4 still
+requires exact supported-client evidence; no client-parity claim follows from automated checks.
 
 ### Optimization Recommendation Dispositions
 

@@ -235,7 +235,7 @@ artifacts-npm-credprovider -c .npmrc --validate-only --verbosity minimal
 # All modes:
 npm config get registry
 npm view @sinclair/typebox@0.34.52 version
-npm view @modelcontextprotocol/sdk@1.29.0 version
+npm view @modelcontextprotocol/server@2.3.1 version
 npm view zod@4.4.3 version
 ```
 

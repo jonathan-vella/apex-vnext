@@ -7,7 +7,8 @@ APEX server with independent state.
 
 ## Server Instructions
 
-The server sends compact session instructions during MCP initialization. They identify APEX as the governed Azure
+The server sends compact session instructions in its `server/discover` result (and in the `initialize` result for
+2025-era clients). They identify APEX as the governed Azure
 workload lifecycle server, require the absolute `workspace` path on every tool call, direct clients to call `status`
 first, preserve kernel ownership of state/gates/authorization/evidence, warn against blind mutation retries after
 timeouts or cancellations, route human decisions through `ask_user`, and explain that large read results continue with
@@ -64,10 +65,15 @@ Proposals are inert: they do not mutate instructions, policy, or runtime behavio
 
 ## Response Contracts
 
-APEX pins TypeScript SDK 1.32.1 (`@modelcontextprotocol/sdk`, v1 line), supporting MCP versions through 2025-11-25.
-It does not claim support for the 2026-07-28 protocol, which ships in the separate v2 packages
-`@modelcontextprotocol/server` and `@modelcontextprotocol/client`. Initialization/version negotiation is handled by the
-SDK; stdio stdout is protocol-only.
+APEX pins the v2 TypeScript server SDK `@modelcontextprotocol/server` 2.3.1 exactly and targets MCP protocol
+`2026-07-28`. The server is a low-level SDK `Server` with explicit `tools/list` and `tools/call` handlers, so the
+advertised tool names, descriptions, input/output schemas and annotations come from APEX's own tool table rather
+than SDK schema conversion. `apex mcp serve` uses the SDK `serveStdio` entry with `legacy: 'serve'`: it answers
+`server/discover` with `supportedVersions: ["2026-07-28"]` and the server instructions, and still serves a 2025-era
+`initialize` handshake (for example `2025-11-25`), including a client that sends `server/discover` first and then
+falls back to `initialize` on the same connection after a discovery timeout. Each connection gets a fresh, cheap
+`Server` instance; the queue, rate limit, cursor key and service resolver are shared per process. The server exits
+when stdin closes and closes cleanly on `SIGINT` or `SIGTERM`; stdio stdout is protocol-only.
 
 Successful responses include an object in `structuredContent` and the same JSON serialized in a text content block.
 Existing object results are unchanged. Non-object service results use these envelopes:
@@ -93,9 +99,10 @@ the stable APEX error class; internal and unknown failures use a generic safe hi
 `APEX_VALIDATION` failure raised by the kernel service: its authored reason, plus up to five schema issue paths,
 truncated to 1,000 characters, is returned so the agent can correct the typed input. Reasons that look like secrets
 stay generic. Stacks and causes are omitted. Tool argument-validation failures use the generic sanitized envelope;
-malformed JSON-RPC requests and unknown methods remain SDK concerns. Clients must inspect `isError`, follow
-`remediation`, refresh stale state and avoid blindly retrying mutations; an error does not imply that all side effects
-were rolled back.
+unknown tool names return the same `isError: true` envelope with `APEX_USAGE`, preserving the v1-era tool-result
+shape instead of a JSON-RPC error. Malformed JSON-RPC requests and unknown methods remain SDK concerns. Clients must
+inspect `isError`, follow `remediation`, refresh stale state and avoid blindly retrying mutations; an error does not
+imply that all side effects were rolled back.
 
 Read tools that can return large collections or documents cap the complete serialized MCP result envelope at 64 KiB.
 The cap leaves room under common host/client message budgets while preventing token-heavy accidental full-document
@@ -139,7 +146,9 @@ Each server permits 240 tool calls per minute and at most 32 active/queued calls
 executing. Dispatch is serialized per server. Queued calls expire after 30 seconds and cancellation/disconnect reclaims
 their slots before execution.
 
-An active mutation is allowed to settle; cancellation is not rollback. Staging/validation bundles check cancellation
+An active mutation is allowed to settle; cancellation is not rollback. When a connection closes, the SDK aborts
+in-flight handlers and drops their late responses, but a mutation that has already started still completes and
+persists. Staging/validation bundles check cancellation
 between items and preserve already-written items on later failure. The adapter never retries mutations automatically.
 Long-running underlying operations retain their own bounded process/provider timeouts. After interruption, reconnect
 and inspect authoritative state before deciding whether to resubmit; do not treat a missing reply as proof of no commit.
