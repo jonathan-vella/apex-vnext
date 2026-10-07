@@ -109,18 +109,22 @@ const status = object({
   task: Type.Union([NonEmptyStringSchema, Type.Null()]),
   blockers: strings,
 });
+/** Maximum checks listed in a doctor MCP summary; the doctorChecks tool pages the complete list. */
+export const MCP_DOCTOR_CHECK_LIMIT = 32;
+const doctorCheck = object({
+  id: Type.String(),
+  ok: Type.Boolean(),
+  value: Type.String(),
+  remedy: Type.Optional(Type.String()),
+});
 const doctor = object({
   healthy: Type.Boolean(),
-  checks: Type.Array(
-    object({
-      id: Type.String(),
-      ok: Type.Boolean(),
-      value: Type.String(),
-      remedy: Type.Optional(Type.String()),
-    }),
-  ),
-  remedies: strings,
   nextAction: Type.String(),
+  remedies: strings,
+  counts: object({ total: count, passed: count, failed: count }),
+  checks: Type.Array(doctorCheck, { maxItems: MCP_DOCTOR_CHECK_LIMIT }),
+  omitted: object({ passed: count, failed: count }),
+  truncated: Type.Boolean(),
 });
 const review = object({
   gate: Type.Integer({ minimum: 1, maximum: 4 }),
@@ -329,6 +333,7 @@ export const MCP_OUTPUT_SCHEMAS = {
   render: contract(object({ markdown: Type.String() }), { pageable: true }),
   promote: contract(RunConfigV1Schema),
   doctor: contract(doctor),
+  doctorChecks: contract(object({ checks: Type.Array(doctorCheck) }), { pageable: true }),
   submitEvidence: contract(
     Type.Union([
       object({ ...evidenceProperties, status: Type.Literal("accepted"), hash: Sha256Schema }),

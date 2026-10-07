@@ -1125,6 +1125,7 @@ test("MCP registers only narrow tools and calls the service", async () => {
     "completeTask",
     "diagnose",
     "doctor",
+    "doctorChecks",
     "gateDecide",
     "generateIac",
     "governanceImport",

@@ -11,8 +11,8 @@ import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import { isJSONRPCResultResponse, type Client } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
-import { mcpWorkspaceRoot, resolveMcpWorkspace } from "../cli.js";
-import { MCP_OUTPUT_SCHEMAS } from "../mcp-output-schemas.js";
+import { execute, mcpWorkspaceRoot, resolveMcpWorkspace } from "../cli.js";
+import { MCP_DOCTOR_CHECK_LIMIT, MCP_OUTPUT_SCHEMAS } from "../mcp-output-schemas.js";
 import { MCP_MAX_SERIALIZED_RESULT_BYTES, MCP_SERVER_INSTRUCTIONS, serveMcp, type McpServiceResolver } from "../mcp.js";
 import { ApexError, EXIT_CODES } from "../errors.js";
 import { GovernanceBaselineError } from "@apexops/capabilities";
@@ -324,6 +324,136 @@ test("oversize non-pageable results fail with a stable remediation error", async
   assert.match(error.remediation!, /paging-capable read tool/u);
 });
 
+type DoctorSummary = {
+  healthy: boolean;
+  remedies: string[];
+  counts: { total: number; passed: number; failed: number };
+  checks: Array<{ id: string; ok: boolean; value: string; remedy?: string }>;
+  omitted: { passed: number; failed: number };
+  truncated: boolean;
+};
+
+async function initializedDoctorWorkspace(context: TestContext) {
+  const root = await tempRoot();
+  await execFileAsync("git", ["init", "--quiet", root]);
+  const options = {
+    executableChecker: async () => false,
+    azureAuthStatus: async () => ({ authenticated: false, detail: "Offline doctor test" }),
+  };
+  await execute(
+    ["init", "--project", "demo", "--risk-owner", "partner", "--target", "local", "--client", "github-copilot-cli"],
+    root,
+    options,
+  );
+  const service = new ApexService(root, options);
+  const { client, close } = await connectMcp(service, { name: "doctor-size-test" });
+  context.after(close);
+  const call = async (name: "doctor" | "doctorChecks" | "diagnose", args: Record<string, unknown> = {}) => {
+    const response = await client.callTool({ name, arguments: { workspace: root, ...args } });
+    const structured = assertSuccess(name, response) as Record<string, unknown>;
+    assert.ok(resultEnvelopeBytes(structured) <= MCP_MAX_SERIALIZED_RESULT_BYTES, name);
+    return structured;
+  };
+  const allChecks = async (failedOnly?: boolean) => {
+    const checks: DoctorSummary["checks"] = [];
+    let cursor: string | undefined;
+    let pages = 0;
+    do {
+      const page = (await call("doctorChecks", {
+        ...(failedOnly === undefined ? {} : { failedOnly }),
+        ...(cursor === undefined ? {} : { cursor }),
+      })) as { checks: DoctorSummary["checks"]; nextCursor?: string };
+      checks.push(...page.checks);
+      cursor = page.nextCursor;
+      pages += 1;
+    } while (cursor !== undefined);
+    return { checks, pages };
+  };
+  return { root, service, call, allChecks };
+}
+
+test("doctor over MCP stays within the result cap in a fully initialized workspace", async (context) => {
+  const { service, call, allChecks } = await initializedDoctorWorkspace(context);
+  const report = await service.doctor();
+  // The complete report is the CLI contract; over MCP it would exceed the cap once serialized into the envelope.
+  assert.ok(resultEnvelopeBytes(report) > MCP_MAX_SERIALIZED_RESULT_BYTES);
+  const managed = report.checks.filter(({ id }) => id.startsWith("managed:"));
+  assert.ok(managed.length > MCP_DOCTOR_CHECK_LIMIT);
+
+  const summary = (await call("doctor")) as DoctorSummary;
+  assert.equal(summary.healthy, report.healthy);
+  assert.deepEqual(summary.remedies, [...new Set(report.remedies)]);
+  assert.deepEqual(summary.counts, {
+    total: report.checks.length,
+    passed: report.checks.filter(({ ok }) => ok).length,
+    failed: report.checks.filter(({ ok }) => !ok).length,
+  });
+  assert.equal(summary.truncated, true);
+  assert.equal(summary.checks.length + summary.omitted.passed + summary.omitted.failed, report.checks.length);
+  assert.equal(summary.omitted.failed, 0);
+  assert.deepEqual(
+    summary.checks.map(({ id }) => id),
+    [
+      ...report.checks.filter(({ ok }) => !ok),
+      ...report.checks.filter(({ ok, id }) => ok && !id.startsWith("managed:")),
+    ].map(({ id }) => id),
+  );
+
+  const diagnose = (await call("diagnose")) as { doctor: DoctorSummary };
+  assert.deepEqual(diagnose.doctor.counts, summary.counts);
+
+  const full = await allChecks();
+  assert.ok(full.pages > 1);
+  assert.deepEqual(full.checks, report.checks);
+
+  const repaired = (await call("doctor", { fix: true, yes: true })) as DoctorSummary & { nextCursor?: string };
+  assert.equal(repaired.nextCursor, undefined);
+  assert.equal(repaired.counts.total, report.checks.length);
+});
+
+test("doctor over MCP lists problems first and counts truncated failures explicitly", async (context) => {
+  const { root, service, call, allChecks } = await initializedDoctorWorkspace(context);
+  const lock = JSON.parse(await readFile(join(root, ".apex", "customizations.lock.json"), "utf8")) as {
+    files: Array<{ path: string }>;
+  };
+  const broken = lock.files.slice(0, MCP_DOCTOR_CHECK_LIMIT + 8);
+  for (const file of broken) await writeFile(join(root, file.path), "tampered\n", "utf8");
+  const report = await service.doctor();
+  const failed = report.checks.filter(({ ok }) => !ok);
+  assert.ok(failed.length > MCP_DOCTOR_CHECK_LIMIT);
+
+  const summary = (await call("doctor")) as DoctorSummary;
+  assert.equal(summary.healthy, false);
+  assert.equal(summary.truncated, true);
+  assert.equal(summary.counts.failed, failed.length);
+  assert.equal(summary.checks.length, MCP_DOCTOR_CHECK_LIMIT);
+  assert.ok(summary.checks.every(({ ok }) => !ok));
+  assert.deepEqual(
+    summary.checks.map(({ id }) => id),
+    failed.slice(0, MCP_DOCTOR_CHECK_LIMIT).map(({ id }) => id),
+  );
+  assert.equal(summary.omitted.failed, failed.length - MCP_DOCTOR_CHECK_LIMIT);
+  assert.equal(summary.omitted.passed, summary.counts.passed);
+  assert.ok(summary.remedies.includes("Run doctor --fix --yes to reinstall bundled managed files"));
+
+  const failing = await allChecks(true);
+  assert.deepEqual(failing.checks, failed);
+
+  const preview = (await call("doctor", { fix: true })) as DoctorSummary;
+  assert.equal(preview.counts.failed, failed.length);
+  assert.ok(preview.remedies.every((remedy) => remedy.startsWith("Preview: ")));
+
+  const repaired = (await call("doctor", { fix: true, yes: true })) as DoctorSummary;
+  assert.equal(
+    repaired.checks.some(({ id }) => broken.some(({ path }) => id === `managed:${path}`)),
+    false,
+  );
+  assert.deepEqual(
+    (await allChecks(true)).checks.filter(({ id }) => id.startsWith("managed:")),
+    [],
+  );
+});
+
 test("paging cursors do not survive an MCP server restart", async (context) => {
   const projects = Array.from({ length: 120 }, (_, index) => ({
     projectId: `project-${index}`,
@@ -359,6 +489,7 @@ test("paging cursors do not survive an MCP server restart", async (context) => {
 
 test("only bounded read tools accept cursors and mutations are never paged", async (context) => {
   const pageable = [
+    "doctorChecks",
     "improvementObservations",
     "improvementProposals",
     "inventory",

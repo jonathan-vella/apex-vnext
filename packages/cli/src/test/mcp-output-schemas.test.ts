@@ -6,6 +6,7 @@ import { Ajv } from "ajv";
 import { Ajv2020 } from "ajv/dist/2020.js";
 import { McpServer } from "@modelcontextprotocol/server";
 import { MCP_OUTPUT_SCHEMAS } from "../mcp-output-schemas.js";
+import { summarizeDoctorReport } from "../mcp.js";
 import { ApexService } from "../service.js";
 import { ApexError, EXIT_CODES, normalizeError, remediationForApexError } from "../errors.js";
 import { nextTaskAfterInput, requirements, tempRoot } from "./helpers.js";
@@ -102,11 +103,16 @@ const capability = {
   action: "Install the pack",
 };
 const status = { run, head: hash, events: 1, task: "requirements", blockers: [] };
+const doctorCheck = { id: "node", ok: true, value: "24", remedy: "Install Node" };
+const doctorReport = { healthy: true, checks: [doctorCheck], remedies: [], nextAction: "No action required" };
 const doctor = {
   healthy: true,
-  checks: [{ id: "node", ok: true, value: "24", remedy: "Install Node" }],
-  remedies: [],
   nextAction: "No action required",
+  remedies: [],
+  counts: { total: 1, passed: 1, failed: 0 },
+  checks: [doctorCheck],
+  omitted: { passed: 0, failed: 0 },
+  truncated: false,
 };
 const approval = {
   schemaVersion: "1.0.0",
@@ -173,6 +179,7 @@ const fixtures: Record<ToolName, Record<string, unknown>> = {
   render: { markdown: "# Status" },
   promote: run,
   doctor,
+  doctorChecks: { checks: [doctorCheck] },
   submitEvidence: {
     status: "accepted",
     kind: "test",
@@ -379,13 +386,13 @@ test("output schema coverage matches every registered MCP tool", async () => {
       assert.equal(tool.inputSchema.additionalProperties, false, tool.name);
       assert.ok(tool.inputSchema.properties?.workspace, tool.name);
       assert.ok(tool.inputSchema.required?.includes("workspace"), tool.name);
-      const readOnly = tool.name === "status" || tool.name === "projectList";
+      const readOnly = ["status", "projectList", "doctorChecks"].includes(tool.name);
       assert.equal(tool.annotations?.readOnlyHint, readOnly, tool.name);
       assert.equal(tool.annotations?.idempotentHint, readOnly, tool.name);
       assert.equal(tool.annotations?.destructiveHint, !readOnly, tool.name);
       assert.equal(
         tool.annotations?.openWorldHint,
-        ["reconcile", "inventory", "diagnose", "doctor"].includes(tool.name),
+        ["reconcile", "inventory", "diagnose", "doctor", "doctorChecks"].includes(tool.name),
         tool.name,
       );
       assert.doesNotMatch(tool.name, /apply|deploy|execute/i);
@@ -505,6 +512,7 @@ test("actual MCP handlers wrap service fixtures and sanitize failures for every 
     render: { method: "render", input: { kind: "status" }, args: ["status"] },
     promote: { method: "promote", input: { environment: "prod", target: "local" }, args: ["prod", "local"] },
     doctor: { method: "doctor", input: {}, args: [undefined, undefined] },
+    doctorChecks: { method: "doctor", input: {}, args: [] },
     submitEvidence: {
       method: "acceptEvidence",
       input: { taskId, kind: "test", value: {} },
@@ -534,6 +542,11 @@ test("actual MCP handlers wrap service fixtures and sanitize failures for every 
         case "preview":
         case "render":
           return value.markdown;
+        case "doctor":
+        case "doctorChecks":
+          return doctorReport;
+        case "diagnose":
+          return { status, doctor: doctorReport };
         default:
           return value;
       }
@@ -744,7 +757,7 @@ test("schemas accept real offline service results through requirements completio
   check("nextTask", await service.nextTask());
   check("capabilityList", { packs: await service.capabilityList() });
   check("projectList", { projects: await service.listProjects() });
-  check("doctor", await service.doctor());
+  check("doctor", summarizeDoctorReport(await service.doctor()));
   const next = await nextTaskAfterInput(service);
   check("nextTask", next);
   assert.equal(next.status, "task");

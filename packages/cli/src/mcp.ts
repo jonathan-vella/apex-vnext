@@ -10,7 +10,7 @@ import { ApexService, SUPPORTED_ARTIFACT_KINDS } from "./service.js";
 import { APEX_VERSION } from "./version.js";
 import { ApexError, EXIT_CODES, normalizeError, remediationForApexError, type ApexErrorCode } from "./errors.js";
 import { SECRET_VALUE_PATTERN } from "@apexops/contracts";
-import { MCP_OUTPUT_SCHEMAS } from "./mcp-output-schemas.js";
+import { MCP_DOCTOR_CHECK_LIMIT, MCP_OUTPUT_SCHEMAS } from "./mcp-output-schemas.js";
 import { TARGET_SCOPE_HINT, TARGET_SCOPE_PATTERN } from "./target-scope.js";
 import { resolveMcpWorkspace } from "./workspace-root.js";
 
@@ -52,6 +52,7 @@ const pagePaths: Partial<Record<keyof typeof MCP_OUTPUT_SCHEMAS, readonly string
   improvementObservations: ["observations"],
   improvementProposals: ["proposals"],
   render: ["markdown"],
+  doctorChecks: ["checks"],
 };
 
 type CursorPayload = {
@@ -154,8 +155,8 @@ const stagingInput = (optional: boolean) =>
       ],
     });
 
-const readOnlyTools = new Set(["status", "projectList"]);
-const externalTools = new Set(["reconcile", "inventory", "diagnose", "doctor"]);
+const readOnlyTools = new Set(["status", "projectList", "doctorChecks"]);
+const externalTools = new Set(["reconcile", "inventory", "diagnose", "doctor", "doctorChecks"]);
 
 function assertBoundedInput(value: unknown): void {
   const stack = [{ value, depth: 0 }];
@@ -190,6 +191,46 @@ const resultEnvelopeBytes = (structuredContent: Record<string, unknown>) => {
     "utf8",
   );
 };
+const MCP_DOCTOR_SUMMARY_BYTES = 48 * 1024;
+type DoctorReport = Awaited<ReturnType<ApexService["doctor"]>>;
+
+/**
+ * Bounds a doctor report for MCP. Failing checks come first, then passing checks other than per-file `managed:`
+ * hashes; every check left out is counted in `omitted`, and doctorChecks pages the complete list. Remedies are
+ * deduplicated, so no distinct remedy is dropped. CLI output keeps the full report.
+ */
+export function summarizeDoctorReport(report: DoctorReport): Record<string, unknown> {
+  const failed = report.checks.filter(({ ok }) => !ok);
+  const passed = report.checks.filter(({ ok }) => ok);
+  const candidates = [...failed, ...passed.filter(({ id }) => !id.startsWith("managed:"))];
+  const checks: DoctorReport["checks"] = [];
+  const summary = () => {
+    const listedFailed = checks.filter(({ ok }) => !ok).length;
+    return {
+      healthy: report.healthy,
+      nextAction: report.nextAction,
+      remedies: [...new Set(report.remedies)],
+      counts: { total: report.checks.length, passed: passed.length, failed: failed.length },
+      checks: checks.map(({ id, ok, value, remedy }) => ({
+        id,
+        ok,
+        value,
+        ...(remedy === undefined ? {} : { remedy }),
+      })),
+      omitted: { passed: passed.length - (checks.length - listedFailed), failed: failed.length - listedFailed },
+      truncated: checks.length < report.checks.length,
+    };
+  };
+  for (const check of candidates) {
+    if (checks.length >= MCP_DOCTOR_CHECK_LIMIT) break;
+    checks.push(check);
+    if (resultEnvelopeBytes(summary()) > MCP_DOCTOR_SUMMARY_BYTES) {
+      checks.pop();
+      break;
+    }
+  }
+  return summary();
+}
 const resultHash = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 
 function cursorError(message: string): ApexError {
@@ -1033,7 +1074,10 @@ export function createMcpServerFactory(
   registerTool(
     "diagnose",
     { description: "Run bounded diagnosis for the selected run and return the kernel-recorded result." },
-    async () => result(await service.diagnose()),
+    async () => {
+      const { status, doctor } = (await service.diagnose()) as { status: unknown; doctor: DoctorReport };
+      return result({ status, doctor: summarizeDoctorReport(doctor) });
+    },
   );
   registerTool(
     "improvementObserve",
@@ -1122,10 +1166,22 @@ export function createMcpServerFactory(
     "doctor",
     {
       description:
-        "Inspect local APEX installation health; request repairs with fix and explicit confirmation with yes.",
+        "Inspect local APEX installation health; request repairs with fix and explicit confirmation with yes. Returns counts, remedies, and a bounded check list with failing checks first; when truncated, read every check with doctorChecks.",
       inputSchema: { fix: z.boolean().optional(), yes: z.boolean().optional() },
     },
-    async ({ fix, yes }) => result(await service.doctor(fix, yes)),
+    async ({ fix, yes }) => result(summarizeDoctorReport(await service.doctor(fix, yes))),
+  );
+  registerTool(
+    "doctorChecks",
+    {
+      description:
+        "Read every local APEX installation health check without repairing; failedOnly limits the list to failing checks.",
+      inputSchema: { failedOnly: z.boolean().optional(), cursor: cursorInput },
+    },
+    async ({ failedOnly }) => {
+      const { checks } = await service.doctor();
+      return result({ checks: failedOnly === true ? checks.filter(({ ok }) => !ok) : checks });
+    },
   );
   registerTool(
     "submitEvidence",
