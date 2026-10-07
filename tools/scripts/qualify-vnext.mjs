@@ -145,7 +145,7 @@ async function main() {
     ...testkit,
     ...renderers,
     scorecard,
-    customizationsSource: join(ROOT, "packages", "cli", "assets", "customizations"),
+    customizationsSource: join(ROOT, "packages", "cli", "assets", "client-projections", "github-copilot-cli"),
     capabilityPackageJson: join(ROOT, "packages", "capabilities", "package.json"),
     budgets: {
       appendP95Ms: defaults.journalBenchmarks.budgetsMilliseconds.appendP95,
