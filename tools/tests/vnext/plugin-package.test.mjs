@@ -11,6 +11,14 @@ import test from "node:test";
 import { load as loadYaml } from "js-yaml";
 import { renderClientAgentProjection } from "../../../packages/cli/scripts/prepare-assets.mjs";
 import {
+  buildReviewPrompt,
+  loadReviewCaptures,
+  reviewCaptureKey,
+  reviewPromptSha256,
+  verifyIssuedReviewCapture,
+} from "../../../packages/kernel/dist/index.js";
+import { mcpToolPolicy } from "../../../packages/cli/dist/mcp.js";
+import {
   build,
   hashTree,
   renderHookScript,
@@ -113,12 +121,7 @@ test("plugin layout, manifests, agents, skills and bundle are valid", async (con
 
   const agentsRoot = join(outputDirectory, "com.github.copilot/agents");
   const agents = (await readdir(agentsRoot)).sort();
-  assert.deepEqual(agents, [
-    "apex-codegen.agent.md",
-    "apex-reviewer.agent.md",
-    "apex-validator.agent.md",
-    "apex.agent.md",
-  ]);
+  assert.deepEqual(agents, ["apex-codegen.agent.md", "apex-validator.agent.md", "apex.agent.md"]);
   for (const file of agents) {
     const { frontmatter, body } = frontmatterOf(await readFile(join(agentsRoot, file), "utf8"));
     for (const field of ["model", "model-policy", "reasoning-effort"]) assert.equal(frontmatter[field], undefined);
@@ -154,10 +157,18 @@ test("plugin layout, manifests, agents, skills and bundle are valid", async (con
   }
 
   assert.deepEqual(manifest.hooks.entries, ["apex-hook.mjs", "hooks.json"]);
+  assert.equal(manifest.hooks.toolPolicy, "apex-mcp-tools.json");
   assert.deepEqual(
     files.filter((path) => path.startsWith("com.github.copilot/hooks/")),
-    ["com.github.copilot/hooks/apex-hook.mjs", "com.github.copilot/hooks/hooks.json"],
+    [
+      "com.github.copilot/hooks/apex-hook.mjs",
+      "com.github.copilot/hooks/apex-mcp-tools.json",
+      "com.github.copilot/hooks/hooks.json",
+    ],
   );
+  const policy = await readJson(join(outputDirectory, "com.github.copilot/hooks/apex-mcp-tools.json"));
+  assert.deepEqual(policy, mcpToolPolicy(), "the deny hook policy is derived from the MCP adapter");
+  assert.deepEqual(policy.readOnly, ["doctorChecks", "projectList", "status"]);
   assert.equal(
     await readFile(join(outputDirectory, "com.github.copilot/hooks/apex-hook.mjs"), "utf8"),
     renderHookScript(
@@ -169,8 +180,28 @@ test("plugin layout, manifests, agents, skills and bundle are valid", async (con
   const hooks = await readJson(join(outputDirectory, "com.github.copilot/hooks/hooks.json"));
   assert.deepEqual(Object.keys(hooks), ["version", "hooks"]);
   assert.equal(hooks.version, 1);
-  assert.deepEqual(Object.keys(hooks.hooks), ["preToolUse"]);
-  assert.equal(hooks.hooks.preToolUse.length, 1);
+  assert.deepEqual(Object.keys(hooks.hooks), [
+    "preToolUse",
+    "postToolUse",
+    "postToolUseFailure",
+    "subagentStart",
+    "subagentStop",
+  ]);
+  assert.deepEqual(
+    Object.fromEntries(Object.entries(hooks.hooks).map(([event, entries]) => [event, entries.map((e) => e.matcher)])),
+    {
+      preToolUse: ["task|.*apex[-_]azure[-_]pricing.*", "apex-.*|apex/.*|mcp__apex__.*"],
+      postToolUse: ["task"],
+      postToolUseFailure: [undefined],
+      subagentStart: ["rubber-duck"],
+      subagentStop: [undefined],
+    },
+  );
+  for (const [event, entries] of Object.entries(hooks.hooks))
+    for (const entry of entries) {
+      assert.match(entry.bash, new RegExp(`exec node "\\$f" ${event};`, "u"));
+      assert.match(entry.powershell, new RegExp(`& node \\$f ${event}`, "u"));
+    }
   const [hook] = hooks.hooks.preToolUse;
   assert.equal(hook.type, "command");
   assert.equal(hook.matcher, "task|.*apex[-_]azure[-_]pricing.*");
@@ -245,6 +276,7 @@ test("plugin agents and skills carry the guidance the retired workspace copies c
     "apex/architectureComplete",
     "apex/planComplete",
     "apex/completeTask",
+    "apex/reviewComplete",
     "apex/reviewDecide",
     "apex/gateDecide",
     "apex/governanceImport",
@@ -273,7 +305,7 @@ test("plugin agents and skills carry the guidance the retired workspace copies c
   assert.match(apexAgent, /Carry the user's requested outcome, stop point and prohibited operations/u);
   assert.match(apexAgent, /If a gate is pending, report it and stop/u);
   assert.match(apexAgent, /worker to call `apex\/taskContext`/u);
-  for (const worker of ["apex-codegen.agent.md", "apex-reviewer.agent.md", "apex-validator.agent.md"]) {
+  for (const worker of ["apex-codegen.agent.md", "apex-validator.agent.md"]) {
     const profile = await readFile(join(agentsRoot, worker), "utf8");
     assert.match(profile, /user-invocable: false/u);
     assert.doesNotMatch(profile, /- ask_user/u);
@@ -348,9 +380,10 @@ test("hook validation rejects drift from the Copilot hooks format and the shippe
   const script = await readFile(join(root, "plugin/hooks/apex-hook.mjs"), "utf8");
   const hooks = await readJson(join(root, "plugin/hooks/hooks.json"));
   const [entry] = hooks.hooks.preToolUse;
-  const check = async (hooksJson, source = script) => {
+  const check = async (hooksJson, source = script, policy = mcpToolPolicy()) => {
     await writeFile(join(hooksRoot, "apex-hook.mjs"), source);
     await writeFile(join(hooksRoot, "hooks.json"), JSON.stringify(hooksJson));
+    await writeFile(join(hooksRoot, "apex-mcp-tools.json"), JSON.stringify(policy));
     return validatePackagedHooks(pluginRoot, manifest);
   };
   const prepend = (lines) => script.replace(/^(#!.*\n)/u, (shebang) => `${shebang}${lines}`);
@@ -402,7 +435,24 @@ test("hook validation rejects drift from the Copilot hooks format and the shippe
   }
   await writeFile(join(hooksRoot, "helper.mjs"), "export const x = 1;\n");
   await assert.rejects(check(hooks, prepend('export * from "./helper.mjs";\n')), /only Node builtins: .*helper\.mjs/u);
-  await check(hooks, prepend('import { createHash } from "node:crypto";\nimport path from "path";\n'));
+  await check(hooks, prepend('import { randomUUID } from "node:crypto";\nimport path from "path";\n'));
+  const policy = mcpToolPolicy();
+  for (const [bad, pattern] of [
+    [{ ...policy, server: "other" }, /server must be the bundled MCP server/u],
+    [{ ...policy, readOnly: ["notATool"] }, /unknown tool read-only: notATool/u],
+    [{ ...policy, tools: [...policy.tools].reverse() }, /sorted, unique/u],
+    [{ ...policy, tools: [] }, /sorted, unique/u],
+    [{ ...policy, extra: true }, /unsupported fields: extra/u],
+  ])
+    await assert.rejects(check(hooks, script, bad), pattern);
+  await rm(join(hooksRoot, "apex-mcp-tools.json"));
+  await writeFile(join(hooksRoot, "hooks.json"), JSON.stringify(hooks));
+  await assert.rejects(validatePackagedHooks(pluginRoot, manifest), /ENOENT/u);
+  for (const toolPolicy of ["hooks.json", "../x.json", "policy.txt", undefined])
+    assert.throws(
+      () => validatePackageManifest({ ...manifest, hooks: { ...manifest.hooks, toolPolicy } }),
+      /toolPolicy|missing fields/u,
+    );
 });
 
 // Copilot CLI 1.0.93 preToolUse payload for a plugin MCP tool, recorded with a probe hook: "<server>-<tool>".
@@ -509,6 +559,92 @@ test("packaged hook commands run end to end through bash and PowerShell", async 
     assert.equal(missing.status, 0, `${shell.name}: ${missing.stderr}`);
     assert.equal(missing.stdout.trim(), "", `${shell.name} fails open without the script`);
     assert.match(missing.stderr, /APEX hook: .* is missing; reinstall the APEX plugin\. Call allowed\./u);
+  }
+});
+
+test("packaged rubber-duck hooks capture reviews and deny reviewer mutations through bash and PowerShell", async (context) => {
+  const { outputDirectory } = await buildInto(context, "review-hooks-build");
+  const sandbox = await temporaryDirectory(context, "review-hooks-run");
+  const pluginRoot = join(sandbox, "installed plugins", "apex");
+  await cp(outputDirectory, pluginRoot, { recursive: true });
+  const hooks = (await readJson(join(pluginRoot, "com.github.copilot/hooks/hooks.json"))).hooks;
+  const pathKey = Object.keys(process.env).find((key) => key.toUpperCase() === "PATH") ?? "PATH";
+  const parent = "36a083fd-de54-420f-892a-46033e0b8a49";
+  const child = "b98af3d1-4763-4c97-a520-e4c5ac7f5fd5";
+  const cwd = join(sandbox, "workspace");
+  const nonce = "0123456789abcdef0123456789abcdef";
+  const prompt = buildReviewPrompt({
+    nonce,
+    gate: 1,
+    subjectKind: "requirements",
+    wellArchitected: false,
+    files: [{ label: "subject", kind: "requirements", path: join(cwd, "subject.json"), sha256: "b".repeat(64) }],
+  });
+  for (const shell of hookShells()) {
+    const home = join(sandbox, `review-home-${shell.name}`);
+    const invoke = (event, payload, index = 0) => {
+      const result = spawnSync(shell.name, shell.args(hooks[event][index][shell.field]), {
+        cwd: pluginRoot,
+        env: {
+          ...process.env,
+          [pathKey]: [dirname(process.execPath), process.env[pathKey]].filter(Boolean).join(delimiter),
+          PLUGIN_ROOT: pluginRoot,
+          APEX_REVIEW_HOME: home,
+        },
+        input: JSON.stringify(payload),
+        encoding: "utf8",
+        windowsHide: true,
+      });
+      assert.equal(result.status, 0, `${shell.name} ${event}: ${result.stderr}`);
+      return result.stdout.trim() === "" ? null : JSON.parse(result.stdout);
+    };
+    const apexCall = (tool, sessionId = child) => ({
+      sessionId,
+      timestamp: 1,
+      cwd,
+      toolName: `apex-${tool}`,
+      toolArgs: {},
+    });
+    assert.equal(invoke("preToolUse", apexCall("gateDecide"), 1), null, `${shell.name}: no rubber-duck run`);
+    assert.equal(invoke("subagentStart", { sessionId: parent, timestamp: 1, cwd, agentName: "rubber-duck" }), null);
+    for (const tool of ["reviewComplete", "gateDecide", "reviewDecide", "completeTask", "nextTask"])
+      assert.equal(invoke("preToolUse", apexCall(tool), 1)?.permissionDecision, "deny", `${shell.name}: ${tool}`);
+    assert.equal(invoke("preToolUse", apexCall("status"), 1), null, `${shell.name}: read-only tools stay allowed`);
+    assert.equal(invoke("preToolUse", apexCall("reviewComplete", parent), 1), null, `${shell.name}: parent`);
+    const response = '```apex-review\n{"findings":[]}\n```';
+    const task = { description: "review", agent_type: "rubber-duck", mode: "sync", name: "review", prompt };
+    assert.equal(
+      invoke("subagentStop", {
+        sessionId: parent,
+        timestamp: 2,
+        cwd,
+        agentId: child,
+        agentType: "rubber-duck",
+        agentName: "rubber-duck",
+        response,
+        stopReason: "end_turn",
+      }),
+      null,
+    );
+    assert.equal(invoke("preToolUse", apexCall("gateDecide"), 1), null, `${shell.name}: mark cleared`);
+    assert.equal(
+      invoke("postToolUse", {
+        sessionId: parent,
+        timestamp: 3,
+        cwd,
+        toolName: "task",
+        toolArgs: task,
+        toolResult: { resultType: "success", textResultForLlm: response },
+      }),
+      null,
+    );
+    const files = await loadReviewCaptures(nonce, home);
+    const record = verifyIssuedReviewCapture(
+      { nonce, promptSha256: reviewPromptSha256(prompt) },
+      files,
+      await reviewCaptureKey(home),
+    );
+    assert.equal(record.response, response, `${shell.name}: exact output captured`);
   }
 });
 
