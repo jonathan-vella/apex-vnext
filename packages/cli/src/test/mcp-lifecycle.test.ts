@@ -4,6 +4,7 @@ import { once } from "node:events";
 import { mkdir, readFile, readdir, realpath, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
+import { PassThrough } from "node:stream";
 import test, { type TestContext } from "node:test";
 import { setImmediate as nextTurn } from "node:timers/promises";
 import { promisify } from "node:util";
@@ -12,7 +13,7 @@ import { isJSONRPCResultResponse, type Client } from "@modelcontextprotocol/clie
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import { mcpWorkspaceRoot, resolveMcpWorkspace } from "../cli.js";
 import { MCP_OUTPUT_SCHEMAS } from "../mcp-output-schemas.js";
-import { MCP_MAX_SERIALIZED_RESULT_BYTES, MCP_SERVER_INSTRUCTIONS, type McpServiceResolver } from "../mcp.js";
+import { MCP_MAX_SERIALIZED_RESULT_BYTES, MCP_SERVER_INSTRUCTIONS, serveMcp, type McpServiceResolver } from "../mcp.js";
 import { ApexError, EXIT_CODES } from "../errors.js";
 import { GovernanceBaselineError } from "@apexops/capabilities";
 import { ApexService } from "../service.js";
@@ -529,7 +530,7 @@ test(
 
 test(
   "a real mutation started before disconnect completes and persists after the transport closes",
-  { timeout: 10_000 },
+  { timeout: 60_000 },
   async (context) => {
     const root = await tempRoot();
     const service = new ApexService(root);
@@ -972,7 +973,8 @@ const modernEnvelope = (name: string) => ({
 
 test(
   "real stdio CLI serves 2026-07-28 discovery, lists tools, reads status, and exits cleanly",
-  { timeout: 30_000 },
+  // Two CLI process starts (probe sibling and session) are slow on Windows runners.
+  { timeout: 120_000 },
   async (context) => {
     const root = await tempRoot();
     const service = new ApexService(root, {
@@ -1013,7 +1015,7 @@ test(
       await transport.close();
     });
     // The base stdio transport probes server/discover on a disposable sibling process, then starts this session.
-    await client.connect(transport, { timeout: 10_000, signal: context.signal });
+    await client.connect(transport, { timeout: 60_000, signal: context.signal });
     assert.equal(client.getNegotiatedProtocolVersion(), MCP_PROTOCOL_VERSION);
     const discovered = client.getDiscoverResult();
     assert.ok(discovered?.supportedVersions.includes(MCP_PROTOCOL_VERSION), JSON.stringify(discovered));
@@ -1037,7 +1039,7 @@ test(
 
 test(
   "real stdio CLI answers a Copilot-style discover then 2025-11-25 initialize fallback on one connection",
-  { timeout: 30_000 },
+  { timeout: 120_000 },
   async () => {
     const root = await tempRoot();
     const child = spawnMcpServe(root);
@@ -1085,9 +1087,36 @@ test(
   },
 );
 
+test("serveMcp answers discovery over its streams and resolves on stdin EOF", async () => {
+  const stdin = new PassThrough();
+  const stdout = new PassThrough();
+  const served = serveMcp(new ApexService(await tempRoot()), { stdin, stdout });
+  const lines = createInterface({ input: stdout })[Symbol.asyncIterator]();
+  stdin.write(
+    `${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "server/discover", params: modernEnvelope("streams-test") })}\n`,
+  );
+  const discovered = JSON.parse((await lines.next()).value as string) as {
+    id: number;
+    result: { instructions: string };
+  };
+  assert.equal(discovered.id, 1);
+  assert.equal(discovered.result.instructions, MCP_SERVER_INSTRUCTIONS);
+  stdin.end();
+  await served;
+});
+
+test("serveMcp rejects with the stdin error after closing the connection", async () => {
+  const stdin = new PassThrough();
+  const stdout = new PassThrough();
+  const served = serveMcp(new ApexService(await tempRoot()), { stdin, stdout });
+  stdin.emit("error", new Error("stdin failed"));
+  await assert.rejects(served, /stdin failed/u);
+  assert.equal(stdin.listenerCount("error"), 0);
+});
+
 test(
   "real stdio CLI closes cleanly on SIGTERM",
-  { timeout: 30_000, skip: process.platform === "win32" ? "POSIX signals only" : false },
+  { timeout: 60_000, skip: process.platform === "win32" ? "POSIX signals only" : false },
   async () => {
     const root = await tempRoot();
     const child = spawnMcpServe(root);

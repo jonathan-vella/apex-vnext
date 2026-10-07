@@ -3,6 +3,7 @@ import { serveStdio, StdioServerTransport, type StdioServerHandle } from "@model
 import { z } from "zod";
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { lstatSync } from "node:fs";
+import type { Readable, Writable } from "node:stream";
 import { realpath } from "node:fs/promises";
 import { isAbsolute, resolve } from "node:path";
 import { ApexService, SUPPORTED_ARTIFACT_KINDS } from "./service.js";
@@ -1186,32 +1187,41 @@ export function createMcpServer(
  * Serves APEX over stdio until the connection ends (stdin EOF), the transport fails, or SIGINT/SIGTERM arrives.
  * `serveStdio` answers `server/discover` for protocol 2026-07-28 and, with `legacy: "serve"`, still serves a 2025-era
  * `initialize` (including the discover-then-initialize fallback) from the same factory. Stdout stays protocol-only.
+ * A stdin error closes the connection and rejects. `streams` defaults to the process stdio.
  */
-export async function serveMcp(serviceOrResolver: ApexService | McpServiceResolver): Promise<void> {
+export async function serveMcp(
+  serviceOrResolver: ApexService | McpServiceResolver,
+  streams: { stdin?: Readable; stdout?: Writable } = {},
+): Promise<void> {
   const factory = createMcpServerFactory(serviceOrResolver);
+  const stdin = streams.stdin ?? process.stdin;
+  const stdout = streams.stdout ?? process.stdout;
   await new Promise<void>((resolve, reject) => {
     let settled = false;
+    let failure: Error | undefined;
     let handle: StdioServerHandle | undefined;
     const signals = ["SIGINT", "SIGTERM"] as const;
     const cleanup = () => {
-      process.stdin.off("error", fail);
+      stdin.off("error", fail);
       for (const signal of signals) process.off(signal, shutdown);
     };
-    const finish = (error?: Error) => {
+    // Every exit path funnels through the transport closing; a recorded stream failure keeps the promise rejecting.
+    const finish = () => {
       if (settled) return;
       settled = true;
       cleanup();
-      if (error === undefined) resolve();
-      else reject(error);
+      if (failure === undefined) resolve();
+      else reject(failure);
     };
     const shutdown = () => {
-      void (handle?.close() ?? Promise.resolve()).then(() => finish(), finish);
+      void (handle?.close() ?? Promise.resolve()).then(finish, (error: unknown) => {
+        failure ??= error instanceof Error ? error : new Error(String(error));
+        finish();
+      });
     };
     function fail(error: Error) {
-      void (handle?.close() ?? Promise.resolve()).then(
-        () => finish(error),
-        () => finish(error),
-      );
+      failure ??= error;
+      shutdown();
     }
     class ApexStdioTransport extends StdioServerTransport {
       override async close(): Promise<void> {
@@ -1219,8 +1229,8 @@ export async function serveMcp(serviceOrResolver: ApexService | McpServiceResolv
         finish();
       }
     }
-    process.stdin.once("error", fail);
+    stdin.once("error", fail);
     for (const signal of signals) process.once(signal, shutdown);
-    handle = serveStdio(factory, { legacy: "serve", transport: new ApexStdioTransport() });
+    handle = serveStdio(factory, { legacy: "serve", transport: new ApexStdioTransport(stdin, stdout) });
   });
 }
