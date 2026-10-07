@@ -30,9 +30,10 @@ marked implemented by this support matrix. See the [checkpoint](../vnext/PROJECT
 ## Current Client Behavior
 
 The [client pivot](../vnext/ROADMAP.md#client-pivot) uses one foreground `APEX` agent for every interactive stage
-(DECISION-032). Rubber-duck replaces the Reviewer later (DECISION-031), and agents do not pin models (DECISION-033).
+(DECISION-032). The built-in `rubber-duck` agent performs the reviews with captured output (DECISION-031), and agents
+do not pin models (DECISION-033).
 
-The CLI projection ships one user-facing `APEX` agent and autonomous CodeGen, Reviewer and Validator workers. CLI
+The CLI projection ships one user-facing `APEX` agent and autonomous CodeGen and Validator workers. CLI
 workers were enabled with maintainer authorization after bounded Luna workflow probes. Revised
 [ADR-0006](../vnext/adrs/03-des-adr-0006-omit-cli-autonomous-workers.md) treats visibility as a usability convention,
 not authorization. Kernel task, evidence, ownership and approval checks remain mandatory, and worker tool grants are

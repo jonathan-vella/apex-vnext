@@ -40,7 +40,7 @@ timeouts or cancellations, route human decisions through `ask_user`, and explain
 | `completeTask`         | Atomically accept a complete typed output bundle.                                             |
 | `requirementsComplete` | Complete Requirements without constructing a generic bundle.                                  |
 | `architectureComplete` | Complete Architecture, cost, and decisions atomically.                                        |
-| `reviewComplete`       | Complete a review with APEX-derived identity and evidence binding.                            |
+| `reviewComplete`       | Complete a review from rubber-duck's captured output; takes only the task ID.                 |
 | `reviewDecide`         | Revise, acknowledge obligations, or accept risk with project owner and 90-day default expiry. |
 | `planComplete`         | Complete a plan with an APEX-derived intent binding.                                          |
 
@@ -50,6 +50,64 @@ finding actions and `reviewDecide`.
 The returned request ID, expected head, and owner epoch are required for `recordInput`.
 `projectCreate` requires `riskOwner` (`partner` or `customer`). `reviewDecide` accept-risk decisions derive owner from
 that project value; omit `expiresAt` to use the 90-day default.
+
+## Rubber-Duck Reviews
+
+The Requirements, Architecture and Plan reviews (`requirements-review`, `architecture-review`, `plan-review`, owner role
+`rubber-duck-review`) run in Copilot's built-in `rubber-duck` agent
+([DECISION-031](../vnext/DECISIONS.md#decision-031-replace-the-apex-reviewer-with-captured-rubber-duck-reviews)).
+
+1. When the kernel issues a review task, it writes the review inputs under `.apex/work/<run>/<task>/review/` (an
+   instructions file, the subject artifact and its dependencies as JSON) and builds a prompt. The prompt's first line is
+   `APEX-REVIEW: nonce=<32 hex>`; the rest lists every file with its SHA-256 and the answer contract. The journal's
+   `task.issued` event records the request hash, nonce, prompt hash, subject hash and attempt.
+2. `taskContext` returns the request as `reviewRequest`. The APEX agent calls `task` with `agent_type: "rubber-duck"`,
+   `mode: "sync"` and that exact prompt.
+3. The managed `postToolUse` hook saves the prompt and rubber-duck's exact output (`toolResult.textResultForLlm`) as an
+   HMAC-signed `review-capture-v1` record under `$APEX_REVIEW_HOME/captures/` (default `~/.apex/reviews/`). The key,
+   `capture.key`, is created there with mode 0600 by whichever side runs first.
+4. `reviewComplete` takes only the task ID. The kernel accepts exactly one capture for the nonce, verifies its signature,
+   hashes and rubber-duck origin, compares the prompt with the issued prompt (line endings and trailing whitespace
+   aside), checks that the reviewed artifact is unchanged, and parses findings only from one fenced `apex-review` JSON
+   block in the output. The capture is stored in the object store and bound in the `task.completed` event; the
+   `review-findings-v1` artifact carries the nonce, capture hash, prompt hash and response hash.
+5. `nextTask` then returns `needs_review` for every open finding, including `info`. The APEX agent records a disposition
+   for each through `reviewDecide`; gates still need the user's approval.
+
+The answer block is one JSON object: `findings` lists `{ "id"?, "severity", "title", "detail" }` with severity
+`critical`, `high`, `medium`, `low` or `info`, and IDs default to `F-1`, `F-2` and so on. The Architecture review also
+returns `criteria` with one entry per Well-Architected pillar (`criterionId`, `outcome`, `rationale`, `findingIds`).
+
+A missing capture leaves the request open: run rubber-duck once more with the same prompt. A second capture for the same
+nonce, an edited or forged record, a different prompt, a nonce from another request, a changed artifact, an edited or
+missing review input file or an answer that does not parse fails closed. The kernel records `review.capture-rejected`
+(except for a missing capture), so the nonce cannot be reused, and the next `nextTask` issues a new request. Rejected
+captures move into the run's object store as audit evidence (their hashes are in the rejection event) and leave the
+review home; captures too large or unreadable to archive move to the review home's `quarantine/` folder instead.
+After two failed attempts the error tells the agent to stop and report to the user. `completeTask`, `stageArtifact`
+and `validateTask` reject review tasks, and `reviewComplete` rejects agent-supplied `findings` or `criteria`.
+
+Rubber-duck inherits the caller's tools. The managed `subagentStart` hook marks a rubber-duck run as active for the
+parent session and folder; `subagentStop` or a failed `task` call clears the mark, and marks expire after 30 minutes.
+While a mark is active, the `preToolUse` hook denies every APEX tool that is not read-only (only `status`,
+`projectList` and `doctorChecks` are) to each session in that folder that owns no active mark. Only one rubber-duck
+run per folder may be active, so a reviewer cannot make itself a parent and one run's stop event cannot clear another
+run's mark.
+Subagent calls carry the subagent's own session ID, so this covers rubber-duck and any agent it starts. A concurrent
+worker waits until the mark clears. The read-only list ships as `apex-mcp-tools.json`, generated from the MCP
+adapter at plugin build time; without it every APEX tool is denied during a run.
+
+What this guarantees and what it does not:
+
+- Findings exist only when a hook-written capture verifies against the issued request. An agent cannot add, remove or
+  edit findings through any MCP tool, cannot reuse an old answer for a new request, and cannot pick between two answers
+  to one request.
+- The HMAC key and captures live outside the workspace. The APEX agent has no shell or file-write tools, and reading
+  outside the workspace needs the user's approval. A process running as the same user with write access to the home
+  folder (another agent with a shell, or the user) can read the key and forge a capture. The kernel does not defend
+  against that, as DECISION-031's accepted risks allow.
+- Hooks only capture, mark and deny; the kernel decides. If hooks are disabled or time out, no capture exists and the
+  review cannot complete, but rubber-duck calls are no longer denied. Rubber-duck's model is not pinned.
 
 ## Read And Operations Tools
 

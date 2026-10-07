@@ -12,8 +12,10 @@ When you prepare a release, rename `## [Unreleased]` to the new version.
 
 First marketplace release of APEX as one Agent Plugins 1.0 plugin.
 
-- The APEX agent, hidden workers and skills from the managed customizations. Agents are rendered with the Copilot CLI
-  client mechanics the workspace copies carried before `apex init` stopped copying them (CP-11).
+- The APEX agent, hidden workers (CodeGen and Validator) and skills from the managed customizations. Agents are rendered
+  with the Copilot CLI client mechanics the workspace copies carried before `apex init` stopped copying them (CP-11).
+  The built-in `rubber-duck` agent runs the Requirements, Architecture and Plan reviews; the APEX Reviewer worker is
+  retired.
 - The `apex` MCP server: the bundled `@apexops/cli` runtime as one esbuild bundle on the MCP TypeScript SDK v2, started
   with `node` from the plugin folder and needing no registry download.
 - The `apex-azure-pricing` MCP server: Azure Resource Manager MCP over streamable HTTP with the `CostManagement` and
@@ -24,7 +26,8 @@ First marketplace release of APEX as one Agent Plugins 1.0 plugin.
   pinned in the bundle. Other platforms, musl Linux and altered binaries fall back to Python and SVG diagrams and report
   PNG as unavailable. The binaries add about 8.5 MB to the package.
 - Managed hooks that deny the APEX agent as a task target, and every `apex-azure-pricing` tool except the read-only
-  pricing and cost tools from `tools/registry/arm-mcp-cost-pricing.v1.json`.
+  pricing and cost tools from `tools/registry/arm-mcp-cost-pricing.v1.json`. They also capture kernel-requested
+  rubber-duck reviews as signed records for the kernel, and deny state-changing APEX tools to rubber-duck while it runs.
 - The `apex` MCP server refuses a workspace whose `.apex/apex.lock.json` names another `@apexops/cli` version with
   `APEX_RUNTIME_MISMATCH`; `status` reports the mismatch read-only. Run `apex update` for an older workspace, or
   install the plugin version that matches a newer one (CP-25).
