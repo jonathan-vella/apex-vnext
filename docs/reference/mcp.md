@@ -169,6 +169,8 @@ persists. Staging/validation bundles check cancellation
 between items and preserve already-written items on later failure. The adapter never retries mutations automatically.
 Long-running underlying operations retain their own bounded process/provider timeouts. After interruption, reconnect
 and inspect authoritative state before deciding whether to resubmit; do not treat a missing reply as proof of no commit.
+If the interrupted mutation committed and nothing has changed the run since, an identical resubmission returns its
+original result under the [repeat rules](#repeat-safety) instead of applying it twice.
 The first worktree to write a run holds a short run-writer lease. Other worktrees may read, but writes return
 `APEX_WRITER_CONFLICT` naming the owning worktree until the owner releases the lease with `releaseWriter`, the run
 reaches a terminal state, or the lease expires (default 2 minutes after the owner's last write).
@@ -176,8 +178,53 @@ reaches a terminal state, or the lease expires (default 2 minutes after the owne
 `status` and `projectList` are read-only and carry corresponding read-only/idempotent hints. Status refuses pending
 transaction recovery instead of writing it. Explicit advancement/final completion owns terminal bookkeeping. Other
 tools are conservatively marked non-read-only/non-idempotent because even read-like service paths can recover state.
+Repeat suppression is bounded by run state, time and storage, so it does not make any state-changing tool idempotent.
 `nextTask` explicitly warns that issuance writes state and is not retry-safe. Tool metadata and host permission prompts
 do not replace kernel authorization. The fixed, deterministically ordered catalog does not change with workflow state.
+
+## Repeat Safety
+
+Session models can issue the same tool call twice. Every tool has an effect class in `MCP_TOOL_EFFECTS` in
+[`packages/cli/src/mcp.ts`](../../packages/cli/src/mcp.ts), and a test fails when a state-changing tool lacks a
+duplicate-call case:
+
+| Class            | Tools                            | Repeat behavior                                                                          |
+| ---------------- | -------------------------------- | ---------------------------------------------------------------------------------------- |
+| `read-only`      | `status`, `projectList`          | Never writes.                                                                            |
+| `read`           | The read tools listed below      | Always executes; at most finishes an already-committed transaction recovery.             |
+| `repeat-guarded` | Every other tool except `doctor` | The kernel repeat guard below decides.                                                   |
+| `convergent`     | `doctor`                         | Always executes; a repeated repair rewrites the same files and keeps the rollback chain. |
+
+The `read` tools are `capabilityList`, `capabilityStatus`, `taskContext`, `readTaskInput`, `preview`, `inventory`,
+`diagnose`, `render`, `improvementObservations` and `improvementProposals`.
+
+`doctor` repairs workspace installation files outside the run, so a run-scoped record could hide a newly broken file.
+It is not deduplicated; a repair that reproduces the current customization lock keeps the existing rollback chain.
+
+For a `repeat-guarded` tool, the kernel identifies a call by the tool name, the canonical worktree (real path,
+case-folded on Windows) and the validated arguments as canonical JSON with sorted keys and undefined members dropped.
+`governanceImport` and `governanceSelect` add the SHA-256 of the referenced file, so an edited baseline is a new call.
+The run state is a hash of the selection, the project set, the selected run document, its journal head and the writer
+lease holder (lease renewals do not change it). The recorded fingerprint binds the call to the state it applied to.
+
+An identical call is answered from the original result only when all of these hold:
+
+1. The original call succeeded. Failures are not stored, so a repeat re-runs validation and stale-state checks, and a
+   failure after a partial commit, such as bundle staging, is not deduplicated.
+2. The run state equals the state right after the original call. Any change to that state, whether from another tool,
+   the CLI or another worktree, makes the call a new request that normal kernel checks decide and may reject as stale.
+3. Fewer than 10 minutes have passed, and a returned task has not reached its `expiresAt`.
+4. No other worktree holds a live writer lease. The check never renews the lease. Because the worktree is part of the
+   call identity, a repeat from another worktree is a new request and meets `APEX_WRITER_CONFLICT` while the lease is
+   held.
+
+An answered repeat returns the original `structuredContent` byte for byte, changes no run state and no run journal
+head, records no new gate decision or evidence, and appends a hash-chained `call.repeated` audit event to the run's
+separate `repeats/` journal. Records live in the run's `.repeat-guard.json`, written atomically, so they survive an
+`apex mcp serve` restart. The file holds at most 16 records with results of at most 64 KiB each; records whose post-call
+state differs from the current state are dropped on every write because they can never match again. A malformed record
+file disables replay instead of returning a forged result. State transfer excludes the record file and carries the
+audit journal.
 
 ## Authority
 
