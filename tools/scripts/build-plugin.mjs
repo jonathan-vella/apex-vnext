@@ -43,6 +43,23 @@ const manifestShape = {
   assets: ["sourceRoot", "targetRoot"],
 };
 const builtins = new Set(builtinModules.flatMap((name) => [name, `node:${name}`]));
+// camelCase events from the Copilot hooks reference; PascalCase names select the VS Code payload format instead.
+const hookEvents = [
+  "agentStop",
+  "errorOccurred",
+  "notification",
+  "permissionRequest",
+  "postToolUse",
+  "postToolUseFailure",
+  "preCompact",
+  "preToolUse",
+  "sessionEnd",
+  "sessionStart",
+  "subagentStart",
+  "subagentStop",
+  "userPromptSubmitted",
+  "userPromptTransformed",
+];
 
 function bytewise(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
@@ -380,6 +397,112 @@ async function validatePackagedSkills(outputRoot, targetRoot) {
 }
 
 /**
+ * The only accepted hook commands: run one shipped script from the plugin root with the event name as its argument.
+ * bash quotes "${PLUGIN_ROOT}/..."; PowerShell (5.1 and 7) builds the same path and lets node inherit stdin, so the
+ * payload is not re-encoded. A missing script drains stdin, warns and allows; the script itself always exits 0.
+ */
+function hookCommands(script, event) {
+  const missing = "is missing; reinstall the APEX plugin. Call allowed.";
+  const segments = script
+    .split("/")
+    .map((segment) => `'${segment}'`)
+    .join(", ");
+  return {
+    bash: [
+      `f="\${PLUGIN_ROOT}/${script}"`,
+      `if [ -f "$f" ]; then exec node "$f" ${event}; fi`,
+      "cat > /dev/null",
+      `echo "APEX hook: $f ${missing}" >&2`,
+    ].join("; "),
+    powershell: [
+      `$f = [System.IO.Path]::Combine([string]$env:PLUGIN_ROOT, ${segments})`,
+      `if ([System.IO.File]::Exists($f)) { try { & node $f ${event} } catch { exit 1 }; exit $LASTEXITCODE }`,
+      "[void][Console]::In.ReadToEnd()",
+      `[Console]::Error.WriteLine("APEX hook: $f ${missing}")`,
+      "exit 0",
+    ].join("; "),
+  };
+}
+
+function validateHookCommand(label, entry, event, scripts) {
+  assertKeys(label, entry, ["type", "matcher", "bash", "powershell", "timeoutSec"], ["type", "bash", "powershell"]);
+  if (entry.type !== "command") throw new Error(`${label} type must be command`);
+  if (entry.matcher !== undefined) {
+    if (typeof entry.matcher !== "string" || entry.matcher.length === 0)
+      throw new Error(`${label} matcher must be a regex`);
+    new RegExp(`^(?:${entry.matcher})$`, "u");
+  }
+  if (entry.timeoutSec !== undefined && !(Number.isInteger(entry.timeoutSec) && entry.timeoutSec > 0))
+    throw new Error(`${label} timeoutSec must be a positive integer`);
+  const script =
+    typeof entry.bash === "string" ? /^f="\$\{PLUGIN_ROOT\}\/([^"$]+)";/u.exec(entry.bash)?.[1] : undefined;
+  if (script === undefined) throw new Error(`${label} bash must start with f="\${PLUGIN_ROOT}/<script>";`);
+  if (!scripts.has(script)) throw new Error(`${label} references a script the package does not ship: ${script}`);
+  const expected = hookCommands(script, event);
+  for (const shell of ["bash", "powershell"]) {
+    if (entry[shell] !== expected[shell])
+      throw new Error(`${label} ${shell} must be the standard command that runs node ${script} ${event}`);
+  }
+  return script;
+}
+
+/** Rejects hook scripts that load anything but Node builtins, including dynamic imports and re-exports. */
+async function validateHookScript(outputRoot, script) {
+  const label = `Hook script ${script} must import only Node builtins`;
+  const result = await esbuild({
+    absWorkingDir: outputRoot,
+    entryPoints: [join(outputRoot, script)],
+    bundle: true,
+    platform: "node",
+    format: "esm",
+    metafile: true,
+    write: false,
+    logLevel: "silent",
+  }).catch((error) => {
+    throw new Error(`${label}: ${error.errors?.[0]?.text ?? error.message}`);
+  });
+  if (result.warnings.length > 0) throw new Error(`${label}: ${result.warnings[0].text}`);
+  const inputs = Object.keys(result.metafile.inputs);
+  if (inputs.length !== 1) throw new Error(`${label}: ${inputs.find((input) => input !== script) ?? inputs[0]}`);
+  const external = Object.values(result.metafile.outputs)
+    .flatMap(({ imports }) => imports)
+    .map(({ path }) => path)
+    .filter((path) => !builtins.has(path));
+  if (external.length > 0) throw new Error(`${label}: ${external[0]}`);
+  const output = Buffer.from(result.outputFiles[0].contents).toString("utf8");
+  if (/\bimport\s*\(|\brequire\s*\(/u.test(output)) throw new Error(`${label}: dynamic import or require`);
+}
+
+/**
+ * Checks hooks.json against the Copilot hook configuration format: version 1, camelCase events, and command entries
+ * with both bash and PowerShell commands that run one shipped, dependency-free Node script from the plugin root.
+ */
+async function validatePackagedHooks(outputRoot, manifest) {
+  if (manifest.hooks.entries.length === 0) return;
+  const hooksRoot = manifest.hooks.targetRoot;
+  const scripts = new Set(
+    manifest.hooks.entries.filter((entry) => entry.endsWith(".mjs")).map((entry) => `${hooksRoot}/${entry}`),
+  );
+  for (const script of scripts) await validateHookScript(outputRoot, script);
+  const hooks = JSON.parse(await readFile(join(outputRoot, hooksRoot, "hooks.json"), "utf8"));
+  assertKeys("hooks.json", hooks, ["version", "hooks"]);
+  if (hooks.version !== 1) throw new Error("hooks.json version must be 1");
+  if (!isPlainObject(hooks.hooks) || Object.keys(hooks.hooks).length === 0)
+    throw new Error("hooks.json hooks must map events to entries");
+  const used = new Set();
+  for (const [event, entries] of Object.entries(hooks.hooks)) {
+    if (!hookEvents.includes(event)) throw new Error(`hooks.json has unsupported event ${event}`);
+    if (!Array.isArray(entries) || entries.length === 0)
+      throw new Error(`hooks.json ${event} must be a non-empty array`);
+    entries.forEach((entry, index) =>
+      used.add(validateHookCommand(`hooks.json ${event}[${index}]`, entry, event, scripts)),
+    );
+  }
+  const unused = [...scripts].filter((script) => !used.has(script));
+  if (unused.length > 0) throw new Error(`Hook script is not referenced by hooks.json: ${unused[0]}`);
+}
+
+/**
  * Bundles the MCP entry and its @apexops/* and npm dependencies into one ESM file. Paths in esbuild comments are
  * relative to the repository root, so the output does not depend on the checkout location.
  */
@@ -522,6 +645,7 @@ async function build(
 
   await validatePackagedAgents(outputDirectory, manifest.agents.targetRoot);
   await validatePackagedSkills(outputDirectory, manifest.skills.targetRoot);
+  await validatePackagedHooks(outputDirectory, manifest);
   await setDirectoryTimes(outputDirectory);
   const tree = await hashTree(outputDirectory);
   await writeFile(`${outputDirectory}.sha256`, `${tree.sha256}  ${basename(outputDirectory)}\n`);
@@ -549,4 +673,13 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(p
   }
 }
 
-export { build, hashTree, validateMcpJson, validatePackageManifest, validatePackagedAgents, validatePluginJson };
+export {
+  build,
+  hashTree,
+  hookCommands,
+  validateMcpJson,
+  validatePackageManifest,
+  validatePackagedAgents,
+  validatePackagedHooks,
+  validatePluginJson,
+};

@@ -27,7 +27,7 @@
   "hooks": {
     "sourceRoot": "plugin/hooks",
     "targetRoot": "com.github.copilot/hooks",
-    "entries": []
+    "entries": ["apex-hook.mjs", "hooks.json"]
   },
   "assets": {
     "sourceRoot": "packages/cli/assets",
