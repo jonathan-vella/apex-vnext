@@ -79,7 +79,7 @@ if (check) {
     process.exitCode = 1;
   }
   const activeDocs = walk(join(root, "docs"));
-  const forbidden = /original APEX|github\.com\/jonathan-vella\/apex(?!-vnext)/iu;
+  const forbidden = /original APEX|github\.com\/jonathan-vella\/apex(?!-vnext|-plugins)/iu;
   for (const path of activeDocs) {
     if (forbidden.test(readFileSync(path, "utf8"))) {
       console.error(`❌ Product documentation must describe current vNext behavior: ${repositoryPath(path)}`);
