@@ -93,18 +93,19 @@ These scenarios belong to the [client pivot](ROADMAP.md#client-pivot). They are 
 the behavior exists. Each is required in the VS Code Copilot harness and the GitHub Copilot app on Windows and in
 Copilot CLI on Linux and WSL2, unless noted.
 
-| ID           | Required outcome                                                                                                     |
-| ------------ | -------------------------------------------------------------------------------------------------------------------- |
-| `CLIENT-028` | The plugin installs through the Copilot CLI store; its agents, skills, hooks and MCP server load once in each client |
-| `CLIENT-029` | Plugin MCP starts with `node` from the plugin folder without registry access and receives the workspace explicitly   |
-| `CLIENT-030` | Plugin update and rollback preserve an active run; on Windows the update follows the documented VS Code steps        |
-| `CLIENT-031` | One APEX agent completes every stage without agent switches; it reuses stated project values and stops at gates      |
-| `CLIENT-032` | Hidden workers never ask questions, and the hook denies the APEX agent as a `task` target                            |
-| `CLIENT-033` | Review findings come only from captured rubber-duck output bound to the prompt and artifact; tampering fails closed  |
-| `CLIENT-034` | Sessions in app-created worktrees share the main checkout's `.apex/`, and a second writer is rejected (app, CLI)     |
-| `CLIENT-035` | With local sandboxing on, the workflow completes, including Azure CLI sign-in, pricing and native validation         |
-| `CLIENT-036` | A duplicated state-changing tool call, as HydraFusion can produce, has no extra effect                               |
-| `CLIENT-037` | Agents without model pins run under the user-selected session model                                                  |
+| ID           | Required outcome                                                                                                       |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| `CLIENT-028` | The plugin installs through the Copilot CLI store; its agents, skills, hooks and MCP server load once in each client   |
+| `CLIENT-029` | Plugin MCP starts with `node` from the plugin folder without registry access and receives the workspace explicitly     |
+| `CLIENT-030` | Plugin update and rollback preserve an active run; on Windows the update follows the documented VS Code steps          |
+| `CLIENT-031` | One APEX agent completes every stage without agent switches; it reuses stated project values and stops at gates        |
+| `CLIENT-032` | Hidden workers never ask questions, and the hook denies the APEX agent as a `task` target                              |
+| `CLIENT-033` | Review findings come only from captured rubber-duck output bound to the prompt and artifact; tampering fails closed    |
+| `CLIENT-034` | Sessions in app-created worktrees share the main checkout's `.apex/`, and a second writer is rejected (app, CLI)       |
+| `CLIENT-035` | With local sandboxing on, the workflow completes, including Azure CLI sign-in, pricing and native validation           |
+| `CLIENT-036` | A duplicated state-changing tool call, as HydraFusion can produce, has no extra effect                                 |
+| `CLIENT-037` | Agents without model pins run under the user-selected session model                                                    |
+| `CLIENT-038` | APEX MCP answers `server/discover`, the client negotiates `2026-07-28`, and the session records the negotiated version |
 
 ## CLI-Only Projection Probes
 
