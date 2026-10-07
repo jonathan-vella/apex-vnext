@@ -423,12 +423,17 @@ export function validateGithubWorkflowContract({ contract, schema, workflowTexts
       )?.[1],
     }))
     .filter((smoke) => smoke.version !== undefined);
+  // The approved install must be the only @github/copilot reference in any ci job, so no unpinned or scripted install
+  // (npx, @latest, a second npm install) can ride along.
+  const copilotReferences = Object.values(ci?.jobs ?? {})
+    .flatMap((job) => (Array.isArray(job?.steps) ? job.steps : []))
+    .filter((step) => JSON.stringify(step ?? null).includes("@github/copilot")).length;
   if (
     copilotInstalls.length !== 1 ||
     pluginSmokes.length !== 1 ||
     pluginSmokes[0].index <= copilotInstalls[0].index ||
     pluginSmokes[0].version !== copilotInstalls[0].version ||
-    ciSteps.some((step) => /@github\/copilot(?!@\d+\.\d+\.\d+$)/u.test(String(step?.run ?? "").trim()))
+    copilotReferences !== 1
   ) {
     errors.push("ci workflow must install an exact Copilot CLI version and then run the plugin install smoke");
   }

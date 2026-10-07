@@ -264,6 +264,24 @@ test("rejects an unpinned or missing Copilot CLI plugin install smoke after reba
     );
   }
   const installStep = `      - name: Install the Copilot CLI\n        if: steps.scope.outputs.docs_only != 'true'\n        run: ${install}\n\n`;
+  for (const extra of [
+    "npm install --global @github/copilot@1.0.93",
+    "npx --yes @github/copilot@1.0.94 --version",
+    "npm exec --package=@github/copilot@1.0.93 -- copilot --version",
+  ]) {
+    for (const anchor of [
+      "      - name: Install the Copilot CLI\n",
+      "      - name: Build and test the agent plugin package\n",
+    ]) {
+      const texts = mutate(ciPath, anchor, `      - name: Extra Copilot step\n        run: ${extra}\n\n${anchor}`);
+      assert.ok(
+        validate(texts, rebaseline(ciPath, texts)).includes(
+          "ci workflow must install an exact Copilot CLI version and then run the plugin install smoke",
+        ),
+        `expected Copilot CLI smoke error for extra ${extra} before ${anchor.trim()}`,
+      );
+    }
+  }
   const reordered = mutate(ciPath, installStep, "");
   reordered[ciPath] = reordered[ciPath].replace(`        run: ${smoke}\n`, `        run: ${smoke}\n\n${installStep}`);
   assert.ok(
