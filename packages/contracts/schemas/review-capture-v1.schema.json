@@ -1,0 +1,67 @@
+{
+  "$id": "https://schemas.apexops.dev/review-capture-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "agentType": {
+      "type": "string"
+    },
+    "capturedAt": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "nonce": {
+      "pattern": "^[0-9a-f]{32}$",
+      "type": "string"
+    },
+    "prompt": {
+      "type": "string"
+    },
+    "requestSha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "response": {
+      "type": "string"
+    },
+    "responseSha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "schema": {
+      "const": "apex-review-capture-v1",
+      "type": "string"
+    },
+    "sessionId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "signature": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "toolName": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "nonce",
+    "sessionId",
+    "toolName",
+    "agentType",
+    "prompt",
+    "requestSha256",
+    "response",
+    "responseSha256",
+    "capturedAt",
+    "signature"
+  ],
+  "type": "object"
+}
