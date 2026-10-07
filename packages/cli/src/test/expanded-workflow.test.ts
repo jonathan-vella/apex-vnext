@@ -58,6 +58,8 @@ import {
   tempRoot,
   validationEvidence,
   writeJson,
+  completeOutputs,
+  completeReviewTask,
 } from "./helpers.js";
 
 async function importTestGovernance(service: ApexService): Promise<string> {
@@ -94,7 +96,8 @@ async function complete(
   outputs: TaskOutput[],
 ): Promise<Record<string, string>> {
   const taskId = await task(service, expected);
-  const result = await service.completeTaskOutputs(
+  const result = await completeOutputs(
+    service,
     taskId,
     expected === "architecture" ? await withPolicyMap(service, taskId, outputs) : outputs,
   );
@@ -1553,23 +1556,21 @@ test("task-bound workflow validators reject semantic and evidence mutations", as
     evidenceRefs: [],
   };
   await assert.rejects(
-    service.completeTaskOutputs(requirementReviewTask, [
-      {
-        kind: "review-findings",
-        value: review(runId, "requirements", requirementHashes.outputHashes.requirements!, [
-          duplicateFinding,
-          duplicateFinding,
-        ]),
-      },
-    ]),
-    /review:requirements-comprehensive/,
+    completeReviewTask(
+      service,
+      requirementReviewTask,
+      review(runId, "requirements", requirementHashes.outputHashes.requirements!, [duplicateFinding, duplicateFinding]),
+    ),
+    /failed \(unparseable\): Review finding ids must be unique/,
   );
-  await service.completeTaskOutputs(requirementReviewTask, [
-    {
-      kind: "review-findings",
-      value: review(runId, "requirements", requirementHashes.outputHashes.requirements!),
-    },
-  ]);
+  // A rejected capture uses up its request; the next review task carries a new nonce.
+  const retriedReviewTask = await task(service, "requirements-review");
+  assert.notEqual(retriedReviewTask, requirementReviewTask);
+  await completeReviewTask(
+    service,
+    retriedReviewTask,
+    review(runId, "requirements", requirementHashes.outputHashes.requirements!),
+  );
   await service.decideGateNumber(1, "approved", "tester");
   const availabilityHash = await acceptAvailabilityEvidence(service, runId);
 
@@ -1678,15 +1679,20 @@ test("task-bound workflow validators reject semantic and evidence mutations", as
   const reviewWithoutCriteria = review(runId, "architecture", architectureHashes.outputHashes.architecture!);
   delete reviewWithoutCriteria.criteria;
   await assert.rejects(
-    service.completeTaskOutputs(architectureReviewTask, [{ kind: "review-findings", value: reviewWithoutCriteria }]),
-    /review:well-architected-criteria-complete/,
+    completeReviewTask(service, architectureReviewTask, reviewWithoutCriteria),
+    /failed \(unparseable\): Review answer criteria must cover the five Well-Architected pillars/,
   );
-  await service.completeTaskOutputs(architectureReviewTask, [
-    {
-      kind: "review-findings",
-      value: review(runId, "architecture", architectureHashes.outputHashes.architecture!),
-    },
-  ]);
+  const unsupportedNotApplicable = review(runId, "architecture", architectureHashes.outputHashes.architecture!);
+  unsupportedNotApplicable.criteria![0]!.outcome = "not-applicable";
+  await assert.rejects(
+    completeReviewTask(service, await task(service, "architecture-review"), unsupportedNotApplicable),
+    /failed \(invalid-findings\): .*review:well-architected-criteria-complete/,
+  );
+  await completeReviewTask(
+    service,
+    await task(service, "architecture-review"),
+    review(runId, "architecture", architectureHashes.outputHashes.architecture!),
+  );
 
   await service.decideGateNumber(2, "approved", "tester");
 
@@ -1785,9 +1791,11 @@ test("architecture assumes availability and permits dismissal of out-of-scope re
   const reliabilityCriterion = architectureReview.criteria!.find(({ criterionId }) => criterionId === "reliability")!;
   reliabilityCriterion.outcome = "finding";
   (reliabilityCriterion.findingIds as string[]).push("F-ARCH-1");
-  const reviewHashes = await service.completeTaskOutputs(await task(service, "architecture-review"), [
-    { kind: "review-findings", value: architectureReview },
-  ]);
+  const reviewHashes = await completeReviewTask(
+    service,
+    await task(service, "architecture-review"),
+    architectureReview,
+  );
   const pendingReview = await service.nextTask();
   assert.equal(pendingReview.status, "needs_review");
   if (pendingReview.status !== "needs_review") return;
@@ -3118,7 +3126,7 @@ test("requirements revision invalidates the old artifact and requires a fresh re
   assert.equal(replacementReview.status, "task");
   if (replacementReview.status !== "task") return;
   assert.equal(replacementReview.task.taskType, "requirements-review");
-  await service.completeReview(replacementReview.task.taskId, []);
+  await completeReviewTask(service, replacementReview.task.taskId, { findings: [] });
   assert.equal((await service.status()).run.gates[0]?.state, "open");
   assert.notEqual(revisedHashes.outputHashes.requirements, initial.requirements);
 });

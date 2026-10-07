@@ -31,6 +31,7 @@ import {
   review,
   tempRoot,
   workloadDecisionManifest,
+  completeReviewTask,
 } from "./helpers.js";
 
 async function recordRequirementsRound(service: ApexService, answers: Record<string, InputValueV1>): Promise<void> {
@@ -1154,12 +1155,11 @@ test("governance reference import ignores tampered workspace runtime copies", as
   const reviewTask = await service.nextTask();
   assert.equal(reviewTask.status, "task");
   if (reviewTask.status !== "task") return;
-  await service.completeTaskOutputs(reviewTask.task.taskId, [
-    {
-      kind: "review-findings",
-      value: review(initialized.runId, "requirements", requirementHashes.outputHashes.requirements!),
-    },
-  ]);
+  await completeReviewTask(
+    service,
+    reviewTask.task.taskId,
+    review(initialized.runId, "requirements", requirementHashes.outputHashes.requirements!),
+  );
   await service.decideGateNumber(1, "approved", "tester");
   await acceptAvailabilityEvidence(service, initialized.runId);
   const runtimeRoots = [
@@ -1192,12 +1192,11 @@ test("architecture task waits for a kernel-owned decision and resumes the issued
   const reviewTask = await service.nextTask();
   assert.equal(reviewTask.status, "task");
   if (reviewTask.status !== "task") return;
-  await service.completeTaskOutputs(reviewTask.task.taskId, [
-    {
-      kind: "review-findings",
-      value: review(initialized.runId, "requirements", requirementHashes.outputHashes.requirements!),
-    },
-  ]);
+  await completeReviewTask(
+    service,
+    reviewTask.task.taskId,
+    review(initialized.runId, "requirements", requirementHashes.outputHashes.requirements!),
+  );
   await service.decideGateNumber(1, "approved", "tester");
   await acceptAvailabilityEvidence(service, initialized.runId);
   await importReferenceGovernance(service);
@@ -1508,12 +1507,11 @@ test("architecture decision is reissued after its journal head becomes stale", a
   const reviewTask = await service.nextTask();
   assert.equal(reviewTask.status, "task");
   if (reviewTask.status !== "task") return;
-  await service.completeTaskOutputs(reviewTask.task.taskId, [
-    {
-      kind: "review-findings",
-      value: review(initialized.runId, "requirements", requirementHashes.outputHashes.requirements!),
-    },
-  ]);
+  await completeReviewTask(
+    service,
+    reviewTask.task.taskId,
+    review(initialized.runId, "requirements", requirementHashes.outputHashes.requirements!),
+  );
   await service.decideGateNumber(1, "approved", "tester");
   await importReferenceGovernance(service);
   const firstEvidence = await acceptAvailabilityEvidence(service, initialized.runId);
@@ -1952,11 +1950,12 @@ test("large multibyte review context stays bounded with authorized selective rea
     criteria: ["review:requirements-comprehensive"],
     dispositions: [],
     evidenceRefs: reviewTask.task.inputRefs,
-    evidenceRefsRequired: true,
   });
   const metadata = await service.readTaskInput(reviewTask.task.taskId, 0, 6_000, "review-metadata");
   assert.deepEqual(JSON.parse(metadata.content), context.reviewMetadata);
-  assert.deepEqual(metadata.outputTemplate, context.outputTemplates["review-findings"]);
+  assert.equal("outputTemplate" in metadata, false);
+  assert.equal(context.outputTemplates["review-findings"], undefined);
+  assert.equal(context.reviewRequest?.subjectHash, accepted.outputHashes.requirements);
   assert.deepEqual(context.inputs, []);
   assert.equal(context.inputReferences[0]!.inlined, false);
   const hash = accepted.outputHashes.requirements!;
@@ -2065,7 +2064,8 @@ test("review context filters current dispositions and selectively reads oversize
   assert.equal(bounded.reviewMetadata, undefined);
   assert.equal(bounded.reviewMetadataReference?.selector, "review-metadata");
   assert.equal(bounded.reviewMetadataReference?.inlined, false);
-  assert.ok(bounded.outputTemplates["review-findings"]);
+  assert.equal(bounded.outputTemplates["review-findings"], undefined);
+  assert.ok(bounded.reviewRequest?.prompt.startsWith("APEX-REVIEW: nonce="));
   assert.deepEqual(
     bounded.inputReferences.map(({ hash }) => hash),
     issued.task.inputRefs,
@@ -2290,7 +2290,6 @@ async function planTaskContextScenario(pngAvailable: boolean): Promise<void> {
       criteria: pack.criteria,
       dispositions: [],
       evidenceRefs: context.task.inputRefs,
-      evidenceRefsRequired: true,
     });
     assert.deepEqual(Object.keys(context.artifactHashes).sort(), pack.kinds.sort());
     assert.deepEqual(
@@ -2298,14 +2297,16 @@ async function planTaskContextScenario(pngAvailable: boolean): Promise<void> {
       context.task.inputRefs,
     );
     assert.ok(Buffer.byteLength(JSON.stringify(context)) <= 262_144);
-    const template = context.outputTemplates["review-findings"] as {
-      subjectHash: string;
-      subjectKind: string;
-      criteria?: unknown[];
-    };
-    assert.equal(template.subjectHash, subjectHash);
-    assert.equal(template.subjectKind, taskType.replace("-review", ""));
-    if (taskType === "architecture-review") assert.equal(template.criteria?.length, 5);
+    assert.equal(context.outputTemplates["review-findings"], undefined);
+    const request = context.reviewRequest!;
+    assert.equal(request.subjectHash, subjectHash);
+    assert.equal(request.subjectKind, taskType.replace("-review", ""));
+    assert.equal(request.agentType, "rubber-duck");
+    assert.deepEqual(
+      request.files.filter(({ label }) => label !== "instructions").map(({ label }) => label)[0],
+      "subject",
+    );
+    assert.equal(request.prompt.includes('"criteria"'), taskType === "architecture-review");
     for (const reference of context.inputReferences) {
       const chunk = await service.readTaskInput(taskId, 0, 6_000, reference.hash);
       assert.equal(chunk.subjectHash, reference.hash);
@@ -2325,13 +2326,13 @@ async function planTaskContextScenario(pngAvailable: boolean): Promise<void> {
       while (offset !== undefined) {
         const chunk = await service.readTaskInput(issued.task.taskId, offset, 137);
         assert.equal(chunk.subjectHash, subjectHash);
-        assert.equal(chunk.outputTemplate !== undefined, offset === 0);
         chunks.push(chunk.content);
         offset = chunk.nextOffset;
       }
       assert.equal(sha256Json(JSON.parse(chunks.join(""))), subjectHash);
       await assert.rejects(service.readTaskInput(issued.task.taskId, chunks.join("").length, 137), /offset/i);
       await assert.rejects(service.readTaskInput(issued.task.taskId, 0, 6_001), /range/i);
+      return completeReviewTask(service, issued.task.taskId, outputs[0]!.value);
     }
     return service.completeTaskOutputs(issued.task.taskId, outputs);
   };
@@ -2572,7 +2573,7 @@ test("direct worker calls preserve authority across missing, foreign, wrong, rep
   };
   const missing = "00000000-0000-4000-8000-000000000000";
   for (const operation of [
-    () => service.completeReview(missing, []),
+    () => service.completeReview(missing),
     () => service.generateIac(missing),
     () => service.validateTask(missing),
     () => service.stageFile(missing, "main.bicep", ""),
@@ -2581,7 +2582,7 @@ test("direct worker calls preserve authority across missing, foreign, wrong, rep
   const issued = await nextTaskAfterInput(service);
   if (issued.status !== "task") throw new Error("Expected requirements task");
   for (const operation of [
-    () => service.completeReview(issued.task.taskId, []),
+    () => service.completeReview(issued.task.taskId),
     () => service.generateIac(issued.task.taskId),
     () => service.stageFile(issued.task.taskId, "../user-notes.md", "overwrite"),
     () => service.decideGateNumber(1, "approved", "direct-worker-probe"),
@@ -2591,7 +2592,7 @@ test("direct worker calls preserve authority across missing, foreign, wrong, rep
   await other.init({ projectId: "other", riskOwner: "partner" });
   const foreign = await nextTaskAfterInput(other);
   if (foreign.status !== "task") throw new Error("Expected foreign task");
-  await unchangedAfterRejection(() => service.completeReview(foreign.task.taskId, []), /task|ENOENT/i);
+  await unchangedAfterRejection(() => service.completeReview(foreign.task.taskId), /task|ENOENT/i);
   const accepted = await service.completeRequirements(issued.task.taskId, requirements());
   assert.ok(accepted.outputHashes.requirements);
   await unchangedAfterRejection(
@@ -2602,13 +2603,13 @@ test("direct worker calls preserve authority across missing, foreign, wrong, rep
   if (reviewTask.status !== "task") throw new Error("Expected review task");
   assert.equal(reviewTask.task.taskType, "requirements-review");
   const reviewOutput = review(runId, "requirements", accepted.outputHashes.requirements!);
-  const wrongSubject = { ...reviewOutput, subjectHash: "f".repeat(64) };
   await unchangedAfterRejection(
-    () => service.completeTaskOutputs(reviewTask.task.taskId, [{ kind: "review-findings", value: wrongSubject }]),
-    /bind|subject|hash/i,
+    () => service.completeTaskOutputs(reviewTask.task.taskId, [{ kind: "review-findings", value: reviewOutput }]),
+    /captured rubber-duck review/i,
   );
+  await unchangedAfterRejection(() => service.completeReview(reviewTask.task.taskId), /No rubber-duck capture/i);
   now += 25 * 60 * 60 * 1_000;
-  await unchangedAfterRejection(() => service.completeReview(reviewTask.task.taskId, []), /expired/i);
+  await unchangedAfterRejection(() => service.completeReview(reviewTask.task.taskId), /expired/i);
 });
 
 test("same client can submit valid requirements and review without authenticating distinct agent identities", async () => {
@@ -2620,7 +2621,7 @@ test("same client can submit valid requirements and review without authenticatin
   const accepted = await service.completeRequirements(issued.task.taskId, requirements());
   const reviewTask = await service.nextTask();
   if (reviewTask.status !== "task") throw new Error("Expected review task");
-  const completed = await service.completeReview(reviewTask.task.taskId, []);
+  const completed = await completeReviewTask(service, reviewTask.task.taskId, { findings: [] });
   const stored = await new ObjectStore(root).getJson(completed.outputHashes["review-findings"]!);
   assert.equal((stored as { subjectHash: string }).subjectHash, accepted.outputHashes.requirements);
   assert.notEqual((await service.status()).run.gates[0]!.state, "approved");
@@ -2655,27 +2656,27 @@ test("reviewer summary preserves non-empty findings and evidence references", as
   const reviewerTask = await service.nextTask();
   assert.equal(reviewerTask.status, "task");
   if (reviewerTask.status !== "task") return;
-  await service.completeTaskOutputs(reviewerTask.task.taskId, [
-    {
-      kind: "review-findings",
-      value: review(initialized.runId, "requirements", accepted.outputHashes.requirements!, [
-        {
-          id: "FIND-001",
-          severity: "high",
-          disposition: "open",
-          title: "Missing owner",
-          detail: "Recovery ownership is not assigned.",
-          evidenceRefs: ["a".repeat(64)],
-        },
-      ]),
-    },
-  ]);
+  await completeReviewTask(
+    service,
+    reviewerTask.task.taskId,
+    review(initialized.runId, "requirements", accepted.outputHashes.requirements!, [
+      {
+        id: "FIND-001",
+        severity: "high",
+        disposition: "open",
+        title: "Missing owner",
+        detail: "Recovery ownership is not assigned.",
+        evidenceRefs: ["a".repeat(64)],
+      },
+    ]),
+  );
   const summary = await readFile(
     join(root, "agent-output", "demo", initialized.runId, "reviews", "requirements-findings.md"),
     "utf8",
   );
   assert.match(summary, /FIND-001: Missing owner/u);
-  assert.match(summary, /Evidence: a{64}/u);
+  assert.match(summary, new RegExp(`Evidence: ${accepted.outputHashes.requirements!}, [0-9a-f]{64}`, "u"));
+  assert.doesNotMatch(summary, /a{64}/u, "agent-supplied evidence references are not findings input");
 });
 
 test("requirements intake preserves explicit unresolved answers", async () => {
@@ -2929,7 +2930,7 @@ test("gate approval rejects stale dependencies while explicit rejection remains 
   const reviewer = await service.nextTask();
   assert.equal(reviewer.status, "task");
   if (reviewer.status !== "task") return;
-  await service.completeReview(reviewer.task.taskId, []);
+  await completeReviewTask(service, reviewer.task.taskId, { findings: [] });
 
   const runPath = join(root, ".apex", "projects", "demo", "runs", initialized.runId, "run.json");
   const run = JSON.parse(await readFile(runPath, "utf8")) as { gates: Array<{ gate: number; dependencyHash: string }> };

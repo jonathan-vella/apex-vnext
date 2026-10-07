@@ -14,7 +14,7 @@ import { execute, formatHumanResult } from "../cli.js";
 import { ApexService } from "../service.js";
 import { ApexError, EXIT_CODES } from "../errors.js";
 import { APEX_VERSION, meetsMinimumVersion, MINIMUM_NODE_VERSION } from "../version.js";
-import { nextTaskAfterInput, requirements, tempRoot, writeJson } from "./helpers.js";
+import { captureReview, nextTaskAfterInput, requirements, tempRoot, writeJson } from "./helpers.js";
 
 test("CLI emits a stable JSON envelope", async () => {
   const child = spawn(process.execPath, [join(import.meta.dirname, "..", "cli.js"), "version", "--json"], {
@@ -1330,62 +1330,36 @@ test("MCP registers only narrow tools and calls the service", async () => {
   const reviewTask = (reviewResult.structuredContent as { task: { taskId: string; taskType: string } }).task;
   assert.equal(reviewTask.taskType, "requirements-review");
   const reviewContext = await service.taskContext(reviewTask.taskId);
-  const reviewTemplate = reviewContext.outputTemplates["review-findings"] as {
-    reviewedAt: string;
-    [key: string]: unknown;
-  };
-  assert.match(reviewTemplate.reviewedAt, /^\d{4}-\d{2}-\d{2}T/u);
-  assert.deepEqual(
-    { ...reviewTemplate, reviewedAt: "TIMESTAMP" },
-    {
-      schemaVersion: CONTRACT_VERSION,
-      projectId: "demo",
-      runId: (await service.status()).run.runId,
-      subjectKind: "requirements",
-      subjectHash: requirementsHash,
-      reviewedAt: "TIMESTAMP",
-      findings: [
-        {
-          id: "FINDING-001",
-          severity: "medium",
-          disposition: "open",
-          title: "Concise finding title",
-          detail: "Evidence, impact, and concrete remediation.",
-          evidenceRefs: [requirementsHash],
-        },
-      ],
-    },
-  );
+  assert.equal(reviewContext.outputTemplates["review-findings"], undefined);
+  assert.equal(reviewContext.reviewRequest?.subjectHash, requirementsHash);
   const chunks: string[] = [];
   let offset: number | undefined = 0;
-  let boundedTemplate: { reviewedAt: string; [key: string]: unknown } | undefined;
   while (offset !== undefined) {
     const reviewInput = await call("readTaskInput", { taskId: reviewTask.taskId, offset, limit: 6_000 });
     assert.equal(reviewInput.isError, undefined, JSON.stringify(reviewInput));
-    const chunk = reviewInput.structuredContent as {
-      content: string;
-      nextOffset?: number;
-      outputTemplate?: { reviewedAt: string; [key: string]: unknown };
-    };
+    const chunk = reviewInput.structuredContent as { content: string; nextOffset?: number; outputTemplate?: unknown };
+    assert.equal(chunk.outputTemplate, undefined);
     chunks.push(chunk.content);
-    boundedTemplate ??= chunk.outputTemplate;
     offset = chunk.nextOffset;
   }
   assert.ok(chunks.length > 1);
   assert.equal(JSON.parse(chunks.join("")).projectId, "demo");
-  assert.ok(boundedTemplate !== undefined);
-  assert.match(boundedTemplate.reviewedAt, /^\d{4}-\d{2}-\d{2}T/u);
-  assert.deepEqual({ ...boundedTemplate, reviewedAt: "TIMESTAMP" }, { ...reviewTemplate, reviewedAt: "TIMESTAMP" });
   const invalidOffset = await call("readTaskInput", {
     taskId: reviewTask.taskId,
     offset: chunks.join("").length,
     limit: 1,
   });
   assert.equal(invalidOffset.isError, true);
-  const reviewCompletion = await call("reviewComplete", {
-    taskId: reviewTask.taskId,
+  const withoutCapture = await call("reviewComplete", { taskId: reviewTask.taskId });
+  assert.equal(withoutCapture.isError, true);
+  assert.match(
+    (withoutCapture.structuredContent as { error: { message: string } }).error.message,
+    /failed \(missing\).*run rubber-duck once more/u,
+  );
+  await captureReview(service, reviewTask.taskId, {
     findings: [{ id: "F-1", severity: "medium", title: "Budget risk", detail: "Accept temporarily." }],
   });
+  const reviewCompletion = await call("reviewComplete", { taskId: reviewTask.taskId });
   assert.equal(reviewCompletion.isError, undefined, JSON.stringify(reviewCompletion));
   assert.equal((await service.status()).run.gates[0]?.state, "closed");
   const reviewDecision = await call("reviewDecide", {

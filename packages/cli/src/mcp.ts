@@ -219,6 +219,20 @@ const readOnlyTools = new Set(
     .filter(([, effect]) => effect === "read-only")
     .map(([name]) => name),
 );
+/** Tools in the `read-only` effect class. Every other APEX tool is state-changing, which the rubber-duck deny hook enforces. */
+export const MCP_READ_ONLY_TOOLS: ReadonlySet<string> = readOnlyTools;
+
+/**
+ * The tool effect policy the plugin build ships beside the managed hooks (apex-mcp-tools.json), so the rubber-duck deny
+ * hook and the MCP annotations share one source.
+ */
+export function mcpToolPolicy(): { server: "apex"; tools: string[]; readOnly: string[] } {
+  return {
+    server: "apex",
+    tools: Object.keys(MCP_OUTPUT_SCHEMAS).sort(),
+    readOnly: [...MCP_READ_ONLY_TOOLS].sort(),
+  };
+}
 const externalTools = new Set(["reconcile", "inventory", "diagnose", "doctor", "doctorChecks"]);
 
 function assertBoundedInput(value: unknown): void {
@@ -449,28 +463,6 @@ function validationIssues(details: Array<{ path?: unknown; message?: unknown }>,
   );
   return lines.length > limit ? [...lines.slice(0, limit), `${lines.length - limit} more`] : lines;
 }
-const reviewFinding = z
-  .object({
-    id: z.string().min(1),
-    severity: z.enum(["critical", "high", "medium", "low", "info"]),
-    title: z.string().min(1),
-    detail: z.string().min(1),
-  })
-  .strict();
-const reviewCriterion = z
-  .object({
-    criterionId: z.enum([
-      "security",
-      "reliability",
-      "performance-efficiency",
-      "cost-optimization",
-      "operational-excellence",
-    ]),
-    outcome: z.enum(["pass", "finding", "not-applicable"]),
-    rationale: z.string().min(1),
-    findingIds: z.array(z.string().min(1)).default([]),
-  })
-  .strict();
 const uniqueStrings = z
   .array(z.string().min(1))
   .min(1)
@@ -1129,14 +1121,10 @@ export function createMcpServerFactory(
     "reviewComplete",
     {
       description:
-        "Complete the active review task; APEX derives subject identity, hash, timestamp, and evidence binding.",
-      inputSchema: {
-        taskId: z.string(),
-        findings: z.array(reviewFinding),
-        criteria: z.array(reviewCriterion).optional(),
-      },
+        "Complete the active review task from rubber-duck's captured output after running rubber-duck in sync mode with the exact reviewRequest.prompt from taskContext. Takes no findings: APEX derives them only from the verified capture. A missing, edited, replayed or mismatched capture fails closed and the review counts as not done.",
+      inputSchema: { taskId: z.string() },
     },
-    async ({ taskId, findings, criteria }) => result(await service.completeReview(taskId, findings, criteria)),
+    async ({ taskId }) => result(await service.completeReview(taskId)),
   );
   registerTool(
     "planComplete",

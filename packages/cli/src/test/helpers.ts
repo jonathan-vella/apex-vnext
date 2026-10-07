@@ -6,8 +6,9 @@ import {
   type QualityScorecardV1,
   type RequirementsV1,
 } from "@apexops/contracts";
-import { sha256Json } from "@apexops/kernel";
+import { reviewCaptureFileName, reviewCaptureKey, reviewHome, sha256Json, signReviewCapture } from "@apexops/kernel";
 import { evaluateQualityScorecard } from "@apexops/renderers";
+import { mkdtempSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -15,6 +16,11 @@ import { after } from "node:test";
 import type { ApexService, TaskOutput } from "../service.js";
 
 const roots: string[] = [];
+
+// Rubber-duck captures and their signing key live outside the workspace. Tests always use a suite-owned review home,
+// even when the developer has APEX_REVIEW_HOME set, because rejection cases leave capture files behind.
+process.env.APEX_REVIEW_HOME = mkdtempSync(join(tmpdir(), "apex-review-home-"));
+roots.push(process.env.APEX_REVIEW_HOME);
 
 export async function tempRoot(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "apex-cli-"));
@@ -207,6 +213,74 @@ export function review(runId: string, subjectKind: string, subjectHash: string, 
         }
       : {}),
   };
+}
+
+interface ReviewValue {
+  findings?: Array<{ id?: string; severity: string; title: string; detail: string }>;
+  criteria?: Array<{ criterionId: string; outcome: string; rationale: string; findingIds?: string[] }>;
+}
+
+/** Rubber-duck's answer text for review findings, in the apex-review block format the kernel parses. */
+export function reviewAnswer(input: unknown, prose = "Rubber-duck review notes.\n"): string {
+  const value = input as ReviewValue;
+  const answer = {
+    findings: (value.findings ?? []).map(({ id, severity, title, detail }) => ({
+      ...(id === undefined ? {} : { id }),
+      severity,
+      title,
+      detail,
+    })),
+    ...(value.criteria === undefined
+      ? {}
+      : {
+          criteria: value.criteria.map(({ criterionId, outcome, rationale, findingIds }) => ({
+            criterionId,
+            outcome,
+            rationale,
+            findingIds: findingIds ?? [],
+          })),
+        }),
+  };
+  return `${prose}\`\`\`apex-review\n${JSON.stringify(answer, null, 2)}\n\`\`\`\n`;
+}
+
+/** Writes a signed capture exactly as the managed postToolUse hook does for the task's issued rubber-duck prompt. */
+export async function captureReview(
+  service: ApexService,
+  taskId: string,
+  value: unknown,
+  options: { prompt?: (prompt: string) => string; capturedAt?: string } = {},
+): Promise<string> {
+  const request = (await service.taskContext(taskId)).reviewRequest;
+  if (request === undefined) throw new Error(`Task ${taskId} has no rubber-duck review request`);
+  const home = reviewHome();
+  const record = signReviewCapture(
+    {
+      prompt: options.prompt?.(request.prompt) ?? request.prompt,
+      response: typeof value === "string" ? value : reviewAnswer(value),
+      sessionId: "test-session",
+      capturedAt: options.capturedAt ?? new Date().toISOString(),
+    },
+    await reviewCaptureKey(home),
+  );
+  const path = join(home, "captures", reviewCaptureFileName(record));
+  await mkdir(join(home, "captures"), { recursive: true });
+  await writeFile(path, JSON.stringify(record));
+  return path;
+}
+
+/** Completes a review task the only supported way: through a captured rubber-duck answer. */
+export async function completeReviewTask(service: ApexService, taskId: string, value: unknown) {
+  await captureReview(service, taskId, value);
+  return service.completeReview(taskId);
+}
+
+/** Completes any task; review-findings bundles become captured rubber-duck answers. */
+export async function completeOutputs(service: ApexService, taskId: string, outputs: TaskOutput[]) {
+  const review = outputs.find(({ kind }) => kind === "review-findings");
+  return review === undefined
+    ? service.completeTaskOutputs(taskId, outputs)
+    : completeReviewTask(service, taskId, review.value);
 }
 
 export function governance(runId: string) {
@@ -541,7 +615,7 @@ export async function prepareValidatedRun(service: ApexService, runId: string, t
     return next.task.taskId;
   };
   const complete = async (expected: string, outputs: TaskOutput[]) =>
-    service.completeTaskOutputs(await nextTask(expected), outputs);
+    completeOutputs(service, await nextTask(expected), outputs);
   const requirementHashes = await complete("requirements", [{ kind: "requirements", value: requirements() }]);
   await complete("requirements-review", [
     { kind: "review-findings", value: review(runId, "requirements", requirementHashes.outputHashes.requirements!) },

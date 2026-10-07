@@ -3,13 +3,18 @@
 
 import { execFile as execFileCallback } from "node:child_process";
 import { createHash } from "node:crypto";
-import { copyFile, mkdir, mkdtemp, readFile, readdir, rename, rm } from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
-import { sha256Json } from "../../packages/kernel/dist/index.js";
+import {
+  reviewCaptureFileName,
+  reviewCaptureKey,
+  sha256Json,
+  signReviewCapture,
+} from "../../packages/kernel/dist/index.js";
 import { VNEXT_QUALIFICATION_REPOSITORY } from "./_lib/vnext-qualification.mjs";
 
 const execFile = promisify(execFileCallback);
@@ -608,6 +613,28 @@ async function complete(service, expected, outputs) {
   return service.completeTaskOutputs(await taskId(service, expected), outputs);
 }
 
+/**
+ * Synthetic qualification state has no rubber-duck session, so it signs the clean review answer itself in a disposable
+ * review home, the way the managed postToolUse hook would. The kernel still verifies and binds the capture.
+ */
+async function completeSyntheticReview(service, reviewHome, expected, value, capturedAt) {
+  const id = await taskId(service, expected);
+  const { prompt } = (await service.taskContext(id)).reviewRequest;
+  const { findings, criteria } = value;
+  const record = signReviewCapture(
+    {
+      prompt,
+      response: `\`\`\`apex-review\n${JSON.stringify({ findings, ...(criteria === undefined ? {} : { criteria }) })}\n\`\`\`\n`,
+      sessionId: "vnext-live-prepare",
+      capturedAt,
+    },
+    await reviewCaptureKey(reviewHome),
+  );
+  await mkdir(join(reviewHome, "captures"), { recursive: true });
+  await writeFile(join(reviewHome, "captures", reviewCaptureFileName(record)), JSON.stringify(record));
+  return service.completeReview(id);
+}
+
 export async function prepareQualificationState(args, dependencies = {}) {
   const root = dependencies.root ?? process.cwd();
   const sourceRoot = dependencies.sourceRoot ?? root;
@@ -639,7 +666,16 @@ export async function prepareQualificationState(args, dependencies = {}) {
     await rename(join(root, ".apex"), backupPath);
   }
   const execute = async () => {
+    const reviewHome = await mkdtemp(join(tmpdir(), "apex-vnext-review-home-"));
+    try {
+      return await executeWith(reviewHome);
+    } finally {
+      await rm(reviewHome, { recursive: true, force: true });
+    }
+  };
+  const executeWith = async (reviewHome) => {
     const service = new ApexService(root, {
+      reviewHome,
       clock: () => new Date(now),
       architectureAvailabilityAdapter: async (evidence) => {
         if (evidence.targetScope !== targetScope || evidence.mode !== "native") {
@@ -725,12 +761,13 @@ export async function prepareQualificationState(args, dependencies = {}) {
     const requirements = await complete(service, "requirements", [
       { kind: "requirements", value: artifacts.requirements },
     ]);
-    await complete(service, "requirements-review", [
-      {
-        kind: "review-findings",
-        value: review(PROJECT_ID, runId, "requirements", requirements.outputHashes.requirements, now),
-      },
-    ]);
+    await completeSyntheticReview(
+      service,
+      reviewHome,
+      "requirements-review",
+      review(PROJECT_ID, runId, "requirements", requirements.outputHashes.requirements, now),
+      now,
+    );
     await service.decideGateNumber(1, "approved", args.actor);
     const baselinePath = ".github/data/governance-policy-baseline.json";
     await mkdir(join(root, ".github/data"), { recursive: true });
@@ -764,12 +801,13 @@ export async function prepareQualificationState(args, dependencies = {}) {
       { kind: "workload-decision-manifest", value: artifacts.workloadDecisionManifest },
       { kind: "policy-property-map", value: artifacts.policyMap },
     ]);
-    await complete(service, "architecture-review", [
-      {
-        kind: "review-findings",
-        value: review(PROJECT_ID, runId, "architecture", architecture.outputHashes.architecture, now),
-      },
-    ]);
+    await completeSyntheticReview(
+      service,
+      reviewHome,
+      "architecture-review",
+      review(PROJECT_ID, runId, "architecture", architecture.outputHashes.architecture, now),
+      now,
+    );
     await service.decideGateNumber(2, "approved", args.actor);
     artifacts.intent.sourceHashes = {
       requirements: requirements.outputHashes.requirements,
@@ -785,12 +823,13 @@ export async function prepareQualificationState(args, dependencies = {}) {
       { kind: "iac-binding", value: artifacts.binding },
       { kind: "environment-inputs", value: artifacts.environmentInputs },
     ]);
-    await complete(service, "plan-review", [
-      {
-        kind: "review-findings",
-        value: review(PROJECT_ID, runId, "plan", plan.outputHashes["implementation-intent"], now),
-      },
-    ]);
+    await completeSyntheticReview(
+      service,
+      reviewHome,
+      "plan-review",
+      review(PROJECT_ID, runId, "plan", plan.outputHashes["implementation-intent"], now),
+      now,
+    );
     await service.decideGateNumber(3, "approved", args.actor);
     await complete(service, `codegen-${args.track}`, [
       { kind: "logical-resource-manifest", value: artifacts.logicalManifest },

@@ -6,7 +6,16 @@ import {
   type QualityScorecardV1,
   type ResourceInventoryV1,
 } from "@apexops/contracts";
-import { ContentCache, EventJournal, ObjectStore, benchmarkKernel, contentCacheKey, sha256Json } from "@apexops/kernel";
+import {
+  ContentCache,
+  EventJournal,
+  ObjectStore,
+  benchmarkKernel,
+  contentCacheKey,
+  reviewCaptureFileName,
+  sha256Json,
+  signReviewCapture,
+} from "@apexops/kernel";
 import { evaluateQualityScorecard, renderResourceInventory } from "@apexops/renderers";
 import { cp, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
@@ -79,6 +88,34 @@ interface TrackContext {
 }
 
 const HASH = "a".repeat(64);
+// Qualification signs rubber-duck captures with a fixed key in a scenario-local review home, so reports stay reproducible.
+const QUALIFICATION_REVIEW_KEY = "5".repeat(64);
+
+async function qualificationReviewHome(root: string): Promise<string> {
+  const home = join(root, ".review-home");
+  await mkdir(home, { recursive: true, mode: 0o700 });
+  await writeFile(join(home, "capture.key"), `${QUALIFICATION_REVIEW_KEY}\n`, { mode: 0o600 });
+  return home;
+}
+
+/** Writes rubber-duck's answer for the task's issued prompt exactly as the managed postToolUse hook does. */
+async function captureQualificationReview(context: TrackContext, taskId: string, value: unknown): Promise<void> {
+  const request = (await context.service.taskContext(taskId)).reviewRequest;
+  const home = context.options.reviewHome;
+  if (request === undefined || home === undefined) throw new Error(`Task ${taskId} has no rubber-duck review request`);
+  const { findings, criteria } = value as { findings: unknown[]; criteria?: unknown[] };
+  const record = signReviewCapture(
+    {
+      prompt: request.prompt,
+      response: `\`\`\`apex-review\n${JSON.stringify({ findings, ...(criteria === undefined ? {} : { criteria }) })}\n\`\`\`\n`,
+      sessionId: "qualification",
+      capturedAt: context.clock.now().toISOString(),
+    },
+    Buffer.from(QUALIFICATION_REVIEW_KEY, "hex"),
+  );
+  await mkdir(join(home, "captures"), { recursive: true });
+  await writeFile(join(home, "captures", reviewCaptureFileName(record)), JSON.stringify(record));
+}
 
 export async function runQualification(options: QualificationOptions): Promise<QualificationReport> {
   const clock = options.clock ?? new FakeClock();
@@ -143,7 +180,7 @@ async function runTrack(
   injectFailure?: string,
 ): Promise<QualificationTrackReport> {
   await mkdir(root, { recursive: true });
-  const serviceOptions = { clock: clock.now, idSource: ids.next };
+  const serviceOptions = { clock: clock.now, idSource: ids.next, reviewHome: await qualificationReviewHome(root) };
   const context: TrackContext = {
     root,
     source,
@@ -496,6 +533,10 @@ async function complete(
   if (issued.task.taskType !== expected) throw new Error(`Expected ${expected}, received ${issued.task.taskType}`);
   const projection = await context.service.taskContext(issued.task.taskId);
   context.taskContextBytes.push(Buffer.byteLength(JSON.stringify(projection), "utf8"));
+  if (outputs[0]?.kind === "review-findings") {
+    await captureQualificationReview(context, issued.task.taskId, outputs[0].value);
+    return (await context.service.completeReview(issued.task.taskId)).outputHashes;
+  }
   return (await context.service.completeTaskOutputs(issued.task.taskId, outputs)).outputHashes;
 }
 
@@ -945,14 +986,15 @@ async function minimalService(
   clock: FakeClock,
   ids: SequenceIds,
 ): Promise<ApexService> {
-  const service = new ApexService(root, { clock: clock.now, idSource: ids.next });
+  const options = { clock: clock.now, idSource: ids.next, reviewHome: await qualificationReviewHome(root) };
+  const service = new ApexService(root, options);
   const context: TrackContext = {
     root,
     source: "",
     track,
     clock,
     ids,
-    options: { clock: clock.now, idSource: ids.next },
+    options,
     runId: "",
     service,
     checks: [],
