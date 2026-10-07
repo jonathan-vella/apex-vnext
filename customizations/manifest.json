@@ -67,7 +67,6 @@
     "files": [
       ".github/agents/apex.agent.md",
       ".github/agents/apex-codegen.agent.md",
-      ".github/agents/apex-reviewer.agent.md",
       ".github/agents/apex-validator.agent.md",
       ".github/skills/apex-workflow/SKILL.md",
       ".github/skills/apex-next/SKILL.md",
@@ -204,16 +203,6 @@
       "interactionType": "autonomous-subagent"
     },
     {
-      "id": "review",
-      "source": ".github/agents/apex-reviewer.agent.md",
-      "agent": "APEX Reviewer",
-      "role": "review",
-      "supportedTargets": [
-        "github-copilot"
-      ],
-      "interactionType": "autonomous-subagent"
-    },
-    {
       "id": "validation",
       "source": ".github/agents/apex-validator.agent.md",
       "agent": "APEX Validator",
@@ -228,11 +217,6 @@
     {
       "from": "APEX",
       "to": "APEX CodeGen",
-      "type": "subagent"
-    },
-    {
-      "from": "APEX",
-      "to": "APEX Reviewer",
       "type": "subagent"
     },
     {

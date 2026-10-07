@@ -65,6 +65,7 @@ test("apex-next maps every workflow owner role to a skill or worker", async () =
   const ownerRoles = new Set(workflow.nodes.map(({ ownerRole }) => ownerRole));
   ownerRoles.add("diagnostic-operator");
   ownerRoles.add("quality-evaluator");
+  ownerRoles.add("rubber-duck-review");
   for (const role of ownerRoles) {
     assert.match(source, new RegExp(`\\| \`${role}\`(?:,|\\s)`, "u"), `${role} must be mapped`);
   }
@@ -76,7 +77,7 @@ test("apex-next maps every workflow owner role to a skill or worker", async () =
     "apex-operations",
     "APEX CodeGen",
     "APEX Validator",
-    "APEX Reviewer",
+    "rubber-duck",
   ]) {
     assert.match(source, new RegExp(target, "u"), `${target} must be present`);
   }

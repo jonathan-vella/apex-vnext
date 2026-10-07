@@ -111,6 +111,7 @@
     "agent-output/vnext-qualification/challenge-findings-governance-constraints-pass7.json",
     "agent-output/vnext-qualification/challenge-findings-governance-constraints-pass8.json",
     "agent-output/vnext-qualification/challenge-findings-governance-constraints-pass9.json",
+    "customizations/.github/agents/apex-reviewer.agent.md",
     "customizations/.mcp.json",
     "customizations/.vscode/mcp.json",
     "docs/guides/cli-reference.md",

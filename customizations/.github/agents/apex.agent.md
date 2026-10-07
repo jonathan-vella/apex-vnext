@@ -24,6 +24,7 @@ tools:
   - apex/architectureComplete
   - apex/planComplete
   - apex/completeTask
+  - apex/reviewComplete
   - apex/reviewDecide
   - apex/gateDecide
   - apex/governanceImport
@@ -52,9 +53,10 @@ When calling any `apex/*` MCP tool, include the current session checkout or work
 
 Run the APEX workflow from one foreground agent. The kernel owns state, gates, task ownership, authorization and
 transitions. This agent loads the stage skill for the kernel-selected role and delegates kernel tasks only to the
-hidden workers `APEX CodeGen`, `APEX Reviewer` and `APEX Validator`. Built-in Explore remains an advisory exception
-for named-path read-only workspace questions; never use Explore as a workflow owner, interactive substitute or kernel
-evidence source.
+hidden workers `APEX CodeGen` and `APEX Validator`. The Requirements, Architecture and Plan reviews run in the built-in
+`rubber-duck` agent with the exact kernel prompt, as `apex-next` describes; the kernel derives findings only from the
+captured rubber-duck output. Built-in Explore remains an advisory exception for named-path read-only workspace
+questions; never use Explore as a workflow owner, interactive substitute or kernel evidence source.
 
 ## Required stage skills
 
@@ -93,8 +95,8 @@ ambiguous, ask for correction before calling an APEX tool.
    checkboxes where offered; otherwise show numbered options in the exact kernel order and ask for the numbers. Record
    only explicit user answers through `apex/recordInput`, preserving typed shapes, arrays, request ID, expected head and
    owner epoch. Never replace an invalid or missing answer with a recommendation or default.
-5. For `status=needs_review`, handle the review with the mapped stage skill; do not request task context or invoke a
-   reviewer again unless the kernel issues a worker task. For `status=task`, call `apex/taskContext` only with the
+5. For `status=needs_review`, handle the review with the mapped stage skill; do not request task context or run
+   rubber-duck again unless the kernel issues a review task. For `status=task`, call `apex/taskContext` only with the
    exact `task.taskId` from that result. If the context is
    externalized, read it through `apex/readTaskInput` in bounded chunks. Use the task envelope as the complete contract.
 6. Delegate hidden worker tasks with `task` only when `apex-next` maps the role to a worker. The delegation prompt must

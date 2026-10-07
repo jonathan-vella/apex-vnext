@@ -42,14 +42,15 @@ Use this skill only when the kernel routes the active foreground `APEX` agent to
    call `apex/completeTask` with a partial plan bundle or placeholder hash.
 9. Report the read-only Gate 3 package under `agent-output/<project>/<run>/plan/`, including implementation plan,
    IaC binding, environment inputs and challenger findings.
-10. When a plan review worker task appears, delegate `APEX Reviewer` with the exact `task.taskId` and tell the worker to
-    call `apex/taskContext`. For `needs_review`, do not request task context or invoke the Reviewer again. For
-    accept-risk, show `owner: <project risk owner>, expires in 90 days`, draft the rationale and ask only for
+10. When the `plan-review` task appears, run the rubber-duck review steps in `apex-next` with the exact `task.taskId`.
+    For `needs_review`, do not request task context or run rubber-duck again; record a disposition for every finding.
+    For accept-risk, show `owner: <project risk owner>, expires in 90 days`, draft the rationale and ask only for
     confirmation.
 11. After `apex/reviewDecide`, call `apex/status`. If Gate 3 is pending, report it and stop. Do not call
     `apex/nextTask` while a gate is pending. If the user's scope permits approval and the user explicitly approves or
     rejects Gate 3, call `apex/gateDecide` with `confirm: true`.
-12. Invoke `APEX CodeGen`, `APEX Reviewer` or `APEX Validator` only for an explicit worker task in the kernel envelope.
+12. Invoke `APEX CodeGen` or `APEX Validator` only for an explicit worker task in the kernel envelope, and rubber-duck
+    only for a kernel review task.
 
 ## Boundaries
 
