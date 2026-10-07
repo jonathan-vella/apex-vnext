@@ -27,6 +27,10 @@ export interface RunRepositoryOptions {
   idSource?: () => string;
   lockTtlMs?: number;
   writerLeaseTtlMs?: number;
+  /** How long a writer lease acquisition waits for the run mutation lock; defaults to 10 seconds. */
+  writerLeaseLockWaitMs?: number;
+  /** Selects Windows transient file-sharing handling; defaults to `process.platform`. */
+  platform?: NodeJS.Platform;
   faultInjector?: (stage: RunTransactionStage) => void | Promise<void>;
 }
 
@@ -78,9 +82,17 @@ export class RunWriterConflictError extends Error {
   constructor(
     readonly ownerWorktree: string,
     readonly expiresAt: string,
+    options?: ErrorOptions,
   ) {
-    super(`Run writer lease is held by ${ownerWorktree} until ${expiresAt}`);
+    super(`Run writer lease is held by ${ownerWorktree} until ${expiresAt}`, options);
     this.name = "RunWriterConflictError";
+  }
+}
+
+export class RunMutationBusyError extends Error {
+  constructor() {
+    super("Run mutation is already in progress");
+    this.name = "RunMutationBusyError";
   }
 }
 
@@ -164,6 +176,8 @@ export class RunRepository {
   private readonly idSource: () => string;
   private readonly lockTtlMs: number;
   private readonly writerLeaseTtlMs: number;
+  private readonly writerLeaseLockWaitMs: number;
+  private readonly platform: NodeJS.Platform;
   private readonly faultInjector?: RunRepositoryOptions["faultInjector"];
   readonly journal: EventJournal;
 
@@ -178,6 +192,8 @@ export class RunRepository {
     this.idSource = options.idSource ?? (() => crypto.randomUUID());
     this.lockTtlMs = options.lockTtlMs ?? 30_000;
     this.writerLeaseTtlMs = options.writerLeaseTtlMs ?? 120_000;
+    this.writerLeaseLockWaitMs = options.writerLeaseLockWaitMs ?? WRITER_LEASE_LOCK_WAIT_MS;
+    this.platform = options.platform ?? process.platform;
     this.faultInjector = options.faultInjector;
     this.journal = new EventJournal(join(directory, "journal"));
   }
@@ -247,33 +263,54 @@ export class RunRepository {
       }
       return undefined;
     };
-    return this.withLock(
-      async () => {
-        const now = this.clock();
-        const existing = await this.readWriterLease();
-        if (
-          existing !== undefined &&
-          existing.expiresAt > now.getTime() &&
-          !sameWorkspace(existing.metadata.workspacePath, workspacePath)
-        ) {
-          throw new RunWriterConflictError(existing.metadata.workspacePath, existing.metadata.expiresAt);
-        }
-        const lease: RunWriterLease = {
-          version: 1,
-          workspacePath,
-          host: hostname(),
-          pid: process.pid,
-          sessionId: owner.sessionId ?? this.idSource(),
-          createdAt:
-            existing !== undefined && sameWorkspace(existing.metadata.workspacePath, workspacePath)
-              ? existing.metadata.createdAt
-              : now.toISOString(),
-          expiresAt: new Date(now.getTime() + this.writerLeaseTtlMs).toISOString(),
-        };
-        await atomicWriteJson(this.writerLeasePath, lease);
-        return lease;
-      },
-      { onContention: conflictFromPublishedLease, waitMs: WRITER_LEASE_LOCK_WAIT_MS },
+    try {
+      return await this.withLock(
+        async () => {
+          const now = this.clock();
+          const existing = await this.readWriterLease();
+          if (
+            existing !== undefined &&
+            existing.expiresAt > now.getTime() &&
+            !sameWorkspace(existing.metadata.workspacePath, workspacePath)
+          ) {
+            throw new RunWriterConflictError(existing.metadata.workspacePath, existing.metadata.expiresAt);
+          }
+          const lease: RunWriterLease = {
+            version: 1,
+            workspacePath,
+            host: hostname(),
+            pid: process.pid,
+            sessionId: owner.sessionId ?? this.idSource(),
+            createdAt:
+              existing !== undefined && sameWorkspace(existing.metadata.workspacePath, workspacePath)
+                ? existing.metadata.createdAt
+                : now.toISOString(),
+            expiresAt: new Date(now.getTime() + this.writerLeaseTtlMs).toISOString(),
+          };
+          await atomicWriteJson(this.writerLeasePath, lease);
+          return lease;
+        },
+        { onContention: conflictFromPublishedLease, waitMs: this.writerLeaseLockWaitMs },
+      );
+    } catch (error) {
+      if (error instanceof RunWriterConflictError || !this.contended(error)) throw error;
+      // A busy lock or a Windows sharing violation is a contended outcome, not a verdict. Report it as a writer
+      // conflict only when another worktree verifiably holds an unexpired lease; otherwise surface the original error.
+      let conflict: RunWriterConflictError | undefined;
+      try {
+        conflict = await conflictFromPublishedLease();
+      } catch {
+        throw error;
+      }
+      if (conflict === undefined) throw error;
+      throw new RunWriterConflictError(conflict.ownerWorktree, conflict.expiresAt, { cause: error });
+    }
+  }
+
+  private contended(error: unknown): boolean {
+    return (
+      error instanceof RunMutationBusyError ||
+      (this.platform === "win32" && TRANSIENT_LOCK_RENAME_CODES.has((error as NodeJS.ErrnoException).code ?? ""))
     );
   }
 
@@ -325,6 +362,7 @@ export class RunRepository {
     const bytes = await readPublishedFile(this.writerLeasePath, {
       maxBytes: MAX_WRITER_LEASE_BYTES,
       label: "Run writer lease metadata",
+      platform: this.platform,
     });
     if (bytes === undefined) return undefined;
     let parsed: unknown;
@@ -371,9 +409,9 @@ export class RunRepository {
           }
         }
         if (await this.readLock().then((current) => current?.metadata.token === token)) break;
-        throw new Error("Run mutation is already in progress");
+        throw new RunMutationBusyError();
       }
-      if (!(await this.retireLock(existing.recoveryId))) throw new Error("Run mutation is already in progress");
+      if (!(await this.retireLock(existing.recoveryId))) throw new RunMutationBusyError();
     }
     try {
       return await operation();
