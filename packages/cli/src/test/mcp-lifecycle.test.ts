@@ -1,27 +1,24 @@
 import assert from "node:assert/strict";
-import { execFile, type ChildProcess } from "node:child_process";
-import { mkdir, readdir, realpath, symlink, writeFile } from "node:fs/promises";
+import { execFile, spawn, type ChildProcess, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { once } from "node:events";
+import { mkdir, readFile, readdir, realpath, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { createInterface } from "node:readline";
+import { PassThrough } from "node:stream";
 import test, { type TestContext } from "node:test";
 import { setImmediate as nextTurn } from "node:timers/promises";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { JSONRPCMessageSchema, SUPPORTED_PROTOCOL_VERSIONS } from "@modelcontextprotocol/sdk/types.js";
+import { isJSONRPCResultResponse, type Client } from "@modelcontextprotocol/client";
+import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import { mcpWorkspaceRoot, resolveMcpWorkspace } from "../cli.js";
 import { MCP_OUTPUT_SCHEMAS } from "../mcp-output-schemas.js";
-import {
-  MCP_MAX_SERIALIZED_RESULT_BYTES,
-  MCP_SERVER_INSTRUCTIONS,
-  createMcpServer,
-  type McpServiceResolver,
-} from "../mcp.js";
+import { MCP_MAX_SERIALIZED_RESULT_BYTES, MCP_SERVER_INSTRUCTIONS, serveMcp, type McpServiceResolver } from "../mcp.js";
 import { ApexError, EXIT_CODES } from "../errors.js";
 import { GovernanceBaselineError } from "@apexops/capabilities";
 import { ApexService } from "../service.js";
 import { requirements, tempRoot } from "./helpers.js";
+import { MCP_PROTOCOL_VERSION, connectMcp, modernMcpClient } from "./mcp-client.js";
 
 const hash = "a".repeat(64);
 const execFileAsync = promisify(execFile);
@@ -71,34 +68,35 @@ async function connect(
   options: { queueTimeoutMs?: number } = {},
 ) {
   const service = Object.assign(new ApexService(await tempRoot()), overrides);
-  const server = createMcpServer(service, options);
-  const client = new Client({ name: "lifecycle-test", version: "1.0.0" });
-  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  const { client, close } = await connectMcp(service, { ...options, name: "lifecycle-test" });
   const releases: Array<() => void> = [];
   const requests: Array<ReturnType<Client["callTool"]>> = [];
   context.after(async () => {
     for (const release of releases) release();
-    await client.close();
-    await server.close();
+    await close();
     await Promise.allSettled(requests);
   });
-  await server.connect(serverTransport);
-  await client.connect(clientTransport);
   return {
     client,
-    server,
     service,
     workspace: service.root,
+    // 2026-07-28 removed ping; a tools/list round trip orders the connection the same way.
+    async flush() {
+      await client.listTools();
+    },
     block() {
       const gate = deferred();
       releases.push(gate.resolve);
       return gate;
     },
     call(name: string, args: Record<string, unknown> = {}, signal?: AbortSignal) {
-      const request = client.callTool({ name, arguments: { workspace: service.root, ...args } }, undefined, {
-        timeout: 3_000,
-        ...(signal === undefined ? {} : { signal }),
-      });
+      const request = client.callTool(
+        { name, arguments: { workspace: service.root, ...args } },
+        {
+          timeout: 3_000,
+          ...(signal === undefined ? {} : { signal }),
+        },
+      );
       requests.push(request);
       void request.catch(() => undefined);
       return request;
@@ -106,11 +104,41 @@ async function connect(
   };
 }
 
-test("initialize result includes compact APEX server instructions", async (context) => {
+test("2026-07-28 discovery includes compact APEX server instructions", async (context) => {
   const { client } = await connect(context);
+  assert.equal(client.getNegotiatedProtocolVersion(), MCP_PROTOCOL_VERSION);
+  assert.equal(client.getDiscoverResult()?.instructions, MCP_SERVER_INSTRUCTIONS);
   assert.equal(client.getInstructions(), MCP_SERVER_INSTRUCTIONS);
   assert.match(MCP_SERVER_INSTRUCTIONS, /Every tool call must include workspace/u);
   assert.match(MCP_SERVER_INSTRUCTIONS, /nextCursor/u);
+});
+
+test("tools/list matches the v1 SDK tool baseline exactly", async (context) => {
+  // Captured from the @modelcontextprotocol/sdk 1.32.1 server at bfbc11a5; regenerate deliberately with
+  // APEX_UPDATE_MCP_TOOLS_FIXTURE=1 when a tool contract changes on purpose.
+  const fixture = new URL("../../src/test/fixtures/mcp-tools-list.json", import.meta.url);
+  const { client } = await connect(context);
+  const { tools } = await client.listTools();
+  if (process.env.APEX_UPDATE_MCP_TOOLS_FIXTURE === "1")
+    await writeFile(fixture, `[\n${tools.map((tool) => JSON.stringify(tool)).join(",\n")}\n]\n`);
+  assert.deepEqual(tools, JSON.parse(await readFile(fixture, "utf8")));
+});
+
+test("unknown tool names return the APEX usage error envelope", async (context) => {
+  const session = await connect(context);
+  assert.match(
+    assertError(
+      await session.call("noSuchTool"),
+      "APEX_USAGE",
+      "Unknown tool noSuchTool; call tools/list for available tools",
+    ).remediation!,
+    /input schema/u,
+  );
+  assertError(
+    await session.client.callTool({ name: "../not a tool", arguments: {} }),
+    "APEX_USAGE",
+    "Unknown tool; call tools/list for available tools",
+  );
 });
 
 test("MCP errors include structured remediation for stable error classes", async (context) => {
@@ -218,18 +246,14 @@ test("paging cursors fail closed when tampered, stale, or bound elsewhere", asyn
     listProjects: async () => projects(),
     improvementObservations: async () => [],
   });
-  const server = createMcpServer({
-    defaultService: service,
-    resolve: async (workspace) => ({ service, workspace }),
-  });
-  const client = new Client({ name: "cursor-test", version: "1.0.0" });
-  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-  context.after(async () => {
-    await client.close();
-    await server.close();
-  });
-  await server.connect(serverTransport);
-  await client.connect(clientTransport);
+  const { client, close } = await connectMcp(
+    {
+      defaultService: service,
+      resolve: async (workspace) => ({ service, workspace }),
+    },
+    { name: "cursor-test" },
+  );
+  context.after(close);
   const first = assertSuccess(
     "projectList",
     await client.callTool({ name: "projectList", arguments: { workspace: workspaceA } }),
@@ -308,18 +332,14 @@ test("paging cursors do not survive an MCP server restart", async (context) => {
   const workspace = await tempRoot();
   const service = Object.assign(new ApexService(workspace), { listProjects: async () => projects });
   const start = async () => {
-    const server = createMcpServer({
-      defaultService: service,
-      resolve: async (path) => ({ service, workspace: path }),
-    });
-    const client = new Client({ name: "restart-test", version: "1.0.0" });
-    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-    context.after(async () => {
-      await client.close();
-      await server.close();
-    });
-    await server.connect(serverTransport);
-    await client.connect(clientTransport);
+    const { client, close } = await connectMcp(
+      {
+        defaultService: service,
+        resolve: async (path) => ({ service, workspace: path }),
+      },
+      { name: "restart-test" },
+    );
+    context.after(close);
     return (args: Record<string, unknown> = {}) =>
       client.callTool({ name: "projectList", arguments: { workspace, ...args } });
   };
@@ -421,12 +441,12 @@ test("a cancelled queued mutation never starts and the queue remains usable", { 
   await entered.promise;
   const cancellation = new AbortController();
   const queued = session.call("recordInput", input, cancellation.signal);
-  await session.client.ping();
+  await session.flush();
   assert.equal(mutations, 0);
   const rejected = assert.rejects(queued, /queued cancellation/);
   cancellation.abort(new Error("queued cancellation"));
   await rejected;
-  await session.client.ping();
+  await session.flush();
   release.resolve();
   assertSuccess("render", await active);
   assert.deepEqual(assertSuccess("projectList", await session.call("projectList")), { projects: [] });
@@ -458,7 +478,7 @@ test(
     const rejected = assert.rejects(active, /active cancellation/);
     cancellation.abort(new Error("active cancellation"));
     await rejected;
-    await session.client.ping();
+    await session.flush();
     assert.equal(commits, 0);
     const following = session.call("projectList");
     release.resolve();
@@ -492,7 +512,7 @@ test(
     const active = session.call("recordInput", input);
     await entered.promise;
     const queued = session.call("recordInput", { ...input, requestId: "queued-request" });
-    await session.client.ping();
+    await session.flush();
     const disconnected = Promise.all([
       assert.rejects(active, /Connection closed/i),
       assert.rejects(queued, /Connection closed/i),
@@ -505,6 +525,51 @@ test(
     await nextTurn();
     assert.deepEqual(starts, [input.requestId]);
     assert.deepEqual(commits, [input.requestId]);
+  },
+);
+
+test(
+  "a real mutation started before disconnect completes and persists after the transport closes",
+  { timeout: 60_000 },
+  async (context) => {
+    const root = await tempRoot();
+    const service = new ApexService(root);
+    await service.init({ projectId: "payments", riskOwner: "partner" });
+    const entered = deferred();
+    const release = deferred();
+    const createProject = service.createProject.bind(service);
+    let settled: Promise<unknown> | undefined;
+    service.createProject = async (projectInput) => {
+      entered.resolve();
+      await release.promise;
+      settled = createProject(projectInput);
+      return (await settled) as Awaited<ReturnType<ApexService["createProject"]>>;
+    };
+    const { client, close } = await connectMcp(service, { name: "disconnect-persistence-test" });
+    context.after(close);
+    const active = client.callTool({
+      name: "projectCreate",
+      arguments: {
+        workspace: root,
+        projectId: "data-platform",
+        displayName: "Data platform",
+        environment: "dev",
+        targetScope: "local",
+        iacTool: "terraform",
+        riskOwner: "partner",
+      },
+    });
+    await entered.promise;
+    const disconnected = assert.rejects(active, /Connection closed/i);
+    await close();
+    await disconnected;
+    release.resolve();
+    while (settled === undefined) await nextTurn();
+    await settled;
+    assert.ok(
+      (await new ApexService(root).listProjects()).some(({ projectId }) => projectId === "data-platform"),
+      "the started mutation must persist",
+    );
   },
 );
 
@@ -568,7 +633,7 @@ test("concurrent staging bundles run sequentially without interleaving", { timeo
   const first = session.call("stageArtifact", { taskId: "first", outputs });
   await entered.promise;
   const second = session.call("stageArtifact", { taskId: "second", outputs });
-  await session.client.ping();
+  await session.flush();
   assert.deepEqual(order, ["first:requirements:start"]);
   release.resolve();
   for (const response of await Promise.all([first, second])) assertSuccess("stageArtifact", response);
@@ -827,12 +892,12 @@ test("queued wait expiration prevents late mutations without aborting active wor
   const active = session.call("render", { kind: "status" });
   await entered.promise;
   const queued = session.call("recordInput", input);
-  await session.client.ping();
+  await session.flush();
   context.mock.timers.tick(101);
   assert.equal((await queued).isError, true);
   assert.equal(mutations, 0);
   const replacement = session.call("recordInput", input);
-  await session.client.ping();
+  await session.flush();
   release.resolve();
   assertSuccess("render", await active);
   assertSuccess("recordInput", await replacement);
@@ -871,20 +936,45 @@ test("cancelled waiters release capacity before the active operation settles", a
   await entered.promise;
   const controller = new AbortController();
   const queued = Array.from({ length: 31 }, () => session.call("projectList", {}, controller.signal));
-  await session.client.ping();
+  await session.flush();
   controller.abort();
   await Promise.allSettled(queued);
-  await session.client.ping();
+  await session.flush();
   const replacement = session.call("projectList");
-  await session.client.ping();
+  await session.flush();
   release.resolve();
   assertSuccess("render", await active);
   assertSuccess("projectList", await replacement);
 });
 
+function spawnMcpServe(cwd: string): ChildProcessWithoutNullStreams {
+  return spawn(process.execPath, [fileURLToPath(new URL("../cli.js", import.meta.url)), "mcp", "serve"], {
+    cwd,
+    stdio: "pipe",
+  });
+}
+
+function stdoutMessages(child: ChildProcessWithoutNullStreams) {
+  const lines = createInterface({ input: child.stdout })[Symbol.asyncIterator]();
+  return async () => {
+    const next = await lines.next();
+    assert.equal(next.done, false, "MCP server closed stdout before answering");
+    return JSON.parse(next.value as string) as Record<string, unknown>;
+  };
+}
+
+const modernEnvelope = (name: string) => ({
+  _meta: {
+    "io.modelcontextprotocol/protocolVersion": MCP_PROTOCOL_VERSION,
+    "io.modelcontextprotocol/clientInfo": { name, version: "1.0.0" },
+    "io.modelcontextprotocol/clientCapabilities": {},
+  },
+});
+
 test(
-  "real stdio CLI negotiates 2025-11-25, lists tools, reads status, and exits cleanly",
-  { timeout: 20_000 },
+  "real stdio CLI serves 2026-07-28 discovery, lists tools, reads status, and exits cleanly",
+  // Two CLI process starts (probe sibling and session) are slow on Windows runners.
+  { timeout: 120_000 },
   async (context) => {
     const root = await tempRoot();
     const service = new ApexService(root, {
@@ -893,7 +983,7 @@ test(
     });
     await service.init({ projectId: "lifecycle", riskOwner: "partner" });
     const expected = await service.status();
-    const client = new Client({ name: "stdio-lifecycle-test", version: "1.0.0" });
+    const client = modernMcpClient("stdio-lifecycle-test");
     const transport = new StdioClientTransport({
       command: process.execPath,
       args: [fileURLToPath(new URL("../cli.js", import.meta.url)), "mcp", "serve"],
@@ -903,7 +993,6 @@ test(
     const exited = Promise.withResolvers<{ code: number | null; signal: NodeJS.Signals | null }>();
     let stdout = "";
     let stderr = "";
-    let negotiated: unknown;
     const errors: Error[] = [];
     const start = transport.start.bind(transport);
     context.mock.method(transport, "start", async () => {
@@ -918,9 +1007,6 @@ test(
     transport.stderr!.on("data", (chunk: Buffer) => {
       stderr += chunk.toString("utf8");
     });
-    transport.onmessage = (message) => {
-      if ("result" in message && "protocolVersion" in message.result) negotiated = message.result.protocolVersion;
-    };
     client.onerror = (error) => {
       errors.push(error);
     };
@@ -928,9 +1014,13 @@ test(
       await client.close();
       await transport.close();
     });
-    await client.connect(transport, { timeout: 5_000, signal: context.signal });
-    assert.ok(SUPPORTED_PROTOCOL_VERSIONS.includes("2025-11-25"));
-    assert.equal(negotiated, "2025-11-25");
+    // The base stdio transport probes server/discover on a disposable sibling process, then starts this session.
+    await client.connect(transport, { timeout: 60_000, signal: context.signal });
+    assert.equal(client.getNegotiatedProtocolVersion(), MCP_PROTOCOL_VERSION);
+    const discovered = client.getDiscoverResult();
+    assert.ok(discovered?.supportedVersions.includes(MCP_PROTOCOL_VERSION), JSON.stringify(discovered));
+    assert.equal(discovered?.instructions, MCP_SERVER_INSTRUCTIONS);
+    assert.equal(client.getInstructions(), MCP_SERVER_INSTRUCTIONS);
     assert.equal(client.getServerVersion()?.name, "apex");
     const { tools } = await client.listTools();
     assert.equal(tools.length, Object.keys(MCP_OUTPUT_SCHEMAS).length);
@@ -942,8 +1032,102 @@ test(
     assert.equal(transport.pid, null);
     assert.deepEqual(errors, [], stderr);
     const lines = stdout.trimEnd().split("\n");
-    assert.equal(lines.length, 3, stdout);
-    for (const line of lines) JSONRPCMessageSchema.parse(JSON.parse(line));
+    assert.equal(lines.length, 2, stdout);
+    for (const line of lines) assert.ok(isJSONRPCResultResponse(JSON.parse(line)), line);
+  },
+);
+
+test(
+  "real stdio CLI answers a Copilot-style discover then 2025-11-25 initialize fallback on one connection",
+  { timeout: 120_000 },
+  async () => {
+    const root = await tempRoot();
+    const child = spawnMcpServe(root);
+    const exited = once(child, "exit");
+    let stderr = "";
+    child.stderr.on("data", (chunk: Buffer) => {
+      stderr += chunk.toString("utf8");
+    });
+    const next = stdoutMessages(child);
+    const send = (message: Record<string, unknown>) =>
+      child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", ...message })}\n`);
+    send({ id: 1, method: "server/discover", params: modernEnvelope("copilot-fallback-test") });
+    const discovered = await next();
+    assert.equal(discovered.id, 1);
+    const discoverResult = discovered.result as { supportedVersions: string[]; instructions?: string };
+    assert.ok(discoverResult.supportedVersions.includes(MCP_PROTOCOL_VERSION), JSON.stringify(discovered));
+    assert.equal(discoverResult.instructions, MCP_SERVER_INSTRUCTIONS);
+    send({
+      id: 2,
+      method: "initialize",
+      params: {
+        protocolVersion: "2025-11-25",
+        capabilities: {},
+        clientInfo: { name: "copilot-fallback-test", version: "1.0.0" },
+      },
+    });
+    const initialized = await next();
+    assert.equal(initialized.id, 2);
+    assert.equal(initialized.error, undefined, JSON.stringify(initialized));
+    const initializeResult = initialized.result as {
+      protocolVersion: string;
+      serverInfo: { name: string };
+      instructions?: string;
+    };
+    assert.equal(initializeResult.protocolVersion, "2025-11-25");
+    assert.equal(initializeResult.serverInfo.name, "apex");
+    assert.equal(initializeResult.instructions, MCP_SERVER_INSTRUCTIONS);
+    send({ method: "notifications/initialized" });
+    send({ id: 3, method: "tools/list" });
+    const listed = await next();
+    assert.equal(listed.id, 3);
+    assert.equal((listed.result as { tools: unknown[] }).tools.length, Object.keys(MCP_OUTPUT_SCHEMAS).length);
+    child.stdin.end();
+    assert.deepEqual(await exited, [0, null], stderr);
+  },
+);
+
+test("serveMcp answers discovery over its streams and resolves on stdin EOF", async () => {
+  const stdin = new PassThrough();
+  const stdout = new PassThrough();
+  const served = serveMcp(new ApexService(await tempRoot()), { stdin, stdout });
+  const lines = createInterface({ input: stdout })[Symbol.asyncIterator]();
+  stdin.write(
+    `${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "server/discover", params: modernEnvelope("streams-test") })}\n`,
+  );
+  const discovered = JSON.parse((await lines.next()).value as string) as {
+    id: number;
+    result: { instructions: string };
+  };
+  assert.equal(discovered.id, 1);
+  assert.equal(discovered.result.instructions, MCP_SERVER_INSTRUCTIONS);
+  stdin.end();
+  await served;
+});
+
+test("serveMcp rejects with the stdin error after closing the connection", async () => {
+  const stdin = new PassThrough();
+  const stdout = new PassThrough();
+  const served = serveMcp(new ApexService(await tempRoot()), { stdin, stdout });
+  stdin.emit("error", new Error("stdin failed"));
+  await assert.rejects(served, /stdin failed/u);
+  assert.equal(stdin.listenerCount("error"), 0);
+});
+
+test(
+  "real stdio CLI closes cleanly on SIGTERM",
+  { timeout: 60_000, skip: process.platform === "win32" ? "POSIX signals only" : false },
+  async () => {
+    const root = await tempRoot();
+    const child = spawnMcpServe(root);
+    const exited = once(child, "exit");
+    const next = stdoutMessages(child);
+    child.stdin.write(
+      `${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "server/discover", params: modernEnvelope("signal-test") })}\n`,
+    );
+    assert.equal((await next()).id, 1);
+    child.kill("SIGTERM");
+    assert.deepEqual(await exited, [0, null]);
   },
 );
 
@@ -1043,15 +1227,8 @@ test("MCP workspace resolution shares APEX state across git worktrees and enforc
     },
   };
   await serviceFor(main).init({ projectId: "demo", riskOwner: "partner" });
-  const server = createMcpServer(resolver);
-  const client = new Client({ name: "worktree-test", version: "1.0.0" });
-  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-  context.after(async () => {
-    await client.close();
-    await server.close();
-  });
-  await server.connect(serverTransport);
-  await client.connect(clientTransport);
+  const { client, close } = await connectMcp(resolver, { name: "worktree-test" });
+  context.after(close);
 
   const worktreeStatus = assertSuccess(
     "status",

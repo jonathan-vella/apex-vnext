@@ -1,8 +1,9 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { Server, type CallToolResult, type Tool } from "@modelcontextprotocol/server";
+import { serveStdio, StdioServerTransport, type StdioServerHandle } from "@modelcontextprotocol/server/stdio";
 import { z } from "zod";
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { lstatSync } from "node:fs";
+import type { Readable, Writable } from "node:stream";
 import { realpath } from "node:fs/promises";
 import { isAbsolute, resolve } from "node:path";
 import { ApexService, SUPPORTED_ARTIFACT_KINDS } from "./service.js";
@@ -11,7 +12,6 @@ import { ApexError, EXIT_CODES, normalizeError, remediationForApexError, type Ap
 import { SECRET_VALUE_PATTERN } from "@apexops/contracts";
 import { MCP_OUTPUT_SCHEMAS } from "./mcp-output-schemas.js";
 import { TARGET_SCOPE_HINT, TARGET_SCOPE_PATTERN } from "./target-scope.js";
-import { ListToolsRequestSchema, type Tool } from "@modelcontextprotocol/sdk/types.js";
 import { resolveMcpWorkspace } from "./workspace-root.js";
 
 const errorMessages: Record<ApexErrorCode, string> = {
@@ -478,10 +478,25 @@ const normalizeOutputs = (outputs: z.infer<typeof taskOutput>[]) =>
     ...(summary === undefined ? {} : { summary }),
   }));
 
-export function createMcpServer(
+type ToolExtra = { signal: AbortSignal };
+type ToolResult = { content: Array<{ type: "text"; text: string }>; structuredContent: Record<string, unknown> };
+type ToolCallResult = ToolResult & { isError?: true };
+type ToolConfig = { description?: string };
+type ToolEntry = { definition: Tool; call(args: unknown, signal: AbortSignal): Promise<ToolCallResult> };
+
+export interface McpServerOptions {
+  queueTimeoutMs?: number;
+}
+
+/**
+ * Builds the APEX MCP tool table and shared call state once, and returns a cheap, side-effect-free factory for
+ * low-level SDK `Server` instances. Every instance from one factory shares the service resolver, single-slot queue,
+ * rate limit, and cursor secret, so per-connection (stdio) and per-request (HTTP) instances behave as one server.
+ */
+export function createMcpServerFactory(
   serviceOrResolver: ApexService | McpServiceResolver,
-  options: { queueTimeoutMs?: number } = {},
-): McpServer {
+  options: McpServerOptions = {},
+): () => Server {
   const services = serviceResolver(serviceOrResolver);
   let activeService = services.defaultService;
   const service: ApexService = new Proxy(services.defaultService, {
@@ -494,10 +509,9 @@ export function createMcpServer(
   const queueTimeoutMs = options.queueTimeoutMs ?? 30_000;
   if (!Number.isSafeInteger(queueTimeoutMs) || queueTimeoutMs < 1 || queueTimeoutMs > 30_000)
     throw new Error("Invalid MCP queue timeout");
-  const server = new McpServer({ name: "apex", version: APEX_VERSION }, { instructions: MCP_SERVER_INSTRUCTIONS });
-  // Cursors are only valid for the server instance that issued them; a restart invalidates every outstanding cursor.
+  // Cursors are only valid for the server process that issued them; a restart invalidates every outstanding cursor.
   const cursorSecret = randomBytes(32);
-  const result = (value: unknown) => {
+  const result = (value: unknown): ToolResult => {
     if (value === null || typeof value !== "object" || Array.isArray(value))
       throw new Error("MCP success results require an object envelope");
     return {
@@ -505,7 +519,7 @@ export function createMcpServer(
       structuredContent: value as Record<string, unknown>,
     };
   };
-  const registerTool = server.registerTool.bind(server);
+  const tools = new Map<string, ToolEntry>();
   const toolDefinitions: Tool[] = [];
   let active = false;
   const waiting: Array<{ start: () => void }> = [];
@@ -547,7 +561,23 @@ export function createMcpServer(
   };
   let rateWindowStart = Date.now();
   let rateCount = 0;
-  server.registerTool = (name, config, callback) => {
+  function registerTool<Schema extends z.ZodType<Record<string, unknown>>>(
+    name: string,
+    config: ToolConfig & { inputSchema: Schema },
+    callback: (input: z.output<Schema>, extra: ToolExtra) => Promise<ToolResult>,
+  ): void;
+  function registerTool<Shape extends z.ZodRawShape>(
+    name: string,
+    config: ToolConfig & { inputSchema: Shape },
+    callback: (input: z.output<z.ZodObject<Shape>>, extra: ToolExtra) => Promise<ToolResult>,
+  ): void;
+  function registerTool(name: string, config: ToolConfig, callback: (extra: ToolExtra) => Promise<ToolResult>): void;
+  function registerTool(
+    name: string,
+    config: ToolConfig & { inputSchema?: z.ZodObject | z.ZodRawShape },
+    callback: (...args: never[]) => Promise<ToolResult>,
+  ): void {
+    if (tools.has(name)) throw new Error(`Duplicate MCP tool ${name}`);
     const outputSchema = MCP_OUTPUT_SCHEMAS[name as keyof typeof MCP_OUTPUT_SCHEMAS];
     if (outputSchema === undefined) throw new Error(`Missing output schema for ${name}`);
     const originalInputSchema =
@@ -560,10 +590,10 @@ export function createMcpServer(
       .extend({ workspace: workspaceInput })
       .strict()
       .meta(originalInputSchema.meta() ?? {});
-    const guarded = async (...args: Parameters<typeof callback>) => {
-      const extra = args.at(-1) as { signal?: AbortSignal };
+    const guarded = async (args: unknown, signal: AbortSignal): Promise<ToolCallResult> => {
+      const extra: ToolExtra = { signal };
       const checkCancelled = () => {
-        if (extra.signal?.aborted) throw new ApexError("APEX_CONFLICT", "Cancelled", EXIT_CODES.conflict);
+        if (signal.aborted) throw new ApexError("APEX_CONFLICT", "Cancelled", EXIT_CODES.conflict);
       };
       let releaseSlot: (() => void) | undefined;
       let serviceValidation: string | undefined;
@@ -574,8 +604,8 @@ export function createMcpServer(
           rateCount = 0;
         }
         if (++rateCount > 240) throw new ApexError("APEX_CONFLICT", "Call rate exceeded", EXIT_CODES.conflict);
-        assertBoundedInput(args[0]);
-        const input = inputSchema.safeParse(args[0]);
+        assertBoundedInput(args);
+        const input = inputSchema.safeParse(args);
         if (!input.success) {
           const issues = validationIssues(
             input.error.issues.map(({ path, message }) => ({ path: `/${path.map(String).join("/")}`, message })),
@@ -585,13 +615,13 @@ export function createMcpServer(
           if (!SECRET_VALUE_PATTERN.test(reason)) serviceValidation = reason;
           throw new ApexError("APEX_VALIDATION", "Invalid tool arguments", EXIT_CODES.validation);
         }
-        releaseSlot = await acquire(extra.signal);
+        releaseSlot = await acquire(signal);
         checkCancelled();
         const { workspace, ...toolInput } = input.data as { workspace: string } & Record<string, unknown>;
         const resolved = await services.resolve(workspace);
         resolved.service.setWorkspacePath?.(resolved.workspace);
         activeService = resolved.service;
-        let response: Awaited<ReturnType<typeof callback>>;
+        let response: ToolResult;
         try {
           response = await Reflect.apply(
             callback,
@@ -654,43 +684,39 @@ export function createMcpServer(
       }
     };
     const inputJson = z.toJSONSchema(inputSchema, { target: "draft-7", io: "input" });
-    const wireInput = z.object({}).passthrough().default({});
     const annotations = {
       readOnlyHint: readOnlyTools.has(name),
       destructiveHint: !readOnlyTools.has(name),
       idempotentHint: readOnlyTools.has(name),
       openWorldHint: externalTools.has(name),
     };
-    toolDefinitions.push({
+    const definition: Tool = {
       name,
       ...(config.description === undefined ? {} : { description: config.description }),
       inputSchema: inputJson as Tool["inputSchema"],
       outputSchema: z.toJSONSchema(outputSchema, { target: "draft-7" }) as NonNullable<Tool["outputSchema"]>,
       annotations,
-    });
-    return Reflect.apply(registerTool, server, [
-      name,
-      { ...config, inputSchema: wireInput, outputSchema, annotations },
-      guarded,
-    ]);
-  };
-  server.registerTool("status", { description: "Read selected APEX run status" }, async () =>
+    };
+    toolDefinitions.push(definition);
+    tools.set(name, { definition, call: guarded });
+  }
+  registerTool("status", { description: "Read selected APEX run status" }, async () =>
     result(await service.workspaceStatus()),
   );
-  server.registerTool(
+  registerTool(
     "releaseWriter",
     { description: "Release this workspace's writer lease for the selected run." },
     async () => result(await service.releaseWriter()),
   );
-  server.registerTool("capabilityList", { description: "Read capability pack availability" }, async () =>
+  registerTool("capabilityList", { description: "Read capability pack availability" }, async () =>
     result({ packs: await service.capabilityList() }),
   );
-  server.registerTool(
+  registerTool(
     "capabilityStatus",
     { description: "Read one capability pack status", inputSchema: { pack: z.string() } },
     async ({ pack }) => result(await service.capabilityStatus(pack)),
   );
-  server.registerTool(
+  registerTool(
     "nextTask",
     {
       description:
@@ -698,7 +724,7 @@ export function createMcpServer(
     },
     async () => result(await service.nextTask()),
   );
-  server.registerTool(
+  registerTool(
     "taskContext",
     {
       description: "Read context only for the exact task.taskId returned by nextTask with status=task.",
@@ -706,7 +732,7 @@ export function createMcpServer(
     },
     async ({ taskId }) => result(await service.taskContext(taskId)),
   );
-  server.registerTool(
+  registerTool(
     "readTaskInput",
     {
       description:
@@ -728,16 +754,15 @@ export function createMcpServer(
     async ({ taskId, offset, limit, inputHash }) =>
       result(await service.readTaskInput(taskId, offset, limit, inputHash)),
   );
-  server.registerTool(
+  registerTool(
     "recordInput",
     {
       description: "Record answers for the exact pending kernel input request",
       inputSchema: inputSubmission,
-      outputSchema: z.object({ recorded: z.literal(true), requestId: z.string().min(1) }).strict(),
     },
     async (input) => result(await service.recordInput(input)),
   );
-  server.registerTool(
+  registerTool(
     "governanceImport",
     {
       description:
@@ -752,7 +777,7 @@ export function createMcpServer(
       );
     },
   );
-  server.registerTool(
+  registerTool(
     "governanceSelect",
     {
       description:
@@ -762,7 +787,7 @@ export function createMcpServer(
     async ({ path, reopen }) =>
       result(await service.selectGovernanceBaseline(path, ...(reopen === undefined ? [] : [{ reopen }]))),
   );
-  server.registerTool(
+  registerTool(
     "projectCreate",
     {
       description:
@@ -771,12 +796,12 @@ export function createMcpServer(
     },
     async (input) => result(await service.createProject(input as Parameters<typeof service.createProject>[0])),
   );
-  server.registerTool(
+  registerTool(
     "projectList",
     { description: "List projects in the current workspace", inputSchema: { cursor: cursorInput } },
     async () => result({ projects: await service.listProjects() }),
   );
-  server.registerTool(
+  registerTool(
     "projectUse",
     { description: "Select an existing project and optionally one of its runs", inputSchema: projectUseInput },
     async ({ projectId, runId }) =>
@@ -784,7 +809,7 @@ export function createMcpServer(
         await service.use(projectId as Parameters<typeof service.use>[0], runId as Parameters<typeof service.use>[1]),
       ),
   );
-  server.registerTool(
+  registerTool(
     "projectDelete",
     {
       description: "Delete a project and all of its run-bound state after explicit confirmation",
@@ -793,7 +818,7 @@ export function createMcpServer(
     async ({ projectId, confirm }) =>
       result(await service.deleteProject(projectId as Parameters<typeof service.deleteProject>[0], confirm)),
   );
-  server.registerTool(
+  registerTool(
     "gateDecide",
     {
       description:
@@ -802,7 +827,7 @@ export function createMcpServer(
     },
     async ({ gate, decision }) => result(await service.decideInteractiveGate(gate, decision)),
   );
-  server.registerTool(
+  registerTool(
     "reviewDecide",
     {
       description:
@@ -822,7 +847,7 @@ export function createMcpServer(
         ),
       ),
   );
-  server.registerTool(
+  registerTool(
     "stageArtifact",
     {
       description:
@@ -844,7 +869,7 @@ export function createMcpServer(
       );
     },
   );
-  server.registerTool(
+  registerTool(
     "stageFile",
     {
       description:
@@ -862,7 +887,7 @@ export function createMcpServer(
     async ({ taskId, path, content, expectedSha }) =>
       result(await service.stageFile(taskId, path, content, expectedSha)),
   );
-  server.registerTool(
+  registerTool(
     "generateIac",
     {
       description:
@@ -885,7 +910,7 @@ export function createMcpServer(
         }),
       ),
   );
-  server.registerTool(
+  registerTool(
     "validateTask",
     {
       description:
@@ -911,7 +936,7 @@ export function createMcpServer(
       );
     },
   );
-  server.registerTool(
+  registerTool(
     "completeTask",
     {
       description: "Complete a task atomically with a nonempty outputs[] bundle.",
@@ -922,7 +947,7 @@ export function createMcpServer(
     },
     async ({ taskId, outputs }) => result(await service.completeTaskOutputs(taskId, normalizeOutputs(outputs))),
   );
-  server.registerTool(
+  registerTool(
     "requirementsComplete",
     {
       description: "Complete the active Requirements task atomically.",
@@ -933,7 +958,7 @@ export function createMcpServer(
         await service.completeRequirements(taskId, requirements as Parameters<typeof service.completeRequirements>[1]),
       ),
   );
-  server.registerTool(
+  registerTool(
     "architectureComplete",
     {
       description:
@@ -957,7 +982,7 @@ export function createMcpServer(
         ),
       ),
   );
-  server.registerTool(
+  registerTool(
     "reviewComplete",
     {
       description:
@@ -970,7 +995,7 @@ export function createMcpServer(
     },
     async ({ taskId, findings, criteria }) => result(await service.completeReview(taskId, findings, criteria)),
   );
-  server.registerTool(
+  registerTool(
     "planComplete",
     {
       description:
@@ -987,17 +1012,17 @@ export function createMcpServer(
         ),
       ),
   );
-  server.registerTool(
+  registerTool(
     "preview",
     { description: "Read the current operator-created deployment preview", inputSchema: { cursor: cursorInput } },
     async () => result({ markdown: await service.currentPreview() }),
   );
-  server.registerTool(
+  registerTool(
     "reconcile",
     { description: "Run the kernel-authorized reconciliation operation for the selected run." },
     async () => result(await service.reconcile()),
   );
-  server.registerTool(
+  registerTool(
     "inventory",
     {
       description: "Run the bounded inventory operation for the selected run and return its evidence.",
@@ -1005,12 +1030,12 @@ export function createMcpServer(
     },
     async () => result(await service.inventory()),
   );
-  server.registerTool(
+  registerTool(
     "diagnose",
     { description: "Run bounded diagnosis for the selected run and return the kernel-recorded result." },
     async () => result(await service.diagnose()),
   );
-  server.registerTool(
+  registerTool(
     "improvementObserve",
     {
       description: "Submit one bounded redacted observation for the selected run",
@@ -1051,17 +1076,17 @@ export function createMcpServer(
         }),
       ),
   );
-  server.registerTool(
+  registerTool(
     "improvementObservations",
     { description: "Read bounded observations", inputSchema: { cursor: cursorInput } },
     async () => result({ observations: await service.improvementObservations() }),
   );
-  server.registerTool(
+  registerTool(
     "improvementProposals",
     { description: "Read inert improvement proposals", inputSchema: { cursor: cursorInput } },
     async () => result({ proposals: await service.improvementProposals() }),
   );
-  server.registerTool(
+  registerTool(
     "render",
     {
       description:
@@ -1081,11 +1106,10 @@ export function createMcpServer(
         ]),
         cursor: cursorInput,
       },
-      outputSchema: z.object({ markdown: z.string() }).strict(),
     },
     async ({ kind }) => result({ markdown: await service.render(kind) }),
   );
-  server.registerTool(
+  registerTool(
     "promote",
     {
       description:
@@ -1094,7 +1118,7 @@ export function createMcpServer(
     },
     async ({ environment, target }) => result(await service.promote(environment, target)),
   );
-  server.registerTool(
+  registerTool(
     "doctor",
     {
       description:
@@ -1103,7 +1127,7 @@ export function createMcpServer(
     },
     async ({ fix, yes }) => result(await service.doctor(fix, yes)),
   );
-  server.registerTool(
+  registerTool(
     "submitEvidence",
     {
       description:
@@ -1122,34 +1146,91 @@ export function createMcpServer(
       );
     },
   );
-  server.server.setRequestHandler(ListToolsRequestSchema, () => ({ tools: toolDefinitions }));
-  return server;
+  // Unknown tool names keep the v1-era externally visible shape (an isError tool result, not a JSON-RPC error), now
+  // as the standard APEX error envelope so clients parse one error contract.
+  const unknownTool = (name: unknown): ToolCallResult => {
+    const label = typeof name === "string" && /^[A-Za-z][A-Za-z0-9_-]{0,63}$/u.test(name) ? ` ${name}` : "";
+    const error = new ApexError(
+      "APEX_USAGE",
+      `Unknown tool${label}; call tools/list for available tools`,
+      EXIT_CODES.usage,
+    );
+    return {
+      ...result({ error: { code: error.code, message: error.message, remediation: remediationForApexError(error) } }),
+      isError: true,
+    };
+  };
+  return () => {
+    const server = new Server(
+      { name: "apex", version: APEX_VERSION },
+      { capabilities: { tools: {} }, instructions: MCP_SERVER_INSTRUCTIONS },
+    );
+    server.setRequestHandler("tools/list", () => ({ tools: toolDefinitions }));
+    server.setRequestHandler("tools/call", async (request, ctx) => {
+      const tool = tools.get(request.params.name);
+      if (tool === undefined) return unknownTool(request.params.name);
+      const response = await tool.call(request.params.arguments ?? {}, ctx.mcpReq.signal);
+      return server.projectCallToolResult(response as CallToolResult, tool.definition.outputSchema);
+    });
+    return server;
+  };
 }
 
-export async function serveMcp(serviceOrResolver: ApexService | McpServiceResolver): Promise<void> {
-  const server = createMcpServer(serviceOrResolver);
-  await server.connect(new StdioServerTransport());
+export function createMcpServer(
+  serviceOrResolver: ApexService | McpServiceResolver,
+  options: McpServerOptions = {},
+): Server {
+  return createMcpServerFactory(serviceOrResolver, options)();
+}
+
+/**
+ * Serves APEX over stdio until the connection ends (stdin EOF), the transport fails, or SIGINT/SIGTERM arrives.
+ * `serveStdio` answers `server/discover` for protocol 2026-07-28 and, with `legacy: "serve"`, still serves a 2025-era
+ * `initialize` (including the discover-then-initialize fallback) from the same factory. Stdout stays protocol-only.
+ * A stdin error closes the connection and rejects. `streams` defaults to the process stdio.
+ */
+export async function serveMcp(
+  serviceOrResolver: ApexService | McpServiceResolver,
+  streams: { stdin?: Readable; stdout?: Writable } = {},
+): Promise<void> {
+  const factory = createMcpServerFactory(serviceOrResolver);
+  const stdin = streams.stdin ?? process.stdin;
+  const stdout = streams.stdout ?? process.stdout;
   await new Promise<void>((resolve, reject) => {
     let settled = false;
+    let failure: Error | undefined;
+    let handle: StdioServerHandle | undefined;
+    const signals = ["SIGINT", "SIGTERM"] as const;
     const cleanup = () => {
-      process.stdin.off("end", close);
-      process.stdin.off("close", close);
-      process.stdin.off("error", fail);
+      stdin.off("error", fail);
+      for (const signal of signals) process.off(signal, shutdown);
     };
-    const finish = (action: () => Promise<void>) => {
+    // Every exit path funnels through the transport closing; a recorded stream failure keeps the promise rejecting.
+    const finish = () => {
       if (settled) return;
       settled = true;
       cleanup();
-      action().then(resolve, reject);
+      if (failure === undefined) resolve();
+      else reject(failure);
     };
-    const close = () => finish(() => server.close());
-    const fail = (error: Error) =>
-      finish(async () => {
-        await server.close();
-        throw error;
+    const shutdown = () => {
+      void (handle?.close() ?? Promise.resolve()).then(finish, (error: unknown) => {
+        failure ??= error instanceof Error ? error : new Error(String(error));
+        finish();
       });
-    process.stdin.once("end", close);
-    process.stdin.once("close", close);
-    process.stdin.once("error", fail);
+    };
+    function fail(error: Error) {
+      failure ??= error;
+      shutdown();
+    }
+    class ApexStdioTransport extends StdioServerTransport {
+      override async close(): Promise<void> {
+        await super.close();
+        finish();
+      }
+    }
+    stdin.once("error", fail);
+    for (const signal of signals) process.once(signal, shutdown);
+    handle = serveStdio(factory, { legacy: "serve", transport: new ApexStdioTransport(stdin, stdout) });
   });
 }

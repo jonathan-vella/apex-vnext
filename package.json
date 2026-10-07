@@ -188,7 +188,6 @@
   "author": "Jonathan Vella",
   "license": "MIT",
   "overrides": {
-    "@hono/node-server": "2.1.1",
     "brace-expansion": "5.0.12",
     "encoding-sniffer": "1.0.2",
     "fast-uri": "4.1.3",

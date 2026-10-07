@@ -3,8 +3,6 @@ import { mkdir, readFile, readdir, rename, rm, stat, symlink, writeFile } from "
 import { platform } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type {
   DeploymentPreviewV1,
   ExecutionPlanAttestationV1,
@@ -37,7 +35,7 @@ import type { IacProvider, PreviewRequest } from "@apexops/capabilities";
 import { EventJournal, ObjectStore, RunRepository, ValidatorRegistry, sha256Bytes, sha256Json } from "@apexops/kernel";
 import { ApexError } from "../errors.js";
 import { dependencyRevision } from "../dependency-revision.js";
-import { createMcpServer } from "../mcp.js";
+import { connectMcp } from "./mcp-client.js";
 import { MCP_OUTPUT_SCHEMAS } from "../mcp-output-schemas.js";
 import { ApexService, type TaskOutput } from "../service.js";
 import { registerWorkflowValidators } from "../workflow-validators.js";
@@ -1076,11 +1074,7 @@ test("native validation receipts are source-bound, runtime-owned and distinguish
       /Native validation requires executed evidence for every required validator/,
     );
     assert.equal(await journal.head(), head);
-    const server = createMcpServer(service);
-    const client = new Client({ name: "validation-evidence-test", version: "1.0.0" });
-    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-    await server.connect(serverTransport);
-    await client.connect(clientTransport);
+    const { client, close } = await connectMcp(service, { name: "validation-evidence-test" });
     try {
       const response = await client.callTool({
         name: "validateTask",
@@ -1092,8 +1086,7 @@ test("native validation receipts are source-bound, runtime-owned and distinguish
       assert.deepEqual(result.execution, checked.execution);
       assert.equal(await journal.head(), head);
     } finally {
-      await client.close();
-      await server.close();
+      await close();
     }
     const submittedOutputs: TaskOutput[] = [{ kind: "validation-evidence", value: submitted }];
     Object.freeze(submittedOutputs);
@@ -3312,11 +3305,7 @@ test("MCP completeTask accepts an output bundle", async () => {
   const issued = await nextTaskAfterInput(service);
   assert.equal(issued.status, "task");
   if (issued.status !== "task") return;
-  const server = createMcpServer(service);
-  const client = new Client({ name: "test", version: "1.0.0" });
-  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-  await server.connect(serverTransport);
-  await client.connect(clientTransport);
+  const { client, close } = await connectMcp(service, { name: "test" });
   const response = await client.callTool({
     name: "completeTask",
     arguments: {
@@ -3326,8 +3315,7 @@ test("MCP completeTask accepts an output bundle", async () => {
     },
   });
   assert.equal(response.isError, undefined);
-  await client.close();
-  await server.close();
+  await close();
 });
 
 test("Architecture decision records reject duplicate IDs and foreign requirement links", () => {
