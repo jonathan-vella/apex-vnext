@@ -67,6 +67,19 @@ test("plugin build is byte reproducible with fixed mtimes", async (context) => {
   );
 });
 
+test("plugin build replaces only an empty folder or a previous build", async (context) => {
+  const parent = await temporaryDirectory(context, "guard");
+  const unrelated = join(parent, "unrelated");
+  await mkdir(unrelated);
+  await writeFile(join(unrelated, "keep.txt"), "keep\n");
+  await assert.rejects(build({ manifestPath, outputDirectory: unrelated }), /not a previous plugin build/u);
+  assert.equal(await readFile(join(unrelated, "keep.txt"), "utf8"), "keep\n");
+  const outputDirectory = join(parent, "plugin");
+  const first = await build({ manifestPath, outputDirectory });
+  const second = await build({ manifestPath, outputDirectory });
+  assert.equal(second.sha256, first.sha256);
+});
+
 test("plugin layout, manifests, agents, skills and bundle are valid", async (context) => {
   const { outputDirectory, files, bundle } = await buildInto(context, "layout");
   const manifest = await readManifest();
@@ -134,12 +147,25 @@ test("plugin validators reject drift from the Agent Plugins 1.0 and APEX contrac
   assert.throws(() => validatePluginJson({ ...plugin, agents: "agents/" }), /unsupported fields: agents/u);
   assert.throws(() => validatePluginJson({ ...plugin, name: "APEX" }), /name constraints/u);
   assert.throws(() => validatePluginJson({ ...plugin, $schema: undefined }), /\$schema/u);
+  assert.throws(() => validatePluginJson({ ...plugin, extensions: null }), /extensions/u);
+  assert.throws(() => validatePluginJson({ ...plugin, extensions: [{}] }), /extensions/u);
+  validatePluginJson({ ...plugin, extensions: { "com.github.copilot": {} } });
   const server = (overrides) => ({ ...mcp, mcpServers: { apex: { ...mcp.mcpServers.apex, ...overrides } } });
   assert.throws(() => validateMcpJson(server({ command: "npx" }), manifest), /must run node/u);
   assert.throws(() => validateMcpJson(server({ args: ["./mcp/apex.mjs"] }), manifest), /must run node/u);
   assert.throws(() => validateMcpJson(server({ env: { PLUGIN_ROOT: "x" } }), manifest), /PLUGIN_ROOT/u);
   assert.throws(() => validateMcpJson(server({ tools: ["status"] }), manifest), /unsupported fields: tools/u);
   assert.throws(() => validateMcpJson({ ...mcp, servers: {} }, manifest), /unsupported fields: servers/u);
+  assert.throws(() => validateMcpJson(server({ cwd: ["./data"] }), manifest), /cwd/u);
+  const remote = (entry) => ({ ...mcp, mcpServers: { ...mcp.mcpServers, remote: entry } });
+  assert.throws(() => validateMcpJson(remote({ type: "http", url: "https://example.test" }), manifest), /type http/u);
+  assert.throws(() => validateMcpJson(remote({ type: "sse", url: 123 }), manifest), /url/u);
+  assert.throws(
+    () =>
+      validateMcpJson(remote({ type: "streamable-http", url: "https://example.test", headers: { a: 1 } }), manifest),
+    /headers/u,
+  );
+  validateMcpJson(remote({ type: "streamable-http", url: "https://example.test", headers: { a: "b" } }), manifest);
   assert.throws(
     () => validatePackageManifest({ ...manifest, assets: { ...manifest.assets, targetRoot: "apex-assets" } }),
     /must ship at assets/u,

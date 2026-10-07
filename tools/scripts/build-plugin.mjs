@@ -272,7 +272,10 @@ function validatePluginJson(plugin) {
   ) {
     throw new Error("plugin.json keywords must be an array of strings");
   }
-  if (plugin.extensions !== undefined && !Object.values(plugin.extensions ?? {}).every(isPlainObject)) {
+  if (
+    plugin.extensions !== undefined &&
+    (!isPlainObject(plugin.extensions) || !Object.values(plugin.extensions).every(isPlainObject))
+  ) {
     throw new Error("plugin.json extensions must map namespaces to objects");
   }
 }
@@ -297,12 +300,21 @@ function validateMcpJson(mcp, manifest) {
       }
       if (
         server.cwd !== undefined &&
-        !/^(?:\.\/|\$\{PLUGIN_ROOT\}(?:\/|$)|\$\{PLUGIN_DATA\}(?:\/|$))/u.test(String(server.cwd))
+        (typeof server.cwd !== "string" ||
+          !/^(?:\.\/|\$\{PLUGIN_ROOT\}(?:\/|$)|\$\{PLUGIN_DATA\}(?:\/|$))/u.test(server.cwd))
       ) {
         throw new Error(`mcp.json server ${name} cwd must be plugin-relative or rooted in a plugin variable`);
       }
     } else if (server.type === "streamable-http" || server.type === "sse") {
       assertKeys(`mcp.json server ${name}`, server, ["type", "url", "headers"], ["type", "url"]);
+      if (typeof server.url !== "string" || server.url.length === 0)
+        throw new Error(`mcp.json server ${name} url must be a non-empty string`);
+      if (
+        server.headers !== undefined &&
+        (!isPlainObject(server.headers) || !Object.values(server.headers).every((value) => typeof value === "string"))
+      ) {
+        throw new Error(`mcp.json server ${name} headers must map names to strings`);
+      }
     } else {
       throw new Error(`mcp.json server ${name} has unsupported type ${String(server.type)}`);
     }
@@ -422,6 +434,32 @@ async function bundleServer(manifest, outputRoot) {
   };
 }
 
+/**
+ * Deletes the output only when it is missing, empty or a previous build (plugin.json plus the .sha256 sidecar), so a
+ * mistaken --output-dir cannot remove an unrelated directory.
+ */
+async function clearOutputDirectory(outputDirectory) {
+  const info = await lstat(outputDirectory).catch((error) => {
+    if (error.code === "ENOENT") return undefined;
+    throw error;
+  });
+  if (info !== undefined) {
+    if (!info.isDirectory() || info.isSymbolicLink())
+      throw new Error(`Plugin output path is not a directory: ${outputDirectory}`);
+    const entries = await readdir(outputDirectory);
+    const previousBuild =
+      entries.includes("plugin.json") &&
+      (await lstat(`${outputDirectory}.sha256`).then(
+        (sidecar) => sidecar.isFile(),
+        () => false,
+      ));
+    if (entries.length > 0 && !previousBuild)
+      throw new Error(`Refusing to replace a directory that is not a previous plugin build: ${outputDirectory}`);
+    await rm(outputDirectory, { recursive: true, force: true });
+  }
+  await mkdir(outputDirectory, { recursive: true });
+}
+
 async function setDirectoryTimes(root) {
   for (const entry of await sortedDirectoryEntries(root)) {
     if (entry.isDirectory()) await setDirectoryTimes(join(root, entry.name));
@@ -455,11 +493,12 @@ async function build(
   { manifestPath, outputDirectory: outputDirectoryOverride } = parseArguments(process.argv.slice(2)),
 ) {
   const { manifest, outputDirectory } = await readManifest(manifestPath, outputDirectoryOverride);
-  await rm(outputDirectory, { recursive: true, force: true });
-  await mkdir(outputDirectory, { recursive: true });
+  await clearOutputDirectory(outputDirectory);
 
   const plugin = await readJson(join(repositoryRoot, manifest.plugin.source));
   const { version } = await readJson(join(repositoryRoot, manifest.plugin.versionFrom));
+  if (Object.hasOwn(plugin, "version"))
+    throw new Error(`${manifest.plugin.source} must not set version; it comes from ${manifest.plugin.versionFrom}`);
   const { $schema, name, ...rest } = plugin;
   const packagedPlugin = { $schema, name, version, ...rest };
   validatePluginJson(packagedPlugin);
