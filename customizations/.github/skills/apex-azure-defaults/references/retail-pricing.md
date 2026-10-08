@@ -71,7 +71,8 @@ never a wildcard. Fail the line when several plausible rows remain and no explic
 | `1/Month` | `price * quantity` |
 | `1 GB/Month` | `price * GB stored * quantity` |
 | `1 GB` | `price * GB transferred * quantity` |
-| `10K` or `1M` operations | `price * operations / unit size * quantity` |
+| `10K` operations | `price * (operations / 10000) * quantity` |
+| `1M` operations | `price * (operations / 1000000) * quantity` |
 
 Variable meters need explicit usage from requirements or telemetry; absent usage is unresolved, not zero. Apply tiered
 rates band by band in `tierMinimumUnits` order. A zero line is valid only for a returned zero-price meter or a service
