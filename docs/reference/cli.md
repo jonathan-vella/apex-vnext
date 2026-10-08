@@ -219,8 +219,9 @@ provide their named bounded operations.
 
 State-changing commands hold the workspace lock that repeat-guarded MCP tools hold, so a command never lands inside a
 tool call that is checking for a repeat (see [Repeat Safety](mcp.md#repeat-safety)). A command that waits more than 30
-seconds for an in-progress tool call or another command exits with `APEX_CONFLICT`. Read-only commands, such as
-`status`, `project list`, `task context` and `writer show`, and `mcp serve` itself do not take the lock.
+seconds for an in-progress tool call or another command exits with `APEX_CONFLICT`. Reads that can finish a pending
+run or customization recovery take the lock too. Only `status`, `project list`, `version` and `mcp serve` itself do
+not.
 
 ## Exit Codes
 

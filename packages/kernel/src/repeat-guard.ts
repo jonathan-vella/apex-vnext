@@ -80,8 +80,9 @@ export interface RepeatSafeHooks<T> {
   /** Optional instant after which the original result must not be returned, such as a task expiry. */
   validUntil?(value: T): string | undefined;
   /**
-   * Optional check after execution that the call identity still describes what executed, for example that a file
-   * bound by content was not modified meanwhile. When it resolves false the result is returned but not stored.
+   * Optional check that the call identity still holds, for example that a file bound by content was not modified since
+   * the identity was taken. Before a replay, false makes the call execute instead; after execution, false returns the
+   * result without storing it.
    */
   identityStable?(): Promise<boolean>;
 }
@@ -365,7 +366,12 @@ async function guardedCall<T extends object>(
         Date.parse(candidate.expiresAt) > now.getTime(),
     );
     const original = record === undefined ? undefined : replayable(record);
-    if (record !== undefined && original !== undefined) {
+    // A bound file that changed since the call identity was taken makes the stored result stale; execute instead.
+    if (
+      record !== undefined &&
+      original !== undefined &&
+      (hooks.identityStable === undefined || (await hooks.identityStable()))
+    ) {
       await hooks.assertReplayAllowed(before);
       await appendRepeatEvent(before, record, call, fingerprint, now, idSource);
       return { value: original as T, repeated: true, fingerprint };

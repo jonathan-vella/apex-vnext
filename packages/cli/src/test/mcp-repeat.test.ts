@@ -486,20 +486,24 @@ test("the first projectCreate in a workspace without a project is answered as a 
 test("state-changing CLI commands share the workspace lock that guarded calls hold", async () => {
   const { service } = await initializedWorkspace();
   const lockDirectory = join(service.root, ".apex", "local");
-  let settled = false;
-  let command: Promise<unknown> | undefined;
+  const settled = new Set<string>();
+  const commands: Promise<unknown>[] = [];
   let status: unknown;
   await withRepeatGuardLock(lockDirectory, async () => {
-    command = execute(["project", "use", "--project", "demo"], service.root).finally(() => {
-      settled = true;
-    });
-    // Read-only commands do not take the lock.
+    // A state-changing command, and a read that may finish a pending recovery, both wait for the lock.
+    for (const argv of [
+      ["project", "use", "--project", "demo"],
+      ["project", "history"],
+    ]) {
+      commands.push(execute(argv, service.root).finally(() => settled.add(argv.join(" "))));
+    }
+    // Commands that never write do not take the lock.
     status = await execute(["status"], service.root);
     await new Promise((done) => setTimeout(done, 100));
-    assert.equal(settled, false);
+    assert.deepEqual([...settled], []);
   });
-  await command;
-  assert.equal(settled, true);
+  await Promise.all(commands);
+  assert.deepEqual([...settled].sort(), ["project history", "project use --project demo"]);
   assert.equal((status as { run: { projectId: string } }).run.projectId, "demo");
 });
 

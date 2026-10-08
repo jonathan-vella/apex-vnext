@@ -464,27 +464,11 @@ export async function execute(argv: string[], root = process.cwd(), options: Ser
   return service.withWorkspaceWriteLock(() => dispatch(service, command, flags, root, options));
 }
 
-/** Long-lived or read-only commands that never write workspace state, so they do not take the workspace lock. */
-const UNSERIALIZED_COMMANDS = new Set([
-  "mcp serve",
-  "version",
-  "capability list",
-  "capability status",
-  "project list",
-  "project show",
-  "project search",
-  "project history",
-  "archetype list",
-  "archetype inspect",
-  "status",
-  "task context",
-  "approval show",
-  "writer show",
-  "cache status",
-  "quality status",
-  "quality observations",
-  "quality proposals",
-]);
+/**
+ * Commands that never write workspace state, not even by finishing a pending recovery, so they do not take the
+ * workspace lock: the long-lived MCP server and the reads that mirror the `read-only` MCP tools.
+ */
+const UNSERIALIZED_COMMANDS = new Set(["mcp serve", "version", "status", "project list"]);
 
 async function dispatch(
   service: ApexService,

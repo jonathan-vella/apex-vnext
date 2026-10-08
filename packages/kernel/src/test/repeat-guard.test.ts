@@ -575,7 +575,7 @@ test("a delayed stale repeat-lock contender cannot remove a replacement lock", a
   assert.equal(JSON.parse(await readFile(join(lock, "metadata.json"), "utf8")).token, "replacement");
 });
 
-test("a call whose identity changed while it ran is returned but not stored", async () => {
+test("a call whose identity changed is never replayed, and is returned but not stored", async () => {
   const { runDirectory, repository, worktree, lockDirectory, scope } = await fixture();
   let executions = 0;
   const run = (stable: boolean) =>
@@ -594,6 +594,12 @@ test("a call whose identity changed while it ran is returned but not stored", as
   assert.equal((await run(true)).repeated, false);
   assert.equal((await run(true)).repeated, true);
   assert.equal(executions, 2);
+  // A bound file that changed after the identity was taken, for example while waiting for the lock, is never answered
+  // from the stored result; the call executes against the current file instead.
+  const changed = await run(false);
+  assert.equal(changed.repeated, false);
+  assert.deepEqual(changed.value, { executions: 3 });
+  assert.equal(executions, 3);
 });
 
 test("repeat records survive a restart because they are stored with the run", async () => {

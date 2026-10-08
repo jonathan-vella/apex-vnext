@@ -158,7 +158,8 @@ const stagingInput = (optional: boolean) =>
 /**
  * Effect class of every MCP tool, keyed by the output-schema registry so a new tool cannot be added unclassified.
  * - `read-only`: never writes state.
- * - `read`: adds no new effect; it may only finish recovering an already-committed run transaction.
+ * - `read`: adds no new effect; it may only finish recovering an already-committed run or customization transaction,
+ *   so it holds the workspace lock like every other writer.
  * - `repeat-guarded`: changes state; each call runs through the kernel repeat guard, so an identical repeat while the
  *   selected run is unchanged returns the original result instead of executing again.
  * - `convergent`: changes state outside the run, so the run-scoped guard cannot tell whether a repeat is stale, and
@@ -750,9 +751,9 @@ export function createMcpServerFactory(
                     signal,
                   ),
                 )
-              : effect === "convergent"
-                ? await resolved.service.withWorkspaceWriteLock(execute, signal)
-                : await execute();
+              : effect === "read-only"
+                ? await execute()
+                : await resolved.service.withWorkspaceWriteLock(execute, signal);
         } catch (error) {
           const normalized = normalizeError(error);
           const governance =
