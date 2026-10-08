@@ -43,7 +43,7 @@
   },
   "devDependencies": {
     "@modelcontextprotocol/client": "2.3.1",
-    "js-yaml": "5.4.2"
+    "js-yaml": "5.4.3"
   },
   "scripts": {
     "build": "tsc -b",
