@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
@@ -28,7 +28,7 @@ test("consumer installer parses without Node and refuses unconfirmed or invalid 
   }
   const help = bash("require_host() { exit 91; }; main --help");
   assert.equal(help.status, 0);
-  assert.match(help.stdout, /ready Ubuntu WSL2/);
+  assert.match(help.stdout, /Ubuntu on Linux or WSL2, the Copilot CLI host/);
   assert.doesNotMatch(readFileSync(script, "utf8"), /npm ci|packages\/cli\/package|gh auth|az login/);
 });
 
@@ -38,7 +38,7 @@ test("consumer plan preserves compatible tools without invoking installers", () 
     command() { if [[ "$1" == -v ]]; then printf '/usr/bin/%s\\n' "$2"; else builtin command "$@"; fi; };
     install_plan() { exit 92; }; main --version 1.2.3 --plan`);
   assert.equal(result.status, 0, result.stderr);
-  assert.equal((result.stdout.match(/preserve/g) ?? []).length, 12);
+  assert.equal((result.stdout.match(/preserve/g) ?? []).length, 13);
   assert.doesNotMatch(result.stdout, /conflict|host-action/);
 });
 
@@ -52,7 +52,10 @@ test("consumer plan blocks incompatible tools unless replacement is separately a
   assert.doesNotMatch(refused.stdout, /APPROVED_ACTIONS/);
   const accepted = bash(`${prelude} main --version 1.2.3 --install --yes --replace-incompatible`);
   assert.equal(accepted.status, 0, accepted.stderr);
-  assert.match(accepted.stdout, /APPROVED_ACTIONS git node npm gh copilot az bicep terraform pwsh azd apex/);
+  assert.match(
+    accepted.stdout,
+    /APPROVED_ACTIONS git node npm gh copilot bwrap slirp4netns az bicep terraform pwsh azd apex/,
+  );
 });
 
 test("consumer installer rendering binds canonical versions and rejects malformed templates", () => {
@@ -60,30 +63,45 @@ test("consumer installer rendering binds canonical versions and rejects malforme
   const toolchain = JSON.parse(readFileSync("config/toolchain.v1.json", "utf8")).compatibilitySet;
   const rendered = renderConsumerInstaller(template, toolchain);
   assert.doesNotMatch(rendered, /__APEX_/u);
-  for (const value of [toolchain.node, toolchain.npm, toolchain.copilotCli, toolchain.minimumVscode])
-    assert.ok(rendered.includes(value));
+  for (const value of [toolchain.node, toolchain.npm, toolchain.copilotCli]) assert.ok(rendered.includes(value));
   assert.throws(() => renderConsumerInstaller(template, { ...toolchain, node: "latest; unsafe" }), /Invalid installer/);
-  for (const minimumVscode of ["01.140.0", "1.140.00"])
-    assert.throws(() => renderConsumerInstaller(template, { ...toolchain, minimumVscode }), /Invalid installer/);
+  for (const copilotCli of ["01.0.86", "1.0.86-next"])
+    assert.throws(() => renderConsumerInstaller(template, { ...toolchain, copilotCli }), /Invalid installer/);
   assert.throws(() => renderConsumerInstaller(`${template}\n__APEX_NODE_VERSION__`, toolchain), /occur once/);
   const result = bash("require_host() { exit 91; }; main --version 1.2.3 --install --yes");
   assert.equal(result.status, 2);
   assert.match(result.stderr, /generated release installer/);
 });
 
-test("rendered consumer installer requires the VS Code 1.140 Copilot harness minimum", () => {
-  const toolchain = JSON.parse(readFileSync("config/toolchain.v1.json", "utf8"));
-  assert.equal(toolchain.compatibilitySet.minimumVscode, "1.140.0");
-  assert.equal(toolchain.core.vscode.minimumSupportedVersion, toolchain.compatibilitySet.minimumVscode);
-  const rendered = renderConsumerInstaller(readFileSync(script, "utf8"), toolchain.compatibilitySet);
-  const compatible = (version) =>
-    spawnSync("bash", ["-c", `source <(printf '%s' "$RENDERED_INSTALLER"); compatible code '${version}'`], {
-      encoding: "utf8",
-      env: { ...process.env, RENDERED_INSTALLER: rendered },
-      timeout: 10_000,
-    }).status;
-  for (const version of ["1.138.0", "1.139.0", "1.139.1", "1.139.99"]) assert.equal(compatible(version), 1, version);
-  for (const version of ["1.140.0", "1.140.1", "1.141.0", "2.0.0"]) assert.equal(compatible(version), 0, version);
+test("Copilot CLI host installer neither inspects nor runs the VS Code shim (#436)", () => {
+  const rendered = renderConsumerInstaller(
+    readFileSync(script, "utf8"),
+    JSON.parse(readFileSync("config/toolchain.v1.json", "utf8")).compatibilitySet,
+  );
+  assert.doesNotMatch(rendered, /\bcode\)|minimumVscode|1\.140\.0/u);
+  const result = bash(`require_host() { :; }; minimum_version() { printf '1.0.0'; };
+    command() { if [[ "$1" == -v && "$2" == code ]]; then printf '/mnt/c/VS Code/bin/code\\n';
+      elif [[ "$1" == -v ]]; then printf '/usr/bin/%s\\n' "$2"; else builtin command "$@"; fi; };
+    tool_version() { if [[ "$1" == code ]]; then exit 93; elif [[ "$1" == apex ]]; then printf '1.2.3'; else printf '9.0.0'; fi; };
+    install_plan() { printf 'EXECUTED\\n'; }; main --version 1.2.3 --install --yes`);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /EXECUTED/u);
+  assert.doesNotMatch(result.stdout, /^code\b|host-action/mu);
+  assert.match(result.stdout, /VS Code is not checked: this host runs Copilot CLI/u);
+});
+
+test("consumer installer accepts Ubuntu on Linux or WSL2 and rejects WSL1", () => {
+  const host = (kernel) =>
+    bash(`uname() { case "$1" in -s) printf 'Linux\\n' ;; -r) printf '%s\\n' '${kernel}' ;; *) printf 'x86_64\\n' ;; esac; };
+      id() { printf '1000\\n'; }; require_host`);
+  const wsl1 = host("4.4.0-26100-Microsoft");
+  assert.equal(wsl1.status, 1);
+  assert.match(wsl1.stderr, /WSL1 cannot run the Copilot CLI sandbox/u);
+  const ubuntu = existsSync("/etc/os-release") && /^ID=ubuntu$/mu.test(readFileSync("/etc/os-release", "utf8"));
+  const container = ["/.dockerenv", "/run/.containerenv"].some((path) => spawnSync("test", ["-e", path]).status === 0);
+  if (!ubuntu || container) return;
+  for (const kernel of ["6.8.0-60-generic", "6.6.87.2-microsoft-standard-WSL2"])
+    assert.equal(host(kernel).status, 0, `${kernel}: ${host(kernel).stderr}`);
 });
 
 test("consumer installer refuses unapproved system changes and unowned local binaries", () => {
@@ -213,7 +231,20 @@ test("consumer dispatch stops after a failed helper even under conditional invoc
   assert.doesNotMatch(result.stdout, /UNEXPECTED_NPM|verified/u);
 });
 
-test("consumer Node installation preserves a compatible npm and host actions cannot be overridden", () => {
+test("consumer installer installs the Copilot CLI sandbox tools from Ubuntu packages", () => {
+  const result = bash(`release=1.2.3; system=true; actions=(bwrap slirp4netns);
+    command() { return 0; }; system_packages() { printf 'SYSTEM %s\\n' "$*"; };
+    install_bootstrap_launcher() { :; }; tool_version() { printf '0.9.0'; }; install_plan`);
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(
+    result.stdout.split("\n").filter((line) => line.startsWith("SYSTEM")),
+    ["SYSTEM bubblewrap", "SYSTEM slirp4netns"],
+  );
+  const old = bash(`minimum_version bwrap`);
+  assert.equal(old.stdout, "0.5.0");
+});
+
+test("consumer Node installation preserves a compatible npm and missing VS Code does not block", () => {
   const result = bash(`tool_root="$HOME/tools"; scratch="$HOME/scratch"; node_arch=x64; actions=(node);
     mkdir -p "$tool_root" "$scratch"; minimum_version() { printf '1.0.0'; };
     download() { printf '${"a".repeat(64)}  node-v1.0.0-linux-x64.tar.xz\\n' > "$2"; };
@@ -224,7 +255,7 @@ test("consumer Node installation preserves a compatible npm and host actions can
   const host = bash(`require_host() { :; }; minimum_version() { printf '1.0.0'; };
     command() { if [[ "$1" == -v && "$2" == code ]]; then return 1; elif [[ "$1" == -v ]]; then printf '/usr/bin/%s\\n' "$2"; else builtin command "$@"; fi; };
     tool_version() { if [[ "$1" == apex ]]; then printf '1.2.3'; else printf '9.0.0'; fi; };
-    install_plan() { exit 91; }; main --version 1.2.3 --install --yes --replace-incompatible`);
-  assert.equal(host.status, 1);
-  assert.match(host.stdout, /host-action/);
+    install_plan() { printf 'EXECUTED\\n'; }; main --version 1.2.3 --install --yes`);
+  assert.equal(host.status, 0, host.stderr);
+  assert.match(host.stdout, /EXECUTED/);
 });

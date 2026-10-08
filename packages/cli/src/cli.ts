@@ -1005,17 +1005,22 @@ export function formatHumanResult(args: string[], result: unknown): string {
   if (command === "doctor" && result !== null && typeof result === "object") {
     const doctor = result as {
       healthy?: boolean;
-      checks?: Array<{ ok: boolean }>;
+      checks?: Array<{ ok: boolean; value?: string; remedy?: string; severity?: string }>;
       remedies?: string[];
       nextAction?: string;
     };
     const passed = doctor.checks?.filter(({ ok }) => ok).length ?? 0;
     const total = doctor.checks?.length ?? 0;
     const remaining = doctor.remedies?.length ?? 0;
+    const warnings = doctor.checks?.filter(({ ok, severity }) => ok && severity === "warning") ?? [];
+    const warning = warnings[0]?.remedy ?? warnings[0]?.value;
     return [
       `Status: ${doctor.healthy ? "Ready" : "Setup incomplete"} (${passed}/${total} checks ready)`,
       `Next: ${doctor.nextAction ?? "No action required"}`,
       ...(remaining > 1 ? [`Later: ${remaining - 1} additional setup item${remaining === 2 ? "" : "s"}`] : []),
+      ...(warnings.length > 0
+        ? [`Warning: ${warning ?? "see doctor --json"}${warnings.length > 1 ? ` (+${warnings.length - 1} more)` : ""}`]
+        : []),
     ].join("\n");
   }
   return typeof result === "string" ? result : JSON.stringify(result, null, 2);

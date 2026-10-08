@@ -119,6 +119,7 @@ const doctorCheck = object({
   ok: Type.Boolean(),
   value: Type.String(),
   remedy: Type.Optional(Type.String()),
+  severity: Type.Optional(Type.Literal("warning")),
 });
 const doctor = object({
   healthy: Type.Boolean(),

@@ -62,6 +62,10 @@ not assertions that corresponding runtime or registry coverage already exists:
 | `CLIENT-019` | Complete design and operational handoff reviewed against the PRD quality reference              |
 | `CLIENT-020` | The plugin starts the bundled APEX MCP and preserves active runs across plugin updates          |
 
+`CLIENT-012` follows the [clean-host checklist](../how-to/manage-installation.md#verify-a-clean-host) on each host in
+[CP-20](https://github.com/jonathan-vella/apex-vnext/issues/386); automated tests cover only the doctor rules with fake
+hosts.
+
 Exercise both IaC tracks and both profiles with representative cases in the existing tests. Reuse fixtures and helpers;
 do not build a separate benchmark harness. Record explicit gaps until implemented.
 

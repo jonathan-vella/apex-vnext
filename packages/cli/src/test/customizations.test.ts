@@ -5,7 +5,7 @@ import { join, relative, sep } from "node:path";
 import test from "node:test";
 import { ApexError } from "../errors.js";
 import { ApexService } from "../service.js";
-import { tempRoot } from "./helpers.js";
+import { hostFixture, tempRoot } from "./helpers.js";
 
 test("init installs and update refreshes managed customizations", async () => {
   const root = await tempRoot();
@@ -547,6 +547,7 @@ test("update rejects and doctor repairs a modified local Git boundary", async ()
 test("init writes a real runtime lock and doctor detects managed tampering", async () => {
   const root = await tempRoot();
   const service = new ApexService(root, {
+    ...(await hostFixture("linux")),
     executableChecker: async (executable) => executable !== "code",
     azureAuthStatus: async () => ({ authenticated: true, detail: "injected" }),
   });
@@ -602,6 +603,7 @@ test("existing runs use their immutable runtime generation", async () => {
 test("doctor and core routes work without shipped governance discovery packs", async () => {
   const root = await tempRoot();
   const service = new ApexService(root, {
+    ...(await hostFixture("linux")),
     executableChecker: async (executable) => executable !== "code",
     azureAuthStatus: async () => ({ authenticated: true, detail: "injected" }),
   });

@@ -13,7 +13,9 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after } from "node:test";
-import type { ApexService, TaskOutput } from "../service.js";
+import type { HostEnvironment } from "../host-profile.js";
+import type { ApexService, ServiceOptions, TaskOutput } from "../service.js";
+import { APEX_VERSION } from "../version.js";
 
 const roots: string[] = [];
 
@@ -21,6 +23,9 @@ const roots: string[] = [];
 // even when the developer has APEX_REVIEW_HOME set, because rejection cases leave capture files behind.
 process.env.APEX_REVIEW_HOME = mkdtempSync(join(tmpdir(), "apex-review-home-"));
 roots.push(process.env.APEX_REVIEW_HOME);
+// Doctor reads the Copilot CLI plugin store; never let the developer's own store decide test outcomes.
+process.env.COPILOT_HOME = mkdtempSync(join(tmpdir(), "apex-copilot-home-"));
+roots.push(process.env.COPILOT_HOME);
 
 export async function tempRoot(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "apex-cli-"));
@@ -700,4 +705,72 @@ export async function nextTaskAfterInput(service: ApexService) {
     next = await service.nextTask();
   }
   return next;
+}
+
+export type HostFixtureKind = "windows" | "wsl2" | "linux" | "wsl1" | "macos";
+
+const HOST_FIXTURES: Record<HostFixtureKind, Pick<HostEnvironment, "platform" | "release">> = {
+  windows: { platform: "win32", release: "10.0.26200" },
+  wsl2: { platform: "linux", release: "6.6.87.2-microsoft-standard-WSL2" },
+  linux: { platform: "linux", release: "6.8.0-60-generic" },
+  wsl1: { platform: "linux", release: "4.4.0-26100-Microsoft" },
+  macos: { platform: "darwin", release: "25.0.0" },
+};
+
+/**
+ * Doctor options for a fake host. `tools` maps each executable on PATH to its `--version` output; `plugin` writes the
+ * Copilot CLI store record (`false` for none). Defaults describe a ready host for that kind.
+ */
+export async function hostFixture(
+  kind: HostFixtureKind,
+  input: {
+    tools?: Record<string, string>;
+    plugin?: false | Record<string, unknown> | Array<Record<string, unknown>>;
+    configText?: string;
+  } = {},
+): Promise<
+  Required<Pick<ServiceOptions, "hostEnvironment" | "executableChecker" | "processRunner">> & {
+    calls: string[][];
+    copilotHome: string;
+  }
+> {
+  const copilotHome = await tempRoot();
+  const tools = input.tools ?? {
+    git: "git version 2.51.0",
+    copilot: "GitHub Copilot CLI 1.0.93.",
+    ...(kind === "wsl2" || kind === "linux"
+      ? { bwrap: "bubblewrap 0.11.0", slirp4netns: "slirp4netns version 1.2.1" }
+      : {}),
+  };
+  const plugin = input.plugin ?? { name: "apex", marketplace: "apex-plugins", version: APEX_VERSION, enabled: true };
+  if (input.configText !== undefined) await writeFile(join(copilotHome, "config.json"), input.configText, "utf8");
+  else if (plugin !== false)
+    await writeFile(
+      join(copilotHome, "config.json"),
+      `// User settings belong in settings.json.\n// This file is managed automatically.\n${JSON.stringify({
+        installedPlugins: Array.isArray(plugin) ? plugin : [plugin],
+      })}\n`,
+      "utf8",
+    );
+  const calls: string[][] = [];
+  return {
+    calls,
+    copilotHome,
+    hostEnvironment: { ...HOST_FIXTURES[kind], env: { COPILOT_HOME: copilotHome }, homedir: copilotHome },
+    executableChecker: async (executable) => tools[executable] !== undefined,
+    processRunner: {
+      run: async (request) => {
+        calls.push([request.executable, ...request.args]);
+        const stdout = tools[request.executable];
+        return {
+          exitCode: stdout === undefined ? 1 : 0,
+          signal: null,
+          stdout: stdout === undefined ? "" : `${stdout}\n`,
+          stderr: "",
+          timedOut: false,
+          outputTruncated: false,
+        };
+      },
+    },
+  };
 }

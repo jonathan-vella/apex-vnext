@@ -14,7 +14,7 @@ import { execute, formatHumanResult } from "../cli.js";
 import { ApexService } from "../service.js";
 import { ApexError, EXIT_CODES } from "../errors.js";
 import { APEX_VERSION, meetsMinimumVersion, MINIMUM_NODE_VERSION } from "../version.js";
-import { captureReview, nextTaskAfterInput, requirements, tempRoot, writeJson } from "./helpers.js";
+import { captureReview, hostFixture, nextTaskAfterInput, requirements, tempRoot, writeJson } from "./helpers.js";
 
 test("CLI emits a stable JSON envelope", async () => {
   const child = spawn(process.execPath, [join(import.meta.dirname, "..", "cli.js"), "version", "--json"], {
@@ -468,14 +468,16 @@ test("CLI Node minimum compares complete stable versions", () => {
   assert.equal(meetsMinimumVersion("invalid", MINIMUM_NODE_VERSION), false);
 });
 
-test("doctor requires the canonical VS Code minimum only when VS Code is installed", async () => {
+test("Windows doctor requires the canonical VS Code minimum only when VS Code is installed", async () => {
   const toolchain = JSON.parse(
     await readFile(join(import.meta.dirname, "../../../../config/toolchain.v1.json"), "utf8"),
   ) as { compatibilitySet: { minimumVscode: string } };
   assert.equal(toolchain.compatibilitySet.minimumVscode, "1.140.0");
   const vscode = async (installed: boolean, output: string, exitCode = 0) => {
     const calls: ProcessRequest[] = [];
+    const { hostEnvironment } = await hostFixture("windows");
     const service = new ApexService(await tempRoot(), {
+      hostEnvironment,
       executableChecker: async (executable) => installed && executable === "code",
       processRunner: {
         run: async (request: ProcessRequest) => {
@@ -682,7 +684,7 @@ test("governance setup CLI reads only bounded GitHub evidence and never mutates 
 
 test("workspace installation leaves first project creation to APEX", async () => {
   const root = await tempRoot();
-  const service = new ApexService(root, { executableChecker: async () => false });
+  const service = new ApexService(root, await hostFixture("linux"));
   const installed = await service.initializeWorkspace({ clientId: "github-copilot-cli" });
   assert.deepEqual(installed, { workspaceReady: true, projectCreated: false });
   assert.deepEqual(await service.listProjects(), []);

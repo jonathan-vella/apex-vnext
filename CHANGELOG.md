@@ -14,6 +14,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `apex doctor` checks the client prerequisites of its host. On native Windows it requires VS Code 1.140 or later
+  only when `code` is installed and the `apex` plugin in the Copilot CLI store; on Linux and WSL2 it requires Copilot
+  CLI and no longer runs or fails on `code`, so an old Windows VS Code shim on WSL2 PATH passes. New `host`, `git`,
+  `copilot-cli`, `copilot-plugin`, `linux-sandbox-tools` and `plugin-settings` checks are read-only; advisory checks
+  pass with `severity: "warning"`. The Linux installer accepts Ubuntu on Linux or WSL2, rejects WSL1, installs
+  Bubblewrap and `slirp4netns`, and no longer checks VS Code.
 - The APEX MCP server, from the plugin or `apex mcp serve`, now requires the workspace runtime lock
   (`cliVersion` in `.apex/apex.lock.json`) to name its exact `@apexops/cli` version. Every tool except `status` fails
   closed with `APEX_RUNTIME_MISMATCH` and a remediation (`apex update` for an older workspace, the matching plugin or

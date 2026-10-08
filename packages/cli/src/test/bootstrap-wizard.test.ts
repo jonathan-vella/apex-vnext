@@ -3,7 +3,7 @@ import test from "node:test";
 import { interactiveBootstrap, runBootstrapWizard } from "../bootstrap-wizard.js";
 import { withRepeatGuardLock } from "@apexops/kernel";
 import { ApexService } from "../service.js";
-import { tempRoot } from "./helpers.js";
+import { hostFixture, tempRoot } from "./helpers.js";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { execute } from "../cli.js";
@@ -418,7 +418,7 @@ test("wizard configures a real empty workspace without asking or inventing proje
     assert.doesNotMatch(questions.join("\n"), /Project ID|Environment \[|target scope|IaC track/i);
     assert.deepEqual(await new ApexService(root).listProjects(), []);
     await assert.rejects(readFile(join(root, ".apex/config.json")), { code: "ENOENT" });
-    assert.equal((await new ApexService(root, { executableChecker: async () => false }).doctor()).healthy, true);
+    assert.equal((await new ApexService(root, await hostFixture("wsl2")).doctor()).healthy, true);
   }
 });
 

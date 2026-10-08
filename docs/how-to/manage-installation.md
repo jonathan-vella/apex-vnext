@@ -155,8 +155,8 @@ npx --yes @apexops/cli@PLUGIN_VERSION bootstrap --create-repo --yes
 
 Omit `--create-repo` only when the workspace already has a `.git` boundary. Omitting `--project` leaves the workspace
 without a project, selected run or workload defaults. `apex status` reports `needs_project`; `doctor` checks workspace
-integrity without requiring Azure authentication, a backend or an IaC choice. If `code` is on `PATH`, `doctor` also
-fails when `code --version` reports a release older than 1.140. Open the workspace APEX agent to gather
+integrity without requiring Azure authentication, a backend or an IaC choice. It also checks the host's client
+prerequisites; [Verify a clean host](#verify-a-clean-host) lists them. Open the workspace APEX agent to gather
 project details, including the `partner` or `customer` risk-owner role, and invoke `projectCreate`. Explicit
 `apex init` or `project create` remains available for automation that already knows those details. Use
 `--file onboarding.json --yes` for validated noninteractive workspace settings.
@@ -167,14 +167,26 @@ selected project and client; incompatible packages, manual managed-file edits or
 This only reuses completed local initialization. It does not yet resume interrupted COE, GitHub or OIDC provisioning,
 change the selected run, adopt conflicting files or repair partial state automatically.
 
+### Install The CLI On Windows
+
+Native Windows has no installer script. Install Git, Node.js, Copilot CLI and your client with `winget` as described in
+[Prepare Windows 11](prepare-windows-11.md#prepare-native-windows-for-vs-code-or-the-app), then
+[install the plugin](#windows-vs-code-or-the-app) and the CLI at the plugin's version, and bootstrap the workspace:
+
+```powershell
+npm install -g @apexops/cli@PLUGIN_VERSION
+apex bootstrap --create-repo --yes
+apex doctor
+```
+
 ### Install The CLI On Linux Or WSL2
 
 Candidate packaging generates a standalone `apex-install.sh` alongside the tarballs. Its digest is recorded in
 `release-manifest.json` and the provenance statement. Obtain that script and its expected digest from the approved
 release channel and verify it before execution. This source template is not directly executable as an installer:
-packaging substitutes the canonical Node, npm, Copilot CLI and minimum VS Code versions.
+packaging substitutes the canonical Node, npm and Copilot CLI versions.
 
-From an Ubuntu terminal, including Ubuntu on WSL2, review the plan for an exact available APEX package version:
+From an Ubuntu terminal on Linux or WSL2, review the plan for an exact available APEX package version:
 
 ```bash
 bash apex-install.sh --version RELEASE_VERSION --plan
@@ -182,7 +194,8 @@ bash apex-install.sh --version RELEASE_VERSION --install --yes
 ```
 
 The generated script runs without Node or an APEX source checkout. It checks Git, Node/npm, GitHub CLI, Copilot CLI,
-Azure CLI, Bicep, Terraform, PowerShell, azd, the VS Code host command and APEX. Compatible tools are preserved. It pins
+Bubblewrap and `slirp4netns` for the Copilot CLI sandbox, Azure CLI, Bicep, Terraform, PowerShell, azd and APEX. It does
+not check or run VS Code, which this host does not use, and it rejects WSL1. Compatible tools are preserved. It pins
 Node/npm/Copilot to the packaged toolchain minimums and retrieves other missing binary tools from official stable
 releases with SHA-256 verification and safe archive extraction. APEX comes from the configured npm registry at the exact
 requested version. A missing/unpublished package or unsupported Ubuntu package repository fails rather than completing.
@@ -193,12 +206,64 @@ require `--replace-incompatible`, which permits user-local shadowing, not remova
 in the install destinations block replacement. The installer does not edit shell profiles: add `~/.local/bin` to PATH in
 future terminals. Successful APEX installation also provides `apex-bootstrap`, a launcher for `apex bootstrap`.
 
-The installer does not install Windows, WSL or the APEX plugin, and does not sign in to any account. No login, repo
+Bubblewrap and `slirp4netns` are Ubuntu packages, so they need `--allow-system` too. The installer does not install
+Windows, WSL or the APEX plugin, and does not sign in to any account. No login, repo
 initialization, GitHub mutation, Azure identity/role change or deployment is executed by the installer. Concurrent
 installs are blocked by an install lock; inspect a stale lock after interruption before removing it. Completed
 compatible steps are retained for reruns. Current proof consists of offline safety tests and generated
-package/provenance checks, not a successful clean-machine installation or complete first-run acceptance. A native
-Windows installer is not available yet.
+package/provenance checks, not a successful clean-machine installation or complete first-run acceptance.
+
+## Verify A Clean Host
+
+Run `apex doctor` on the host after setup; add `--json` for every check. Plain `apex doctor` only reads; repair with
+`apex doctor --fix --yes` rewrites managed files and the runtime lock, never host tools. Doctor infers the host from
+the platform, because every workspace uses the `github-copilot-cli` projection whichever client runs it. Warnings do
+not make doctor unhealthy; failures do, and each one names a remedy. Doctor cannot see inside a client, so it does not
+check whether local sandboxing is on or whether the client has loaded the plugin.
+
+| Check                 | Windows: VS Code or the app                                  | Linux or WSL2: Copilot CLI                                  |
+| --------------------- | ------------------------------------------------------------ | ----------------------------------------------------------- |
+| `node`                | Fails below Node.js 24.21.0                                  | Fails below Node.js 24.21.0                                 |
+| `host`                | Passes; macOS warns as best effort                           | Passes on Linux and WSL2; WSL1 fails                        |
+| `git`                 | Fails when `git` is not on `PATH`                            | Fails when `git` is not on `PATH`                           |
+| `vscode`              | Passes when absent; fails when `code` is older than 1.140.0  | Passes without running `code`, whatever its version         |
+| `copilot-cli`         | Warns when absent or older than 1.0.86 (store manager only)  | Fails when absent or older than 1.0.86                      |
+| `copilot-plugin`      | Fails unless one enabled `apex@apex-plugins` matches the CLI | Warns when absent; fails when disabled, doubled or mismatch |
+| `linux-sandbox-tools` | Not checked                                                  | Warns when `bwrap` or `slirp4netns` is missing              |
+| `plugin-settings`     | After `apex init`, fails unless settings enable the plugin   | After `apex init`, fails unless settings enable the plugin  |
+
+Doctor reads the plugin store from `config.json` in `COPILOT_HOME`, by default `~/.copilot` or
+`%USERPROFILE%\.copilot`. On Linux and WSL2, Copilot CLI can still install the plugin from the workspace settings on
+the first trusted session, so a missing plugin is only a warning there.
+
+Clean-host qualification belongs to [CP-20](https://github.com/jonathan-vella/apex-vnext/issues/386) (`CLIENT-012`).
+Start from a host without APEX, follow [Prepare Windows 11](prepare-windows-11.md) for that host, and record each result.
+
+### Windows 11 With VS Code Or The App
+
+In PowerShell, without WSL:
+
+1. Run `node --version`, `git --version`, `copilot --version` and, for VS Code, `code --version`. Expect Node.js
+   24.21.0 or later and VS Code 1.140 or later.
+2. Install the plugin and CLI as in [Install the CLI on Windows](#install-the-cli-on-windows), in an empty folder.
+3. Run `apex doctor`. Expect `Status: Ready`; without Copilot CLI, the app reports one warning for `copilot-cli`.
+4. Run `apex doctor --json`. Expect `host` to start with `windows:` and `copilot-plugin` to name the plugin store.
+5. In VS Code, search `@agentPlugins` and expect one `apex` entry; in the app, confirm that the project sandbox is on.
+   Doctor cannot check either.
+
+### Linux Or WSL2 With Copilot CLI
+
+In the Ubuntu terminal:
+
+1. Run `bash apex-install.sh --version RELEASE_VERSION --plan`. Expect `preserve` or `install` for each tool; VS Code
+   is not listed.
+2. Run `sudo -v` yourself, then `bash apex-install.sh --version RELEASE_VERSION --install --yes --allow-system`;
+   Bubblewrap, `slirp4netns` and other missing Ubuntu packages need `--allow-system`. Run `copilot login`, install the
+   plugin, then run `apex bootstrap --create-repo --yes` in a folder under your Linux home.
+3. Run `apex doctor`. Expect `Status: Ready` with no warnings. A Windows `code` shim on `PATH` must not change the
+   result.
+4. Run `apex doctor --json`. Expect `host` to start with `wsl2:` or `linux:`, and `linux-sandbox-tools` to pass.
+5. Run `copilot --agent apex` in the workspace and turn on the sandbox with `/sandbox enable`. Doctor cannot check it.
 
 ## Update APEX
 
@@ -316,6 +381,7 @@ Removing the plugin does not delete `.apex/` project state or history.
 | **MCP: List Servers** shows the APEX server failing with `${PLUGIN_ROOT}` | That list does not run Copilot harness sessions; check `agenthost.log` under `%APPDATA%\Code\logs`        |
 | `copilot plugin install apex@apex-plugins` finds no plugin                | No release is published yet; see the release status above                                                 |
 | `doctor` reports `plugin-owned:<path>`                                    | Run `apex update`, then move or delete edited copies it lists                                             |
+| `doctor` reports `copilot-plugin` with another version                    | Run `copilot plugin update apex@apex-plugins`, or install the CLI at the plugin's version                 |
 | The client reports the sandbox as unavailable                             | Install the Windows update it names, or Bubblewrap and `slirp4netns` on Linux and WSL2                    |
 
 ## Install A Local Candidate
