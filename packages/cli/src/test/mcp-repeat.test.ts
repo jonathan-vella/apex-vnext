@@ -557,6 +557,67 @@ test("state-changing CLI commands share the workspace lock that guarded calls ho
   assert.equal((status as { run: { projectId: string } }).run.projectId, "demo");
 });
 
+/** A terminal whose questions stay unanswered until the test answers them. */
+function simulatedTerminal() {
+  const questions: Array<{ question: string; answer: (value: string) => void }> = [];
+  let asked: (() => void) | undefined;
+  return {
+    interaction: {
+      ask: (question: string) =>
+        new Promise<string>((answer) => {
+          questions.push({ question, answer });
+          asked?.();
+        }),
+      show: () => {},
+    },
+    async question() {
+      while (questions.length === 0) await new Promise<void>((done) => (asked = done));
+      return questions.shift()!;
+    },
+    pending: () => questions.length,
+  };
+}
+
+test("a CLI command waiting at a prompt does not hold the workspace lock and fails stale after a write", async (context) => {
+  const { service } = await initializedWorkspace();
+  const { client } = await connect(context, service, "prompt-wait");
+  const call = (name: string, input: Record<string, unknown> = {}) =>
+    client.callTool({ name, arguments: { workspace: service.root, ...input } });
+  const lockDirectory = join(service.root, ".apex", "local");
+  const lockFree = () => withRepeatGuardLock(lockDirectory, async () => true, { lockWaitMs: 0 });
+
+  // Unchanged state: reads, including a read tool that takes the workspace lock, succeed while the command waits, and
+  // the command then continues with the answer.
+  const unchanged = simulatedTerminal();
+  const continuing = execute(["bootstrap", "wizard"], service.root, {}, { bootstrap: unchanged.interaction });
+  const first = await unchanged.question();
+  assert.match(first.question, /Copy one or more independent workloads/);
+  assert.equal(await lockFree(), true);
+  const started = Date.now();
+  assertSuccess(await call("status"), "status");
+  assertSuccess(await call("render", { kind: "status" }), "render");
+  assert.ok(Date.now() - started < 10_000, "MCP reads must not wait for the prompt");
+  first.answer("no");
+  const second = await unchanged.question();
+  assert.match(second.question, /Initialize a local Git repository/);
+  second.answer("cancel");
+  assert.equal(((await continuing) as { status: string }).status, "cancelled");
+
+  // A write while the command waits makes the continuation fail stale instead of applying the answer.
+  const changed = simulatedTerminal();
+  const stale = execute(["bootstrap", "wizard"], service.root, {}, { bootstrap: changed.interaction });
+  const prompt = await changed.question();
+  assertSuccess(await call("projectCreate", duplicateCases.projectCreate.input), "projectCreate");
+  prompt.answer("no");
+  await assert.rejects(stale, (error: unknown) => {
+    assert.equal((error as { code?: unknown }).code, "APEX_STALE");
+    assert.match((error as Error).message, /Refresh status and run the command again/);
+    return true;
+  });
+  assert.equal(changed.pending(), 0, "nothing after the wait may run");
+  assert.equal(await lockFree(), true);
+});
+
 test("repeat records stay out of Git through the managed .apex boundary", async (context) => {
   const { service, runDirectory } = await initializedWorkspace();
   await execFileAsync("git", ["init", service.root]);

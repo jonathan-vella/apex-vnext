@@ -27,6 +27,36 @@ test("bootstrap wizard cancellation and declined plans never initialize a worksp
   }
 });
 
+test("bootstrap wizard never applies a confirmation to a local plan that changed while it waited", async (context) => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  const setup = context.mock.method(service, "bootstrap", async () => ({ runtimeInstalled: true }));
+  const answers: Array<string | (() => Promise<string>)> = [
+    "no",
+    "yes",
+    async () => {
+      await mkdir(join(root, ".git"));
+      return "yes";
+    },
+  ];
+  const result = await runBootstrapWizard(
+    root,
+    {
+      ask: async () => {
+        const answer = answers.shift();
+        assert.ok(answer !== undefined);
+        return typeof answer === "string" ? answer : answer();
+      },
+      show: () => {},
+    },
+    () => service,
+  );
+  assert.equal(result.status, "blocked");
+  assert.match(result.nextAction, /plan changed after it was shown/);
+  assert.equal(setup.mock.callCount(), 0);
+  assert.equal(answers.length, 0);
+});
+
 test(
   "bare bootstrap presents a real terminal question and cancels without files",
   { skip: process.platform !== "linux", timeout: 15_000 },

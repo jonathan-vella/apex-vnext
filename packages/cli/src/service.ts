@@ -154,9 +154,11 @@ import {
   REPEAT_GUARD_FILE,
   RepeatGuardBusyError,
   RepeatGuardCancelledError,
+  RepeatGuardStaleError,
   withRepeatGuardLock,
   repeatStateToken,
   type RepeatScope,
+  type WorkspaceLockHold,
   atomicWriteBytes,
   atomicWriteJson,
   createTaskEnvelope,
@@ -212,6 +214,7 @@ import {
   renderWafAssessmentDiagram,
   type DiagramSource,
 } from "@apexops/renderers";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { constants, realpathSync } from "node:fs";
 import { cp, lstat, mkdir, open, readFile, readdir, realpath, rm, stat } from "node:fs/promises";
 import { userInfo } from "node:os";
@@ -243,6 +246,13 @@ import {
 const ZERO_HASH = "0".repeat(64);
 const TASK_TTL_MS = 24 * 60 * 60 * 1000;
 const PREVIEW_TTL_MS = 24 * 60 * 60 * 1000;
+/** Workspace setup files that bootstrap, init, update and customization repair change outside any run. */
+const WORKSPACE_STATE_FILES = [
+  ".apex/config.json",
+  ".apex/customizations.selection.json",
+  ".apex/customizations.lock.json",
+  ".apex/apex.lock.json",
+] as const;
 // Repeat records hold serialized tool results for this machine only; they stay out of Git like other local state.
 const APEX_GITIGNORE = `/cache/\n/local/\n/work/\n/runtime/capability-packs/\n${REPEAT_GUARD_FILE}\n`;
 
@@ -251,6 +261,14 @@ function repeatGuardError(error: unknown): unknown {
     return new ApexError("APEX_CONFLICT", error.message, EXIT_CODES.conflict, undefined, error);
   if (error instanceof RepeatGuardCancelledError)
     return new ApexError("APEX_CONFLICT", "Cancelled", EXIT_CODES.conflict, undefined, error);
+  if (error instanceof RepeatGuardStaleError)
+    return new ApexError(
+      "APEX_STALE",
+      "Workspace state changed while the command waited for input; nothing after the wait was applied. Refresh status and run the command again.",
+      EXIT_CODES.stale,
+      undefined,
+      error,
+    );
   return error;
 }
 
@@ -794,6 +812,7 @@ export class ApexService {
   private readonly azureAuthStatus: (live: boolean) => Promise<{ authenticated: boolean; detail: string }>;
   private readonly customizationFailureInjector?: ServiceOptions["customizationFailureInjector"];
   private readonly processRunner: ProcessRunnerLike;
+  private readonly workspaceLockHold = new AsyncLocalStorage<WorkspaceLockHold | undefined>();
   private readonly improvementPolicy: ImprovementPolicyV1 | undefined;
   private improvementRuntime?: ImprovementStore;
   private requirementsDocumentTemplate?: Promise<{ content: string; hash: string }>;
@@ -2544,13 +2563,51 @@ export class ApexService {
   /**
    * Runs a state-changing operation that is not repeat-guarded, such as a CLI command, under the workspace repeat lock
    * that guarded calls hold, so it cannot land between a guarded call's state reads, execution and record publication.
+   * A `suspendable` operation, such as a CLI command, may give the lock up while it waits for interactive input through
+   * {@link waitOutsideWorkspaceLock}; MCP calls never do.
    */
-  async withWorkspaceWriteLock<T>(operation: () => Promise<T>, signal?: AbortSignal): Promise<T> {
-    return withRepeatGuardLock(this.repeatLockDirectory(), operation, {
-      ...(signal === undefined ? {} : { signal }),
-    }).catch((error: unknown) => {
+  async withWorkspaceWriteLock<T>(
+    operation: () => Promise<T>,
+    signal?: AbortSignal,
+    options: { suspendable?: boolean } = {},
+  ): Promise<T> {
+    return withRepeatGuardLock(
+      this.repeatLockDirectory(),
+      (hold) => this.workspaceLockHold.run(options.suspendable === true ? hold : undefined, operation),
+      { ...(signal === undefined ? {} : { signal }) },
+    ).catch((error: unknown) => {
       throw repeatGuardError(error);
     });
+  }
+
+  /**
+   * Runs `wait`, such as an interactive prompt, without the workspace lock when the current operation holds it as
+   * suspendable, so MCP calls in the workspace are not blocked meanwhile. The lock is then taken again and the command
+   * fails with `APEX_STALE` unless the workspace state is unchanged, so a decision taken during the wait is applied
+   * only to the state it was taken against. Elsewhere `wait` runs as is.
+   */
+  async waitOutsideWorkspaceLock<T>(wait: () => Promise<T>): Promise<T> {
+    const hold = this.workspaceLockHold.getStore();
+    if (hold === undefined) return wait();
+    return hold
+      .suspend(wait, () => this.workspaceStateToken())
+      .catch((error: unknown) => {
+        throw repeatGuardError(error);
+      });
+  }
+
+  /**
+   * Token over the selected run state that repeat-guarded calls are bound to and the workspace setup files, so any
+   * change by another writer of the workspace changes it.
+   */
+  private async workspaceStateToken(): Promise<string> {
+    const files: Record<string, string | null> = {};
+    for (const path of WORKSPACE_STATE_FILES)
+      files[path] = await readFile(join(this.root, path)).then(sha256Bytes, (error: unknown) => {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+        throw error;
+      });
+    return sha256Json({ version: 1, run: (await this.repeatScope())?.state ?? null, files });
   }
 
   private repeatLockDirectory(): string {

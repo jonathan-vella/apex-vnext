@@ -1,6 +1,7 @@
 import { createInterface } from "node:readline/promises";
 import { join } from "node:path";
 import { stdin, stdout } from "node:process";
+import { isDeepStrictEqual } from "node:util";
 import type {
   ArchetypeBatchConfigV1,
   GovernanceSetupConfigV1,
@@ -30,6 +31,13 @@ type SetupService = Pick<
   | "inspectGovernanceBaselineReadiness"
 >;
 
+/** An APEX error raised while waiting for an answer, such as a stale workspace after the wait; it ends the wizard. */
+class InterruptedWait extends Error {
+  constructor(readonly error: ApexError) {
+    super(error.message);
+  }
+}
+
 export async function runBootstrapWizard(
   root: string,
   interaction: BootstrapInteraction,
@@ -37,7 +45,11 @@ export async function runBootstrapWizard(
 ) {
   const progress: Array<{ directory: string; step: string; outcome: unknown }> = [];
   const ask = async (question: string) => {
-    const value = (await interaction.ask(question)).trim();
+    const value = (
+      await interaction.ask(question).catch((error: unknown) => {
+        throw error instanceof ApexError ? new InterruptedWait(error) : error;
+      })
+    ).trim();
     if (value.toLowerCase() === "cancel") throw new Error("BOOTSTRAP_CANCELLED");
     if (value.length > 4096)
       throw new ApexError("APEX_VALIDATION", "Bootstrap answer exceeds the input budget", EXIT_CODES.validation);
@@ -126,6 +138,12 @@ export async function runBootstrapWizard(
         ))
       )
         return { status: "pending", progress, nextAction: "Workspace setup was not confirmed." };
+      if (!isDeepStrictEqual(await service.planBootstrap(config), plan))
+        throw new ApexError(
+          "APEX_STALE",
+          "The local bootstrap plan changed after it was shown; run the wizard again to review a fresh plan.",
+          EXIT_CODES.stale,
+        );
       const initialized = await service.bootstrap({ createRepository, clientId: "github-copilot-cli" });
       progress.push({ directory, step: "local-bootstrap", outcome: initialized });
       if (await confirm("Create a GitHub repository and push this reviewed branch?")) {
@@ -242,6 +260,7 @@ export async function runBootstrapWizard(
         "Workspace setup is complete; no project was created. Open APEX to gather details and create the first project. Complete pending governance and client checks. No deployment is authorized.",
     };
   } catch (error) {
+    if (error instanceof InterruptedWait) throw error.error;
     return {
       status: error instanceof Error && error.message === "BOOTSTRAP_CANCELLED" ? "cancelled" : "blocked",
       progress,
@@ -253,7 +272,22 @@ export async function runBootstrapWizard(
   }
 }
 
-export async function interactiveBootstrap(root: string) {
+/**
+ * Runs the wizard on the terminal, or on `interaction` when given. Each question is asked without the workspace lock, so
+ * MCP calls are not blocked while the wizard waits; if the workspace changed during the wait, the wizard fails with
+ * `APEX_STALE` instead of applying the answer.
+ */
+export async function interactiveBootstrap(
+  root: string,
+  service: Pick<ApexService, "waitOutsideWorkspaceLock">,
+  interaction?: BootstrapInteraction,
+) {
+  const run = (terminal: BootstrapInteraction) =>
+    runBootstrapWizard(root, {
+      ask: (question) => service.waitOutsideWorkspaceLock(() => terminal.ask(question)),
+      show: (value) => terminal.show(value),
+    });
+  if (interaction !== undefined) return run(interaction);
   if (!stdin.isTTY || !stdout.isTTY)
     throw new ApexError(
       "APEX_USAGE",
@@ -262,7 +296,7 @@ export async function interactiveBootstrap(root: string) {
     );
   const terminal = createInterface({ input: stdin, output: stdout });
   try {
-    return await runBootstrapWizard(root, {
+    return await run({
       ask: (question) => terminal.question(question),
       show: (value) => stdout.write(`${typeof value === "string" ? value : JSON.stringify(value, null, 2)}\n`),
     });
