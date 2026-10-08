@@ -1,4 +1,15 @@
-import type { EventV1, ProjectId, RunId } from "@apexops/contracts";
+import {
+  CONTRACT_VERSION,
+  RepeatGuardRecordsV1Schema,
+  contractMetadata,
+  registerContractFormats,
+  type EventV1,
+  type ProjectId,
+  type RepeatGuardRecordV1,
+  type RepeatGuardRecordsV1,
+  type RunId,
+} from "@apexops/contracts";
+import { Value } from "@sinclair/typebox/value";
 import { constants } from "node:fs";
 import { lstat, open } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
@@ -23,8 +34,7 @@ const REPEAT_LOCK_TTL_MS = 30_000;
 export const DEFAULT_REPEAT_WINDOW_MS = 10 * 60 * 1000;
 export const MAX_REPEAT_RECORDS = 16;
 export const MAX_REPEAT_RESULT_BYTES = 64 * 1024;
-const MAX_REPEAT_GUARD_FILE_BYTES = MAX_REPEAT_RECORDS * (MAX_REPEAT_RESULT_BYTES * 6 + 4096);
-const HASH = /^[0-9a-f]{64}$/u;
+const MAX_REPEAT_GUARD_FILE_BYTES = contractMetadata[RepeatGuardRecordsV1Schema.$id!]!.maxBytes;
 const OPERATION = /^[A-Za-z][A-Za-z0-9_-]{0,63}$/u;
 const AUDIT_APPEND_ATTEMPTS = 3;
 
@@ -99,22 +109,8 @@ export interface RepeatSafeOutcome<T> {
   fingerprint: string;
 }
 
-export interface RepeatRecord {
-  version: 1;
-  fingerprint: string;
-  callHash: string;
-  operation: string;
-  stateBefore: string | null;
-  stateAfter: string;
-  recordedAt: string;
-  expiresAt: string;
-  result: string;
-}
-
-interface RepeatGuardFile {
-  version: 1;
-  records: RepeatRecord[];
-}
+/** A stored result; the persisted file is the versioned `repeat-guard-records-v1` contract. */
+export type RepeatRecord = RepeatGuardRecordV1;
 
 function normalizedArguments(value: unknown): unknown {
   if (value === undefined) return null;
@@ -156,24 +152,17 @@ export function repeatStateToken(input: RepeatStateInput): string {
   });
 }
 
-function validRecord(value: unknown): value is RepeatRecord {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
-  const record = value as Partial<RepeatRecord>;
+function validRecords(value: unknown): value is RepeatGuardRecordsV1 {
+  registerContractFormats();
   return (
-    record.version === 1 &&
-    typeof record.fingerprint === "string" &&
-    HASH.test(record.fingerprint) &&
-    typeof record.callHash === "string" &&
-    HASH.test(record.callHash) &&
-    typeof record.operation === "string" &&
-    OPERATION.test(record.operation) &&
-    (record.stateBefore === null || (typeof record.stateBefore === "string" && HASH.test(record.stateBefore))) &&
-    typeof record.stateAfter === "string" &&
-    HASH.test(record.stateAfter) &&
-    Number.isFinite(Date.parse(record.recordedAt ?? "")) &&
-    Number.isFinite(Date.parse(record.expiresAt ?? "")) &&
-    typeof record.result === "string" &&
-    Buffer.byteLength(record.result) <= MAX_REPEAT_RESULT_BYTES
+    Value.Check(RepeatGuardRecordsV1Schema, value) &&
+    value.records.length <= MAX_REPEAT_RECORDS &&
+    value.records.every(
+      (record) =>
+        Number.isFinite(Date.parse(record.recordedAt)) &&
+        Number.isFinite(Date.parse(record.expiresAt)) &&
+        Buffer.byteLength(record.result) <= MAX_REPEAT_RESULT_BYTES,
+    )
   );
 }
 
@@ -194,10 +183,8 @@ export async function readRepeatRecords(runDirectory: string): Promise<RepeatRec
       await handle.close();
     }
     if (bytes.byteLength > MAX_REPEAT_GUARD_FILE_BYTES) return [];
-    const parsed = JSON.parse(bytes.toString("utf8")) as Partial<RepeatGuardFile>;
-    if (parsed?.version !== 1 || !Array.isArray(parsed.records) || parsed.records.length > MAX_REPEAT_RECORDS)
-      return [];
-    return parsed.records.every(validRecord) ? parsed.records : [];
+    const parsed = JSON.parse(bytes.toString("utf8")) as unknown;
+    return validRecords(parsed) ? parsed.records : [];
   } catch {
     return [];
   }
@@ -270,7 +257,9 @@ async function storeRepeatRecord(
       record.stateAfter === scope.state && Date.parse(record.expiresAt) > now.getTime() && record.callHash !== callHash,
   );
   const records = [...live, ...(candidate === undefined ? [] : [candidate])].slice(-maxRecords);
-  await atomicWriteJson(join(scope.runDirectory, REPEAT_GUARD_FILE), { version: 1, records });
+  const file: RepeatGuardRecordsV1 = { schemaVersion: CONTRACT_VERSION, records };
+  if (!validRecords(file)) throw new Error("Repeat records do not satisfy repeat-guard-records-v1");
+  await atomicWriteJson(join(scope.runDirectory, REPEAT_GUARD_FILE), file);
 }
 
 /**
@@ -365,7 +354,6 @@ async function guardedCall<T extends object>(
       after,
       storable
         ? {
-            version: 1,
             fingerprint,
             callHash,
             operation: call.operation,

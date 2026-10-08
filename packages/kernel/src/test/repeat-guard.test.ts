@@ -25,6 +25,8 @@ import {
   type RepeatSafeOutcome,
   type RepeatScope,
 } from "../index.js";
+import { CONTRACT_VERSION, RepeatGuardRecordsV1Schema, registerContractFormats } from "@apexops/contracts";
+import { Value } from "@sinclair/typebox/value";
 
 async function fixture(start = "2026-01-01T00:00:00.000Z") {
   const root = await mkdtemp(join(tmpdir(), "apex-repeat-guard-"));
@@ -535,10 +537,12 @@ test("repeat records survive a restart because they are stored with the run", as
   const { call, runDirectory, worktree, lockDirectory } = await fixture();
   const first = await call();
   const stored = JSON.parse(await readFile(join(runDirectory, REPEAT_GUARD_FILE), "utf8")) as {
-    version: number;
+    schemaVersion: string;
     records: Array<{ result: string; fingerprint: string }>;
   };
-  assert.equal(stored.version, 1);
+  assert.equal(stored.schemaVersion, CONTRACT_VERSION);
+  registerContractFormats();
+  assert.equal(Value.Check(RepeatGuardRecordsV1Schema, stored), true);
   assert.equal(stored.records.length, 1);
   assert.equal(stored.records[0]!.result, JSON.stringify(first.value));
   assert.equal(stored.records[0]!.fingerprint, first.fingerprint);
@@ -619,9 +623,21 @@ test("a corrupt or unsafe record file disables replay instead of forging a resul
   const stored = JSON.parse(await readFile(join(runDirectory, REPEAT_GUARD_FILE), "utf8")) as {
     records: Array<Record<string, unknown>>;
   };
+  const valid = structuredClone(stored);
   stored.records[0]!.callHash = "not-a-hash";
   await writeFile(join(runDirectory, REPEAT_GUARD_FILE), JSON.stringify(stored));
   assert.deepEqual(await readRepeatRecords(runDirectory), []);
   assert.equal((await call(undefined, { effect: async () => undefined })).repeated, false);
   assert.equal(executions(), 3);
+  // The file must satisfy the strict repeat-guard-records-v1 contract: unknown members disable replay too.
+  for (const tampered of [
+    { ...valid, unexpected: true },
+    { ...valid, records: [{ ...valid.records[0], unexpected: true }] },
+    { ...valid, schemaVersion: "2.0.0" },
+  ]) {
+    await writeFile(join(runDirectory, REPEAT_GUARD_FILE), JSON.stringify(tampered));
+    assert.deepEqual(await readRepeatRecords(runDirectory), []);
+  }
+  await writeFile(join(runDirectory, REPEAT_GUARD_FILE), JSON.stringify(valid));
+  assert.equal((await readRepeatRecords(runDirectory)).length, 1);
 });
