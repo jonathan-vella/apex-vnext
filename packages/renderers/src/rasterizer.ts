@@ -89,7 +89,16 @@ export function loadBundledRasterizer(
     throw new Error(
       `PNG rasterizer ${manifest.package} binary for ${target} failed its integrity check; ${unavailable}`,
     );
-  const binding = host.dlopen(path) as Partial<ResvgBinding> | undefined;
+  let binding: Partial<ResvgBinding> | undefined;
+  try {
+    binding = host.dlopen(path) as Partial<ResvgBinding> | undefined;
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `PNG rasterizer ${manifest.package} binary for ${target} could not be loaded (${reason}); ${unavailable}`,
+      { cause: error },
+    );
+  }
   if (typeof binding?.Resvg !== "function")
     throw new Error(`PNG rasterizer ${manifest.package} binary for ${target} has no Resvg export; ${unavailable}`);
   return binding as ResvgBinding;

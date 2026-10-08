@@ -83,10 +83,23 @@ test("the bundled rasterizer refuses unsupported, musl, missing and tampered bin
   assert.deepEqual(opened, [], "no binary is loaded unless it matches its pinned hash");
 });
 
-test("the bundled rasterizer rejects a binary without the Resvg export", async (context) => {
+test("the bundled rasterizer reports a binary that fails to load or lacks the Resvg export", async (context) => {
   const { base, manifest, host } = await fixture(context);
   const empty = { ...host("linux", "x64"), dlopen: () => ({}) };
   assert.throws(() => loadBundledRasterizer({ ...manifest, root: "../" }, base, empty), /has no Resvg export/u);
+  const failing = {
+    ...host("win32", "x64"),
+    dlopen: () => {
+      throw new Error("The specified module could not be found.");
+    },
+  };
+  assert.throws(
+    () => loadBundledRasterizer({ ...manifest, root: "../" }, base, failing),
+    (error: Error) =>
+      error.message ===
+        "PNG rasterizer @resvg/resvg-js binary for win32-x64 could not be loaded (The specified module could not be found.); SVG output is available" &&
+      error.cause instanceof Error,
+  );
 });
 
 test("the bundled rasterizer renders a PNG with the installed platform binary", async (context) => {

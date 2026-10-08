@@ -750,6 +750,10 @@ async function renderThroughPackagedServer(plugin, preload = []) {
 
 const hostPlatform = `${process.platform}-${process.arch}`;
 const nativePlatforms = ["linux-x64", "win32-x64"];
+// The shipped Linux binary needs glibc; a musl host falls back to SVG before any hash check.
+const hostLoadsShippedBinary =
+  nativePlatforms.includes(hostPlatform) &&
+  (process.platform !== "linux" || process.report.getReport().header.glibcVersionRuntime !== undefined);
 
 test("plugin ships the pinned resvg binaries, license and provenance under native/", async (context) => {
   const { outputDirectory, files, native } = await buildInto(context, "native");
@@ -822,11 +826,8 @@ test("plugin native manifest rejects drift from the shipped platform packages", 
 });
 
 test("packaged MCP server renders Gate 2 diagrams to PNG with the shipped binary", async (context) => {
-  if (
-    !nativePlatforms.includes(hostPlatform) ||
-    (process.platform === "linux" && process.report.getReport().header.glibcVersionRuntime === undefined)
-  ) {
-    context.skip(`no shipped binary for ${hostPlatform}`);
+  if (!hostLoadsShippedBinary) {
+    context.skip(`no loadable shipped binary for ${hostPlatform}`);
     return;
   }
   const { directory, readme } = await renderThroughPackagedServer(await offlinePlugin(context, undefined, "demo"));
@@ -848,9 +849,7 @@ test("packaged MCP server writes SVG only on an unsupported platform or a tamper
   await writeFile(join(tampered.pluginRoot, "native/resvg-js", hostBinary), "replaced");
   for (const [plugin, preload, reason] of [
     [unsupported, [arch], `is not bundled for ${process.platform}-riscv64`],
-    ...(nativePlatforms.includes(hostPlatform)
-      ? [[tampered, [], `binary for ${hostPlatform} failed its integrity check`]]
-      : []),
+    ...(hostLoadsShippedBinary ? [[tampered, [], `binary for ${hostPlatform} failed its integrity check`]] : []),
   ]) {
     const { directory, readme } = await renderThroughPackagedServer(plugin, preload);
     for (const name of diagramNames) {
