@@ -32,5 +32,21 @@
   "assets": {
     "sourceRoot": "packages/cli/assets",
     "targetRoot": "assets"
+  },
+  "native": {
+    "package": "@resvg/resvg-js",
+    "targetRoot": "native/resvg-js",
+    "source": "https://github.com/yisibl/resvg-js",
+    "binaries": {
+      "linux-x64": {
+        "package": "@resvg/resvg-js-linux-x64-gnu",
+        "file": "resvgjs.linux-x64-gnu.node",
+        "libc": "glibc"
+      },
+      "win32-x64": {
+        "package": "@resvg/resvg-js-win32-x64-msvc",
+        "file": "resvgjs.win32-x64-msvc.node"
+      }
+    }
   }
 }

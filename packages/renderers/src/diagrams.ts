@@ -1,4 +1,3 @@
-import { createRequire } from "node:module";
 import type { ArchitectureV1, CostEstimateV1 } from "@apexops/contracts";
 import { stableJson } from "./markdown.js";
 
@@ -217,25 +216,4 @@ export function renderCostUncertaintyDiagram(cost: CostEstimateV1): DiagramSourc
   return source(spec, document(spec.title, height, ranges, "Lower, base, and upper monthly cost by priced line item"));
 }
 
-type ResvgModule = typeof import("@resvg/resvg-js");
-
-const requireModule = createRequire(import.meta.url);
-let resvg: ResvgModule | undefined;
-
-// The native rasterizer loads on first use: the plugin's single-file MCP bundle cannot carry platform binaries, so it
-// reports PNG output as unavailable while SVG output still works.
-function loadResvg(): ResvgModule {
-  if (resvg !== undefined) return resvg;
-  try {
-    resvg = requireModule("@resvg/resvg-js") as ResvgModule;
-    return resvg;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "MODULE_NOT_FOUND")
-      throw new Error("PNG rasterizer @resvg/resvg-js is not installed; SVG output is available");
-    throw error;
-  }
-}
-
-export function rasterizeDiagram(svg: string): Uint8Array {
-  return new (loadResvg().Resvg)(svg).render().asPng();
-}
+export { rasterizeDiagram } from "./rasterizer.js";

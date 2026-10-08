@@ -19,5 +19,9 @@ First marketplace release of APEX as one Agent Plugins 1.0 plugin.
 - The `apex-azure-pricing` MCP server: Azure Resource Manager MCP over streamable HTTP with the `CostManagement` and
   `Pricing` toolsets. It replaces `azure-resource-manager-mcp` from the retired workspace `.mcp.json`; agent tool
   references use `apex-azure-pricing/<tool>`.
+- PNG diagrams on `linux-x64` (glibc) and `win32-x64` hosts: the plugin ships the prebuilt `@resvg/resvg-js` 2.6.2
+  binaries under `native/resvg-js/` with their MPL-2.0 license and loads one only when its SHA-256 matches the hash
+  pinned in the bundle. Other platforms, musl Linux and altered binaries fall back to Python and SVG diagrams and report
+  PNG as unavailable. The binaries add about 8.5 MB to the package.
 - Managed hooks that deny the APEX agent as a task target, and every `apex-azure-pricing` tool except the read-only
   pricing and cost tools from `tools/registry/arm-mcp-cost-pricing.v1.json`.
