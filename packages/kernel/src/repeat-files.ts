@@ -69,6 +69,7 @@ export async function snapshotRepeatFiles(
   const maxBytes = options.maxBytes ?? MAX_REPEAT_FILE_BYTES;
   const retry: SharingRetryOptions = {
     ...(options.platform === undefined ? {} : { platform: options.platform }),
+    ...(options.attempts === undefined ? {} : { attempts: options.attempts }),
     ...(options.sleep === undefined ? {} : { sleep: options.sleep }),
   };
   const unique = [...new Set(roots.map((root) => resolve(root)))].sort();
@@ -147,6 +148,16 @@ export async function snapshotRepeatFiles(
     const entry = await hash(path);
     if (entry !== undefined) add(path, entry);
   };
+  for (const root of unique) {
+    if (!unique.some((other) => other !== root && within(other, root))) continue;
+    // A nested root is read through its enclosing root, so check it here for the symbolic-link rule.
+    try {
+      const metadata = await retrySharingViolations(() => lstat(root, { bigint: true }), retry);
+      if (metadata.isSymbolicLink()) throw new RepeatFileSnapshotError("A repeat-bound root is a symbolic link");
+    } catch (error) {
+      if (!missing(error)) throw error;
+    }
+  }
   for (const root of unique) {
     if (unique.some((other) => other !== root && within(other, root))) continue;
     await visit(root, true);

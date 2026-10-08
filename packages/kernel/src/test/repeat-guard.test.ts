@@ -854,7 +854,9 @@ test("a repeat file snapshot streams large files, fails closed over budget, and 
     const linked = join(root, "linked");
     await symlink(root, linked);
     await assert.rejects(snapshotRepeatFiles([linked]), RepeatFileSnapshotError);
+    await assert.rejects(snapshotRepeatFiles([root, linked]), RepeatFileSnapshotError);
   }
+  await assert.rejects(snapshotRepeatFiles([root], { attempts: 0 }), RangeError);
 });
 
 async function boundFixture() {
