@@ -224,6 +224,7 @@ import {
 } from "./assets.js";
 import { dependencyRevision as calculateDependencyRevision } from "./dependency-revision.js";
 import { ApexError, EXIT_CODES, governanceBaselineApexError, retiredProjectionError } from "./errors.js";
+import { REVIEW_GUARDED_OPERATIONS, type ReviewGuardedOperation } from "./review-guard.js";
 import { APEX_VERSION, meetsMinimumVersion, MINIMUM_NODE_VERSION } from "./version.js";
 import {
   registerWorkflowValidators,
@@ -863,12 +864,14 @@ export class ApexService {
     rationale: string;
     externalRef?: string;
   }): Promise<ImprovementDecisionV1> {
+    await this.assertNoPendingReview("improvementDecide");
     const run = await this.currentRun();
     await this.acquireRunWriterLease(run);
     return (await this.improvements(run)).decide({ projectId: run.projectId, ...input });
   }
 
   async improvementDeleteObservation(observationId: string): Promise<{ deleted: string }> {
+    await this.assertNoPendingReview("improvementDeleteObservation");
     const run = await this.currentRun();
     const store = await this.improvements(run);
     const observation = (await store.listObservations()).find((item) => item.observationId === observationId);
@@ -881,6 +884,7 @@ export class ApexService {
   }
 
   async improvementPrune(): Promise<{ observations: number; decisions: number }> {
+    await this.assertNoPendingReview("improvementPrune");
     const run = await this.currentRun();
     await this.acquireRunWriterLease(run);
     return (await this.improvements(run)).prune();
@@ -1146,6 +1150,7 @@ export class ApexService {
   }
 
   async provisionGovernance(config: GovernanceSetupConfigV1, expectedHash: string, confirm: boolean) {
+    await this.assertNoPendingReview("provisionGovernance");
     if (confirm !== true)
       throw new ApexError(
         "APEX_AUTHORIZATION",
@@ -1405,6 +1410,7 @@ export class ApexService {
 
   /** Executes exactly the confirmed repository creation, remote and non-forced push actions. */
   async publishRepository(config: RepositoryPublishConfigV1, expectedHash: string, confirm: boolean) {
+    await this.assertNoPendingReview("publishRepository");
     if (confirm !== true)
       throw new ApexError(
         "APEX_AUTHORIZATION",
@@ -2066,6 +2072,7 @@ export class ApexService {
   }
 
   async deleteProject(projectId: ProjectId, confirmed: boolean): Promise<{ deleted: ProjectId; selected?: Selection }> {
+    await this.assertNoPendingReview("deleteProject");
     if (!confirmed)
       throw new ApexError("APEX_USAGE", "project deletion requires explicit confirmation", EXIT_CODES.usage);
     const projects = await this.listProjects();
@@ -5111,6 +5118,68 @@ export class ApexService {
     return completion;
   }
 
+  /**
+   * Review requests in this workspace that still wait for their rubber-duck capture: in each run, the last issued task
+   * is a review task with a request, it is neither completed nor cancelled, and it has not expired. A rejected capture
+   * leaves the review pending until the next request or a cancellation. Unreadable task files count as pending.
+   */
+  private async pendingReviews(): Promise<Array<{ projectId: string; runId: string; taskId: string }>> {
+    const pending: Array<{ projectId: string; runId: string; taskId: string }> = [];
+    const projectsDirectory = join(this.root, ".apex", "projects");
+    const projectIds = await readdir(projectsDirectory).catch((error: unknown) => {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return [] as string[];
+      throw error;
+    });
+    for (const projectId of projectIds.sort()) {
+      const runIds = await readdir(join(projectsDirectory, projectId, "runs")).catch((error: unknown) => {
+        if (["ENOENT", "ENOTDIR"].includes((error as NodeJS.ErrnoException).code ?? "")) return [] as string[];
+        throw error;
+      });
+      for (const runId of runIds.sort()) {
+        if (!Value.Check(RunIdSchema, runId)) continue;
+        const runDirectory = join(projectsDirectory, projectId, "runs", runId);
+        const events = await new EventJournal(join(runDirectory, "journal")).replay();
+        const issued = events.findLast(({ type }) => type === "task.issued")?.payload as
+          { taskId?: unknown; review?: { nonce?: unknown } } | undefined;
+        if (typeof issued?.taskId !== "string" || typeof issued.review?.nonce !== "string") continue;
+        const taskId = issued.taskId;
+        if (
+          events.some(
+            ({ type, payload }) =>
+              (type === "task.completed" || type === "task.cancelled") &&
+              (payload as { taskId?: unknown } | null)?.taskId === taskId,
+          )
+        )
+          continue;
+        const task = await readFile(join(runDirectory, "tasks", `${taskId}.json`), "utf8")
+          .then((text) => JSON.parse(text) as { expiresAt?: unknown })
+          .catch(() => undefined);
+        const expiresAt = typeof task?.expiresAt === "string" ? Date.parse(task.expiresAt) : Number.NaN;
+        if (Number.isFinite(expiresAt) && expiresAt <= this.clock().getTime()) continue;
+        pending.push({ projectId, runId, taskId });
+      }
+    }
+    return pending;
+  }
+
+  /**
+   * DECISION-031 amendment (2026-10-08): while a review waits for its capture, refuse operations that approve, delete
+   * or publish (REVIEW_GUARDED_OPERATIONS), so an inherited rubber-duck cannot use them even when hooks fail open.
+   */
+  private async assertNoPendingReview(operation: ReviewGuardedOperation): Promise<void> {
+    const [pending] = await this.pendingReviews();
+    if (pending === undefined) return;
+    throw new ApexError(
+      "APEX_REVIEW_PENDING",
+      `${operation} (${REVIEW_GUARDED_OPERATIONS[operation]}) is blocked while a rubber-duck review waits for its ` +
+        `capture in project ${pending.projectId}, run ${pending.runId} (task ${pending.taskId}). Finish the review ` +
+        `with reviewComplete, or cancel it from a terminal: apex project use --project ${pending.projectId} --run ` +
+        `${pending.runId}, then apex task cancel --task ${pending.taskId}.`,
+      EXIT_CODES.conflict,
+      { reason: "REVIEW_PENDING", operation, ...pending },
+    );
+  }
+
   private reviewNonceConsumed(events: Awaited<ReturnType<EventJournal["replay"]>>, nonce: string): boolean {
     return events.some((event) => {
       const payload = event.payload as { nonce?: unknown; capture?: { nonce?: unknown } } | null;
@@ -6124,6 +6193,7 @@ export class ApexService {
   }
 
   async resolveReview(resolution: ReviewResolution): Promise<void> {
+    await this.assertNoPendingReview("resolveReview");
     const run = await this.currentRun();
     const events = await this.journal(run).replay();
     const reviewEvent = [...events]
@@ -6201,6 +6271,7 @@ export class ApexService {
     reviewHash: string,
     decisions: ReviewDecision[],
   ): Promise<{ status: "revision_requested" | "resolved" }> {
+    await this.assertNoPendingReview("decideReview");
     if (decisions.length === 0 || new Set(decisions.map(({ findingId }) => findingId)).size !== decisions.length) {
       throw new ApexError("APEX_VALIDATION", "Review decisions must be nonempty and unique", EXIT_CODES.validation);
     }
@@ -6433,6 +6504,7 @@ export class ApexService {
     actor: string,
     options: GateDecisionOptions = {},
   ): Promise<ApprovalEvidenceV1> {
+    await this.assertNoPendingReview("decideGateNumber");
     const run = await this.currentRun();
     if (gateNumber === 4)
       await this.assertGeneratedReviewUnmodified(join(this.operationsReviewDirectory(run), "approval.md"));
@@ -6935,6 +7007,7 @@ export class ApexService {
   }
 
   async deploy(expectedPreviewHash?: string): Promise<{ operation: unknown; inventory: ResourceInventoryV1 }> {
+    await this.assertNoPendingReview("deploy");
     const run = await this.currentRun();
     const transferStore = new WriterTransferStore(this.projects.runDirectory(run.projectId, run.runId), this.clock);
     await this.assertCurrentWriterAuthority(run, transferStore);
@@ -7280,6 +7353,7 @@ export class ApexService {
   }
 
   async promote(environment: string, targetScope: string): Promise<RunConfigV1> {
+    await this.assertNoPendingReview("promote");
     const source = await this.currentRun();
     const sourceEvents = await this.journal(source).replay();
     if (![1, 2, 3].every((gate) => this.gateApproved(source, gate)))
@@ -7523,6 +7597,7 @@ export class ApexService {
     currentHead: string;
     ttlMs: number;
   }): Promise<unknown> {
+    await this.assertNoPendingReview("createWriterTransfer");
     const run = await this.currentRun();
     if (input.commit !== input.currentHead)
       throw new ApexError("APEX_STALE", "Transfer commit does not match current Git head", EXIT_CODES.stale);
@@ -7563,6 +7638,7 @@ export class ApexService {
   }
 
   async acceptWriterTransfer(claimHash: string, recipient: string, currentHead: string): Promise<unknown> {
+    await this.assertNoPendingReview("acceptWriterTransfer");
     const run = await this.currentRun();
     return new WriterTransferStore(this.projects.runDirectory(run.projectId, run.runId), this.clock).accept({
       claimHash,
@@ -7601,6 +7677,7 @@ export class ApexService {
     file?: string;
     required: boolean;
   }): Promise<unknown> {
+    await this.assertNoPendingReview("acceptEvidence");
     if ((input.value === undefined) === (input.file === undefined))
       throw new ApexError("APEX_USAGE", "Evidence requires exactly one value or file", EXIT_CODES.usage);
     const store = await this.evidenceStore(input.kind, input.contentType);
@@ -7678,6 +7755,7 @@ export class ApexService {
     return (await this.evidenceStore()).exportTelemetry();
   }
   async deleteTelemetry(): Promise<{ deleted: true }> {
+    await this.assertNoPendingReview("deleteTelemetry");
     await (await this.evidenceStore()).deleteTelemetry();
     return { deleted: true };
   }

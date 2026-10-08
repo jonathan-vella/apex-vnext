@@ -462,7 +462,9 @@ test("rejected captures keep state transfer working, and non-UTF-8 captures are 
   assert.equal(payload.captureHashes.length, 1);
   assert.deepEqual(payload.quarantined, [`${nonce}-1111111111111111.json`]);
   assert.deepEqual(await captureFiles(nonce), []);
-  // State transfer carries every journal-referenced object and requires each to be JSON.
+  // State transfer carries every journal-referenced object and requires each to be JSON. A rejected review is still
+  // pending, so cancel it before the writer transfer.
+  await service.cancelTask(taskId);
   await rm(join(root, ".apex", "runtime"), { recursive: true, force: true });
   await rm(join(root, ".apex", "runtime-generations"), { recursive: true, force: true });
   await mkdir(join(root, ".apex", "runtime"), { recursive: true });

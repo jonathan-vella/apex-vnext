@@ -25,6 +25,7 @@ export type ApexErrorCode =
   | "APEX_AUTHORIZATION"
   | "APEX_CURSOR_INVALID"
   | "APEX_RESULT_TOO_LARGE"
+  | "APEX_REVIEW_PENDING"
   | "APEX_INTERNAL";
 
 export class ApexError extends Error {
@@ -58,6 +59,8 @@ const REMEDIATION_BY_CODE: Record<ApexErrorCode, string> = {
     "Discard the cursor, call the same tool again without it, and continue only from the new result; cursors do not survive an MCP server restart.",
   APEX_RESULT_TOO_LARGE:
     "Request a smaller bounded result, use a paging-capable read tool, or narrow the requested document or collection.",
+  APEX_REVIEW_PENDING:
+    "Finish the pending rubber-duck review with reviewComplete, or have the user cancel it from a terminal with apex task cancel; then retry.",
   APEX_INTERNAL:
     "Report this with the server log; retry only after checking status because side effects may have completed.",
 };

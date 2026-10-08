@@ -29,6 +29,8 @@ const errorMessages: Record<ApexErrorCode, string> = {
     "Operation is not authorized in the current workflow state; check status and approval requirements.",
   APEX_CURSOR_INVALID: "Cursor is invalid for this tool, workspace, or server session.",
   APEX_RESULT_TOO_LARGE: "MCP result exceeded the bounded result size and cannot be paged safely.",
+  APEX_REVIEW_PENDING:
+    "A rubber-duck review is waiting for its capture; operations that approve, delete or publish are blocked until it completes or is cancelled.",
   APEX_INTERNAL: "APEX could not complete the operation.",
 };
 

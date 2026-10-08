@@ -100,6 +100,17 @@ Subagent calls carry the subagent's own session ID, so this covers rubber-duck a
 worker waits until the mark clears. The read-only list ships as `apex-mcp-tools.json`, generated from the MCP
 adapter at plugin build time; without it every APEX tool is denied during a run.
 
+The kernel adds a guard that does not depend on hooks (DECISION-031 amendment of 2026-10-08). A review is pending while
+the last task issued in a run is a review task with a rubber-duck request that is not completed, not cancelled and not
+expired; a rejected capture keeps it pending until the next request. While any run in the workspace has a pending
+review, every operation classified in `packages/cli/src/review-guard.ts` as approving, deleting or publishing fails
+with `APEX_REVIEW_PENDING` (exit code 4), whether it comes from MCP or the CLI. That covers `gateDecide`,
+`reviewDecide`, `projectDelete`, `promote` and `submitEvidence`, and also the CLI-only review resolution, deployment,
+repository publication, governance provisioning, writer transfer, improvement decision and deletion, and telemetry
+deletion. Reads, staging, `nextTask`, `taskContext` and `reviewComplete` stay available. To continue, finish the review
+with `reviewComplete`, or cancel it from a terminal with `apex project use --project <id> --run <run>` and
+`apex task cancel --task <taskId>`; the CLI error names the project, run and task.
+
 What this guarantees and what it does not:
 
 - Findings exist only when a hook-written capture verifies against the issued request. An agent cannot add, remove or
@@ -110,7 +121,10 @@ What this guarantees and what it does not:
   folder (another agent with a shell, or the user) can read the key and forge a capture. The kernel does not defend
   against that, as DECISION-031's accepted risks allow.
 - Hooks only capture, mark and deny; the kernel decides. If hooks are disabled or time out, no capture exists and the
-  review cannot complete, but rubber-duck calls are no longer denied. Rubber-duck's model is not pinned.
+  review cannot complete, and rubber-duck calls are no longer denied by the hook. The kernel's pending-review guard
+  still refuses every approve, delete and publish operation until the review completes or is cancelled; other
+  state-changing tools (for example `recordInput` or staging) are then guarded only by their usual kernel checks.
+  Rubber-duck's model is not pinned.
 
 ## Read And Operations Tools
 

@@ -52,6 +52,7 @@ function contract(schema: TObject | TUnion<TObject[]>, options: { pageable?: boo
             "APEX_AUTHORIZATION",
             "APEX_CURSOR_INVALID",
             "APEX_RESULT_TOO_LARGE",
+            "APEX_REVIEW_PENDING",
             "APEX_INTERNAL",
           ].map((code) => Type.Literal(code)),
         ),

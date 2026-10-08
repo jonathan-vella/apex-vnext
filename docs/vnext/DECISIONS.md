@@ -233,6 +233,11 @@ denies APEX state-changing MCP tools during rubber-duck calls; a negative test m
 counts as findings. Accepted risk: its model is not pinned. Slice 11 finding R9 (findings drifting across blind retries)
 motivates kernel capture.
 
+Amendment 2026-10-08 (coordinator decision on PR #421, maintainer unavailable): hooks fail open when missing or timed
+out, so the kernel also refuses every operation that approves, deletes or publishes (one classification in
+`packages/cli/src/review-guard.ts`) with `APEX_REVIEW_PENDING` while any review waits for its capture. Completing the
+review, or cancelling its task from the CLI, lifts the guard; hooks still only capture and deny.
+
 ## DECISION-032: Use One Interactive APEX Agent
 
 Maintainer direction on 2026-10-02 and 2026-10-05 amends DECISION-029. One user-facing `APEX` agent replaces the
