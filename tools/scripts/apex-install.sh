@@ -8,7 +8,8 @@ usage() {
         '  --install --yes          Apply the displayed installation plan.' \
         '  --allow-system           Separately approve Ubuntu package/repository changes using sudo -n.' \
         '  --replace-incompatible   Permit a user-local tool to shadow an incompatible installed version.' \
-        'Requires ready Ubuntu WSL2; does not install Windows/WSL, sign in, initialize repos or change Azure.'
+        'Requires Ubuntu on Linux or WSL2, the Copilot CLI host. VS Code and the Copilot app run on native Windows.' \
+        'Does not install Windows/WSL or the APEX plugin, sign in, initialize repos or change Azure.'
 }
 
 fail() { printf 'ERROR: %s\n' "$*" >&2; }
@@ -16,11 +17,12 @@ fail() { printf 'ERROR: %s\n' "$*" >&2; }
 require_host() {
     local kernel
     kernel="$(uname -r)"
-    [[ "${kernel,,}" == *microsoft* && "${kernel,,}" == *wsl2* ]] || {
-        fail 'Ubuntu WSL2 is required; prepare the Windows host first.'; return 1;
-    }
-    [[ "$(id -u)" != 0 ]] || { fail 'Run as your normal WSL user, not root.'; return 1; }
-    [[ ! -e /.dockerenv && ! -e /run/.containerenv ]] || { fail 'Use WSL2 without a container.'; return 1; }
+    [[ "$(uname -s)" == Linux ]] || { fail 'Ubuntu on Linux or WSL2 is required.'; return 1; }
+    if [[ "${kernel,,}" == *microsoft* && "${kernel,,}" != *microsoft-standard* && "${kernel,,}" != *wsl2* ]]; then
+        fail 'WSL1 cannot run the Copilot CLI sandbox; convert the distribution to WSL2.'; return 1
+    fi
+    [[ "$(id -u)" != 0 ]] || { fail 'Run as your normal user, not root.'; return 1; }
+    [[ ! -e /.dockerenv && ! -e /run/.containerenv ]] || { fail 'Use Linux or WSL2 without a container.'; return 1; }
     [[ -r /etc/os-release ]] || { fail 'Linux distribution is unavailable.'; return 1; }
     # shellcheck disable=SC1091
     . /etc/os-release
@@ -49,7 +51,7 @@ minimum_version() {
         node) printf '%s' '__APEX_NODE_VERSION__' ;;
         npm) printf '%s' '__APEX_NPM_VERSION__' ;;
         copilot) printf '%s' '__APEX_COPILOT_VERSION__' ;;
-        code) printf '%s' '__APEX_VSCODE_VERSION__' ;;
+        bwrap) printf '0.5.0' ;;
         *) printf '0.0.0' ;;
     esac
 }
@@ -66,13 +68,13 @@ plan() {
     local tool location version state
     actions=()
     blocked=0
-    printf 'APEX installation plan: %s; both Copilot clients and both IaC tracks\n' "$release"
-    for tool in git node npm gh copilot az bicep terraform pwsh azd code apex; do
+    printf 'APEX installation plan: %s; Copilot CLI host and both IaC tracks\n' "$release"
+    for tool in git node npm gh copilot bwrap slirp4netns az bicep terraform pwsh azd apex; do
         location="$(command -v "$tool" || true)"
         version='not available'
         state=install
         if [[ -n "$location" ]]; then
-            if [[ "$tool" != code && ( "$location" == /mnt/* || "$location" == *.exe ) ]]; then
+            if [[ "$location" == /mnt/* || "$location" == *.exe ]]; then
                 state=conflict
             elif version="$(tool_version "$tool")" && compatible "$tool" "$version"; then
                 state=preserve
@@ -80,17 +82,14 @@ plan() {
                 state=conflict
             fi
         fi
-        if [[ "$tool" == code && "$state" != preserve ]]; then
-            state=host-action
-            blocked=1
-        elif [[ "$state" == conflict && "$replace" != true ]]; then
+        if [[ "$state" == conflict && "$replace" != true ]]; then
             blocked=1
         elif [[ "$state" != preserve ]]; then
             actions+=("$tool")
         fi
         printf '%-12s %-12s %s\n' "$tool" "$state" "$version"
     done
-    printf '%s\n' 'VS Code host, WSL/Copilot extensions, account access and interactive login require separate verification.'
+    printf '%s\n' 'VS Code is not checked: this host runs Copilot CLI. Sign-in, sandboxing and the APEX plugin are separate steps.'
     printf '%s\n' 'Downloads: pinned Node/npm/Copilot; other missing tools use official stable releases with integrity checks.'
     printf '%s\n' 'System prerequisites if missing: ca-certificates, curl, jq, Python 3, xz-utils, gnupg and Git.'
     printf '%s\n' 'Missing Azure CLI adds its Microsoft signed-package repository for this Ubuntu release; unsupported releases fail.'
@@ -267,6 +266,8 @@ install_plan() {
                 link_tool "$prefix/bin/npm" npm || return 1; link_tool "$prefix/bin/npx" npx || return 1 ;;
             gh) github_tool cli/cli "^gh_.*_linux_${architecture}\\.tar\\.gz$" bin/gh gh || return 1 ;;
             copilot) github_tool github/copilot-cli "^copilot-linux-${node_arch}\\.tar\\.gz$" copilot copilot "v$(minimum_version copilot)" || return 1 ;;
+            bwrap) system_packages bubblewrap || return 1 ;;
+            slirp4netns) system_packages slirp4netns || return 1 ;;
             az) install_azure_cli || return 1 ;;
             bicep) github_tool Azure/bicep "^bicep-linux-${node_arch}$" bicep bicep || return 1 ;;
             terraform) install_terraform || return 1 ;;
@@ -282,7 +283,7 @@ install_plan() {
     done
     install_bootstrap_launcher || return 1
     printf 'Local tool installation verified. Add %s/.local/bin to PATH in new terminals.\n' "$HOME"
-    printf '%s\n' 'Pending: verify VS Code WSL/Copilot extensions and account access, then use apex bootstrap plan.'
+    printf '%s\n' 'Pending: copilot login, copilot plugin install apex@apex-plugins, apex bootstrap, then apex doctor.'
 }
 
 main() {
@@ -304,7 +305,7 @@ main() {
     valid_version "$release" || { fail 'An exact APEX release version is required, not a tag or command.'; return 2; }
     if [[ "$mode" == install && "$yes" != true ]]; then fail 'Installation requires --yes after reviewing the plan.'; return 2; fi
     if [[ "$mode" == install ]]; then
-        for tool in node npm copilot code; do
+        for tool in node npm copilot; do
             valid_version "$(minimum_version "$tool")" || { fail 'Use a generated release installer, not the source template.'; return 2; }
         done
     fi

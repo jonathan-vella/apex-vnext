@@ -228,6 +228,7 @@ import {
   type BundledPluginDeclaration,
 } from "./assets.js";
 import { dependencyRevision as calculateDependencyRevision } from "./dependency-revision.js";
+import { currentHostEnvironment, firstReleaseVersion, hostDoctorChecks, type HostEnvironment } from "./host-profile.js";
 import { ApexError, EXIT_CODES, governanceBaselineApexError, retiredProjectionError } from "./errors.js";
 import { MCP_TOOL_REVIEW_GUARDS, type ReviewGuardedTool } from "./mcp-tool-effects.js";
 import { APEX_VERSION, meetsMinimumVersion, MINIMUM_NODE_VERSION } from "./version.js";
@@ -439,6 +440,8 @@ export interface ServiceOptions {
   repeatWindowMs?: number;
   /** Folder shared with the managed rubber-duck capture hook; defaults to `$APEX_REVIEW_HOME` or `~/.apex/reviews`. */
   reviewHome?: string;
+  /** Host that doctor inspects; defaults to the running process. */
+  hostEnvironment?: HostEnvironment;
 }
 
 /** Canonical description of one state-changing call submitted through {@link ApexService.repeatSafe}. */
@@ -454,6 +457,8 @@ interface DoctorCheck {
   ok: boolean;
   value: string;
   remedy?: string;
+  /** Marks a passing advisory check; warnings never make doctor unhealthy. */
+  severity?: "warning";
 }
 
 const RELEASE_VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/u;
@@ -813,6 +818,7 @@ export class ApexService {
   private readonly customizationFailureInjector?: ServiceOptions["customizationFailureInjector"];
   private readonly processRunner: ProcessRunnerLike;
   private readonly workspaceLockHold = new AsyncLocalStorage<WorkspaceLockHold | undefined>();
+  private readonly host: HostEnvironment;
   private readonly improvementPolicy: ImprovementPolicyV1 | undefined;
   private improvementRuntime?: ImprovementStore;
   private requirementsDocumentTemplate?: Promise<{ content: string; hash: string }>;
@@ -823,6 +829,7 @@ export class ApexService {
   constructor(root: string, options: ServiceOptions = {}) {
     this.root = resolve(root);
     this.reviewHomeOverride = options.reviewHome;
+    this.host = options.hostEnvironment ?? currentHostEnvironment();
     this.workspacePath = canonicalWorkspacePath(options.workspacePath ?? root);
     this.clock = options.clock ?? (() => new Date());
     this.diagramRasterizer = options.diagramRasterizer ?? rasterizeDiagram;
@@ -7631,10 +7638,11 @@ export class ApexService {
       },
       { id: "workspace", ok: await this.exists(this.root), value: this.root, remedy: "Restore the workspace root" },
       { id: "apex", ok: apexExists, value: join(this.root, ".apex"), remedy: "Run apex init" },
-      await this.vscodeCheck(),
+      ...(await this.hostChecks()),
     ];
     if (apexExists && (await this.workspaceHasNoProjects())) {
       checks.push(
+        await this.pluginSettingsCheck(),
         await this.localGitBoundaryCheck(),
         ...(await this.managedFileChecks()),
         ...(await this.runtimeLockChecks()),
@@ -7666,6 +7674,7 @@ export class ApexService {
         value: auth.detail,
         remedy: "Authenticate with Azure outside doctor, then run setup --live",
       });
+      checks.push(await this.pluginSettingsCheck());
       checks.push(await this.localGitBoundaryCheck());
       checks.push(...(await this.managedFileChecks()));
       checks.push(...(await this.runtimeLockChecks(run)));
@@ -11059,54 +11068,89 @@ export class ApexService {
     return bytes;
   }
 
-  private async bundledVscodeMinimum(): Promise<string | undefined> {
+  private async bundledToolchainMinimums(): Promise<{ vscode?: string | undefined; copilotCli?: string | undefined }> {
     try {
       const assets = await resolveBundledAssets();
       const entry = assets.manifest.files.find(({ path }) => path === "config/toolchain.v1.json");
       const bytes = entry === undefined ? undefined : await readBundledFile(assets.root, entry.path);
-      if (entry === undefined || bytes === undefined || sha256Bytes(bytes) !== entry.sha256) return undefined;
-      const minimum = (JSON.parse(bytes.toString("utf8")) as { compatibilitySet?: { minimumVscode?: unknown } })
-        .compatibilitySet?.minimumVscode;
-      return typeof minimum === "string" && RELEASE_VERSION.test(minimum) ? minimum : undefined;
+      if (entry === undefined || bytes === undefined || sha256Bytes(bytes) !== entry.sha256) return {};
+      const set = (
+        JSON.parse(bytes.toString("utf8")) as { compatibilitySet?: { minimumVscode?: unknown; copilotCli?: unknown } }
+      ).compatibilitySet;
+      const release = (value: unknown) =>
+        typeof value === "string" && RELEASE_VERSION.test(value) ? value : undefined;
+      return { vscode: release(set?.minimumVscode), copilotCli: release(set?.copilotCli) };
+    } catch {
+      return {};
+    }
+  }
+
+  private async hostToolVersion(executable: string, args: readonly string[]): Promise<string | undefined> {
+    try {
+      const result = await this.processRunner.run({
+        executable,
+        args,
+        cwd: this.root,
+        env: this.host.env,
+        timeoutMs: 15_000,
+        maxOutputBytes: 4_096,
+      });
+      if (result.exitCode !== 0 || result.timedOut || result.outputTruncated) return undefined;
+      return firstReleaseVersion(result.stdout.split(/\r?\n/u)[0] ?? "");
     } catch {
       return undefined;
     }
   }
 
-  // VS Code is optional (Copilot CLI and the Copilot app do not need it), but an installed one must run the harness.
-  private async vscodeCheck(): Promise<DoctorCheck> {
-    const minimum = await this.bundledVscodeMinimum();
-    if (minimum === undefined)
-      return {
-        id: "vscode",
-        ok: false,
-        value: "bundled VS Code minimum unavailable",
-        remedy: "Reinstall the apex CLI package",
-      };
-    const remedy = `Update VS Code to ${minimum} or newer to use the Copilot harness`;
-    if (!(await this.executableChecker("code")))
-      return { id: "vscode", ok: true, value: `not found; ${minimum} or newer needed only for the VS Code harness` };
-    let version: string | undefined;
+  // The host decides which client checks apply: VS Code only on native Windows (and best-effort macOS), Copilot CLI as
+  // the session client on Linux and WSL2. See host-profile.ts.
+  private async hostChecks(): Promise<DoctorCheck[]> {
+    let plugin: { name: string; marketplace: string };
     try {
-      const result = await this.processRunner.run({
-        executable: "code",
-        args: ["--version"],
-        cwd: this.root,
-        timeoutMs: 15_000,
-        maxOutputBytes: 4_096,
-      });
-      const first = result.stdout.split(/\r?\n/u)[0]?.trim() ?? "";
-      if (result.exitCode === 0 && !result.timedOut && !result.outputTruncated && RELEASE_VERSION.test(first))
-        version = first;
+      plugin = await readBundledPluginDeclaration();
     } catch {
-      version = undefined;
+      plugin = { name: "apex", marketplace: "apex-plugins" };
     }
-    return {
-      id: "vscode",
-      ok: version !== undefined && meetsMinimumVersion(version, minimum),
-      value: version ?? "version unavailable from code --version",
-      remedy,
-    };
+    return hostDoctorChecks({
+      host: this.host,
+      minimums: await this.bundledToolchainMinimums(),
+      plugin,
+      apexVersion: APEX_VERSION,
+      executableExists: this.executableChecker,
+      toolVersion: (executable, args) => this.hostToolVersion(executable, args),
+    });
+  }
+
+  private async pluginSettingsCheck(): Promise<DoctorCheck> {
+    const remedy = "Run doctor --fix --yes to reinstall bundled managed files";
+    let plugin: { name: string; marketplace: string; marketplaceRepository: string };
+    try {
+      plugin = await readBundledPluginDeclaration();
+    } catch {
+      return { id: "plugin-settings", ok: false, value: "bundled plugin declaration unavailable", remedy };
+    }
+    const qualified = `${plugin.name}@${plugin.marketplace}`;
+    const path = join(this.root, ".github", "copilot", "settings.json");
+    try {
+      await this.assertSafeDestination(this.root, path);
+      const settings = JSON.parse(await readFile(path, "utf8")) as {
+        enabledPlugins?: Record<string, unknown>;
+        extraKnownMarketplaces?: Record<string, { source?: { repo?: unknown } }>;
+      } | null;
+      const enabled =
+        settings?.enabledPlugins?.[qualified] === true &&
+        settings.extraKnownMarketplaces?.[plugin.marketplace]?.source?.repo === plugin.marketplaceRepository;
+      return {
+        id: "plugin-settings",
+        ok: enabled,
+        value: enabled
+          ? `.github/copilot/settings.json enables ${qualified}`
+          : `.github/copilot/settings.json does not enable ${qualified}`,
+        remedy,
+      };
+    } catch {
+      return { id: "plugin-settings", ok: false, value: ".github/copilot/settings.json missing or invalid", remedy };
+    }
   }
 
   private async runtimeRootForRun(run: RunConfigV1): Promise<string> {
@@ -11390,7 +11434,7 @@ export class ApexService {
   }
 
   private async pathExecutableExists(executable: string): Promise<boolean> {
-    return resolveExecutable(executable) !== undefined;
+    return resolveExecutable(executable, { platform: this.host.platform, env: this.host.env }) !== undefined;
   }
 
   private async installCustomizations(

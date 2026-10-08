@@ -236,7 +236,8 @@ az account show --output table
 ```
 
 For VS Code, `code --version` must report 1.140 or later. Confirm that local sandboxing is on for your client and that
-`copilot plugin list` shows one `apex` plugin once a release is published.
+`copilot plugin list` shows one `apex` plugin once a release is published. After you install the CLI, `apex doctor`
+checks the same prerequisites for your host; see [Verify a clean host](manage-installation.md#verify-a-clean-host).
 
 ## Automated Repository Setup
 

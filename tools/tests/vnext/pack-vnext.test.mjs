@@ -628,6 +628,24 @@ test("packs and clean-installs the vNext runtime reproducibly", { timeout: 240_0
   );
   const revision = (await runInTest("git", ["rev-parse", "HEAD"], coe)).stdout.trim();
   const clientId = "github-copilot-cli";
+  // Doctor checks the host's Copilot CLI and plugin store; give it a ready fake host instead of the developer's own.
+  const hostBin = join(temporaryRoot, "host-bin");
+  const copilotHome = join(temporaryRoot, "copilot-home");
+  await mkdir(hostBin, { recursive: true });
+  await mkdir(copilotHome, { recursive: true });
+  await writeFile(join(hostBin, "copilot"), "#!/bin/sh\necho 'GitHub Copilot CLI 1.0.93.'\n", { mode: 0o755 });
+  await writeFile(join(hostBin, "copilot.cmd"), "@echo GitHub Copilot CLI 1.0.93.\r\n");
+  await writeFile(
+    join(copilotHome, "config.json"),
+    JSON.stringify({
+      installedPlugins: [{ name: "apex", marketplace: "apex-plugins", version: candidateVersion, enabled: true }],
+    }),
+  );
+  const pathKey = Object.keys(process.env).find((key) => key.toUpperCase() === "PATH") ?? "PATH";
+  const doctorEnv = {
+    COPILOT_HOME: copilotHome,
+    [pathKey]: `${hostBin}${process.platform === "win32" ? ";" : ":"}${process.env[pathKey] ?? ""}`,
+  };
   for (const mode of ["init", "bootstrap"]) {
     const consumer = mode === "init" ? project : await createConsumer(`${mode}-consumer`);
     if (consumer !== project) {
@@ -635,13 +653,15 @@ test("packs and clean-installs the vNext runtime reproducibly", { timeout: 240_0
       await runInTest("git", ["init", "--initial-branch", "qualification"], consumer);
     }
     const binary = join(consumer, "node_modules", ".bin", process.platform === "win32" ? "apex.cmd" : "apex");
-    const cli = async (args) => JSON.parse((await runInTest(binary, [...args, "--json"], consumer)).stdout).result;
+    const cli = async (args, options = {}) =>
+      JSON.parse((await runInTest(binary, [...args, "--json"], consumer, options)).stdout).result;
     if (consumer !== project) {
       const workspace = await cli(["bootstrap", "--client", clientId, "--yes"]);
       assert.equal(workspace.projectCreated, false);
       assert.equal(workspace.projectId, undefined);
       assert.equal((await cli(["status"])).status, "needs_project");
-      assert.equal((await cli(["doctor"])).healthy, true);
+      const doctor = await cli(["doctor"], { env: doctorEnv });
+      assert.equal(doctor.healthy, true, JSON.stringify(doctor.checks.filter(({ ok }) => !ok)));
       const repeated = await cli(["bootstrap", "--client", clientId, "--yes"]);
       assert.equal(repeated.resumed, true);
       assert.equal(repeated.projectCreated, false);

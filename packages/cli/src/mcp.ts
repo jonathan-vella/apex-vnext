@@ -240,11 +240,12 @@ export function summarizeDoctorReport(report: DoctorReport): Record<string, unkn
       nextAction: report.nextAction,
       remedies: [...new Set(report.remedies)],
       counts: { total: report.checks.length, passed: passed.length, failed: failed.length },
-      checks: checks.map(({ id, ok, value, remedy }) => ({
+      checks: checks.map(({ id, ok, value, remedy, severity }) => ({
         id,
         ok,
         value,
         ...(remedy === undefined ? {} : { remedy }),
+        ...(severity === undefined ? {} : { severity }),
       })),
       omitted: { passed: passed.length - (checks.length - listedFailed), failed: failed.length - listedFailed },
       truncated: checks.length < report.checks.length,

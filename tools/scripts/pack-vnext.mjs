@@ -254,7 +254,6 @@ export function renderConsumerInstaller(template, toolchain) {
     NODE: toolchain.node,
     NPM: toolchain.npm,
     COPILOT: toolchain.copilotCli,
-    VSCODE: toolchain.minimumVscode,
   };
   let rendered = template;
   for (const [name, version] of Object.entries(versions)) {
