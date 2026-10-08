@@ -1,11 +1,12 @@
 import type { RunConfigV1 } from "@apexops/contracts";
-import { constants, realpathSync } from "node:fs";
-import { lstat, mkdir, mkdtemp, open, readFile, readdir, rm } from "node:fs/promises";
+import { realpathSync } from "node:fs";
+import { readFile, rm } from "node:fs/promises";
 import { hostname } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { canonicalJsonBytes, sha256Bytes, sha256Json, type JsonValue } from "./canonical.js";
+import { join, resolve } from "node:path";
+import { sha256Json, type JsonValue } from "./canonical.js";
 import { EventJournal, type AppendEventInput } from "./event-journal.js";
-import { atomicWriteJson, readPublishedFile, renameWithRetry } from "./files.js";
+import { DirectoryLock } from "./directory-lock.js";
+import { atomicWriteJson, readPublishedFile } from "./files.js";
 
 export interface RunMutation {
   expectedRunHash: string;
@@ -40,20 +41,6 @@ interface TransactionIntent {
   beforeHash: string;
   afterHash: string;
   after: RunConfigV1;
-}
-
-interface MutationLock {
-  token: string;
-  pid: number;
-  host: string;
-  createdAt: string;
-  expiresAt: string;
-}
-
-interface MutationLockSnapshot {
-  metadata: MutationLock;
-  expiresAt: number;
-  recoveryId: string;
 }
 
 interface RunWriterLeaseSnapshot {
@@ -96,38 +83,12 @@ export class RunMutationBusyError extends Error {
   }
 }
 
-const LOCK_METADATA_FILE = "metadata.json";
-const MAX_LOCK_METADATA_BYTES = 64 * 1024;
 const WRITER_LEASE_FILE = ".run-writer-lease.json";
 const MAX_WRITER_LEASE_BYTES = 64 * 1024;
 // Same-workspace renewals cannot fail fast with a conflict, so they queue on the run mutation lock. The budget must
 // cover a serialized queue of lock cycles on slow file systems (Windows cycles are an order of magnitude slower).
 const WRITER_LEASE_LOCK_WAIT_MS = 10_000;
-const WRITER_LEASE_LOCK_RETRY_MS = 10;
 const TRANSIENT_LOCK_RENAME_CODES = new Set(["EPERM", "EACCES", "EBUSY"]);
-// Released generations are parked under the retired-lock root with this prefix and deleted; every other entry there
-// is a permanent takeover tombstone named by its recovery id.
-const RELEASED_LOCK_PREFIX = "released-";
-const RELEASED_LOCK_REMOVE_ATTEMPTS = 5;
-const TRANSIENT_LOCK_REMOVE_CODES = new Set(["EPERM", "EACCES", "EBUSY", "ENOTEMPTY"]);
-
-function lockExpiry(value: unknown): number | undefined {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) return undefined;
-  const lock = value as Partial<MutationLock>;
-  const createdAt = Date.parse(lock.createdAt ?? "");
-  const expiresAt = Date.parse(lock.expiresAt ?? "");
-  return typeof lock.token === "string" &&
-    lock.token.length > 0 &&
-    Number.isInteger(lock.pid) &&
-    Number(lock.pid) > 0 &&
-    typeof lock.host === "string" &&
-    lock.host.length > 0 &&
-    Number.isFinite(createdAt) &&
-    Number.isFinite(expiresAt) &&
-    expiresAt >= createdAt
-    ? expiresAt
-    : undefined;
-}
 
 function writerLeaseExpiry(value: unknown): number | undefined {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return undefined;
@@ -172,19 +133,13 @@ function sameWorkspace(left: string, right: string): boolean {
   return canonicalWorktreePath(left) === canonicalWorktreePath(right);
 }
 
-async function sleep(milliseconds: number): Promise<void> {
-  await new Promise((done) => setTimeout(done, milliseconds));
-}
-
 export class RunRepository {
   private readonly runPath: string;
-  private readonly lockPath: string;
-  private readonly retiredLockPath: string;
+  private readonly mutationLock: DirectoryLock;
   private readonly intentPath: string;
   private readonly writerLeasePath: string;
   private readonly clock: () => Date;
   private readonly idSource: () => string;
-  private readonly lockTtlMs: number;
   private readonly writerLeaseTtlMs: number;
   private readonly writerLeaseLockWaitMs: number;
   private readonly platform: NodeJS.Platform;
@@ -194,17 +149,22 @@ export class RunRepository {
   constructor(runDirectory: string, options: RunRepositoryOptions = {}) {
     const directory = resolve(runDirectory);
     this.runPath = join(directory, "run.json");
-    this.lockPath = join(directory, ".run-mutation.lock");
-    this.retiredLockPath = join(directory, ".run-mutation.retired");
     this.intentPath = join(directory, ".run-transaction.json");
     this.writerLeasePath = join(directory, WRITER_LEASE_FILE);
     this.clock = options.clock ?? (() => new Date());
     this.idSource = options.idSource ?? (() => crypto.randomUUID());
-    this.lockTtlMs = options.lockTtlMs ?? 30_000;
     this.writerLeaseTtlMs = options.writerLeaseTtlMs ?? 120_000;
     this.writerLeaseLockWaitMs = options.writerLeaseLockWaitMs ?? WRITER_LEASE_LOCK_WAIT_MS;
     this.platform = options.platform ?? process.platform;
     this.faultInjector = options.faultInjector;
+    this.mutationLock = new DirectoryLock(join(directory, ".run-mutation.lock"), {
+      label: "Run mutation lock",
+      clock: this.clock,
+      idSource: this.idSource,
+      ttlMs: options.lockTtlMs ?? 30_000,
+      platform: this.platform,
+      busyError: () => new RunMutationBusyError(),
+    });
     this.journal = new EventJournal(join(directory, "journal"));
   }
 
@@ -425,291 +385,6 @@ export class RunRepository {
     operation: () => Promise<T>,
     options: { onContention?: () => Promise<Error | undefined>; waitMs?: number } = {},
   ): Promise<T> {
-    await mkdir(dirname(this.lockPath), { recursive: true });
-    const token = this.idSource();
-    const createdAt = this.clock();
-    const metadata: MutationLock = {
-      token,
-      pid: process.pid,
-      host: hostname(),
-      createdAt: createdAt.toISOString(),
-      expiresAt: new Date(createdAt.getTime() + this.lockTtlMs).toISOString(),
-    };
-    for (;;) {
-      if (await this.acquireLock(metadata)) break;
-      const existing = await this.readLock();
-      if (existing === undefined) continue;
-      if (existing.expiresAt > this.clock().getTime() || this.ownerMayBeAlive(existing.metadata)) {
-        const deadline = Date.now() + (options.waitMs ?? 0);
-        for (;;) {
-          const contention = await options.onContention?.();
-          if (contention !== undefined) throw contention;
-          if (Date.now() >= deadline) break;
-          await sleep(WRITER_LEASE_LOCK_RETRY_MS);
-          if (await this.acquireLock(metadata)) break;
-          const current = await this.readLock();
-          if (current === undefined) continue;
-          if (current.expiresAt <= this.clock().getTime() && !this.ownerMayBeAlive(current.metadata)) {
-            if (await this.retireStaleLock(current)) continue;
-          }
-        }
-        if (await this.readLock().then((current) => current?.metadata.token === token)) break;
-        throw new RunMutationBusyError();
-      }
-      if (!(await this.retireStaleLock(existing))) throw new RunMutationBusyError();
-    }
-    try {
-      return await operation();
-    } finally {
-      try {
-        const current = await this.readLock();
-        if (current?.metadata.token === token) await this.releaseLock();
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-      }
-      await this.sweepReleasedLocks();
-    }
-  }
-
-  private async acquireLock(metadata: MutationLock): Promise<boolean> {
-    const parent = dirname(this.lockPath);
-    await mkdir(parent, { recursive: true });
-    if (await this.lockPublished()) return false;
-    const staging = await mkdtemp(join(parent, ".run-mutation.pending-"));
-    let published = false;
-    try {
-      const handle = await open(
-        join(staging, LOCK_METADATA_FILE),
-        constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY,
-        0o600,
-      );
-      try {
-        await handle.writeFile(canonicalJsonBytes(metadata));
-        await handle.sync();
-      } finally {
-        await handle.close();
-      }
-      if (await this.lockPublished()) return false;
-      try {
-        await renameWithRetry(staging, this.lockPath);
-        published = true;
-        return true;
-      } catch (error) {
-        const code = (error as NodeJS.ErrnoException).code ?? "";
-        if (["EEXIST", "ENOTEMPTY"].includes(code) || TRANSIENT_LOCK_RENAME_CODES.has(code)) return false;
-        try {
-          await lstat(this.lockPath);
-          return false;
-        } catch (lockError) {
-          if ((lockError as NodeJS.ErrnoException).code === "ENOENT") throw error;
-          throw lockError;
-        }
-      }
-    } finally {
-      if (!published) await rm(staging, { recursive: true, force: true });
-    }
-  }
-
-  /** Cheap pre-check so contended waiters do not stage and fsync lock metadata on every poll. */
-  private async lockPublished(): Promise<boolean> {
-    try {
-      await lstat(this.lockPath);
-      return true;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
-      throw error;
-    }
-  }
-
-  private async readLock(): Promise<MutationLockSnapshot | undefined> {
-    let directoryStat;
-    try {
-      directoryStat = await lstat(this.lockPath);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
-      throw error;
-    }
-    if (!directoryStat.isDirectory() || directoryStat.isSymbolicLink()) {
-      throw new Error("Run mutation lock metadata is unsafe");
-    }
-    const metadataPath = join(this.lockPath, LOCK_METADATA_FILE);
-    let metadataStat;
-    try {
-      metadataStat = await lstat(metadataPath);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-        let currentDirectory;
-        try {
-          currentDirectory = await lstat(this.lockPath);
-        } catch (lockError) {
-          if ((lockError as NodeJS.ErrnoException).code === "ENOENT") return undefined;
-          throw lockError;
-        }
-        if (currentDirectory.dev !== directoryStat.dev || currentDirectory.ino !== directoryStat.ino) return undefined;
-        throw new Error("Run mutation lock metadata is unreadable", { cause: error });
-      }
-      throw error;
-    }
-    if (!metadataStat.isFile() || metadataStat.isSymbolicLink() || metadataStat.size > MAX_LOCK_METADATA_BYTES) {
-      throw new Error("Run mutation lock metadata is unsafe");
-    }
-    let handle;
-    try {
-      handle = await open(metadataPath, constants.O_RDONLY);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
-      throw error;
-    }
-    let bytes: Buffer;
-    try {
-      const opened = await handle.stat();
-      if (
-        !opened.isFile() ||
-        opened.dev !== metadataStat.dev ||
-        opened.ino !== metadataStat.ino ||
-        opened.size > MAX_LOCK_METADATA_BYTES
-      ) {
-        return undefined;
-      }
-      bytes = await handle.readFile();
-    } finally {
-      await handle.close();
-    }
-    const [after, metadataAfter] = await Promise.all([
-      lstat(this.lockPath).catch((error: unknown) => {
-        if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
-        throw error;
-      }),
-      lstat(metadataPath).catch((error: unknown) => {
-        if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
-        throw error;
-      }),
-    ]);
-    if (
-      after === undefined ||
-      metadataAfter === undefined ||
-      after.dev !== directoryStat.dev ||
-      after.ino !== directoryStat.ino ||
-      metadataAfter.isSymbolicLink() ||
-      metadataAfter.dev !== metadataStat.dev ||
-      metadataAfter.ino !== metadataStat.ino ||
-      bytes.byteLength > MAX_LOCK_METADATA_BYTES
-    ) {
-      return undefined;
-    }
-    let metadata: unknown;
-    try {
-      metadata = JSON.parse(bytes.toString("utf8")) as unknown;
-    } catch (error) {
-      throw new Error("Run mutation lock metadata is unreadable", { cause: error });
-    }
-    const expiresAt = lockExpiry(metadata);
-    if (expiresAt === undefined) throw new Error("Run mutation lock metadata is unreadable");
-    return {
-      metadata: metadata as MutationLock,
-      expiresAt,
-      recoveryId: sha256Json({
-        metadataHash: sha256Bytes(bytes),
-        device: String(directoryStat.dev),
-        inode: String(directoryStat.ino),
-        changedAt: directoryStat.ctimeMs,
-      }),
-    };
-  }
-
-  private ownerMayBeAlive(metadata: MutationLock): boolean {
-    if (metadata.host !== hostname()) return true;
-    try {
-      process.kill(metadata.pid, 0);
-      return true;
-    } catch (error) {
-      return (error as NodeJS.ErrnoException).code !== "ESRCH";
-    }
-  }
-
-  /**
-   * Take over an expired generation whose local owner was confirmed dead after `snapshot` was read. Re-reading the lock
-   * after that liveness check is what lets released generations skip tombstones: a generation still present after its
-   * owner died can no longer be released by that owner, so it can only leave the lock path through another takeover,
-   * which leaves the permanent tombstone that makes this rename fail instead of retiring a replacement generation.
-   */
-  private async retireStaleLock(snapshot: MutationLockSnapshot): Promise<boolean> {
-    const confirmed = await this.readLock();
-    if (confirmed?.recoveryId !== snapshot.recoveryId) return false;
-    return this.retireLock(snapshot.recoveryId);
-  }
-
-  /**
-   * Retire a taken-over generation into a permanent tombstone named by its recovery id. Rename is not compare-and-swap,
-   * so the tombstone is the guard: a delayed contender that confirmed the same generation renames onto the existing
-   * non-empty tombstone and fails rather than moving a replacement lock. Tombstones are therefore never swept; they
-   * accumulate only once per crashed lock owner, not per mutation.
-   */
-  private async retireLock(recoveryId: string): Promise<boolean> {
-    await this.ensureRetiredRoot();
-    try {
-      await renameWithRetry(this.lockPath, join(this.retiredLockPath, recoveryId));
-      return true;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
-      if (["EEXIST", "ENOTEMPTY"].includes((error as NodeJS.ErrnoException).code ?? "")) return false;
-      throw error;
-    }
-  }
-
-  /**
-   * Release a generation this process owns. While the owner is alive no contender can take its generation over (see
-   * `retireStaleLock`), so the rename moves exactly this generation and needs no tombstone: it is parked under a fresh
-   * unique name and deleted by `sweepReleasedLocks`.
-   */
-  private async releaseLock(): Promise<void> {
-    await this.ensureRetiredRoot();
-    await renameWithRetry(this.lockPath, join(this.retiredLockPath, `${RELEASED_LOCK_PREFIX}${crypto.randomUUID()}`));
-  }
-
-  private async ensureRetiredRoot(): Promise<void> {
-    await mkdir(this.retiredLockPath, { recursive: true, mode: 0o700 });
-    const retiredRoot = await lstat(this.retiredLockPath);
-    if (!retiredRoot.isDirectory() || retiredRoot.isSymbolicLink()) {
-      throw new Error("Run mutation retired-lock directory is unsafe");
-    }
-  }
-
-  /**
-   * Best-effort deletion of every released generation, including ones left by earlier cleanup failures or crashes
-   * between release and deletion. Any process may delete any released entry at any time: each has a unique name that
-   * only its releasing owner ever renames to, and nothing reads, renames, or locks through it afterwards. Takeover
-   * tombstones, the live lock, and other processes' `.pending-` staging directories are never touched. Failures never
-   * fail the caller; Windows sharing violations (for example a contender's metadata handle still open) are retried
-   * briefly and otherwise left for the next sweep.
-   */
-  private async sweepReleasedLocks(): Promise<void> {
-    let entries;
-    try {
-      const retiredRoot = await lstat(this.retiredLockPath);
-      if (!retiredRoot.isDirectory() || retiredRoot.isSymbolicLink()) return;
-      entries = await readdir(this.retiredLockPath, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const entry of entries) {
-      if (entry.isDirectory() && entry.name.startsWith(RELEASED_LOCK_PREFIX)) {
-        await this.removeReleasedLock(join(this.retiredLockPath, entry.name));
-      }
-    }
-  }
-
-  private async removeReleasedLock(path: string): Promise<void> {
-    const attempts = this.platform === "win32" ? RELEASED_LOCK_REMOVE_ATTEMPTS : 1;
-    for (let attempt = 1; ; attempt += 1) {
-      try {
-        await rm(path, { recursive: true, force: true });
-        return;
-      } catch (error) {
-        const code = (error as NodeJS.ErrnoException).code ?? "";
-        if (attempt >= attempts || !TRANSIENT_LOCK_REMOVE_CODES.has(code)) return;
-        await sleep(10 * 2 ** (attempt - 1));
-      }
-    }
+    return this.mutationLock.run(operation, options);
   }
 }
