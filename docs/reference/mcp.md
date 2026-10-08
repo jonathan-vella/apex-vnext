@@ -188,18 +188,21 @@ Session models can issue the same tool call twice. Every tool has an effect clas
 [`packages/cli/src/mcp.ts`](../../packages/cli/src/mcp.ts), and a test fails when a state-changing tool lacks a
 duplicate-call case:
 
-| Class            | Tools                                   | Repeat behavior                                        |
-| ---------------- | --------------------------------------- | ------------------------------------------------------ |
-| `read-only`      | `status`, `projectList`, `doctorChecks` | Never writes.                                          |
-| `read`           | The read tools listed below             | Always executes; may only finish a committed recovery. |
-| `repeat-guarded` | Every other tool except `doctor`        | The kernel repeat guard below decides.                 |
-| `convergent`     | `doctor`                                | Always executes; a repeat re-applies the same repair.  |
+| Class            | Tools                                   | Repeat behavior                                          |
+| ---------------- | --------------------------------------- | -------------------------------------------------------- |
+| `read-only`      | `status`, `projectList`, `doctorChecks` | Never writes.                                            |
+| `read`           | The read tools listed below             | Always executes; may only finish a committed recovery.   |
+| `repeat-guarded` | Every other tool                        | The kernel repeat guard below decides.                   |
+| `convergent`     | `doctor`, `improvementObserve`          | Always executes; a repeat converges on the same outcome. |
 
 The `read` tools are `capabilityList`, `capabilityStatus`, `taskContext`, `readTaskInput`, `preview`, `inventory`,
 `diagnose`, `render`, `improvementObservations` and `improvementProposals`.
 
 `doctor` repairs workspace installation files outside the run, so a run-scoped record could hide a newly broken file.
 It is not deduplicated; a repair that reproduces the current customization lock keeps the existing rollback chain.
+`improvementObserve` writes the content-addressed improvement store outside the run, which `quality delete-observation`
+and `quality prune` can change without changing the run. It is not deduplicated either: a repeat returns the stored
+observation with `deduplicated: true`, or records it again if it was deleted in between.
 
 For a `repeat-guarded` tool, the kernel identifies a call by the tool name, the canonical worktree (real path,
 case-folded on Windows) and the validated arguments as canonical JSON with sorted keys and undefined members dropped.
@@ -232,9 +235,11 @@ An answered repeat returns the original `structuredContent` byte for byte, chang
 head, records no new gate decision or evidence, and appends a hash-chained `call.repeated` audit event to the run's
 separate `repeats/` journal. Records live in the run's `.repeat-guard.json`, written atomically, so they survive an
 `apex mcp serve` restart. The file holds at most 16 records with results of at most 64 KiB each; records whose post-call
-state differs from the current state are dropped on every write because they can never match again. A malformed record
-file disables replay instead of returning a forged result. State transfer excludes the record file and carries the
-audit journal.
+state differs from the current state are dropped on every write because they can never match again. The file is the
+strict, versioned `repeat-guard-records-v1` contract
+([schema](../../packages/contracts/schemas/repeat-guard-records-v1.schema.json)), validated on every read and write; a
+file that fails it disables replay instead of returning a forged result. State transfer excludes the record file and
+carries the audit journal.
 
 ## Authority
 

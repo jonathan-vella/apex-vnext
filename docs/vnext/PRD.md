@@ -340,7 +340,8 @@ answers without relying on chat history.
   evidence, completion or approval. A managed `preToolUse` hook denies the APEX agent as a `task` target.
 - Agent files carry no `model`, `model-policy` or `reasoning-effort`; the user selects the session model.
   State-changing MCP tools are safe to call twice with the same input: while the run is unchanged, the kernel answers
-  an identical repeat with the original result. Every MCP tool takes an explicit workspace path.
+  an identical repeat with the original result, and convergent tools that change state outside the run reach the same
+  outcome. Every MCP tool takes an explicit workspace path.
 
 General-purpose delegation, `/fleet`, `/delegate` and plan mode are not part of managed workflows. Agents, skills,
 hooks, the MCP inventory and the plugin lifecycle are qualified per client. Qualify both environment profiles and COE

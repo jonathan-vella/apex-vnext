@@ -161,8 +161,10 @@ const stagingInput = (optional: boolean) =>
  * - `read`: adds no new effect; it may only finish recovering an already-committed run transaction.
  * - `repeat-guarded`: changes state; each call runs through the kernel repeat guard, so an identical repeat while the
  *   selected run is unchanged returns the original result instead of executing again.
- * - `convergent`: changes workspace installation state outside the run, so the run-scoped guard cannot tell whether a
- *   repeat is stale; repeating it re-applies the same repair and converges on the same state.
+ * - `convergent`: changes state outside the run, so the run-scoped guard cannot tell whether a repeat is stale, and
+ *   converges on its own: `doctor` re-applies the same repair to workspace installation files, and
+ *   `improvementObserve` content-addresses observations, so a repeat returns the stored observation as deduplicated
+ *   or recreates it after a supported deletion.
  */
 export type McpToolEffect = "read-only" | "read" | "repeat-guarded" | "convergent";
 export const MCP_TOOL_EFFECTS = {
@@ -199,9 +201,9 @@ export const MCP_TOOL_EFFECTS = {
   reviewComplete: "repeat-guarded",
   planComplete: "repeat-guarded",
   reconcile: "repeat-guarded",
-  improvementObserve: "repeat-guarded",
   promote: "repeat-guarded",
   submitEvidence: "repeat-guarded",
+  improvementObserve: "convergent",
   doctor: "convergent",
 } as const satisfies Record<keyof typeof MCP_OUTPUT_SCHEMAS, McpToolEffect>;
 /** Arguments naming workspace files whose content, not only path, identifies a repeated call. */

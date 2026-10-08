@@ -87,16 +87,6 @@ const duplicateCases: Record<GuardedTool, ToolCase> = {
     },
   },
   reconcile: { method: "reconcile", input: {} },
-  improvementObserve: {
-    method: "improvementObserve",
-    input: {
-      source: "deterministic-test",
-      category: "correctness",
-      severity: "low",
-      statement: "Repeat safety",
-      evidenceRefs: [hash],
-    },
-  },
   promote: { method: "promote", input: { environment: "prod", target: "local" } },
   submitEvidence: { method: "acceptEvidence", input: { taskId: "task-1", kind: "test", value: {} } },
 };
@@ -177,7 +167,7 @@ test("every state-changing MCP tool is classified and has a duplicate-call case"
   assert.deepEqual(Object.keys(duplicateCases).sort(), listedGuarded);
   assert.deepEqual(
     names.filter((name) => MCP_TOOL_EFFECTS[name as ToolName] === "convergent"),
-    ["doctor"],
+    ["doctor", "improvementObserve"],
   );
   assert.deepEqual(
     Object.keys(readCases).sort(),
@@ -336,6 +326,41 @@ test("read tools are never answered from a stored result", async (context) => {
       assertSuccess(await client.callTool({ name, arguments: { workspace: service.root, ...input } }), name);
     assert.equal(invocations.get(name), 2, name);
   }
+  assert.deepEqual(await readRepeatEvents(runDirectory), []);
+});
+
+test("a repeated improvementObserve converges and recreates an observation deleted in between", async (context) => {
+  const { service, runDirectory } = await initializedWorkspace();
+  const { client } = await connect(context, service, "repeat-observe");
+  const call = () =>
+    client.callTool({
+      name: "improvementObserve",
+      arguments: {
+        workspace: service.root,
+        source: "deterministic-test",
+        category: "correctness",
+        severity: "low",
+        statement: "Repeat safety",
+        evidenceRefs: [hash],
+      },
+    });
+  type Observed = { observation: { observationId: string; observedAt: string }; deduplicated: boolean };
+  const first = await call();
+  assertSuccess(first, "improvementObserve");
+  const created = first.structuredContent as Observed;
+  assert.equal(created.deduplicated, false);
+  const again = await call();
+  assertSuccess(again, "improvementObserve");
+  assert.deepEqual((again.structuredContent as Observed).observation, created.observation);
+  assert.equal((again.structuredContent as Observed).deduplicated, true);
+  assert.equal((await service.improvementObservations()).length, 1);
+  await service.improvementDeleteObservation(created.observation.observationId);
+  assert.deepEqual(await service.improvementObservations(), []);
+  const recreated = await call();
+  assertSuccess(recreated, "improvementObserve");
+  assert.equal((recreated.structuredContent as Observed).deduplicated, false);
+  assert.equal((recreated.structuredContent as Observed).observation.observationId, created.observation.observationId);
+  assert.equal((await service.improvementObservations()).length, 1);
   assert.deepEqual(await readRepeatEvents(runDirectory), []);
 });
 
