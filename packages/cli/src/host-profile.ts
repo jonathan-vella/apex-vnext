@@ -260,6 +260,14 @@ async function copilotPluginCheck(kind: HostKind, inputs: HostCheckInputs): Prom
   const version = typeof entry.version === "string" ? entry.version : "unknown";
   const source = typeof entry.marketplace === "string" && entry.marketplace.length > 0 ? entry.marketplace : "direct";
   const label = `${name}@${source} ${version}`;
+  // Workspace settings enable only the declared marketplace; a direct install (no marketplace) is a local candidate.
+  if (source !== "direct" && source !== marketplace)
+    return {
+      id: "copilot-plugin",
+      ok: false,
+      value: `${label} from another marketplace`,
+      remedy: `Uninstall ${name}@${source}, then run copilot plugin install ${qualified}`,
+    };
   if (entry.enabled !== true) return { id: "copilot-plugin", ok: false, value: `${label} disabled`, remedy: reinstall };
   if (version !== inputs.apexVersion)
     return {

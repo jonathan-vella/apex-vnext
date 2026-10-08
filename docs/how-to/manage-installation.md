@@ -215,21 +215,22 @@ package/provenance checks, not a successful clean-machine installation or comple
 
 ## Verify A Clean Host
 
-Run `apex doctor` on the host after setup; add `--json` for every check. Doctor is read-only. It infers the host from
+Run `apex doctor` on the host after setup; add `--json` for every check. Plain `apex doctor` only reads; repair with
+`apex doctor --fix --yes` rewrites managed files and the runtime lock, never host tools. Doctor infers the host from
 the platform, because every workspace uses the `github-copilot-cli` projection whichever client runs it. Warnings do
 not make doctor unhealthy; failures do, and each one names a remedy. Doctor cannot see inside a client, so it does not
 check whether local sandboxing is on or whether the client has loaded the plugin.
 
-| Check                 | Windows: VS Code or the app                                 | Linux or WSL2: Copilot CLI                                  |
-| --------------------- | ----------------------------------------------------------- | ----------------------------------------------------------- |
-| `node`                | Fails below Node.js 24.21.0                                 | Fails below Node.js 24.21.0                                 |
-| `host`                | Passes; macOS warns as best effort                          | Passes on Linux and WSL2; WSL1 fails                        |
-| `git`                 | Fails when `git` is not on `PATH`                           | Fails when `git` is not on `PATH`                           |
-| `vscode`              | Passes when absent; fails when `code` is older than 1.140.0 | Passes without running `code`, whatever its version         |
-| `copilot-cli`         | Warns when absent or older than 1.0.86 (store manager only) | Fails when absent or older than 1.0.86                      |
-| `copilot-plugin`      | Fails unless one enabled `apex` matches the CLI version     | Warns when absent; fails when disabled, doubled or mismatch |
-| `linux-sandbox-tools` | Not checked                                                 | Warns when `bwrap` or `slirp4netns` is missing              |
-| `plugin-settings`     | After `apex init`, fails unless settings enable the plugin  | After `apex init`, fails unless settings enable the plugin  |
+| Check                 | Windows: VS Code or the app                                  | Linux or WSL2: Copilot CLI                                  |
+| --------------------- | ------------------------------------------------------------ | ----------------------------------------------------------- |
+| `node`                | Fails below Node.js 24.21.0                                  | Fails below Node.js 24.21.0                                 |
+| `host`                | Passes; macOS warns as best effort                           | Passes on Linux and WSL2; WSL1 fails                        |
+| `git`                 | Fails when `git` is not on `PATH`                            | Fails when `git` is not on `PATH`                           |
+| `vscode`              | Passes when absent; fails when `code` is older than 1.140.0  | Passes without running `code`, whatever its version         |
+| `copilot-cli`         | Warns when absent or older than 1.0.86 (store manager only)  | Fails when absent or older than 1.0.86                      |
+| `copilot-plugin`      | Fails unless one enabled `apex@apex-plugins` matches the CLI | Warns when absent; fails when disabled, doubled or mismatch |
+| `linux-sandbox-tools` | Not checked                                                  | Warns when `bwrap` or `slirp4netns` is missing              |
+| `plugin-settings`     | After `apex init`, fails unless settings enable the plugin   | After `apex init`, fails unless settings enable the plugin  |
 
 Doctor reads the plugin store from `config.json` in `COPILOT_HOME`, by default `~/.copilot` or
 `%USERPROFILE%\.copilot`. On Linux and WSL2, Copilot CLI can still install the plugin from the workspace settings on
@@ -256,8 +257,9 @@ In the Ubuntu terminal:
 
 1. Run `bash apex-install.sh --version RELEASE_VERSION --plan`. Expect `preserve` or `install` for each tool; VS Code
    is not listed.
-2. Install, run `copilot login`, install the plugin, then run `apex bootstrap --create-repo --yes` in a folder under
-   your Linux home.
+2. Run `sudo -v` yourself, then `bash apex-install.sh --version RELEASE_VERSION --install --yes --allow-system`;
+   Bubblewrap, `slirp4netns` and other missing Ubuntu packages need `--allow-system`. Run `copilot login`, install the
+   plugin, then run `apex bootstrap --create-repo --yes` in a folder under your Linux home.
 3. Run `apex doctor`. Expect `Status: Ready` with no warnings. A Windows `code` shim on `PATH` must not change the
    result.
 4. Run `apex doctor --json`. Expect `host` to start with `wsl2:` or `linux:`, and `linux-sandbox-tools` to pass.

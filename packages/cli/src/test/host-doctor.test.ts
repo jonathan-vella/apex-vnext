@@ -167,6 +167,9 @@ test("doctor reads the Copilot CLI plugin store without trusting malformed or am
   const direct = await value({ plugin: { ...entry, marketplace: undefined } });
   assert.equal(direct.ok, true);
   assert.match(direct.value, /^apex@direct /u);
+  const foreign = await value({ plugin: { ...entry, marketplace: "other-plugins" } });
+  assert.deepEqual([foreign.ok, foreign.value], [false, `apex@other-plugins ${APEX_VERSION} from another marketplace`]);
+  assert.match(foreign.remedy ?? "", /copilot plugin install apex@apex-plugins/u);
   const other = await value({ plugin: { ...entry, name: "other" } });
   assert.equal(other.ok, false);
   for (const configText of ["{not json", "[]", '{"installedPlugins":{}}']) {
