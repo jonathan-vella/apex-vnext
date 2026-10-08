@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, symlink, utimes, writeFile } from "node:fs/promises";
 import { hostname, tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -270,7 +270,7 @@ test("repeat events keep the caller's worktree spelling while Windows identity i
   );
 });
 
-test("concurrent identical calls from separate processes execute once", async () => {
+test("concurrent identical calls on one run execute once", async () => {
   const { runDirectory, repository, worktree, scope, appendRunEvent } = await fixture();
   let executions = 0;
   const run = () =>
@@ -313,8 +313,15 @@ test("a live repeat lock makes callers wait and fail closed; a dead holder's loc
     JSON.stringify({ token: "dead", pid: 2 ** 22 + 7, host: hostname(), createdAt: new Date().toISOString() }),
   );
   assert.equal((await call(0)).repeated, false);
+  // A holder that created the lock but has not written its metadata yet keeps it; an abandoned one is recovered.
+  await writeFile(lock, "");
+  await assert.rejects(call(60), RepeatGuardBusyError);
   await writeFile(lock, "not json");
+  await assert.rejects(call(60), RepeatGuardBusyError);
+  const abandoned = new Date(Date.now() - 60_000);
+  await utimes(lock, abandoned, abandoned);
   assert.equal((await call(0)).repeated, true);
+  await assert.rejects(readFile(lock), { code: "ENOENT" });
 });
 
 test("a call whose identity changed while it ran is returned but not stored", async () => {

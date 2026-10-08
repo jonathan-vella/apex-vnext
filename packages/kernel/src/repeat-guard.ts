@@ -1,6 +1,6 @@
 import type { EventV1, ProjectId, RunId } from "@apexops/contracts";
 import { constants } from "node:fs";
-import { lstat, open, readFile, rm } from "node:fs/promises";
+import { lstat, open, rm } from "node:fs/promises";
 import { hostname } from "node:os";
 import { join, resolve } from "node:path";
 import { sha256Json, sha256Text } from "./canonical.js";
@@ -18,6 +18,7 @@ export const REPEAT_LOCK_FILE = ".repeat-guard.lock";
 export const DEFAULT_REPEAT_LOCK_WAIT_MS = 30_000;
 const REPEAT_LOCK_RETRY_MS = 25;
 const FOREIGN_REPEAT_LOCK_STALE_MS = 60 * 60 * 1000;
+const INCOMPLETE_REPEAT_LOCK_GRACE_MS = 10_000;
 export const DEFAULT_REPEAT_WINDOW_MS = 10 * 60 * 1000;
 export const MAX_REPEAT_RECORDS = 16;
 export const MAX_REPEAT_RESULT_BYTES = 64 * 1024;
@@ -273,8 +274,12 @@ interface RepeatLock {
   createdAt: string;
 }
 
-function repeatLockStale(lock: Partial<RepeatLock> | undefined, now: number): boolean {
-  if (lock === undefined || typeof lock.pid !== "number" || typeof lock.host !== "string") return true;
+function repeatLockStale(current: RepeatLockSnapshot, now: number): boolean {
+  const { lock } = current;
+  // A holder creates the file and then writes its metadata, so an unreadable lock may still be in the middle of that
+  // write; it is only recovered once it is older than any such write could take.
+  if (lock === undefined || typeof lock.pid !== "number" || typeof lock.host !== "string")
+    return now - current.modifiedMs > INCOMPLETE_REPEAT_LOCK_GRACE_MS;
   if (lock.host !== hostname()) return now - Date.parse(lock.createdAt ?? "") > FOREIGN_REPEAT_LOCK_STALE_MS;
   try {
     process.kill(lock.pid, 0);
@@ -284,18 +289,37 @@ function repeatLockStale(lock: Partial<RepeatLock> | undefined, now: number): bo
   }
 }
 
-async function readRepeatLock(path: string): Promise<{ bytes: string; lock?: Partial<RepeatLock> } | undefined> {
-  let bytes: string;
+interface RepeatLockSnapshot {
+  /** Bytes plus file identity, so a lock recreated with identical bytes is not mistaken for the one judged stale. */
+  identity: string;
+  modifiedMs: number;
+  lock?: Partial<RepeatLock>;
+}
+
+async function readRepeatLock(path: string): Promise<RepeatLockSnapshot | undefined> {
+  let handle;
   try {
-    bytes = await readFile(path, "utf8");
+    handle = await open(path, constants.O_RDONLY);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
     throw error;
   }
+  let bytes: string;
+  let modifiedMs: number;
+  let identity: string;
   try {
-    return { bytes, lock: JSON.parse(bytes) as Partial<RepeatLock> };
+    const stat = await handle.stat({ bigint: true });
+    if (stat.size > 4096n) throw new Error("Repeat lock metadata is unsafe");
+    bytes = await handle.readFile("utf8");
+    modifiedMs = Number(stat.mtimeMs);
+    identity = [stat.dev, stat.ino, stat.size, stat.mtimeNs, bytes].join("\u0000");
+  } finally {
+    await handle.close();
+  }
+  try {
+    return { identity, modifiedMs, lock: JSON.parse(bytes) as Partial<RepeatLock> };
   } catch {
-    return { bytes };
+    return { identity, modifiedMs };
   }
 }
 
@@ -319,17 +343,20 @@ async function withRepeatLock<T>(
       const handle = await open(path, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY, 0o600);
       try {
         await handle.writeFile(JSON.stringify(metadata));
-      } finally {
+      } catch (error) {
         await handle.close();
+        await rm(path, { force: true });
+        throw error;
       }
+      await handle.close();
       break;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
     }
     const current = await readRepeatLock(path);
-    if (current !== undefined && repeatLockStale(current.lock, Date.now())) {
+    if (current !== undefined && repeatLockStale(current, Date.now())) {
       // Remove the stale lock only if it is still the one judged stale.
-      if ((await readRepeatLock(path))?.bytes === current.bytes) await rm(path, { force: true });
+      if ((await readRepeatLock(path))?.identity === current.identity) await rm(path, { force: true });
       continue;
     }
     if (Date.now() >= deadline) throw new RepeatGuardBusyError();

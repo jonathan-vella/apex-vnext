@@ -210,7 +210,8 @@ lease holder (lease renewals do not change it) and a stat signature of the run's
 source tree, so an external edit to staged or generated files also makes an identical call new. The recorded fingerprint
 binds the call to the state it applied to. Guarded calls on one run are serialized across processes by a run-scoped
 `.repeat-guard.lock` from record lookup through record publication; a caller that waits more than 30 seconds for another
-process's call gets `APEX_CONFLICT`, and a lock left by a process that no longer runs is recovered.
+process's call gets `APEX_CONFLICT`. A lock left by a process that no longer runs is recovered, and a lock without
+readable holder metadata is recovered once it is older than 10 seconds.
 
 An identical call is answered from the original result only when all of these hold:
 
