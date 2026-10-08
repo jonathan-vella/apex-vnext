@@ -73,10 +73,12 @@ output and the kernel derives the findings from that capture; this agent never w
    exactly as returned. Copy it character for character; add nothing before or after it and do not summarize or
    extend it. Do not provide model, model-policy or reasoning-effort.
 3. Call `apex/reviewComplete` with only the task ID. Do not pass, interpret or correct rubber-duck's answer.
-4. If `apex/reviewComplete` fails, the review is not done. Follow the error: for a missing capture, run rubber-duck once
-   more with the same prompt; otherwise call `apex/nextTask` and run rubber-duck once with the new request's prompt.
-   Then call `apex/reviewComplete` again. If that second attempt fails, stop and report the error to the user. Never
-   complete a review task with `apex/completeTask` or author findings yourself.
+4. If `apex/reviewComplete` fails, branch on the error. For a missing capture, run rubber-duck once more with the same
+   prompt. For `APEX_CONFLICT` or `APEX_STALE`, do not run rubber-duck: call `apex/nextTask` and follow what it returns.
+   For any other failure, call `apex/nextTask`. Run rubber-duck again only when `apex/nextTask` returns a new
+   `rubber-duck-review` task, and use that task's prompt. Then call `apex/reviewComplete` again. If that second attempt
+   fails, stop and report the error to the user. Never complete a review task with `apex/completeTask` or author
+   findings yourself.
 5. When `apex/nextTask` returns `needs_review`, load the stage skill for that gate. Record a disposition for every
    finding through `apex/reviewDecide`: fix (`revise`), accept (`accept-risk`), or dismiss with a reason; Requirements
    obligations may also be acknowledged with an owner. Gates still need the user's explicit approval.
