@@ -344,3 +344,38 @@ test("captures of long-expired requests are swept; younger ones stay", async (co
   assert.equal(await sweepReviewCaptures(home), 1);
   assert.deepEqual(await readdir(join(home, "captures")), [`${"f".repeat(32)}-0000000000000000.json`]);
 });
+
+test(
+  "a review home under a folder other users can write is refused unless that folder is sticky",
+  { skip: process.platform === "win32" },
+  async (context) => {
+    const root = await mkdtemp(join(tmpdir(), "apex-review-parent-"));
+    context.after(async () => {
+      await chmod(root, 0o700);
+      await rm(root, { recursive: true, force: true });
+    });
+    const home = join(root, "reviews");
+    await reviewCaptureKey(home);
+    await chmod(root, 0o777);
+    await assert.rejects(loadReviewCaptures(nonce, home), (error: unknown) => {
+      assert.ok(error instanceof ReviewHomeError);
+      assert.match(error.message, /folder above the review home lets another user replace it/u);
+      return true;
+    });
+    await chmod(root, 0o1777);
+    assert.deepEqual(await loadReviewCaptures(nonce, home), [], "a sticky shared folder (like /tmp) is trusted");
+    await chmod(root, 0o700);
+    const shared = await mkdtemp(join(tmpdir(), "apex-review-shared-"));
+    context.after(async () => {
+      await chmod(shared, 0o700);
+      await rm(shared, { recursive: true, force: true });
+    });
+    await symlink(root, join(shared, "via"));
+    await chmod(shared, 0o777);
+    await assert.rejects(
+      loadReviewCaptures(nonce, join(shared, "via", "reviews")),
+      /folder above the review home lets another user replace it/u,
+      "a symbolic link in the path counts only if the folder holding it is trusted",
+    );
+  },
+);

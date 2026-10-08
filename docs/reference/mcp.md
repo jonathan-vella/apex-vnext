@@ -125,8 +125,10 @@ What this guarantees and what it does not:
   folder (another agent with a shell, or the user) can read the key and forge a capture. The kernel does not defend
   against that, as DECISION-031's accepted risks allow.
 - On Linux and macOS the review home and its folders must belong to the user and must not be writable by group or
-  others. Otherwise the hook stores no capture and denies APEX mutations while marks cannot be trusted, and
-  `reviewComplete` fails with `REVIEW_HOME_INSECURE` until the folders are private (`chmod 700`).
+  others. Every folder above it, and the folder holding any symbolic link in its path, must belong to the user or root
+  and must not be writable by others unless it is sticky (as `/tmp` is), because a folder's parent controls renames.
+  Otherwise the hook stores no capture and denies APEX mutations while marks cannot be trusted, and `reviewComplete`
+  fails with `REVIEW_HOME_INSECURE` until the folders are private (`chmod 700`).
 - Captures of a cancelled review move into the run's object store, and the cancellation event lists them. Removal
   retries transient errors. Each `nextTask` and each new review request also sweep the review home: they remove the
   run's used captures that are still there, and captures older than 48 hours, which belong to expired requests.

@@ -1,8 +1,8 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { constants } from "node:fs";
-import { link, lstat, mkdir, open, readdir, rename, rm } from "node:fs/promises";
+import { link, lstat, mkdir, open, readdir, realpath, rename, rm } from "node:fs/promises";
 import { homedir } from "node:os";
-import { basename, isAbsolute, join, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { ReviewCaptureV1Schema, registerContractFormats, type ReviewCaptureV1 } from "@apexops/contracts";
 import { Value } from "@sinclair/typebox/value";
 import { canonicalJson, sha256Bytes, sha256Text } from "./canonical.js";
@@ -353,8 +353,43 @@ async function plainDirectory(path: string, create: boolean): Promise<boolean> {
       throw new ReviewHomeError(`Review folder is owned by another user: ${path}; it must belong to you`);
     if ((stat.mode & 0o022) !== 0)
       throw new ReviewHomeError(`Review folder is writable by other users: ${path}; run chmod 700 on it`);
+    await assertTrustedAncestors(path);
   }
   return true;
+}
+
+/** An ancestor another user cannot use to rename the review home away: owned by you or root, and not writable by
+ * group or others unless it is sticky (as /tmp is). */
+async function assertTrustedFolder(path: string): Promise<void> {
+  const stat = await lstat(path);
+  const uid = process.getuid!();
+  if ((stat.uid !== uid && stat.uid !== 0) || ((stat.mode & 0o022) !== 0 && (stat.mode & 0o1000) === 0))
+    throw new ReviewHomeError(
+      `A folder above the review home lets another user replace it: ${path}; ` +
+        "set APEX_REVIEW_HOME inside a folder only you (or root) can change",
+    );
+}
+
+/**
+ * Rename and delete authority over a folder belongs to its parent, so every real ancestor of the review folder must be
+ * trusted, and so must the folder holding each symbolic link in the configured path, which decides where it resolves.
+ */
+async function assertTrustedAncestors(path: string): Promise<void> {
+  const real = await realpath(path);
+  for (let current = dirname(real); ; current = dirname(current)) {
+    await assertTrustedFolder(current);
+    if (dirname(current) === current) break;
+  }
+  for (let prefix = dirname(resolve(path)); dirname(prefix) !== prefix; prefix = dirname(prefix)) {
+    const info = await lstat(prefix);
+    if (info.isSymbolicLink()) {
+      const holder = await realpath(dirname(prefix));
+      for (let current = holder; ; current = dirname(current)) {
+        await assertTrustedFolder(current);
+        if (dirname(current) === current) break;
+      }
+    }
+  }
 }
 
 /** Captures older than this belong to requests that expired (tasks live 24 hours) and can never be ingested. */

@@ -802,6 +802,24 @@ test(
   },
 );
 
+test(
+  "a review home under a non-sticky folder other users can write is not trusted",
+  { skip: process.platform === "win32" },
+  async (context) => {
+    const parent = await mkdtemp(join(tmpdir(), "apex-hook-parent-"));
+    context.after(async () => {
+      await chmod(parent, 0o700);
+      await rm(parent, { recursive: true, force: true });
+    });
+    const env = { ...process.env, APEX_REVIEW_HOME: join(parent, "reviews") };
+    await mkdir(join(parent, "reviews"), { mode: 0o700 });
+    await chmod(parent, 0o777);
+    assert.throws(() => activeRubberDuckMarks({ env }), /folder above the review home lets another user replace it/u);
+    await chmod(parent, 0o1777);
+    assert.deepEqual(activeRubberDuckMarks({ env }), []);
+  },
+);
+
 test("unreadable APEX tool payloads are denied only while a rubber-duck run is marked", async () => {
   await resetReviewHome();
   const truncated = JSON.stringify(apexCall("gateDecide")).slice(0, -10);

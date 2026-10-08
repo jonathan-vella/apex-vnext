@@ -202,8 +202,32 @@ function plainDirectory(path, create) {
   if (process.platform !== "win32" && typeof process.getuid === "function") {
     if (stat.uid !== process.getuid()) throw new Error(`review folder is owned by another user: ${path}`);
     if ((stat.mode & 0o022) !== 0) throw new Error(`review folder is writable by other users: ${path}`);
+    assertTrustedAncestors(path);
   }
   return true;
+}
+
+/** Owned by you or root, and not writable by group or others unless sticky (as /tmp is). Same rule as the kernel. */
+function assertTrustedFolder(path) {
+  const stat = lstatSync(path);
+  const uid = process.getuid();
+  if ((stat.uid !== uid && stat.uid !== 0) || ((stat.mode & 0o022) !== 0 && (stat.mode & 0o1000) === 0))
+    throw new Error(`a folder above the review home lets another user replace it: ${path}`);
+}
+
+/** Every real ancestor, and the folder holding each symbolic link in the configured path, must be trusted. */
+function assertTrustedAncestors(path) {
+  for (let current = dirname(realpathSync(path)); ; current = dirname(current)) {
+    assertTrustedFolder(current);
+    if (dirname(current) === current) break;
+  }
+  for (let prefix = dirname(resolve(path)); dirname(prefix) !== prefix; prefix = dirname(prefix)) {
+    if (!lstatSync(prefix).isSymbolicLink()) continue;
+    for (let current = realpathSync(dirname(prefix)); ; current = dirname(current)) {
+      assertTrustedFolder(current);
+      if (dirname(current) === current) break;
+    }
+  }
 }
 
 /**
