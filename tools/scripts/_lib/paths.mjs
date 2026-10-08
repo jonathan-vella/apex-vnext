@@ -8,6 +8,9 @@
 export const AGENTS_DIR = "customizations/.github/agents";
 export const SUBAGENTS_DIR = "customizations/.github/agents/_subagents";
 export const SKILLS_DIR = ".github/skills";
+// Shipped skills (projected into the Agent Plugin). `SKILLS_DIR` holds the
+// repository's own authoring skills, which never ship.
+export const SHIPPED_SKILLS_DIR = "customizations/.github/skills";
 export const INSTRUCTIONS_DIR = "customizations/.github/instructions";
 export const AGENT_OUTPUT_DIR = "agent-output";
 // NOTE: APEX prompt files live under `tools/apex-prompts/` (not `.github/prompts/`)

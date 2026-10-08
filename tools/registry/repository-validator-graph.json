@@ -719,6 +719,16 @@
       }
     },
     {
+      "id": "test-skills",
+      "script": "test:skills",
+      "profile": "node-test",
+      "aliases": [],
+      "retirement": {
+        "status": "active",
+        "replacementIds": []
+      }
+    },
+    {
       "id": "validate-guidance-migration",
       "script": "validate:guidance-migration",
       "profile": "node-validation",
@@ -898,6 +908,7 @@
         "validate:artifacts",
         "validate:agents",
         "validate:skills",
+        "test:skills",
         "validate:guidance-migration",
         "validate:instruction-catalog-review",
         "validate:optimization-gate",

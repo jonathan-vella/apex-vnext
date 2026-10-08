@@ -1,0 +1,47 @@
+{
+  "$schema": "schemas/skill-validation-baseline.schema.json",
+  "schemaVersion": "1.0.0",
+  "policy": "Shrink-only. Each entry records one pre-existing validate:skills error for one skill. Fix the skill and delete the entry; validate:skills fails when an entry no longer matches a violation or names an unknown root, skill or rule. Never add entries for new violations.",
+  "entries": [
+    {
+      "root": "shipped",
+      "skill": "apex-azure-compute",
+      "rule": "skill-user-invocable-explicit",
+      "violation": "SKILL.md frontmatter does not declare 'user-invocable' (true or false)",
+      "recorded": "2026-10-08",
+      "tracking": "#401"
+    },
+    {
+      "root": "shipped",
+      "skill": "apex-azure-storage",
+      "rule": "skill-user-invocable-explicit",
+      "violation": "SKILL.md frontmatter does not declare 'user-invocable' (true or false)",
+      "recorded": "2026-10-08",
+      "tracking": "#401"
+    },
+    {
+      "root": "shipped",
+      "skill": "apex-bicep-patterns",
+      "rule": "skill-user-invocable-explicit",
+      "violation": "SKILL.md frontmatter does not declare 'user-invocable' (true or false)",
+      "recorded": "2026-10-08",
+      "tracking": "#401"
+    },
+    {
+      "root": "shipped",
+      "skill": "apex-microsoft-docs",
+      "rule": "skill-user-invocable-explicit",
+      "violation": "SKILL.md frontmatter does not declare 'user-invocable' (true or false)",
+      "recorded": "2026-10-08",
+      "tracking": "#401"
+    },
+    {
+      "root": "shipped",
+      "skill": "apex-next",
+      "rule": "skill-user-invocable-explicit",
+      "violation": "SKILL.md frontmatter does not declare 'user-invocable' (true or false)",
+      "recorded": "2026-10-08",
+      "tracking": "#401"
+    }
+  ]
+}

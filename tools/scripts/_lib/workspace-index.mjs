@@ -8,6 +8,7 @@
  *   import { getAgents, getSkills, getInstructions } from "./_lib/workspace-index.mjs";
  *   const agents = getAgents();   // Map<filename, { path, dir, content, frontmatter }>
  *   const skills = getSkills();   // Map<skillName, { dir, content, frontmatter, hasRefs, refFiles }>
+ *   const shipped = getSkills(SHIPPED_SKILLS_DIR); // same shape, another skill root
  *   const instructions = getInstructions(); // Map<filename, { path, content, frontmatter }>
  */
 
@@ -17,7 +18,7 @@ import { parseFrontmatter } from "./parse-frontmatter.mjs";
 import { AGENTS_DIR, SUBAGENTS_DIR, SKILLS_DIR, INSTRUCTIONS_DIR, PROMPT_SOURCE_DIRS } from "./paths.mjs";
 
 let _agents = null;
-let _skills = null;
+const _skills = new Map();
 let _instructions = null;
 let _prompts = null;
 
@@ -51,15 +52,19 @@ export function getAgents() {
 }
 
 /**
- * Returns a Map of all skills: skillName → { dir, content, frontmatter, hasRefs, refFiles }
+ * Returns a Map of the skills under `root` (default: the repository authoring
+ * skills in `SKILLS_DIR`): skillName → { dir, content, frontmatter, hasRefs, refFiles }
+ *
+ * @param {string} [root] - Skill root directory; results are cached per root.
  */
-export function getSkills() {
-  if (_skills) return _skills;
-  _skills = new Map();
-  if (!fs.existsSync(SKILLS_DIR)) return _skills;
-  for (const entry of fs.readdirSync(SKILLS_DIR, { withFileTypes: true })) {
+export function getSkills(root = SKILLS_DIR) {
+  if (_skills.has(root)) return _skills.get(root);
+  const skills = new Map();
+  _skills.set(root, skills);
+  if (!fs.existsSync(root)) return skills;
+  for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
-    const skillDir = path.join(SKILLS_DIR, entry.name);
+    const skillDir = path.join(root, entry.name);
     const skillFile = path.join(skillDir, "SKILL.md");
     // Skip container directories like `archived_skills/` that have no SKILL.md
     // at the top level — those are inactive skill stores, not active skills.
@@ -69,7 +74,7 @@ export function getSkills() {
     const content = fs.readFileSync(skillFile, "utf-8");
     const frontmatter = parseFrontmatter(content);
     const refFiles = hasRefs ? fs.readdirSync(refsDir).filter((f) => f.endsWith(".md")) : [];
-    _skills.set(entry.name, {
+    skills.set(entry.name, {
       dir: skillDir,
       content,
       frontmatter,
@@ -77,14 +82,16 @@ export function getSkills() {
       refFiles,
     });
   }
-  return _skills;
+  return skills;
 }
 
 /**
- * Returns a Set of skill directory names.
+ * Returns a Set of skill directory names under `root` (default: `SKILLS_DIR`).
+ *
+ * @param {string} [root]
  */
-export function getSkillNames() {
-  return new Set(getSkills().keys());
+export function getSkillNames(root = SKILLS_DIR) {
+  return new Set(getSkills(root).keys());
 }
 
 /**
@@ -110,7 +117,7 @@ export function getInstructions() {
 /** Reset all caches (useful for testing). */
 export function resetIndex() {
   _agents = null;
-  _skills = null;
+  _skills.clear();
   _instructions = null;
   _prompts = null;
 }
