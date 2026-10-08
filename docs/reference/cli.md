@@ -215,6 +215,13 @@ State and provider transfer commands use explicit files, recipients, claims or p
 commands create, accept, and show single-writer transfer claims. Evidence, telemetry, cache, and quality command groups
 provide their named bounded operations.
 
+## Concurrent Writers
+
+State-changing commands hold the workspace lock that repeat-guarded MCP tools hold, so a command never lands inside a
+tool call that is checking for a repeat (see [Repeat Safety](mcp.md#repeat-safety)). A command that waits more than 30
+seconds for an in-progress tool call or another command exits with `APEX_CONFLICT`. Read-only commands, such as
+`status`, `project list`, `task context` and `writer show`, and `mcp serve` itself do not take the lock.
+
 ## Exit Codes
 
 | Code | Error                                           |

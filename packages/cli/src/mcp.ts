@@ -747,9 +747,12 @@ export function createMcpServerFactory(
                       if (resultEnvelopeBytes(value) > MCP_MAX_SERIALIZED_RESULT_BYTES) throw tooLargeError(name);
                       return value;
                     },
+                    signal,
                   ),
                 )
-              : await execute();
+              : effect === "convergent"
+                ? await resolved.service.withWorkspaceWriteLock(execute, signal)
+                : await execute();
         } catch (error) {
           const normalized = normalizeError(error);
           const governance =

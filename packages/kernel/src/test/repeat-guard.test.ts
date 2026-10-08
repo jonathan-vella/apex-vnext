@@ -13,9 +13,12 @@ import {
   REPEAT_GUARD_FILE,
   REPEAT_LOCK_FILE,
   RepeatGuardBusyError,
+  RepeatGuardCancelledError,
   RunRepository,
   RunWriterConflictError,
   executeRepeatSafe,
+  withRepeatGuardLock,
+  sha256Json,
   readRepeatEvents,
   readRepeatRecords,
   repeatCallHash,
@@ -411,6 +414,66 @@ test("the call that creates the first selection is answered as a repeat", async 
   assert.equal(again.repeated, true);
   assert.deepEqual(again.value, first.value);
   assert.equal(executions, 1);
+});
+
+test("a same-workspace writer holding the lock cannot land between a guarded call's reads and replay", async () => {
+  const { lockDirectory, worktree, scope } = await fixture();
+  let selected: "demo" | "next" = "demo";
+  const currentScope = async (): Promise<RepeatScope> => {
+    const current = await scope();
+    return { ...current, state: selected === "demo" ? current.state : sha256Json({ selected }) };
+  };
+  let executions = 0;
+  const run = () =>
+    executeRepeatSafe(
+      { operation: "projectUse", workspace: worktree, arguments: { projectId: "demo" } },
+      {
+        lockDirectory,
+        scope: currentScope,
+        assertReplayAllowed: async () => undefined,
+        execute: async () => ({ executions: ++executions }),
+      },
+    );
+  assert.equal((await run()).repeated, false);
+  let repeat: Promise<RepeatSafeOutcome<{ executions: number }>> | undefined;
+  // An unguarded writer, such as a CLI command, changes the selection while it holds the workspace lock.
+  await withRepeatGuardLock(lockDirectory, async () => {
+    repeat = run();
+    await new Promise((done) => setTimeout(done, 50));
+    selected = "next";
+  });
+  const outcome = await repeat!;
+  assert.equal(outcome.repeated, false);
+  assert.equal(executions, 2);
+});
+
+test("a call cancelled before or while it waits for the lock never executes", async () => {
+  const { lockDirectory, worktree, scope } = await fixture();
+  let executed = false;
+  const call = (signal: AbortSignal) =>
+    executeRepeatSafe(
+      { operation: "projectUse", workspace: worktree, arguments: {} },
+      {
+        lockDirectory,
+        scope,
+        assertReplayAllowed: async () => undefined,
+        execute: async () => ({ ok: (executed = true) }),
+      },
+      { lockWaitMs: 10_000, signal },
+    );
+  await assert.rejects(call(AbortSignal.abort()), RepeatGuardCancelledError);
+  const controller = new AbortController();
+  let waiting: Promise<unknown> | undefined;
+  const started = Date.now();
+  await withRepeatGuardLock(lockDirectory, async () => {
+    waiting = call(controller.signal);
+    await new Promise((done) => setTimeout(done, 50));
+    controller.abort();
+    await assert.rejects(waiting, RepeatGuardCancelledError);
+  });
+  assert.ok(Date.now() - started < 5_000);
+  assert.equal(executed, false);
+  assert.deepEqual(await readRepeatRecords((await scope()).runDirectory), []);
 });
 
 test("a live repeat lock makes callers fail closed; an expired dead holder's lock is taken over", async () => {

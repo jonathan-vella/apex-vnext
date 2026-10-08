@@ -11,7 +11,7 @@ import {
 } from "@apexops/contracts";
 import { Value } from "@sinclair/typebox/value";
 import { constants } from "node:fs";
-import { lstat, open } from "node:fs/promises";
+import { lstat, mkdir, open } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { sha256Json, sha256Text } from "./canonical.js";
 import { DirectoryLock } from "./directory-lock.js";
@@ -93,9 +93,19 @@ export interface RepeatSafeOptions {
   maxRecords?: number;
   /** Longest wait for another guarded call in the workspace before failing with {@link RepeatGuardBusyError}. */
   lockWaitMs?: number;
+  /** Cancels the call while it waits for the lock, and before lookup or execution once the lock is held. */
+  signal?: AbortSignal;
 }
 
 /** Another guarded call in the workspace is still running; the caller should refresh state and retry later. */
+/** The caller cancelled the call before it started; nothing was looked up, executed or recorded. */
+export class RepeatGuardCancelledError extends Error {
+  constructor() {
+    super("The state-changing call was cancelled before it started");
+    this.name = "RepeatGuardCancelledError";
+  }
+}
+
 export class RepeatGuardBusyError extends Error {
   constructor() {
     super("Another state-changing call in this workspace is still in progress");
@@ -283,18 +293,47 @@ export async function executeRepeatSafe<T extends object>(
   if (!Number.isSafeInteger(maxRecords) || maxRecords < 1 || maxRecords > MAX_REPEAT_RECORDS)
     throw new RangeError(`Repeat records must be an integer from 1 to ${MAX_REPEAT_RECORDS}`);
   const lockWaitMs = options.lockWaitMs ?? DEFAULT_REPEAT_LOCK_WAIT_MS;
+  const callHash = repeatCallHash(call);
+  return withRepeatGuardLock(
+    hooks.lockDirectory,
+    () => guardedCall(call, callHash, hooks, clock, idSource, windowMs, maxRecords),
+    { lockWaitMs, ...(options.signal === undefined ? {} : { signal: options.signal }) },
+  );
+}
+
+/**
+ * Runs `operation` while holding the workspace repeat lock in `lockDirectory`. Guarded calls take it, and so must every
+ * other writer of the same workspace (such as state-changing CLI commands), so that no write lands between a guarded
+ * call's state reads, execution and record publication. While the parent of `lockDirectory` does not exist there is no
+ * workspace state yet, and `operation` runs unserialized. The lock is not reentrant.
+ */
+export async function withRepeatGuardLock<T>(
+  lockDirectory: string,
+  operation: () => Promise<T>,
+  options: { lockWaitMs?: number; signal?: AbortSignal } = {},
+): Promise<T> {
+  const lockWaitMs = options.lockWaitMs ?? DEFAULT_REPEAT_LOCK_WAIT_MS;
   if (!Number.isSafeInteger(lockWaitMs) || lockWaitMs < 0)
     throw new RangeError("Repeat lock wait must not be negative");
-  const callHash = repeatCallHash(call);
-  const guarded = () => guardedCall(call, callHash, hooks, clock, idSource, windowMs, maxRecords);
+  const { signal } = options;
+  const cancelled = () => (signal?.aborted === true ? new RepeatGuardCancelledError() : undefined);
+  const started = async () => {
+    const error = cancelled();
+    if (error !== undefined) throw error;
+    return operation();
+  };
+  if (signal?.aborted === true) throw new RepeatGuardCancelledError();
   try {
-    await lstat(dirname(hooks.lockDirectory));
+    await lstat(dirname(lockDirectory));
   } catch (error) {
-    // Without workspace state there is no run to deduplicate against or race with; normal kernel checks decide.
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return guarded();
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return started();
     throw error;
   }
-  const lock = new DirectoryLock(join(hooks.lockDirectory, REPEAT_LOCK_FILE), {
+  await mkdir(lockDirectory, { recursive: true });
+  const directory = await lstat(lockDirectory);
+  if (!directory.isDirectory() || directory.isSymbolicLink())
+    throw new Error("Repeat guard lock directory is not a regular directory");
+  const lock = new DirectoryLock(join(lockDirectory, REPEAT_LOCK_FILE), {
     label: "Repeat guard lock",
     clock: () => new Date(),
     idSource: () => crypto.randomUUID(),
@@ -302,7 +341,7 @@ export async function executeRepeatSafe<T extends object>(
     platform: process.platform,
     busyError: () => new RepeatGuardBusyError(),
   });
-  return lock.run(guarded, { waitMs: lockWaitMs });
+  return lock.run(started, { waitMs: lockWaitMs, onContention: async () => cancelled() });
 }
 
 async function guardedCall<T extends object>(

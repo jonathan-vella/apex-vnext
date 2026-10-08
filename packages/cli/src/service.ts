@@ -150,6 +150,8 @@ import {
   assertTaskCurrent,
   executeRepeatSafe,
   RepeatGuardBusyError,
+  RepeatGuardCancelledError,
+  withRepeatGuardLock,
   repeatStateToken,
   type RepeatScope,
   atomicWriteBytes,
@@ -218,6 +220,14 @@ const ZERO_HASH = "0".repeat(64);
 const TASK_TTL_MS = 24 * 60 * 60 * 1000;
 const PREVIEW_TTL_MS = 24 * 60 * 60 * 1000;
 const APEX_GITIGNORE = "/cache/\n/local/\n/work/\n/runtime/capability-packs/\n";
+
+function repeatGuardError(error: unknown): unknown {
+  if (error instanceof RepeatGuardBusyError)
+    return new ApexError("APEX_CONFLICT", error.message, EXIT_CODES.conflict, undefined, error);
+  if (error instanceof RepeatGuardCancelledError)
+    return new ApexError("APEX_CONFLICT", "Cancelled", EXIT_CODES.conflict, undefined, error);
+  return error;
+}
 
 function isContainedPath(root: string, destination: string): boolean {
   const child = relative(resolve(root), resolve(destination));
@@ -2462,7 +2472,27 @@ export class ApexService {
    * selected run is unchanged since the original succeeded returns the original result and is audited instead of
    * executing again; anything else executes normally under the usual kernel checks.
    */
-  async repeatSafe<T extends Record<string, unknown>>(call: RepeatSafeCall, execute: () => Promise<T>): Promise<T> {
+  /**
+   * Runs a state-changing operation that is not repeat-guarded, such as a CLI command, under the workspace repeat lock
+   * that guarded calls hold, so it cannot land between a guarded call's state reads, execution and record publication.
+   */
+  async withWorkspaceWriteLock<T>(operation: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+    return withRepeatGuardLock(this.repeatLockDirectory(), operation, {
+      ...(signal === undefined ? {} : { signal }),
+    }).catch((error: unknown) => {
+      throw repeatGuardError(error);
+    });
+  }
+
+  private repeatLockDirectory(): string {
+    return join(this.root, ".apex", "local");
+  }
+
+  async repeatSafe<T extends Record<string, unknown>>(
+    call: RepeatSafeCall,
+    execute: () => Promise<T>,
+    signal?: AbortSignal,
+  ): Promise<T> {
     await this.refreshWorkspacePath();
     const workspacePath = this.workspacePath;
     const fileBindings = async () => {
@@ -2484,7 +2514,7 @@ export class ApexService {
         arguments: call.fileArguments === undefined ? call.arguments : { input: call.arguments, files },
       },
       {
-        lockDirectory: join(this.root, ".apex", "local"),
+        lockDirectory: this.repeatLockDirectory(),
         scope: () => this.repeatScope(),
         assertReplayAllowed: async (scope) =>
           this.runRepository(scope).assertWriterAvailable({ workspacePath: workspacePath }),
@@ -2502,11 +2532,10 @@ export class ApexService {
         clock: this.clock,
         idSource: this.idSource,
         ...(this.repeatWindowMs === undefined ? {} : { windowMs: this.repeatWindowMs }),
+        ...(signal === undefined ? {} : { signal }),
       },
     ).catch((error: unknown) => {
-      if (error instanceof RepeatGuardBusyError)
-        throw new ApexError("APEX_CONFLICT", error.message, EXIT_CODES.conflict, undefined, error);
-      throw error;
+      throw repeatGuardError(error);
     });
     return outcome.value;
   }

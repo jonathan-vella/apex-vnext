@@ -6,8 +6,15 @@ import { join, relative } from "node:path";
 import test, { type TestContext } from "node:test";
 import { promisify } from "node:util";
 import type { Client } from "@modelcontextprotocol/client";
-import { EventJournal, REPEAT_EVENT_TYPE, RunRepository, readRepeatEvents, readRepeatRecords } from "@apexops/kernel";
-import { resolveMcpWorkspace } from "../cli.js";
+import {
+  EventJournal,
+  REPEAT_EVENT_TYPE,
+  RunRepository,
+  readRepeatEvents,
+  readRepeatRecords,
+  withRepeatGuardLock,
+} from "@apexops/kernel";
+import { execute, resolveMcpWorkspace } from "../cli.js";
 import { MCP_TOOL_EFFECTS, type McpServiceResolver } from "../mcp.js";
 import { ApexService } from "../service.js";
 import { fixtures, hash, request, selection, task, type ToolName } from "./mcp-fixtures.js";
@@ -474,6 +481,26 @@ test("the first projectCreate in a workspace without a project is answered as a 
     (await readRepeatEvents(runDirectory)).map(({ payload }) => (payload as { operation: string }).operation),
     ["projectCreate"],
   );
+});
+
+test("state-changing CLI commands share the workspace lock that guarded calls hold", async () => {
+  const { service } = await initializedWorkspace();
+  const lockDirectory = join(service.root, ".apex", "local");
+  let settled = false;
+  let command: Promise<unknown> | undefined;
+  let status: unknown;
+  await withRepeatGuardLock(lockDirectory, async () => {
+    command = execute(["project", "use", "--project", "demo"], service.root).finally(() => {
+      settled = true;
+    });
+    // Read-only commands do not take the lock.
+    status = await execute(["status"], service.root);
+    await new Promise((done) => setTimeout(done, 100));
+    assert.equal(settled, false);
+  });
+  await command;
+  assert.equal(settled, true);
+  assert.equal((status as { run: { projectId: string } }).run.projectId, "demo");
 });
 
 test("a repeat survives an MCP server restart within the run", async (context) => {

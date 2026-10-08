@@ -216,8 +216,12 @@ binds the call to the state it applied to. Every guarded call in a workspace hol
 separate processes execute once, including calls such as `projectCreate` and `projectUse` that create or change the
 selected run. A call made before any run exists is recorded against the run it creates, so a repeated first
 `projectCreate` returns the original result. A caller that waits more than 30 seconds for another process's call gets
-`APEX_CONFLICT`. The lock uses the run mutation lock's protocol: an expired lock whose holder process no longer runs on
-this host is taken over into a permanent tombstone, so a delayed contender can never remove a replacement lock.
+`APEX_CONFLICT`, and a call cancelled while it waits returns `APEX_CONFLICT` without executing. Every other writer of
+the workspace shares the lock: state-changing CLI commands and the `convergent` tools hold it while they run, so no
+write lands between a guarded call's state reads, execution and record publication. Read-only CLI commands and
+`apex mcp serve` itself do not take it. The lock uses the run mutation lock's protocol: an expired lock whose holder
+process no longer runs on this host is taken over into a permanent tombstone, so a delayed contender can never remove a
+replacement lock.
 
 An identical call is answered from the original result only when all of these hold:
 
