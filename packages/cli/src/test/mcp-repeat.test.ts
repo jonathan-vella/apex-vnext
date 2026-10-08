@@ -303,40 +303,60 @@ test("a governance file replaced while the call runs never binds the result to o
   assert.equal(invocations, 3);
 });
 
-test("an external edit to staged work makes an identical call a new request", async (context) => {
-  const { service, runDirectory, journal } = await initializedWorkspace();
+test("staged work is bound by content: an edit during or after a call makes the identical call new", async (context) => {
+  const { service, runDirectory } = await initializedWorkspace();
+  const issued = await nextTaskAfterInput(service);
+  if (issued.status !== "task") throw new Error("Expected requirements task");
+  const taskId = issued.task.taskId;
   const { run } = await service.status();
-  const staged = join(service.root, ".apex", "work", run.runId, "task-1", "code", "main.bicep");
+  const staged = join(service.root, ".apex", "work", run.runId, taskId, "requirements.json");
+  // An editor rewrites one character, so the file keeps its size.
+  const sameSizeEdit = async () => {
+    const text = await readFile(staged, "utf8");
+    const edited = text.replace(/"demo"/u, '"dem0"');
+    assert.notEqual(edited, text);
+    assert.equal(Buffer.byteLength(edited), Buffer.byteLength(text));
+    await writeFile(staged, edited);
+  };
+  const stageArtifact = service.stageArtifact.bind(service);
   let invocations = 0;
-  context.mock.method(service, "stageFile", async () => {
+  let editWhileRunning = false;
+  context.mock.method(service, "stageArtifact", async (...args: Parameters<ApexService["stageArtifact"]>) => {
     invocations += 1;
-    if (invocations === 1) {
-      await mkdir(join(staged, ".."), { recursive: true });
-      await writeFile(staged, "{}");
-      await journal.append({
-        eventId: crypto.randomUUID(),
-        projectId: run.projectId,
-        runId: run.runId,
-        type: "file.staged",
-        timestamp: new Date().toISOString(),
-        ownerEpoch: run.ownerEpoch,
-        expectedHead: await journal.head(),
-        payload: { path: "main.bicep" },
-      });
-    }
-    return serviceValue("stageFile");
+    const value = await stageArtifact(...args);
+    if (editWhileRunning) await sameSizeEdit();
+    return value;
   });
-  const { client } = await connect(context, service, "repeat-staged-edit");
+  const { client } = await connect(context, service, "repeat-staged-content");
   const call = () =>
-    client.callTool({ name: "stageFile", arguments: { workspace: service.root, ...duplicateCases.stageFile.input } });
+    client.callTool({
+      name: "stageArtifact",
+      arguments: { workspace: service.root, taskId, kind: "requirements", value: requirements() },
+    });
+  // The call's own write is bound by content, so its identical repeat is answered.
   const first = await call();
-  assertSuccess(first, "stageFile");
-  assertSameResult(await call(), first, "stageFile");
+  assertSuccess(first, "stageArtifact");
+  assertSameResult(await call(), first, "stageArtifact");
   assert.equal(invocations, 1);
-  await writeFile(staged, "{ /* edited */ }");
-  assertSuccess(await call(), "stageFile");
+
+  // An edit after the call makes the identical call a new request.
+  await sameSizeEdit();
+  assertSuccess(await call(), "stageArtifact");
   assert.equal(invocations, 2);
-  assert.equal((await readRepeatEvents(runDirectory)).length, 1);
+  assertSuccess(await call(), "stageArtifact");
+  assert.equal(invocations, 2);
+
+  // An edit while the call runs keeps its result from being stored, so the repeat executes against current content.
+  await sameSizeEdit();
+  editWhileRunning = true;
+  assertSuccess(await call(), "stageArtifact");
+  editWhileRunning = false;
+  assert.equal(invocations, 3);
+  assertSuccess(await call(), "stageArtifact");
+  assert.equal(invocations, 4);
+  assertSuccess(await call(), "stageArtifact");
+  assert.equal(invocations, 4);
+  assert.equal((await readRepeatEvents(runDirectory)).length, 3);
 });
 
 test("read tools are never answered from a stored result", async (context) => {

@@ -323,10 +323,14 @@ case-folded on Windows) and the validated arguments as canonical JSON with sorte
 `governanceImport` and `governanceSelect` add the SHA-256 of the referenced file, so an edited baseline is a new call;
 a result is not stored when that file changed while the call ran.
 The run state is a hash of the selection, the project set, the selected run document, its journal head, the writer
-lease holder (lease renewals do not change it) and a stat signature of the run's staged work tree and latest generated
-source tree, so an external edit to staged or generated files also makes an identical call new. Editors do not take
-the workspace lock, so the guard reads the state again before answering a repeat and executes instead if it changed. It
-also does not store a result when a staged or generated file changed after the operation returned. The recorded
+lease holder (lease renewals do not change it) and the content of the run's staged work tree and latest generated
+source tree: the streamed SHA-256 of every file plus its stat identity. An external edit to a staged or generated file,
+including one that keeps its size and modification time, makes an identical call new. Editors do not take the
+workspace lock, so the guard reads the state again before answering a repeat and executes instead if it changed. The
+guard also stores a result only if those trees, read again after the call, still hold their content from its start,
+changed only by the call's own writes; an edit while the call runs leaves the result unstored, so the repeat executes
+against the current files. Trees over 20,000 entries or 64 MiB are not bound, so their calls are never stored or
+answered from a record. The recorded
 fingerprint binds the call to the state it applied to. Every guarded call in a workspace holds a workspace-scoped lock,
 `.apex/local/.repeat-guard.lock`, from record lookup through record publication, so concurrent identical calls from
 separate processes execute once, including calls such as `projectCreate` and `projectUse` that create or change the

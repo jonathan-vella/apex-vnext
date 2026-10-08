@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { readPublishedFile, renameWithRetry } from "../index.js";
+import { readPublishedFile, renameWithRetry, retrySharingViolations } from "../index.js";
 
 function flakyRename(failures: string[]) {
   const calls: Array<[string, string]> = [];
@@ -42,6 +42,24 @@ test("renameWithRetry gives up after the attempt budget and never retries other 
   const linux = flakyRename(["EPERM"]);
   await assert.rejects(renameWithRetry("a.tmp", "a", { platform: "linux", rename: linux.rename }), { code: "EPERM" });
   assert.equal(linux.calls.length, 1);
+});
+
+test("retrySharingViolations returns the operation's value after transient Windows sharing violations", async () => {
+  const failures = ["EBUSY", "EACCES"];
+  const value = await retrySharingViolations(
+    async () => {
+      const code = failures.shift();
+      if (code !== undefined) throw Object.assign(new Error(code), { code });
+      return "read";
+    },
+    { platform: "win32", sleep: async () => {} },
+  );
+  assert.equal(value, "read");
+  assert.deepEqual(failures, []);
+  await assert.rejects(
+    retrySharingViolations(async () => undefined, { platform: "win32", attempts: 0 }),
+    RangeError,
+  );
 });
 
 test("renameWithRetry rejects attempt budgets outside 1 to 10", async () => {

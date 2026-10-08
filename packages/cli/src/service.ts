@@ -157,6 +157,9 @@ import {
   RepeatGuardStaleError,
   withRepeatGuardLock,
   repeatStateToken,
+  repeatFilesDigest,
+  snapshotRepeatFiles,
+  RepeatFileWrites,
   type RepeatScope,
   type WorkspaceLockHold,
   atomicWriteBytes,
@@ -819,6 +822,8 @@ export class ApexService {
   private readonly processRunner: ProcessRunnerLike;
   private readonly workspaceLockHold = new AsyncLocalStorage<WorkspaceLockHold | undefined>();
   private readonly host: HostEnvironment;
+  /** Writes the running repeat-guarded call makes to the files its repeat record binds. */
+  private readonly repeatWrites = new AsyncLocalStorage<RepeatFileWrites>();
   private readonly improvementPolicy: ImprovementPolicyV1 | undefined;
   private improvementRuntime?: ImprovementStore;
   private requirementsDocumentTemplate?: Promise<{ content: string; hash: string }>;
@@ -2152,6 +2157,7 @@ export class ApexService {
       if (await this.pathExistsLstat(workDirectory)) {
         await this.assertSafeExistingPath(join(this.root, ".apex"), workDirectory);
         await rm(workDirectory, { recursive: true, force: true });
+        this.repeatWrites.getStore()?.removed(workDirectory);
       }
     }
     await rm(projectDirectory, { recursive: true, force: true });
@@ -2645,6 +2651,7 @@ export class ApexService {
     const files = Object.fromEntries(
       Object.entries(bindings).map(([name, binding]) => [name, binding?.sha256 ?? null]),
     );
+    const writes = new RepeatFileWrites();
     const outcome = await executeRepeatSafe<T>(
       {
         operation: call.operation,
@@ -2656,7 +2663,8 @@ export class ApexService {
         scope: () => this.repeatScope(),
         assertReplayAllowed: async (scope) =>
           this.runRepository(scope).assertWriterAvailable({ workspacePath: workspacePath }),
-        execute,
+        execute: () => this.repeatWrites.run(writes, execute),
+        writes,
         validUntil: (value) => {
           const expiresAt = (value.task as { expiresAt?: unknown } | undefined)?.expiresAt;
           return typeof expiresAt === "string" ? expiresAt : undefined;
@@ -2687,7 +2695,7 @@ export class ApexService {
       throw error;
     }
     const state = await this.runRepository(selection).repeatState();
-    const { signature: files, changedAtMs } = await this.repeatFilesSignature(selection);
+    const files = await snapshotRepeatFiles(await this.repeatFileRoots(selection));
     let projects: string[];
     try {
       projects = await readdir(join(this.root, ".apex", "projects"));
@@ -2700,17 +2708,17 @@ export class ApexService {
       projectId: selection.projectId,
       runId: selection.runId,
       ownerEpoch: state.ownerEpoch,
-      state: repeatStateToken({ selection, projects, ...state, files }),
-      changedAtMs,
+      state: repeatStateToken({ selection, projects, ...state, files: repeatFilesDigest(files) }),
+      files,
     };
   }
 
   /**
-   * Stat signature of the files guarded operations read outside the run journal: the run's staged work tree and the
-   * latest generated source tree. Any edit changes a file's ctime, so an external edit makes an identical call new.
-   * Also returns the latest change time across the trees and their roots.
+   * Roots of the files guarded operations read outside the run journal: the run's staged work tree and the latest
+   * generated source tree. The repeat guard binds them by content, so an external edit makes an identical call new and
+   * an edit while a call runs keeps its result from being stored.
    */
-  private async repeatFilesSignature(selection: Selection): Promise<{ signature: string; changedAtMs: number }> {
+  private async repeatFileRoots(selection: Selection): Promise<string[]> {
     const events = await this.journal(selection as RunConfigV1).replay();
     const generated = events.findLast(
       (event) =>
@@ -2723,40 +2731,7 @@ export class ApexService {
     const roots = [join(this.root, ".apex", "work", selection.runId)];
     if (handoffHash !== undefined)
       roots.push(resolve(this.root, (await this.objects.getJson<IacHandoffV1>(handoffHash)).rootPath));
-    const entries: string[] = [];
-    let changedAtNs = 0n;
-    const changed = (entry: { mtimeNs: bigint; ctimeNs: bigint }) => {
-      for (const time of [entry.mtimeNs, entry.ctimeNs]) if (time > changedAtNs) changedAtNs = time;
-    };
-    const walk = async (root: string, directory: string): Promise<void> => {
-      let names: string[];
-      try {
-        names = (await readdir(directory)).sort();
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
-        throw error;
-      }
-      for (const name of names) {
-        const path = join(directory, name);
-        const entry = await lstat(path, { bigint: true });
-        if (entries.length >= 20_000) throw new Error("Repeat file signature exceeds its entry budget");
-        entries.push(
-          [relative(root, path), entry.mode, entry.ino, entry.size, entry.mtimeNs, entry.ctimeNs].join("\u0000"),
-        );
-        changed(entry);
-        if (entry.isDirectory()) await walk(root, path);
-      }
-    };
-    for (const root of roots) {
-      entries.push(`root\u0000${root}`);
-      const rootEntry = await lstat(root, { bigint: true }).catch((error: unknown) => {
-        if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
-        throw error;
-      });
-      if (rootEntry !== undefined) changed(rootEntry);
-      await walk(root, root);
-    }
-    return { signature: sha256Json(entries), changedAtMs: Number(changedAtNs / 1_000_000n) };
+    return roots;
   }
 
   /** Content hash plus the inode, size and change times that any later modification of the file would alter. */
@@ -3325,6 +3300,7 @@ export class ApexService {
     await mkdir(directory, { recursive: true });
     await atomicWriteJson(path, output.value);
     const hash = sha256Bytes(await readFile(path));
+    this.repeatWrites.getStore()?.file(path, hash);
     await this.append(run, "artifact.staged", { taskId, kind: output.kind, hash, bytes: bytes.byteLength });
     const expectedHead = await this.journal(run).head();
     if (expectedHead === null) throw new ApexError("APEX_STALE", "Staging event was not recorded", EXIT_CODES.stale);
@@ -4283,6 +4259,7 @@ export class ApexService {
       if (used + bytes.byteLength > task.maxOutputBytes)
         throw new ApexError("APEX_VALIDATION", "Task output exceeds its cumulative size limit", EXIT_CODES.validation);
       await atomicWriteBytes(path, bytes, { refuseOverwrite: true });
+      this.repeatWrites.getStore()?.file(path, hash);
       await this.append(run, "file.staged", { taskId, path: normalized, hash, bytes: bytes.byteLength });
       await this.refreshTaskHead(run, task);
     }
@@ -5424,7 +5401,9 @@ export class ApexService {
       const bytes = Buffer.from(content, "utf8");
       const path = join(directory, name);
       await atomicWriteBytes(path, bytes, { refuseOverwrite: true });
-      return { path, sha256: sha256Bytes(bytes) };
+      const sha256 = sha256Bytes(bytes);
+      this.repeatWrites.getStore()?.file(path, sha256);
+      return { path, sha256 };
     };
     const files: ReviewPromptFile[] = [
       {
