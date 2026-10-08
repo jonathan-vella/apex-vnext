@@ -39,7 +39,7 @@ Read `.github/skills/apex-terraform-test/SKILL.md` only for accepted Terraform t
 
 Do not ask the user, repair artifacts, accept risk, or reinterpret findings. Request validation through the kernel;
 do not query ARM or replace missing validator evidence with an independent lookup. The kernel owns validator selection,
-caches, acceptance, and state. The owning CodeGen, Planner, Reviewer, or Operator role handles remediation and follow-up.
+caches, acceptance, and state. The owning CodeGen, Planner or Operator role handles remediation and follow-up.
 
 # Output
 

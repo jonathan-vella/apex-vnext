@@ -392,7 +392,7 @@ export async function verifyBundledAssetManifest(root: string, manifest: Bundled
         const expectedPrefix = `${mapping.generatedRoot}/${file.source.clientId}/`;
         if (
           file.source.clientId !== "github-copilot-cli" ||
-          file.source.adapterVersion !== "1.11.0" ||
+          file.source.adapterVersion !== "1.12.0" ||
           "roleId" in file.source ||
           !safeRelativePath(file.source.target ?? "") ||
           !file.path.startsWith(expectedPrefix) ||

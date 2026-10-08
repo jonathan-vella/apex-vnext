@@ -79,8 +79,8 @@ pre-commit:
           if ! npm run validate:challenger-presence --silent; then
             echo ""
             echo "❌ Mandatory challenger review missing for one or more steps."
-            echo "   Complete the required APEX Reviewer task against the current"
-            echo "   artifact through the owning typed completion operation."
+            echo "   Run the kernel-issued rubber-duck review for the current artifact"
+            echo "   (apex-next: exact reviewRequest.prompt, then apex/reviewComplete)."
             exit 1
           fi
         else
@@ -93,7 +93,7 @@ pre-commit:
         - customizations/.github/instructions/apex-artifact-contracts.instructions.md
         - AGENTS.md "Agent Workflow" (mandatory challenger reviews)
         🔧 Auto-fix H2: npm run fix:artifact-h2 -- <file> --apply
-        🔧 Reviewer: complete the current APEX Reviewer task
+        🔧 Review: run the kernel-issued rubber-duck review, then apex/reviewComplete
 
     agents:
       glob: "customizations/.github/agents/**/*.agent.md,.github/prompts/**/*.prompt.md"

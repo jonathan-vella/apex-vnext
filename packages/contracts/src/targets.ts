@@ -292,6 +292,56 @@ export const CostEstimateV1Schema = Type.Object(
   { $id: "https://schemas.apexops.dev/cost-estimate-v1.json", additionalProperties: false },
 );
 
+export const ReviewNonceSchema = Type.String({ pattern: "^[0-9a-f]{32}$" });
+
+/** The kernel-issued rubber-duck review request for one review task (DECISION-031), kept in the object store. */
+export const ReviewRequestV1Schema = Type.Object(
+  {
+    schemaVersion: ContractVersionSchema,
+    nonce: ReviewNonceSchema,
+    agentType: Type.Literal("rubber-duck"),
+    mode: Type.Literal("sync"),
+    gate: Type.Integer({ minimum: 1, maximum: 3 }),
+    subjectKind: NonEmptyStringSchema,
+    subjectHash: Sha256Schema,
+    attempt: Type.Integer({ minimum: 1 }),
+    maxAttempts: Type.Integer({ minimum: 1 }),
+    prompt: NonEmptyStringSchema,
+    promptSha256: Sha256Schema,
+    files: Type.Array(
+      Type.Object(
+        {
+          label: Type.Union([Type.Literal("instructions"), Type.Literal("subject"), Type.Literal("input")]),
+          kind: NonEmptyStringSchema,
+          path: NonEmptyStringSchema,
+          sha256: Sha256Schema,
+        },
+        { additionalProperties: false },
+      ),
+      { minItems: 2 },
+    ),
+  },
+  { $id: "https://schemas.apexops.dev/review-request-v1.json", additionalProperties: false },
+);
+
+/** The record the managed postToolUse hook writes for one rubber-duck task call (DECISION-031). */
+export const ReviewCaptureV1Schema = Type.Object(
+  {
+    schema: Type.Literal("apex-review-capture-v1"),
+    nonce: ReviewNonceSchema,
+    sessionId: Type.Union([Type.String(), Type.Null()]),
+    toolName: Type.String(),
+    agentType: Type.String(),
+    prompt: Type.String(),
+    requestSha256: Sha256Schema,
+    response: Type.String(),
+    responseSha256: Sha256Schema,
+    capturedAt: IsoDateTimeSchema,
+    signature: Sha256Schema,
+  },
+  { $id: "https://schemas.apexops.dev/review-capture-v1.json", additionalProperties: false },
+);
+
 export const ReviewFindingsV1Schema = Type.Object(
   {
     schemaVersion: ContractVersionSchema,
@@ -300,6 +350,16 @@ export const ReviewFindingsV1Schema = Type.Object(
     subjectKind: NonEmptyStringSchema,
     subjectHash: Sha256Schema,
     reviewedAt: IsoDateTimeSchema,
+    capture: Type.Object(
+      {
+        reviewer: Type.Literal("rubber-duck"),
+        nonce: ReviewNonceSchema,
+        captureHash: Sha256Schema,
+        promptSha256: Sha256Schema,
+        responseSha256: Sha256Schema,
+      },
+      { additionalProperties: false },
+    ),
     findings: Type.Array(
       Type.Object(
         {
@@ -710,6 +770,8 @@ export type WorkloadDecisionManifestV1 = Static<typeof WorkloadDecisionManifestV
 export type ArchitectureV1 = Static<typeof ArchitectureV1Schema>;
 export type CostEstimateV1 = Static<typeof CostEstimateV1Schema>;
 export type ReviewFindingsV1 = Static<typeof ReviewFindingsV1Schema>;
+export type ReviewCaptureV1 = Static<typeof ReviewCaptureV1Schema>;
+export type ReviewRequestV1 = Static<typeof ReviewRequestV1Schema>;
 export type GovernanceConstraintsV1 = Static<typeof GovernanceConstraintsV1Schema>;
 export type PolicyPropertyMapV1 = Static<typeof PolicyPropertyMapV1Schema>;
 export type EnvironmentInputsV1 = Static<typeof EnvironmentInputsV1Schema>;

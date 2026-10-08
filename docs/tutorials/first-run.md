@@ -72,9 +72,11 @@ deprecated.
 
 ### Managed Hooks
 
-The plugin ships `com.github.copilot/hooks/hooks.json` and one dependency-free Node script, `apex-hook.mjs`. The
-`preToolUse` entry matches the `task` tool and the tools of the plugin's `apex-azure-pricing` server. Its `bash` command
-runs `node "${PLUGIN_ROOT}/com.github.copilot/hooks/..."` and its `powershell` command (Windows PowerShell 5.1 or
+The plugin ships `com.github.copilot/hooks/hooks.json`, one dependency-free Node script, `apex-hook.mjs`, and the
+generated read-only APEX tool list `apex-mcp-tools.json`. The first `preToolUse` entry matches the subagent tool
+(`task` in Copilot CLI, `Task` or `Agent` in the VS Code payload format) and the tools of the plugin's
+`apex-azure-pricing` server. Every entry's `bash` command runs
+`node "${PLUGIN_ROOT}/com.github.copilot/hooks/..."` and its `powershell` command (Windows PowerShell 5.1 or
 PowerShell 7) runs the same script from `$env:PLUGIN_ROOT`, so paths with spaces stay one argument. The client writes
 the hook payload to stdin; the script denies a `task` call whose `agent_type` names the user-facing APEX agent
 (`apex:apex`, `APEX`) with `permissionDecision: "deny"` and a reason. It also denies every `apex-azure-pricing` tool
@@ -85,11 +87,18 @@ read. `build-plugin.mjs` embeds the read allowlist from `managedPolicy.candidate
 `tools/registry/arm-mcp-cost-pricing.v1.json`; an unbuilt script allows no pricing tool. Hidden workers such as
 `apex:apex-codegen`, built-in agents and every other tool get no output, so the normal permission flow applies.
 
+The other entries serve [rubber-duck reviews](../reference/mcp.md#rubber-duck-reviews): `postToolUse`, matched on the
+same subagent tool names, saves a kernel-requested rubber-duck answer, `subagentStart`, `subagentStop` and
+`postToolUseFailure` track active rubber-duck runs, and a second `preToolUse` entry, matched on APEX tool names, denies
+state-changing APEX tools to the rubber-duck run. Captures, the signing key, run marks and denial records live in
+`~/.apex/reviews/`, or in `APEX_REVIEW_HOME` when set.
+
 The script always exits 0, because Copilot denies a `preToolUse` call when a command hook exits non-zero. Input it
-cannot parse is allowed (fail open), unless a raw-text scan still reads a `task` call that targets APEX or a call to the
-pricing server that is not a read tool, which it denies (fail closed for those rules). A missing script is allowed with
-a warning on stderr. A missing `node` makes the command fail, so the client denies the matched calls only. Hook timeouts
-always fail open in Copilot. The hook guards against agent mistakes; kernel authorization stays the security boundary.
+cannot parse is allowed (fail open), unless a raw-text scan still reads a `task` call that targets APEX, a call to the
+pricing server that is not a read tool, or an APEX tool or rubber-duck `task` call while a rubber-duck run is marked
+active, which it denies (fail closed for those rules). A missing script is allowed with a warning on stderr. A missing
+`node` makes the command fail, so the client denies the matched calls only. Hook timeouts always fail open in Copilot.
+The hook guards against agent mistakes; kernel authorization stays the security boundary.
 
 ## Create A Consumer Repository
 

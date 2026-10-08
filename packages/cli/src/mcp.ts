@@ -14,6 +14,7 @@ import { MCP_DOCTOR_CHECK_LIMIT, MCP_OUTPUT_SCHEMAS } from "./mcp-output-schemas
 import { TARGET_SCOPE_HINT, TARGET_SCOPE_PATTERN } from "./target-scope.js";
 import { resolveMcpWorkspace } from "./workspace-root.js";
 import { runtimeMismatchError, runtimeMismatchStatus, workspaceRuntimeBinding } from "./runtime-binding.js";
+import { MCP_TOOL_EFFECTS, type McpToolEffect } from "./mcp-tool-effects.js";
 
 const errorMessages: Record<ApexErrorCode, string> = {
   APEX_USAGE: "Invalid operation arguments; check the tool input contract.",
@@ -29,6 +30,8 @@ const errorMessages: Record<ApexErrorCode, string> = {
     "Operation is not authorized in the current workflow state; check status and approval requirements.",
   APEX_CURSOR_INVALID: "Cursor is invalid for this tool, workspace, or server session.",
   APEX_RESULT_TOO_LARGE: "MCP result exceeded the bounded result size and cannot be paged safely.",
+  APEX_REVIEW_PENDING:
+    "A rubber-duck review is waiting for its capture; operations that approve, delete or publish are blocked until it completes or is cancelled.",
   APEX_INTERNAL: "APEX could not complete the operation.",
 };
 
@@ -157,58 +160,7 @@ const stagingInput = (optional: boolean) =>
       ],
     });
 
-/**
- * Effect class of every MCP tool, keyed by the output-schema registry so a new tool cannot be added unclassified.
- * - `read-only`: never writes state.
- * - `read`: adds no new effect; it may only finish recovering an already-committed run or customization transaction,
- *   so it holds the workspace lock like every other writer.
- * - `repeat-guarded`: changes state; each call runs through the kernel repeat guard, so an identical repeat while the
- *   selected run is unchanged returns the original result instead of executing again.
- * - `convergent`: changes state outside the run, so the run-scoped guard cannot tell whether a repeat is stale, and
- *   converges on its own: `doctor` re-applies the same repair to workspace installation files, and
- *   `improvementObserve` content-addresses observations, so a repeat returns the stored observation as deduplicated
- *   or recreates it after a supported deletion.
- */
-export type McpToolEffect = "read-only" | "read" | "repeat-guarded" | "convergent";
-export const MCP_TOOL_EFFECTS = {
-  status: "read-only",
-  projectList: "read-only",
-  doctorChecks: "read",
-  capabilityList: "read",
-  capabilityStatus: "read",
-  taskContext: "read",
-  readTaskInput: "read",
-  preview: "read",
-  inventory: "read",
-  diagnose: "read",
-  render: "read",
-  improvementObservations: "read",
-  improvementProposals: "read",
-  releaseWriter: "repeat-guarded",
-  nextTask: "repeat-guarded",
-  recordInput: "repeat-guarded",
-  governanceImport: "repeat-guarded",
-  governanceSelect: "repeat-guarded",
-  projectCreate: "repeat-guarded",
-  projectUse: "repeat-guarded",
-  projectDelete: "repeat-guarded",
-  gateDecide: "repeat-guarded",
-  reviewDecide: "repeat-guarded",
-  stageArtifact: "repeat-guarded",
-  stageFile: "repeat-guarded",
-  generateIac: "repeat-guarded",
-  validateTask: "repeat-guarded",
-  completeTask: "repeat-guarded",
-  requirementsComplete: "repeat-guarded",
-  architectureComplete: "repeat-guarded",
-  reviewComplete: "repeat-guarded",
-  planComplete: "repeat-guarded",
-  reconcile: "repeat-guarded",
-  promote: "repeat-guarded",
-  submitEvidence: "repeat-guarded",
-  improvementObserve: "convergent",
-  doctor: "convergent",
-} as const satisfies Record<keyof typeof MCP_OUTPUT_SCHEMAS, McpToolEffect>;
+export { MCP_TOOL_EFFECTS, MCP_TOOL_REVIEW_GUARDS, type McpToolEffect } from "./mcp-tool-effects.js";
 /** Arguments naming workspace files whose content, not only path, identifies a repeated call. */
 const repeatFileArguments: Partial<Record<keyof typeof MCP_OUTPUT_SCHEMAS, readonly string[]>> = {
   governanceImport: ["path"],
@@ -219,6 +171,20 @@ const readOnlyTools = new Set(
     .filter(([, effect]) => effect === "read-only")
     .map(([name]) => name),
 );
+/** Tools in the `read-only` effect class. Every other APEX tool is state-changing, which the rubber-duck deny hook enforces. */
+export const MCP_READ_ONLY_TOOLS: ReadonlySet<string> = readOnlyTools;
+
+/**
+ * The tool effect policy the plugin build ships beside the managed hooks (apex-mcp-tools.json), so the rubber-duck deny
+ * hook and the MCP annotations share one source.
+ */
+export function mcpToolPolicy(): { server: "apex"; tools: string[]; readOnly: string[] } {
+  return {
+    server: "apex",
+    tools: Object.keys(MCP_OUTPUT_SCHEMAS).sort(),
+    readOnly: [...MCP_READ_ONLY_TOOLS].sort(),
+  };
+}
 const externalTools = new Set(["reconcile", "inventory", "diagnose", "doctor", "doctorChecks"]);
 
 function assertBoundedInput(value: unknown): void {
@@ -449,28 +415,6 @@ function validationIssues(details: Array<{ path?: unknown; message?: unknown }>,
   );
   return lines.length > limit ? [...lines.slice(0, limit), `${lines.length - limit} more`] : lines;
 }
-const reviewFinding = z
-  .object({
-    id: z.string().min(1),
-    severity: z.enum(["critical", "high", "medium", "low", "info"]),
-    title: z.string().min(1),
-    detail: z.string().min(1),
-  })
-  .strict();
-const reviewCriterion = z
-  .object({
-    criterionId: z.enum([
-      "security",
-      "reliability",
-      "performance-efficiency",
-      "cost-optimization",
-      "operational-excellence",
-    ]),
-    outcome: z.enum(["pass", "finding", "not-applicable"]),
-    rationale: z.string().min(1),
-    findingIds: z.array(z.string().min(1)).default([]),
-  })
-  .strict();
 const uniqueStrings = z
   .array(z.string().min(1))
   .min(1)
@@ -1129,14 +1073,10 @@ export function createMcpServerFactory(
     "reviewComplete",
     {
       description:
-        "Complete the active review task; APEX derives subject identity, hash, timestamp, and evidence binding.",
-      inputSchema: {
-        taskId: z.string(),
-        findings: z.array(reviewFinding),
-        criteria: z.array(reviewCriterion).optional(),
-      },
+        "Complete the active review task from rubber-duck's captured output after running rubber-duck in sync mode with the exact reviewRequest.prompt from taskContext. Takes no findings: APEX derives them only from the verified capture. A missing, edited, replayed or mismatched capture fails closed and the review counts as not done.",
+      inputSchema: { taskId: z.string() },
     },
-    async ({ taskId, findings, criteria }) => result(await service.completeReview(taskId, findings, criteria)),
+    async ({ taskId }) => result(await service.completeReview(taskId)),
   );
   registerTool(
     "planComplete",

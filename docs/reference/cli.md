@@ -225,16 +225,16 @@ not.
 
 ## Exit Codes
 
-| Code | Error                                                            |
-| ---: | ---------------------------------------------------------------- |
-|    0 | Success                                                          |
-|    2 | `APEX_USAGE`                                                     |
-|    3 | `APEX_NOT_FOUND`                                                 |
-|    4 | `APEX_CONFLICT`, `APEX_WRITER_CONFLICT`, `APEX_RUNTIME_MISMATCH` |
-|    5 | `APEX_VALIDATION`, `APEX_WORKSPACE_UNSUPPORTED`                  |
-|    6 | `APEX_STALE`                                                     |
-|    7 | `APEX_AUTHORIZATION`                                             |
-|   10 | `APEX_INTERNAL`                                                  |
+| Code | Error                                                                                   |
+| ---: | --------------------------------------------------------------------------------------- |
+|    0 | Success                                                                                 |
+|    2 | `APEX_USAGE`                                                                            |
+|    3 | `APEX_NOT_FOUND`                                                                        |
+|    4 | `APEX_CONFLICT`, `APEX_WRITER_CONFLICT`, `APEX_RUNTIME_MISMATCH`, `APEX_REVIEW_PENDING` |
+|    5 | `APEX_VALIDATION`, `APEX_WORKSPACE_UNSUPPORTED`                                         |
+|    6 | `APEX_STALE`                                                                            |
+|    7 | `APEX_AUTHORIZATION`                                                                    |
+|   10 | `APEX_INTERNAL`                                                                         |
 
 `APEX_RUNTIME_MISMATCH` comes from the MCP server when the workspace runtime lock names another `@apexops/cli`
 version (see [Runtime Binding](mcp.md#runtime-binding)). CLI commands do not raise it; `apex update` is the fix for an

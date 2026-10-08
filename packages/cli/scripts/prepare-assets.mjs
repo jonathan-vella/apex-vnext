@@ -11,7 +11,7 @@ const repositoryRoot = resolve(packageRoot, "../..");
 const assetsRoot = join(packageRoot, "assets");
 const LOCK_DOMAIN = "apex-bundled-assets-v1\0";
 const PROJECTION_DOMAIN = "apex-client-projection-v1\0";
-const CLIENT_ADAPTER_VERSION = "1.11.0";
+const CLIENT_ADAPTER_VERSION = "1.12.0";
 export const ASSET_GENERATION_LOCK_ENV = "APEX_ASSET_GENERATION_LOCK_HELD";
 const ASSET_GENERATION_LOCK_TTL_MS = 5 * 60 * 1000;
 const ASSET_GENERATION_LOCK_RETRY_MS = 50;
@@ -160,7 +160,7 @@ export function renderClientAgentProjection(source, clientId, toolInventory, opt
     (inventory.agentReadTools ?? []).every((tool) => tools.includes(tool));
   const mechanics = [
     frontmatter.name === "APEX"
-      ? `Route through the \`apex-next\` skill in this same APEX agent. Use \`${inventory.interactiveTools.delegate}\` only for the hidden workers it names, never for interactive intake, gates or governance choices, and do not substitute Explore. Use \`${inventory.interactiveTools.askUser}\` for project lifecycle choices and kernel-owned input or review decisions. Reuse values the user already stated, ask only for missing values, and never invent defaults.`
+      ? `Route through the \`apex-next\` skill in this same APEX agent. Use \`${inventory.interactiveTools.delegate}\` only for the hidden workers and kernel rubber-duck reviews it names, never for interactive intake, gates or governance choices, and do not substitute Explore. Use \`${inventory.interactiveTools.askUser}\` for project lifecycle choices and kernel-owned input or review decisions. Reuse values the user already stated, ask only for missing values, and never invent defaults.`
       : tools.includes(inventory.interactiveTools.askUser)
         ? `Use \`${inventory.interactiveTools.askUser}\` for kernel-owned input requests.`
         : null,

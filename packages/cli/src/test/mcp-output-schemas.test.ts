@@ -94,7 +94,30 @@ const validVariants: Array<[ToolName, Record<string, unknown>]> = [
   ["validateTask", { valid: true, taskId: "task-1", staged: [staged] }],
   ["gateDecide", { ...approval, mechanism: "inherited", recipientIdentity: "tester", expiresAt: timestamp }],
   ["projectDelete", { deleted: "other", selected: selection }],
-  ["readTaskInput", { ...fixtures.readTaskInput, nextOffset: 2, outputTemplate: {} }],
+  ["readTaskInput", { ...fixtures.readTaskInput, nextOffset: 2 }],
+  [
+    "taskContext",
+    {
+      ...fixtures.taskContext,
+      reviewRequest: {
+        schemaVersion: "1.0.0",
+        nonce: "0123456789abcdef0123456789abcdef",
+        agentType: "rubber-duck",
+        mode: "sync",
+        gate: 1,
+        subjectKind: "requirements",
+        subjectHash: hash,
+        attempt: 1,
+        maxAttempts: 2,
+        prompt: "APEX-REVIEW: nonce=0123456789abcdef0123456789abcdef",
+        promptSha256: hash,
+        files: [
+          { label: "instructions", kind: "instructions", path: "/workspace/instructions.md", sha256: hash },
+          { label: "subject", kind: "requirements", path: "/workspace/subject.json", sha256: hash },
+        ],
+      },
+    },
+  ],
   ["status", { ...status, head: null, task: null }],
   [
     "taskContext",
@@ -111,7 +134,6 @@ const validVariants: Array<[ToolName, Record<string, unknown>]> = [
         subjectHash: hash,
         criteria: ["security"],
         evidenceRefs: [hash],
-        evidenceRefsRequired: true,
         dispositions: [
           {
             findingId: "finding-1",
@@ -191,6 +213,7 @@ const invalidVariants: Array<[ToolName, Record<string, unknown>]> = [
   ["improvementProposals", { proposals: [{ ...proposal, inert: false }] }],
   ["submitEvidence", { ...fixtures.submitEvidence, quarantinePath: "/workspace/quarantine.bin" }],
   ["readTaskInput", { ...fixtures.readTaskInput, nextOffset: -1 }],
+  ["readTaskInput", { ...fixtures.readTaskInput, outputTemplate: {} }],
 ];
 
 test("canonical inventory contract remains precise after the Zod bridge", () => {
@@ -335,7 +358,7 @@ test("actual MCP handlers wrap service fixtures and sanitize failures for every 
       input: { taskId, architecture: {}, costEstimate: {}, decisionManifest: {}, policyMappings: [] },
       args: [taskId, {}, {}, {}, []],
     },
-    reviewComplete: { method: "completeReview", input: { taskId, findings: [] }, args: [taskId, [], undefined] },
+    reviewComplete: { method: "completeReview", input: { taskId }, args: [taskId] },
     planComplete: {
       method: "completePlan",
       input: { taskId, implementationIntent: {}, iacBinding: binding, environmentInputs: {} },

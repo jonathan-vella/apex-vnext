@@ -57,10 +57,11 @@ or task.
 9. Submit the typed requirements artifact through `apex/requirementsComplete`. Report the materialized read-only Gate 1
    review package under `agent-output/<project>/<run>/`, including requirements, recommendations, SKU preferences and
    challenger findings.
-10. Immediately call `apex/nextTask` after submitting requirements. When it returns a requirements review worker task,
-    delegate `APEX Reviewer` with the exact `task.taskId` and tell the worker to call `apex/taskContext`. If the worker
-    is unavailable, report the pending review task and stop.
-11. When `needs_review` returns, do not request task context or invoke the Reviewer again. For accept-risk, show
+10. Immediately call `apex/nextTask` after submitting requirements. When it returns the `requirements-review` task,
+    run the rubber-duck review steps in `apex-next` with that exact `task.taskId`. If rubber-duck is unavailable or the
+    capture fails twice, report the pending review task and stop.
+11. When `needs_review` returns, do not request task context or run rubber-duck again. Record a disposition for every
+    finding: fix, accept or dismiss with a reason, or acknowledge an obligation with an owner. For accept-risk, show
     `owner: <project risk owner>, expires in 90 days`, draft the rationale and ask only for confirmation. Existing
     blocking findings require the normal correction and fresh review path; do not automatically acknowledge, dismiss or
     accept risk.

@@ -119,7 +119,7 @@ test("the bundle ships only the thin Copilot CLI projection with plugin settings
   for (const file of manifest.files.filter(({ path }) => path.startsWith(prefix))) {
     assert.equal(file.source.clientId, "github-copilot-cli");
     assert.equal(file.source.roleId, undefined);
-    assert.equal(file.source.adapterVersion, "1.11.0");
+    assert.equal(file.source.adapterVersion, "1.12.0");
   }
 });
 
@@ -308,6 +308,7 @@ test("managed role projections retain required tools and exclude unrelated grant
       "architectureComplete",
       "planComplete",
       "completeTask",
+      "reviewComplete",
       "reviewDecide",
       "gateDecide",
       "governanceImport",
@@ -318,13 +319,11 @@ test("managed role projections retain required tools and exclude unrelated grant
       "diagnose",
     ],
     "code-generation": ["taskContext", "stageFile", "generateIac", "completeTask"],
-    review: ["taskContext", "readTaskInput", "reviewComplete"],
     validation: ["taskContext", "validateTask", "completeTask"],
   };
   const requiredArm = {
     coordinator: arm.managedPolicy.candidateReadAllowlist,
     "code-generation": [],
-    review: [],
     validation: [],
   };
   const readTools = ["view", "glob", "rg"];
@@ -333,7 +332,7 @@ test("managed role projections retain required tools and exclude unrelated grant
   assert.deepEqual(manifest.roles.map(({ id }) => id).sort(), Object.keys(requiredApex).sort());
   for (const client of ["github-copilot-cli"]) {
     for (const role of manifest.roles) {
-      if (["code-generation", "review", "validation"].includes(role.id)) {
+      if (["code-generation", "validation"].includes(role.id)) {
         assert.deepEqual(role.supportedTargets, ["github-copilot"], `${role.id} must ship to Copilot CLI`);
       }
       if (!roleSupportsClient(role, client)) {
@@ -425,11 +424,15 @@ test("managed routing distinguishes input, review dispositions, and exact task c
     assert.match(apex, /Do not call\s+`apex\/nextTask` after `apex\/reviewDecide` or `apex\/reviewComplete`/u);
     if (client === "github-copilot-cli") {
       assert.match(mechanics, /Route through the `apex-next` skill/);
-      assert.match(mechanics, /Use `task` only for the hidden workers it names, never for interactive intake/);
+      assert.match(
+        mechanics,
+        /Use `task` only for the hidden workers and kernel rubber-duck reviews it names, never for interactive intake/,
+      );
     }
-    const reviewer = await pluginAgent(".github/agents/apex-reviewer.agent.md");
-    assert.match(reviewer, /Do not create blocking findings or\s+owner-assignment requests solely/);
-    assert.match(reviewer, /violated\s+Azure Policy constraints/);
+    assert.equal(await pluginAgent(".github/agents/apex-reviewer.agent.md"), undefined);
+    const next = await readFile(join(root, "customizations/.github/skills/apex-next/SKILL.md"), "utf8");
+    assert.match(next, /`agent_type: "rubber-duck"`, `mode: "sync"` and `prompt` set to `reviewRequest.prompt`/u);
+    assert.match(next, /Call `apex\/reviewComplete` with only the task ID/u);
     for (const agent of agents) {
       const content = await pluginAgent(`${agent}.agent.md`);
       for (const state of ["status=needs_input", "status=needs_review", "status=task", "task.taskId"]) {
@@ -687,7 +690,7 @@ Gather requirements through the kernel.
   assert.match(cli, /Never pass unsupported question-tool parameters/u);
   assert.match(cli, /<!-- apex-shared-body -->\n+## Role\n\nGather requirements through the kernel\./u);
   const render = (text) => () => renderClientAgentProjection(text, "github-copilot-cli");
-  for (const field of ["argument-hint: Describe the workload", "agents: [APEX Reviewer]", "handoffs: []"])
+  for (const field of ["argument-hint: Describe the workload", "agents: [APEX CodeGen]", "handoffs: []"])
     assert.throws(render(source.replace("user-invocable:", `${field}\nuser-invocable:`)), /must not declare/u);
   for (const tool of ["vscode/askQuestions", "agent"])
     assert.throws(render(source.replace("  - ask_user", `  - ${tool}`)), /must not use/u);

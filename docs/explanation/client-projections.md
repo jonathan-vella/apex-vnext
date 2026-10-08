@@ -34,10 +34,11 @@ session uses the model the user picks (DECISION-033). Standalone Copilot CLI and
 projection; `github-copilot-vscode` remains only the evidence identity for VS Code runs. The VS Code Local projection is
 retired and archived under `.archive/vscode-projection/`.
 
-The `APEX` agent is the only foreground managed agent, because only foreground APEX may ask questions. CodeGen,
-Reviewer and Validator are hidden workers that run through `task` delegation with kernel task context, not repository
-instructions. Direct-selection visibility is not an authorization boundary; kernel task, evidence, ownership and
-approval checks remain authoritative.
+The `APEX` agent is the only foreground managed agent, because only foreground APEX may ask questions. CodeGen and
+Validator are hidden workers that run through `task` delegation with kernel task context, not repository instructions.
+The Requirements, Architecture and Plan reviews run in Copilot's built-in `rubber-duck` agent; a managed hook captures
+its output and the kernel derives the findings (DECISION-031). Direct-selection visibility is not an authorization
+boundary; kernel task, evidence, ownership and approval checks remain authoritative.
 
 ## Routing With apex-next
 

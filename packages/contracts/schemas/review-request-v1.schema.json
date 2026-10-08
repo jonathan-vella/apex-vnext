@@ -1,0 +1,111 @@
+{
+  "$id": "https://schemas.apexops.dev/review-request-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "agentType": {
+      "const": "rubber-duck",
+      "type": "string"
+    },
+    "attempt": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "files": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "const": "instructions",
+                "type": "string"
+              },
+              {
+                "const": "subject",
+                "type": "string"
+              },
+              {
+                "const": "input",
+                "type": "string"
+              }
+            ]
+          },
+          "path": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "kind",
+          "path",
+          "sha256"
+        ],
+        "type": "object"
+      },
+      "minItems": 2,
+      "type": "array"
+    },
+    "gate": {
+      "maximum": 3,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "maxAttempts": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "mode": {
+      "const": "sync",
+      "type": "string"
+    },
+    "nonce": {
+      "pattern": "^[0-9a-f]{32}$",
+      "type": "string"
+    },
+    "prompt": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "promptSha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "subjectHash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "subjectKind": {
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "nonce",
+    "agentType",
+    "mode",
+    "gate",
+    "subjectKind",
+    "subjectHash",
+    "attempt",
+    "maxAttempts",
+    "prompt",
+    "promptSha256",
+    "files"
+  ],
+  "type": "object"
+}

@@ -164,7 +164,7 @@ test("CLI distinguishes interactive handoffs from supported subagent edges", () 
 
 test("CLI preserves an explicit worker invocation-disable boundary", () => {
   const result = mutate((model) => {
-    model.customization.agents.find(({ frontmatter }) => frontmatter.name === "APEX Reviewer").frontmatter[
+    model.customization.agents.find(({ frontmatter }) => frontmatter.name === "APEX Validator").frontmatter[
       "disable-model-invocation"
     ] = true;
   });
@@ -174,7 +174,7 @@ test("CLI preserves an explicit worker invocation-disable boundary", () => {
 test("keeps native read tools off hidden workers", () => {
   const result = mutate((model) => {
     model.customization.agents
-      .find(({ frontmatter }) => frontmatter.name === "APEX Reviewer")
+      .find(({ frontmatter }) => frontmatter.name === "APEX Validator")
       .frontmatter.tools.push("view");
   });
   assert.ok(hasRule(result, "customization.worker-read-tool"));
@@ -213,7 +213,7 @@ test("rejects unknown managed agent tool names while accepting the central inven
 test("rejects ask_user on an autonomous subagent", () => {
   const result = mutate((model) => {
     model.customization.agents
-      .find(({ frontmatter }) => frontmatter.name === "APEX Reviewer")
+      .find(({ frontmatter }) => frontmatter.name === "APEX Validator")
       .frontmatter.tools.push("ask_user");
   });
   assert.ok(hasRule(result, "customization.subagent-questions"));
@@ -254,13 +254,13 @@ test("rejects ask_user argument prescriptions in managed guidance and generated 
 
 test("rejects worker prompts that rely on caller context or omit taskContext delegation guidance", () => {
   const workerResult = mutate((model) => {
-    model.customization.agents.find(({ frontmatter }) => frontmatter.name === "APEX Reviewer").content +=
+    model.customization.agents.find(({ frontmatter }) => frontmatter.name === "APEX Validator").content +=
       "\nSee the coordinator instructions for the review criteria.\n";
   });
   assert.ok(hasRule(workerResult, "customization.worker-context"));
 
   const unrelatedNegationResult = mutate((model) => {
-    model.customization.agents.find(({ frontmatter }) => frontmatter.name === "APEX Reviewer").content +=
+    model.customization.agents.find(({ frontmatter }) => frontmatter.name === "APEX Validator").content +=
       "\nDo not guess; see the coordinator instructions for the review criteria.\n";
   });
   assert.ok(hasRule(unrelatedNegationResult, "customization.worker-context"));

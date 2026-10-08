@@ -8,6 +8,8 @@ import {
   ArchitectureAvailabilityV1Schema,
   ArchitectureV1Schema,
   CONTRACT_VERSION,
+  ReviewRequestV1Schema,
+  type ReviewRequestV1,
   CostEstimateV1Schema,
   DeploymentPreviewV1Schema,
   DiagnosisV1Schema,
@@ -167,7 +169,27 @@ import {
   validateInputAnswers,
   workflowValidatorOwnership,
   renameWithRetry,
+  REVIEW_AGENT,
+  REVIEW_MAX_ATTEMPTS,
+  ReviewCaptureError,
+  ReviewHomeError,
+  sweepReviewCaptures,
+  assertSingleReviewCapture,
+  quarantineReviewCaptures,
+  buildReviewInstructions,
+  buildReviewPrompt,
+  createReviewNonce,
+  loadReviewCaptures,
+  parseReviewAnswer,
+  removeReviewCaptures,
+  rejectedReviewCapture,
+  reviewCaptureKey,
+  reviewHome,
+  reviewPromptSha256,
+  verifyIssuedReviewCapture,
+  verifyReviewFiles,
   type JsonValue,
+  type ReviewPromptFile,
   type ValidationIssue,
 } from "@apexops/kernel";
 import {
@@ -204,6 +226,7 @@ import {
 } from "./assets.js";
 import { dependencyRevision as calculateDependencyRevision } from "./dependency-revision.js";
 import { ApexError, EXIT_CODES, governanceBaselineApexError, retiredProjectionError } from "./errors.js";
+import { MCP_TOOL_REVIEW_GUARDS, type ReviewGuardedTool } from "./mcp-tool-effects.js";
 import { APEX_VERSION, meetsMinimumVersion, MINIMUM_NODE_VERSION } from "./version.js";
 import {
   registerWorkflowValidators,
@@ -396,6 +419,8 @@ export interface ServiceOptions {
   improvementPolicy?: ImprovementPolicyV1;
   diagramRasterizer?: (svg: string) => Uint8Array;
   repeatWindowMs?: number;
+  /** Folder shared with the managed rubber-duck capture hook; defaults to `$APEX_REVIEW_HOME` or `~/.apex/reviews`. */
+  reviewHome?: string;
 }
 
 /** Canonical description of one state-changing call submitted through {@link ApexService.repeatSafe}. */
@@ -471,7 +496,13 @@ const GOVERNANCE_FINDINGS_SELECTOR = "governance-findings:";
 
 const TASKS: readonly WorkflowTaskDescriptor[] = [
   { id: "requirements", role: "requirements", outputs: ["requirements"] },
-  { id: "requirements-review", role: "reviewer", outputs: ["review-findings"], reviewSubject: "requirements", gate: 1 },
+  {
+    id: "requirements-review",
+    role: "rubber-duck-review",
+    outputs: ["review-findings"],
+    reviewSubject: "requirements",
+    gate: 1,
+  },
   {
     id: "governance-discovery",
     role: "governance-operator",
@@ -483,7 +514,13 @@ const TASKS: readonly WorkflowTaskDescriptor[] = [
     role: "architect",
     outputs: ["architecture", "cost-estimate", "workload-decision-manifest", "policy-property-map"],
   },
-  { id: "architecture-review", role: "reviewer", outputs: ["review-findings"], reviewSubject: "architecture", gate: 2 },
+  {
+    id: "architecture-review",
+    role: "rubber-duck-review",
+    outputs: ["review-findings"],
+    reviewSubject: "architecture",
+    gate: 2,
+  },
   {
     id: "governance-refresh",
     role: "governance-operator",
@@ -492,7 +529,7 @@ const TASKS: readonly WorkflowTaskDescriptor[] = [
   },
   { id: "policy-refresh", role: "architect", outputs: ["policy-property-map"] },
   { id: "plan", role: "planner", outputs: ["implementation-intent", "iac-binding", "environment-inputs"] },
-  { id: "plan-review", role: "reviewer", outputs: ["review-findings"], reviewSubject: "plan", gate: 3 },
+  { id: "plan-review", role: "rubber-duck-review", outputs: ["review-findings"], reviewSubject: "plan", gate: 3 },
   { id: "codegen-bicep", role: "bicep-codegen", outputs: ["logical-resource-manifest", "iac-handoff"], track: "bicep" },
   {
     id: "codegen-terraform",
@@ -711,6 +748,26 @@ const ARCHITECTURE_DECISIONS: readonly ArchitectureDecision[] = [
   },
 ];
 
+/** A review home another OS user can write cannot be trusted; the user fixes it, then the review completes as usual. */
+function reviewHomeFailure(error: unknown): unknown {
+  if (!(error instanceof ReviewHomeError)) return error;
+  return new ApexError(
+    "APEX_VALIDATION",
+    `${error.message}. Captures in it cannot be trusted; make the review home (APEX_REVIEW_HOME or ~/.apex/reviews) ` +
+      "and its folders private to you, then call reviewComplete again",
+    EXIT_CODES.validation,
+    { reason: "REVIEW_HOME_INSECURE" },
+  );
+}
+
+function capturedReviewOnlyError(): ApexError {
+  return new ApexError(
+    "APEX_AUTHORIZATION",
+    "Review findings come only from a captured rubber-duck review; run rubber-duck with the task's review prompt and call reviewComplete",
+    EXIT_CODES.authorization,
+  );
+}
+
 function architectureSubmissionError(issues: ValidationIssue[]): ApexError {
   return new ApexError(
     "APEX_VALIDATION",
@@ -741,9 +798,12 @@ export class ApexService {
   private improvementRuntime?: ImprovementStore;
   private requirementsDocumentTemplate?: Promise<{ content: string; hash: string }>;
   private workspacePath: string;
+  private readonly reviewHomeOverride: string | undefined;
+  private reviewGuardPeers: () => Iterable<ApexService> = () => [];
 
   constructor(root: string, options: ServiceOptions = {}) {
     this.root = resolve(root);
+    this.reviewHomeOverride = options.reviewHome;
     this.workspacePath = canonicalWorkspacePath(options.workspacePath ?? root);
     this.clock = options.clock ?? (() => new Date());
     this.diagramRasterizer = options.diagramRasterizer ?? rasterizeDiagram;
@@ -758,6 +818,7 @@ export class ApexService {
     this.validators.register("runtime-lock", RuntimeBundleLockV1Schema);
     this.validators.register("quality-measurements", QualityMeasurementsV1Schema);
     this.validators.register("architecture-availability", ArchitectureAvailabilityV1Schema);
+    this.validators.register("review-request", ReviewRequestV1Schema);
     this.validators.register(
       "workload-decision-submission",
       Type.Omit(WorkloadDecisionManifestV1Schema, [...DERIVED_DECISION_KEYS]),
@@ -778,6 +839,14 @@ export class ApexService {
 
   setWorkspacePath(workspacePath: string): void {
     this.workspacePath = canonicalWorkspacePath(workspacePath);
+  }
+
+  /**
+   * Other workspaces served by the same process (the MCP server resolves each caller-supplied workspace to its own
+   * service). The pending-review guard scans them too, so pointing an inherited tool at another workspace cannot evade it.
+   */
+  setReviewGuardPeers(peers: () => Iterable<ApexService>): void {
+    this.reviewGuardPeers = peers;
   }
 
   async improvementObserve(input: {
@@ -2021,6 +2090,7 @@ export class ApexService {
   }
 
   async deleteProject(projectId: ProjectId, confirmed: boolean): Promise<{ deleted: ProjectId; selected?: Selection }> {
+    await this.assertNoPendingReview("projectDelete");
     if (!confirmed)
       throw new ApexError("APEX_USAGE", "project deletion requires explicit confirmation", EXIT_CODES.usage);
     const projects = await this.listProjects();
@@ -2680,6 +2750,7 @@ export class ApexService {
     const selection = await this.selection();
     const run = await this.run(selection);
     const events = await this.journal(run).replay();
+    await this.sweepCaptures(events);
     const requirements = this.artifactHash(events, "requirements");
     const governanceInput = await this.governanceInputState(run, events);
     if (governanceInput !== undefined && !governanceInput.fulfilled) {
@@ -2749,8 +2820,16 @@ export class ApexService {
     taskType: string,
   ): Promise<TaskEnvelopeV1 | undefined> {
     const last = events.at(-1);
-    const payload = last?.payload as { taskId?: unknown; taskType?: unknown } | undefined;
+    const payload = last?.payload as
+      { taskId?: unknown; taskType?: unknown; review?: { requestHash?: unknown } } | undefined;
     if (last?.type !== "task.issued" || payload?.taskType !== taskType || typeof payload.taskId !== "string")
+      return undefined;
+    // A review task without a rubber-duck request binding (issued by an earlier runtime) can never complete; issue a
+    // fresh task with its own request instead of returning it.
+    if (
+      TASKS.find(({ id }) => id === taskType)?.reviewSubject !== undefined &&
+      typeof payload.review?.requestHash !== "string"
+    )
       return undefined;
     const task = await this.readTask(run, payload.taskId);
     return task.expectedHead === last.hash &&
@@ -2761,6 +2840,7 @@ export class ApexService {
   }
 
   async recordInput(input: InputSubmissionV1): Promise<{ recorded: true; requestId: string }> {
+    await this.assertNoPendingReview("recordInput");
     let run: RunConfigV1;
     try {
       const selection = await this.selection();
@@ -2914,7 +2994,6 @@ export class ApexService {
       criteria: node.validators.filter((id) => workflowValidatorOwnership(id)?.boundary === "review"),
       dispositions: [...dispositions.values()],
       evidenceRefs: task.inputRefs,
-      evidenceRefsRequired: true,
     };
   }
 
@@ -2928,6 +3007,7 @@ export class ApexService {
     outputTemplates: Partial<Record<ArtifactKind, unknown>>;
     reviewMetadata?: Awaited<ReturnType<ApexService["taskReviewMetadata"]>>;
     reviewMetadataReference?: { selector: "review-metadata"; bytes: number; inlined: boolean };
+    reviewRequest?: ReviewRequestV1;
     outputRoot: string;
     status: string;
     blockers: string[];
@@ -2955,8 +3035,7 @@ export class ApexService {
       task.taskType === "requirements" ||
       task.taskType === "architecture" ||
       task.taskType === "plan" ||
-      task.taskType === "governance-discovery" ||
-      task.taskType.endsWith("-review")
+      task.taskType === "governance-discovery"
     ) {
       for (const kind of task.allowedOutputKinds) {
         if (!SUPPORTED_ARTIFACT_KINDS.includes(kind as ArtifactKind)) {
@@ -2976,6 +3055,8 @@ export class ApexService {
     );
     const values = await Promise.all(task.inputRefs.map((hash) => this.objects.getJson(hash)));
     const reviewMetadata = await this.taskReviewMetadata(run, task, events, descriptor);
+    const reviewRequest =
+      descriptor.reviewSubject === undefined ? undefined : (await this.issuedReviewRequest(events, taskId)).request;
     const context = {
       task,
       inputs: [] as unknown[],
@@ -3015,6 +3096,7 @@ export class ApexService {
               inlined: true,
             },
           }),
+      ...(reviewRequest === undefined ? {} : { reviewRequest }),
       outputRoot: join(this.root, ".apex", "work", run.runId, taskId),
       status: this.completedNodeIds(events).has(task.taskType) ? "completed" : "active",
       blockers: route.blockers,
@@ -3154,9 +3236,6 @@ export class ApexService {
       subjectHash: selectedHash ?? sha256Bytes(Buffer.from(serialized, "utf8")),
       content,
       offset,
-      ...(offset === 0 && descriptor.reviewSubject !== undefined
-        ? { outputTemplate: this.outputTemplate("review-findings", run, events, task.taskType) }
-        : {}),
       ...(nextOffset < serialized.length ? { nextOffset } : {}),
     };
   }
@@ -3164,6 +3243,7 @@ export class ApexService {
   async stageArtifact(taskId: string, output: TaskOutput): Promise<StagedArtifact> {
     const run = await this.currentRun();
     const task = await this.readTask(run, taskId);
+    if (output.kind === "review-findings" || task.taskType.endsWith("-review")) throw capturedReviewOnlyError();
     const head = await this.journal(run).head();
     if (head === null) throw new ApexError("APEX_STALE", "Task journal is empty", EXIT_CODES.stale);
     assertTaskCurrent(task, head, run.ownerEpoch, this.clock);
@@ -4298,6 +4378,7 @@ export class ApexService {
   }> {
     const run = await this.currentRun();
     const task = await this.readTask(run, taskId);
+    if (task.taskType.endsWith("-review")) throw capturedReviewOnlyError();
     const head = await this.journal(run).head();
     if (head === null) throw new ApexError("APEX_STALE", "Task journal is empty", EXIT_CODES.stale);
     assertTaskCurrent(task, head, run.ownerEpoch, this.clock);
@@ -4941,31 +5022,397 @@ export class ApexService {
     ]);
   }
 
+  /**
+   * Completes a review task from rubber-duck's captured output (DECISION-031). The kernel locates the single capture
+   * for the task's request nonce, verifies its signature, prompt and origin, checks that the reviewed artifact is
+   * still current, and derives every finding from the captured answer. The caller supplies no findings.
+   */
   async completeReview(
     taskId: string,
-    findings: Array<Pick<ReviewFindingsV1["findings"][number], "id" | "severity" | "title" | "detail">>,
-    criteria?: NonNullable<ReviewFindingsV1["criteria"]>,
   ): Promise<{ outputHashes: Partial<Record<ArtifactKind, string>>; summary: string }> {
-    const context = await this.taskContext(taskId);
-    if (!context.task.taskType.endsWith("-review")) {
+    const run = await this.currentRun();
+    const task = await this.readTask(run, taskId);
+    const descriptor = TASKS.find(({ id }) => id === task.taskType);
+    if (descriptor?.reviewSubject === undefined)
       throw new ApexError("APEX_AUTHORIZATION", "Task is not a review task", EXIT_CODES.authorization);
-    }
-    const template = context.outputTemplates["review-findings"] as ReviewFindingsV1 | undefined;
-    if (template === undefined) throw new ApexError("APEX_STALE", "Review template is unavailable", EXIT_CODES.stale);
-    return this.completeTaskOutputs(taskId, [
-      {
-        kind: "review-findings",
-        value: {
-          ...template,
-          findings: findings.map((finding) => ({
-            ...finding,
-            disposition: "open" as const,
-            evidenceRefs: [template.subjectHash],
-          })),
-          ...(criteria === undefined ? {} : { criteria }),
+    const events = await this.journal(run).replay();
+    const head = events.at(-1)?.hash;
+    if (head === undefined) throw new ApexError("APEX_STALE", "Task journal is empty", EXIT_CODES.stale);
+    assertTaskCurrent(task, head, run.ownerEpoch, this.clock);
+    const { request, requestHash } = await this.issuedReviewRequest(events, task.taskId);
+    const subjectKind = this.reviewSubjectArtifactKind(descriptor)!;
+    if (this.artifactHash(events, subjectKind) !== request.subjectHash)
+      throw new ApexError("APEX_STALE", "The reviewed artifact changed after the review request", EXIT_CODES.stale);
+    if (this.reviewNonceConsumed(events, request.nonce))
+      throw new ApexError("APEX_CONFLICT", "This review request was already used", EXIT_CODES.conflict);
+    const home = this.reviewHomeOverride ?? reviewHome();
+    const files = await loadReviewCaptures(request.nonce, home).catch((error: unknown) => {
+      throw reviewHomeFailure(error);
+    });
+    let completion: { outputHashes: Partial<Record<ArtifactKind, string>>; summary: string };
+    try {
+      await verifyReviewFiles(request.files);
+      assertSingleReviewCapture(files);
+      const record = verifyIssuedReviewCapture(request, files, await reviewCaptureKey(home));
+      const answer = parseReviewAnswer(record.response, {
+        wellArchitected: descriptor.reviewSubject === "architecture",
+      });
+      const captureHash = await this.objects.putJson(record);
+      const review: ReviewFindingsV1 = {
+        schemaVersion: CONTRACT_VERSION,
+        projectId: run.projectId,
+        runId: run.runId,
+        subjectKind: descriptor.reviewSubject,
+        subjectHash: request.subjectHash,
+        reviewedAt: this.clock().toISOString(),
+        capture: {
+          reviewer: REVIEW_AGENT,
+          nonce: record.nonce,
+          captureHash,
+          promptSha256: request.promptSha256,
+          responseSha256: record.responseSha256,
         },
+        findings: answer.findings.map((finding) => ({
+          ...finding,
+          disposition: "open" as const,
+          evidenceRefs: [request.subjectHash, captureHash],
+        })),
+        ...(answer.criteria === undefined ? {} : { criteria: answer.criteria }),
+      };
+      completion = await this.acceptTaskOutputs(taskId, [{ kind: "review-findings", value: review }], undefined, {
+        requestHash,
+      });
+    } catch (error) {
+      if (error instanceof ReviewHomeError) throw reviewHomeFailure(error);
+      const failure =
+        error instanceof ReviewCaptureError
+          ? { reason: error.reason, message: error.message }
+          : error instanceof ApexError && error.code === "APEX_VALIDATION"
+            ? { reason: "invalid-findings", message: error.message }
+            : undefined;
+      // A failure after task.completed committed (for example while materializing review files), or a rejection that
+      // lost the race to another writer, still used the nonce; its captures can never be ingested again.
+      const releaseConsumed = async () => {
+        if (this.reviewNonceConsumed(await this.journal(run).replay(), request.nonce))
+          await removeReviewCaptures(files);
+      };
+      if (failure === undefined) {
+        await releaseConsumed();
+        throw error;
+      }
+      if (failure.reason === "missing") {
+        // A concurrent reviewComplete may have consumed the nonce and removed its capture after this call read the
+        // journal; a rerun would then only leave a capture for a stale task.
+        const latest = await this.journal(run).replay();
+        if (this.reviewNonceConsumed(latest, request.nonce))
+          throw new ApexError(
+            "APEX_CONFLICT",
+            "This review request was completed or rejected concurrently; do not rerun rubber-duck, call nextTask",
+            EXIT_CODES.conflict,
+          );
+        if (latest.at(-1)?.hash !== head)
+          throw new ApexError(
+            "APEX_STALE",
+            "The run changed while the capture was checked; call nextTask before running rubber-duck again",
+            EXIT_CODES.stale,
+          );
+      }
+      if (failure.reason !== "missing")
+        await this.rejectReviewCapture(run, descriptor.id, request, requestHash, failure.reason, files, head).catch(
+          async (rejection: unknown) => {
+            await releaseConsumed();
+            throw rejection;
+          },
+        );
+      const next =
+        failure.reason === "missing"
+          ? "The review is not done: run rubber-duck once more in sync mode with the exact prompt from taskContext, then call reviewComplete again; if the capture is still missing, stop and report it to the user."
+          : request.attempt < request.maxAttempts
+            ? "The review is not done and this request is used up: call nextTask for a new review request and run rubber-duck once more with its exact prompt."
+            : "The review is not done after the allowed reruns: stop and report this problem to the user; do not run rubber-duck again without their direction.";
+      throw new ApexError(
+        "APEX_VALIDATION",
+        `Rubber-duck review attempt ${request.attempt} of ${request.maxAttempts} failed (${failure.reason}): ${failure.message}. ${next}`,
+        EXIT_CODES.validation,
+        { reason: `REVIEW_CAPTURE_${failure.reason.toUpperCase().replace(/-/gu, "_")}` },
+      );
+    }
+    await removeReviewCaptures(files);
+    return completion;
+  }
+
+  /**
+   * Review requests in this workspace that still wait for their rubber-duck capture: in each run, the last issued task
+   * is a review task with a request, it is neither completed nor cancelled, and it has not expired. A rejected capture
+   * leaves the review pending until the next request or a cancellation. Unreadable task files count as pending.
+   */
+  private async pendingReviews(): Promise<Array<{ projectId: string; runId: string; taskId: string }>> {
+    const pending: Array<{ projectId: string; runId: string; taskId: string }> = [];
+    const projectsDirectory = join(this.root, ".apex", "projects");
+    const projectIds = await readdir(projectsDirectory).catch((error: unknown) => {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return [] as string[];
+      throw error;
+    });
+    for (const projectId of projectIds.sort()) {
+      const runIds = await readdir(join(projectsDirectory, projectId, "runs")).catch((error: unknown) => {
+        if (["ENOENT", "ENOTDIR"].includes((error as NodeJS.ErrnoException).code ?? "")) return [] as string[];
+        throw error;
+      });
+      for (const runId of runIds.sort()) {
+        if (!Value.Check(RunIdSchema, runId)) continue;
+        const runDirectory = join(projectsDirectory, projectId, "runs", runId);
+        const events = await new EventJournal(join(runDirectory, "journal")).replay();
+        const issued = events.findLast(({ type }) => type === "task.issued")?.payload as
+          { taskId?: unknown; review?: { nonce?: unknown } } | undefined;
+        if (typeof issued?.taskId !== "string" || typeof issued.review?.nonce !== "string") continue;
+        const taskId = issued.taskId;
+        if (
+          events.some(
+            ({ type, payload }) =>
+              (type === "task.completed" || type === "task.cancelled") &&
+              (payload as { taskId?: unknown } | null)?.taskId === taskId,
+          )
+        )
+          continue;
+        const task = await readFile(join(runDirectory, "tasks", `${taskId}.json`), "utf8")
+          .then((text) => JSON.parse(text) as { expiresAt?: unknown })
+          .catch(() => undefined);
+        const expiresAt = typeof task?.expiresAt === "string" ? Date.parse(task.expiresAt) : Number.NaN;
+        if (Number.isFinite(expiresAt) && expiresAt <= this.clock().getTime()) continue;
+        pending.push({ projectId, runId, taskId });
+      }
+    }
+    return pending;
+  }
+
+  /**
+   * DECISION-031 amendment (2026-10-08): while a review waits for its capture, refuse operations that approve, delete
+   * or publish (MCP_TOOL_REVIEW_GUARDS), so an inherited rubber-duck cannot use them even when hooks fail open.
+   */
+  private async assertNoPendingReview(operation: ReviewGuardedTool): Promise<void> {
+    let pending: { projectId: string; runId: string; taskId: string; workspace?: string } | undefined = (
+      await this.pendingReviews()
+    )[0];
+    for (const peer of this.reviewGuardPeers()) {
+      if (pending !== undefined) break;
+      if (peer === this || peer.root === this.root) continue;
+      const [found] = await peer.pendingReviews();
+      if (found !== undefined) pending = { ...found, workspace: peer.root };
+    }
+    if (pending === undefined) return;
+    throw new ApexError(
+      "APEX_REVIEW_PENDING",
+      `${operation} (${MCP_TOOL_REVIEW_GUARDS[operation]}) is blocked while a rubber-duck review waits for its ` +
+        `capture in ${pending.workspace === undefined ? "" : `workspace ${pending.workspace}, `}project ` +
+        `${pending.projectId}, run ${pending.runId} (task ${pending.taskId}). Finish the review ` +
+        `with reviewComplete, or stop any running rubber-duck and cancel it from a terminal: apex project use ` +
+        `--project ${pending.projectId} --run ` +
+        `${pending.runId}, then apex task cancel --task ${pending.taskId}.`,
+      EXIT_CODES.conflict,
+      { reason: "REVIEW_PENDING", operation, ...pending },
+    );
+  }
+
+  /**
+   * Best effort: removes captures of this run's used review requests whose earlier removal failed, and captures of
+   * long-expired requests. File times are wall-clock, so the sweep uses the wall clock rather than the service clock.
+   */
+  private async sweepCaptures(events: Awaited<ReturnType<EventJournal["replay"]>>): Promise<void> {
+    const consumed = new Set<string>();
+    for (const { type, payload } of events) {
+      const value = payload as { nonce?: unknown; capture?: { nonce?: unknown } } | null;
+      const nonce =
+        type === "task.completed"
+          ? value?.capture?.nonce
+          : ["review.capture-rejected", "task.cancelled"].includes(type)
+            ? value?.nonce
+            : undefined;
+      if (typeof nonce === "string") consumed.add(nonce);
+    }
+    await sweepReviewCaptures(this.reviewHomeOverride ?? reviewHome(), Date.now(), undefined, consumed).catch(() => 0);
+  }
+
+  private reviewNonceConsumed(events: Awaited<ReturnType<EventJournal["replay"]>>, nonce: string): boolean {
+    return events.some((event) => {
+      const payload = event.payload as { nonce?: unknown; capture?: { nonce?: unknown } } | null;
+      return (
+        (event.type === "review.capture-rejected" && payload?.nonce === nonce) ||
+        (event.type === "task.completed" && payload?.capture?.nonce === nonce)
+      );
+    });
+  }
+
+  private async issuedReviewRequest(
+    events: Awaited<ReturnType<EventJournal["replay"]>>,
+    taskId: string,
+  ): Promise<{ request: ReviewRequestV1; requestHash: string }> {
+    const issued = events.findLast(
+      (event) => event.type === "task.issued" && (event.payload as { taskId?: unknown }).taskId === taskId,
+    );
+    const binding = (issued?.payload as { review?: { requestHash?: unknown; nonce?: unknown } } | undefined)?.review;
+    if (typeof binding?.requestHash !== "string")
+      throw new ApexError("APEX_STALE", "Review task has no issued rubber-duck request", EXIT_CODES.stale);
+    const request = await this.objects.getJson<unknown>(binding.requestHash);
+    if (
+      !Value.Check(ReviewRequestV1Schema, request) ||
+      request.nonce !== binding.nonce ||
+      reviewPromptSha256(request.prompt) !== request.promptSha256
+    )
+      throw new ApexError("APEX_INTERNAL", "Issued review request is invalid or inconsistent", EXIT_CODES.internal);
+    return { request, requestHash: binding.requestHash };
+  }
+
+  private async rejectReviewCapture(
+    run: RunConfigV1,
+    nodeId: string,
+    request: ReviewRequestV1,
+    requestHash: string,
+    reason: string,
+    files: Awaited<ReturnType<typeof loadReviewCaptures>>,
+    validatedHead: string,
+  ): Promise<void> {
+    const { captureHashes, quarantined, notQuarantined, archived } = await this.archiveReviewCaptures(run, files);
+    try {
+      // Compare-and-swap on the head completeReview validated: a concurrent rejection or completion consumes the
+      // nonce first, so this one fails stale instead of counting the same attempt twice.
+      await this.append(
+        run,
+        "review.capture-rejected",
+        {
+          nodeId,
+          nonce: request.nonce,
+          requestHash,
+          subjectHash: request.subjectHash,
+          attempt: request.attempt,
+          reason,
+          captures: files.length,
+          captureHashes,
+          quarantined,
+          ...(notQuarantined.length === 0 ? {} : { notQuarantined }),
+        },
+        validatedHead,
+      );
+    } catch (error) {
+      if (error instanceof Error && /Stale journal head/u.test(error.message))
+        throw new ApexError(
+          "APEX_STALE",
+          "The review request changed while its capture was checked; refresh with nextTask",
+          EXIT_CODES.stale,
+        );
+      throw error;
+    }
+    await removeReviewCaptures(archived);
+  }
+
+  /**
+   * Moves captures that will never be ingested into the run's object store as typed JSON audit evidence, so the shared
+   * review home stays bounded and state transfer can still carry (and secret-check) every journal-referenced object.
+   * Captures that cannot be archived move to the review home's quarantine first, so the caller's event records only
+   * moves that happened; the quarantine keeps them even if that event then loses the race to another writer. The
+   * caller removes `archived` once its event is committed.
+   */
+  private async archiveReviewCaptures(
+    run: RunConfigV1,
+    files: Awaited<ReturnType<typeof loadReviewCaptures>>,
+  ): Promise<{
+    captureHashes: string[];
+    quarantined: string[];
+    notQuarantined: Awaited<ReturnType<typeof quarantineReviewCaptures>>["failed"];
+    archived: Awaited<ReturnType<typeof loadReviewCaptures>>;
+  }> {
+    await this.acquireRunWriterLease(run);
+    const captureHashes: string[] = [];
+    const unarchivable: typeof files = [];
+    for (const file of files) {
+      const evidence = file.bytes === undefined ? undefined : rejectedReviewCapture(file.bytes);
+      if (evidence === undefined) unarchivable.push(file);
+      else captureHashes.push(await this.objects.putJson(evidence));
+    }
+    const quarantine = await quarantineReviewCaptures(unarchivable, this.reviewHomeOverride ?? reviewHome());
+    return {
+      captureHashes,
+      quarantined: quarantine.quarantined.map(({ name }) => name),
+      notQuarantined: quarantine.failed,
+      archived: files.filter((file) => !unarchivable.includes(file)),
+    };
+  }
+
+  /**
+   * Writes the review inputs as readable files and builds the rubber-duck prompt that binds their hashes, the gate and
+   * a fresh single-use nonce. Returns the journal binding for `task.issued`.
+   */
+  private async prepareReviewRequest(
+    run: RunConfigV1,
+    descriptor: WorkflowTaskDescriptor,
+    taskId: string,
+    inputRefs: readonly string[],
+  ): Promise<{ requestHash: string; nonce: string; promptSha256: string; subjectHash: string; attempt: number }> {
+    // Best effort: drop captures of long-expired requests from the shared review home; issuing never depends on it.
+    const events = await this.journal(run).replay();
+    await this.sweepCaptures(events);
+    const subjectKind = this.reviewSubjectArtifactKind(descriptor)!;
+    const subjectHash = this.artifactHash(events, subjectKind);
+    if (subjectHash === undefined || !inputRefs.includes(subjectHash))
+      throw new ApexError("APEX_STALE", "Review subject is unavailable", EXIT_CODES.stale);
+    const kinds = new Map(Object.entries(this.acceptedArtifactHashes(events)).map(([kind, hash]) => [hash, kind]));
+    const directory = join(this.root, ".apex", "work", run.runId, taskId, "review");
+    const write = async (name: string, content: string): Promise<{ path: string; sha256: string }> => {
+      const bytes = Buffer.from(content, "utf8");
+      const path = join(directory, name);
+      await atomicWriteBytes(path, bytes, { refuseOverwrite: true });
+      return { path, sha256: sha256Bytes(bytes) };
+    };
+    const files: ReviewPromptFile[] = [
+      {
+        label: "instructions",
+        kind: "instructions",
+        ...(await write("instructions.md", buildReviewInstructions(descriptor.reviewSubject!))),
       },
-    ]);
+    ];
+    const ordered = [subjectHash, ...inputRefs.filter((hash) => hash !== subjectHash)];
+    for (const [index, hash] of ordered.entries()) {
+      const kind = kinds.get(hash) ?? "evidence";
+      const value = await this.objects.getJson(hash);
+      files.push({
+        label: index === 0 ? "subject" : "input",
+        kind,
+        ...(await write(`${String(index).padStart(2, "0")}-${kind}.json`, `${JSON.stringify(value, null, 2)}\n`)),
+      });
+    }
+    const nonce = createReviewNonce(this.idSource());
+    const gate = descriptor.gate!;
+    const prompt = buildReviewPrompt({
+      nonce,
+      gate,
+      subjectKind: descriptor.reviewSubject!,
+      files,
+      wellArchitected: descriptor.reviewSubject === "architecture",
+    });
+    const attempt =
+      1 +
+      events.filter(
+        (event) =>
+          event.type === "review.capture-rejected" &&
+          (event.payload as { nodeId?: unknown }).nodeId === descriptor.id &&
+          (event.payload as { subjectHash?: unknown }).subjectHash === subjectHash,
+      ).length;
+    const request: ReviewRequestV1 = {
+      schemaVersion: CONTRACT_VERSION,
+      nonce,
+      agentType: REVIEW_AGENT,
+      mode: "sync",
+      gate,
+      subjectKind: descriptor.reviewSubject!,
+      subjectHash,
+      attempt,
+      maxAttempts: REVIEW_MAX_ATTEMPTS,
+      prompt,
+      promptSha256: reviewPromptSha256(prompt),
+      files,
+    };
+    this.assertValid("review-request", request);
+    const requestHash = await this.objects.putJson(request);
+    return { requestHash, nonce, promptSha256: request.promptSha256, subjectHash, attempt };
   }
 
   async completePlan(
@@ -4993,6 +5440,7 @@ export class ApexService {
     taskId: string,
     outputs: TaskOutput[],
     confirmedRevision?: ReturnType<ApexService["pendingGovernanceRevision"]>,
+    capturedReview?: { requestHash: string },
   ): Promise<{ outputHashes: Partial<Record<ArtifactKind, string>>; summary: string }> {
     outputs = [...outputs];
     const run = await this.currentRun();
@@ -5009,6 +5457,7 @@ export class ApexService {
     const descriptor = TASKS.find(({ id }) => id === task.taskType);
     if (descriptor === undefined)
       throw new ApexError("APEX_VALIDATION", `Unknown task type ${task.taskType}`, EXIT_CODES.validation);
+    if (descriptor.reviewSubject !== undefined && capturedReview === undefined) throw capturedReviewOnlyError();
     await this.assertTaskReviewFilesUnmodified(run, descriptor);
     if (descriptor.id.startsWith("codegen-")) await this.assertPreviousGeneratedSourceUnmodified(events);
     if (descriptor.id === "requirements") {
@@ -5100,6 +5549,10 @@ export class ApexService {
               reviewHash: outputHashes["review-findings"],
               subjectHash: (outputs[0]!.value as ReviewFindingsV1).subjectHash,
               dependencyHash,
+              capture: {
+                ...(outputs[0]!.value as ReviewFindingsV1).capture,
+                requestHash: capturedReview!.requestHash,
+              },
             }),
       },
       completionHead,
@@ -5811,10 +6264,36 @@ export class ApexService {
   async cancelTask(taskId: string): Promise<void> {
     const run = await this.currentRun();
     await this.readTask(run, taskId);
-    await this.append(run, "task.cancelled", { taskId });
+    const events = await this.journal(run).replay();
+    const binding = (
+      events.findLast(
+        ({ type, payload }) => type === "task.issued" && (payload as { taskId?: unknown }).taskId === taskId,
+      )?.payload as { review?: { nonce?: unknown } } | undefined
+    )?.review;
+    if (typeof binding?.nonce !== "string" || this.reviewNonceConsumed(events, binding.nonce)) {
+      await this.append(run, "task.cancelled", { taskId });
+      return;
+    }
+    // A cancelled review's captures can never be ingested: archive them as audit evidence and clear the review home.
+    const files = await loadReviewCaptures(binding.nonce, this.reviewHomeOverride ?? reviewHome()).catch(
+      (error: unknown) => {
+        throw reviewHomeFailure(error);
+      },
+    );
+    const archive = await this.archiveReviewCaptures(run, files);
+    await this.append(run, "task.cancelled", {
+      taskId,
+      nonce: binding.nonce,
+      captures: files.length,
+      captureHashes: archive.captureHashes,
+      quarantined: archive.quarantined,
+      ...(archive.notQuarantined.length === 0 ? {} : { notQuarantined: archive.notQuarantined }),
+    });
+    await removeReviewCaptures(archive.archived);
   }
 
   async resolveReview(resolution: ReviewResolution): Promise<void> {
+    await this.assertNoPendingReview("reviewDecide");
     const run = await this.currentRun();
     const events = await this.journal(run).replay();
     const reviewEvent = [...events]
@@ -5892,6 +6371,7 @@ export class ApexService {
     reviewHash: string,
     decisions: ReviewDecision[],
   ): Promise<{ status: "revision_requested" | "resolved" }> {
+    await this.assertNoPendingReview("reviewDecide");
     if (decisions.length === 0 || new Set(decisions.map(({ findingId }) => findingId)).size !== decisions.length) {
       throw new ApexError("APEX_VALIDATION", "Review decisions must be nonempty and unique", EXIT_CODES.validation);
     }
@@ -6124,6 +6604,7 @@ export class ApexService {
     actor: string,
     options: GateDecisionOptions = {},
   ): Promise<ApprovalEvidenceV1> {
+    await this.assertNoPendingReview("gateDecide");
     const run = await this.currentRun();
     if (gateNumber === 4)
       await this.assertGeneratedReviewUnmodified(join(this.operationsReviewDirectory(run), "approval.md"));
@@ -6971,6 +7452,7 @@ export class ApexService {
   }
 
   async promote(environment: string, targetScope: string): Promise<RunConfigV1> {
+    await this.assertNoPendingReview("promote");
     const source = await this.currentRun();
     const sourceEvents = await this.journal(source).replay();
     if (![1, 2, 3].every((gate) => this.gateApproved(source, gate)))
@@ -7292,6 +7774,7 @@ export class ApexService {
     file?: string;
     required: boolean;
   }): Promise<unknown> {
+    await this.assertNoPendingReview("submitEvidence");
     if ((input.value === undefined) === (input.file === undefined))
       throw new ApexError("APEX_USAGE", "Evidence requires exactly one value or file", EXIT_CODES.usage);
     const store = await this.evidenceStore(input.kind, input.contentType);
@@ -7657,12 +8140,20 @@ export class ApexService {
       this.idSource,
     );
     await this.acquireRunWriterLease(run);
+    const review =
+      descriptor.reviewSubject === undefined
+        ? undefined
+        : await this.prepareReviewRequest(run, descriptor, task.taskId, inputRefs);
     await atomicWriteJson(
       join(this.projects.runDirectory(run.projectId, run.runId), "tasks", `${task.taskId}.json`),
       task,
       { refuseOverwrite: true },
     );
-    await this.append(run, "task.issued", { taskId: task.taskId, taskType: descriptor.id });
+    await this.append(run, "task.issued", {
+      taskId: task.taskId,
+      taskType: descriptor.id,
+      ...(review === undefined ? {} : { review }),
+    });
     const currentHead = await this.journal(run).head();
     const current = { ...task, expectedHead: currentHead! };
     await atomicWriteJson(
@@ -8394,49 +8885,6 @@ export class ApexService {
         ...this.requirementsTemplateFromIntake({ ...(input ?? {}), "iac-preference": run.iacTool }),
       };
     }
-    if (kind === "review-findings") {
-      const review = TASKS.find(({ id }) => id === taskType);
-      const subjectKind = review?.reviewSubject;
-      const artifactKind = review === undefined ? undefined : this.reviewSubjectArtifactKind(review);
-      const subjectHash = artifactKind === undefined ? undefined : this.artifactHash(events, artifactKind);
-      if (subjectKind === undefined || subjectHash === undefined) {
-        throw new ApexError("APEX_STALE", "Review subject is unavailable", EXIT_CODES.stale);
-      }
-      return {
-        schemaVersion: CONTRACT_VERSION,
-        projectId: run.projectId,
-        runId: run.runId,
-        subjectKind,
-        subjectHash,
-        reviewedAt: this.clock().toISOString(),
-        findings: [
-          {
-            id: "FINDING-001",
-            severity: "medium",
-            disposition: "open",
-            title: "Concise finding title",
-            detail: "Evidence, impact, and concrete remediation.",
-            evidenceRefs: [subjectHash],
-          },
-        ],
-        ...(subjectKind === "architecture"
-          ? {
-              criteria: [
-                "security",
-                "reliability",
-                "performance-efficiency",
-                "cost-optimization",
-                "operational-excellence",
-              ].map((criterionId) => ({
-                criterionId,
-                outcome: "pass",
-                rationale: "Explain how this pillar was independently reviewed.",
-                findingIds: [],
-              })),
-            }
-          : {}),
-      };
-    }
     if (kind === "architecture") {
       return {
         schemaVersion: CONTRACT_VERSION,
@@ -9045,9 +9493,7 @@ export class ApexService {
 
   private openReviewFindings(value: unknown): string[] {
     const review = value as { findings?: Array<{ id: string; disposition: string; severity: string }> };
-    return (review.findings ?? [])
-      .filter((finding) => finding.disposition === "open" && finding.severity !== "info")
-      .map(({ id }) => id);
+    return (review.findings ?? []).filter((finding) => finding.disposition === "open").map(({ id }) => id);
   }
 
   private validateOutput(run: RunConfigV1, output: TaskOutput): void {

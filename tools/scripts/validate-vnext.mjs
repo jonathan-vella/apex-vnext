@@ -1013,11 +1013,7 @@ function validateCustomizations(model, findings) {
   }
 
   const declaredEdges = array(customization.manifest.invocationEdges);
-  const expectedWorkerEdges = new Set([
-    "APEX\0APEX CodeGen\0subagent",
-    "APEX\0APEX Reviewer\0subagent",
-    "APEX\0APEX Validator\0subagent",
-  ]);
+  const expectedWorkerEdges = new Set(["APEX\0APEX CodeGen\0subagent", "APEX\0APEX Validator\0subagent"]);
   const actualWorkerEdges = new Set(declaredEdges.map(({ from, to, type }) => `${from}\0${to}\0${type}`));
   if (
     actualWorkerEdges.size !== expectedWorkerEdges.size ||
@@ -1026,7 +1022,7 @@ function validateCustomizations(model, findings) {
     finding(
       findings,
       "customization.cli-delegation",
-      "APEX must delegate exactly to the hidden CodeGen, Reviewer and Validator workers",
+      "APEX must delegate exactly to the hidden CodeGen and Validator workers",
       "customizations/manifest.json",
     );
   const subagentParents = new Set(declaredEdges.filter(({ type }) => type === "subagent").map(({ from }) => from));

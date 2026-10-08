@@ -42,6 +42,7 @@ const requiredPaths = [
   "mcp.json",
   "com.github.copilot/hooks/hooks.json",
   "com.github.copilot/hooks/apex-hook.mjs",
+  "com.github.copilot/hooks/apex-mcp-tools.json",
 ];
 
 function parseArguments(argv) {

@@ -67,7 +67,7 @@ const toolArguments: Record<ToolName, Record<string, unknown>> = {
     decisionManifest: {},
     policyMappings: [],
   },
-  reviewComplete: { taskId: "task-1", findings: [] },
+  reviewComplete: { taskId: "task-1" },
   planComplete: {
     taskId: "task-1",
     implementationIntent: {},

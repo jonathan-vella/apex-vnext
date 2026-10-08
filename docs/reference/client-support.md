@@ -30,9 +30,10 @@ marked implemented by this support matrix. See the [checkpoint](../vnext/PROJECT
 ## Current Client Behavior
 
 The [client pivot](../vnext/ROADMAP.md#client-pivot) uses one foreground `APEX` agent for every interactive stage
-(DECISION-032). Rubber-duck replaces the Reviewer later (DECISION-031), and agents do not pin models (DECISION-033).
+(DECISION-032). The built-in `rubber-duck` agent performs the reviews with captured output (DECISION-031), and agents
+do not pin models (DECISION-033).
 
-The CLI projection ships one user-facing `APEX` agent and autonomous CodeGen, Reviewer and Validator workers. CLI
+The CLI projection ships one user-facing `APEX` agent and autonomous CodeGen and Validator workers. CLI
 workers were enabled with maintainer authorization after bounded Luna workflow probes. Revised
 [ADR-0006](../vnext/adrs/03-des-adr-0006-omit-cli-autonomous-workers.md) treats visibility as a usability convention,
 not authorization. Kernel task, evidence, ownership and approval checks remain mandatory, and worker tool grants are
@@ -54,9 +55,13 @@ values either way, and cancellation records nothing. See
 [input qualification](../vnext/CLIENT-QUALIFICATION.md#multiple-selection-input) for required evidence.
 
 The foreground APEX agent may use the built-in Explore agent for read-only questions about named workspace paths.
-Managed agents do not use Rubber-duck, Code-review or Security-review, because they inherit the caller's APEX tools.
-You can run `/review` or `/security-review` yourself on promoted output, and `/research` for background reading. Treat
-their findings as advice and record any change through APEX. General-purpose delegation, `/fleet`,
+It runs the built-in `rubber-duck` agent only for kernel-issued Requirements, Architecture and Plan reviews, with the
+exact review prompt. Rubber-duck inherits the caller's APEX tools, so the managed `preToolUse` hook denies its
+state-changing APEX calls, and the kernel accepts only its captured output (see
+[rubber-duck reviews](mcp.md#rubber-duck-reviews)). Managed agents do not use rubber-duck as an advisory helper, nor
+Code-review or Security-review, because these also inherit the caller's APEX tools. You can run `/review` or
+`/security-review` yourself on promoted output, and `/research` for background reading. Treat their findings as advice
+and record any change through APEX. General-purpose delegation, `/fleet`,
 `/delegate` and plan mode stay out of managed workflows.
 
 In VS Code on native Windows, open the workspace, start a chat with the session target set to Copilot, and pick the

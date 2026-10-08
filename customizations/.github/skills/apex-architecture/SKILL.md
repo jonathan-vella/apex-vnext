@@ -56,9 +56,9 @@ review or task.
 9. Report the read-only Gate 2 package under `agent-output/<project>/<run>/architecture/`, including Architecture,
    WAF, cost breakdown, uncertainty diagrams, assessment, SKU comparison and challenger findings. Diagrams are derived
    views, not gate evidence.
-10. When an architecture review worker task appears, delegate `APEX Reviewer` with the exact `task.taskId` and tell the
-    worker to call `apex/taskContext`. For `needs_review`, do not request task context or invoke the Reviewer again.
-    Present findings in one decision panel and submit permitted decisions through `apex/reviewDecide`. Automatically
+10. When the `architecture-review` task appears, run the rubber-duck review steps in `apex-next` with the exact
+    `task.taskId`. For `needs_review`, do not request task context or run rubber-duck again. Present findings in one
+    decision panel and record a disposition for every finding through `apex/reviewDecide`. Automatically
     dismiss findings that only request regional, zonal, quota, deployment, restore, failover or complete pricing checks.
 11. For a `policy-refresh` task after Gate 2, start from the `policy-property-map` template in task context. Decide only
     rows listed in `governanceFindings`, submit the complete map through `apex/completeTask`, and let blocked rows

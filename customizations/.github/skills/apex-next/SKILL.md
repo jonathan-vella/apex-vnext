@@ -1,6 +1,6 @@
 ---
 name: apex-next
-description: "Routes the next APEX kernel step inside the same APEX agent by mapping owner roles to stage skills or hidden workers."
+description: "Routes the next APEX kernel step inside the same APEX agent by mapping owner roles to stage skills, hidden workers or captured rubber-duck reviews."
 ---
 
 When calling any `apex/*` MCP tool, include the current session checkout or worktree as the required absolute
@@ -9,7 +9,7 @@ When calling any `apex/*` MCP tool, include the current session checkout or work
 ## APEX Next
 
 Route the next APEX step from kernel state. The kernel selects the owner role; the foreground `APEX` agent remains
-active and loads the mapped skill, or delegates one hidden worker.
+active and loads the mapped skill, delegates one hidden worker, or runs one captured rubber-duck review.
 
 ## Prerequisites
 
@@ -43,7 +43,7 @@ active and loads the mapped skill, or delegates one hidden worker.
    | `diagnostic-operator`                | `apex-operations`                |
    | `quality-owner`                      | `apex-operations`                |
    | `quality-evaluator`                  | `apex-operations`                |
-   | reviewer tasks or review roles       | worker `APEX Reviewer`           |
+   | `rubber-duck-review`                 | built-in `rubber-duck` (below)   |
    | `request.intake`                     | `apex-requirements`              |
    | `request.decision`                   | `apex-architecture`              |
    | `request.governance`                 | `apex-operations`                |
@@ -63,10 +63,31 @@ active and loads the mapped skill, or delegates one hidden worker.
 6. After worker completion or same-agent stage completion, call `apex/status`. If a gate is pending, report it and stop.
    Never call `apex/nextTask` after `apex/reviewDecide` or `apex/reviewComplete` while a gate is pending.
 
+## Rubber-duck reviews
+
+The Requirements, Architecture and Plan reviews run in the built-in `rubber-duck` agent. A managed hook saves its exact
+output and the kernel derives the findings from that capture; this agent never writes, edits or restates findings.
+
+1. Call `apex/taskContext` with the exact `task.taskId` and read `reviewRequest`.
+2. Call `task` once with `agent_type: "rubber-duck"`, `mode: "sync"` and `prompt` set to `reviewRequest.prompt`
+   exactly as returned. Copy it character for character; add nothing before or after it and do not summarize or
+   extend it. Do not provide model, model-policy or reasoning-effort.
+3. Call `apex/reviewComplete` with only the task ID. Do not pass, interpret or correct rubber-duck's answer.
+4. If `apex/reviewComplete` fails, branch on the error. For a missing capture, run rubber-duck once more with the same
+   prompt. For `APEX_CONFLICT` or `APEX_STALE`, do not run rubber-duck: call `apex/nextTask` and follow what it returns.
+   For any other failure, call `apex/nextTask`. Run rubber-duck again only when `apex/nextTask` returns a new
+   `rubber-duck-review` task, and use that task's prompt. Then call `apex/reviewComplete` again. If that second attempt
+   fails, stop and report the error to the user. Never complete a review task with `apex/completeTask` or author
+   findings yourself.
+5. When `apex/nextTask` returns `needs_review`, load the stage skill for that gate. Record a disposition for every
+   finding through `apex/reviewDecide`: fix (`revise`), accept (`accept-risk`), or dismiss with a reason; Requirements
+   obligations may also be acknowledged with an owner. Gates still need the user's explicit approval.
+
 ## Boundaries
 
 - No `/agent` switching, Agent picker directions, copyable specialist prompts or interactive specialist handoffs.
-- Delegate only `APEX CodeGen`, `APEX Reviewer` and `APEX Validator`.
+- Delegate only `APEX CodeGen` and `APEX Validator`. Run built-in `rubber-duck` only for a kernel `rubber-duck-review`
+  task, with the exact kernel prompt; any other rubber-duck answer is advice and never kernel evidence.
 - Never delegate intake, user questions, gate decisions, governance selection, or any other interactive work.
 - Never collect, answer, summarize or record a question unless the kernel returned it to the active `APEX` agent.
 - Never replace invalid choices with defaults or recommendations.

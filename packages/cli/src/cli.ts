@@ -454,6 +454,32 @@ export async function createApexService(
   });
 }
 
+/**
+ * One service per resolved workspace root. Every service sees the others as pending-review guard peers, so a guarded
+ * call aimed at another workspace still fails while any served workspace has a review waiting for its capture.
+ */
+export function mcpServiceResolver(
+  defaultService: ApexService,
+  create: (workspaceRoot: string, workspacePath: string) => Promise<ApexService>,
+): McpServiceResolver {
+  const cache = new Map<string, ApexService>([[defaultService.root, defaultService]]);
+  const peers = () => cache.values();
+  defaultService.setReviewGuardPeers(peers);
+  return {
+    defaultService,
+    resolve: async (workspace) => {
+      const resolved = await resolveMcpWorkspace(workspace);
+      let resolvedService = cache.get(resolved.root);
+      if (resolvedService === undefined) {
+        resolvedService = await create(resolved.root, resolved.workspace);
+        resolvedService.setReviewGuardPeers(peers);
+        cache.set(resolved.root, resolvedService);
+      }
+      return { service: resolvedService, workspace: resolved.workspace };
+    },
+  };
+}
+
 export async function execute(argv: string[], root = process.cwd(), options: ServiceOptions = {}): Promise<unknown> {
   const { words, flags } = parse(argv);
   const command = words.join(" ");
@@ -478,25 +504,12 @@ async function dispatch(
   options: ServiceOptions,
 ): Promise<unknown> {
   switch (command) {
-    case "mcp serve": {
-      const cache = new Map<string, ApexService>([[service.root, service]]);
-      const resolver: McpServiceResolver = {
-        defaultService: service,
-        resolve: async (workspace) => {
-          const resolved = await resolveMcpWorkspace(workspace);
-          let resolvedService = cache.get(resolved.root);
-          if (resolvedService === undefined) {
-            resolvedService = await createApexService(resolved.root, flags, command, {
-              ...options,
-              workspacePath: resolved.workspace,
-            });
-            cache.set(resolved.root, resolvedService);
-          }
-          return { service: resolvedService, workspace: resolved.workspace };
-        },
-      };
-      return serveMcp(resolver);
-    }
+    case "mcp serve":
+      return serveMcp(
+        mcpServiceResolver(service, (workspaceRoot, workspacePath) =>
+          createApexService(workspaceRoot, flags, command, { ...options, workspacePath }),
+        ),
+      );
     case "version": {
       const assets = await resolveBundledAssets();
       return {

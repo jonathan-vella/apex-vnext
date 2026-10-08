@@ -67,7 +67,7 @@ const manifestShape = {
   server: ["entry", "target", "nodeTarget"],
   agents: ["sourceRoot", "targetRoot"],
   skills: ["sourceRoot", "targetRoot"],
-  hooks: ["sourceRoot", "targetRoot", "entries"],
+  hooks: ["sourceRoot", "targetRoot", "entries", "toolPolicy"],
   assets: ["sourceRoot", "targetRoot"],
   native: ["package", "targetRoot", "source", "binaries"],
 };
@@ -75,6 +75,8 @@ const nativeBinaryShape = ["package", "file", "libc"];
 const nativeCacheDirectory = join(repositoryRoot, "node_modules/.cache/apex-plugin-native");
 const nativeFetchTimeoutMs = 120_000;
 const builtins = new Set(builtinModules.flatMap((name) => [name, `node:${name}`]));
+// The MCP adapter owns tool effects; build:vnext compiles it before the plugin build reads the policy from it.
+const toolPolicyModule = "packages/cli/dist/mcp.js";
 // camelCase events from the Copilot hooks reference; PascalCase names select the VS Code payload format instead.
 const hookEvents = [
   "agentStop",
@@ -225,6 +227,12 @@ function validatePackageManifest(manifest) {
   ) {
     throw new Error("Plugin hooks entries must be safe relative paths and include hooks.json when present");
   }
+  if (
+    !safeRelativePath(manifest.hooks.toolPolicy) ||
+    !manifest.hooks.toolPolicy.endsWith(".json") ||
+    manifest.hooks.entries.includes(manifest.hooks.toolPolicy)
+  )
+    throw new Error("Plugin hooks toolPolicy must be a generated .json path that is not a hook source entry");
 }
 
 async function readManifest(manifestPath, outputDirectoryOverride) {
@@ -618,6 +626,29 @@ async function validateHookScript(outputRoot, script) {
   if (/\bimport\s*\(|\brequire\s*\(/u.test(output)) throw new Error(`${label}: dynamic import or require`);
 }
 
+/** Reads the APEX MCP tool effect policy from the compiled MCP adapter. */
+async function mcpToolPolicy() {
+  const module = await import(pathToFileURL(join(repositoryRoot, toolPolicyModule)).href).catch((error) => {
+    throw new Error(
+      `Cannot read the MCP tool policy from ${toolPolicyModule}; run npm run build:vnext (${error.message})`,
+    );
+  });
+  return module.mcpToolPolicy();
+}
+
+function validateToolPolicy(policy, manifest) {
+  assertKeys("Hook tool policy", policy, ["server", "tools", "readOnly"]);
+  const names = (value) =>
+    Array.isArray(value) &&
+    value.every((name) => typeof name === "string" && /^[A-Za-z][A-Za-z0-9]*$/u.test(name)) &&
+    value.every((name, index) => index === 0 || bytewise(value[index - 1], name) < 0);
+  if (policy.server !== manifest.mcp.server) throw new Error("Hook tool policy server must be the bundled MCP server");
+  if (!names(policy.tools) || policy.tools.length === 0 || !names(policy.readOnly))
+    throw new Error("Hook tool policy must list sorted, unique tool names");
+  const unknown = policy.readOnly.filter((name) => !policy.tools.includes(name));
+  if (unknown.length > 0) throw new Error(`Hook tool policy marks an unknown tool read-only: ${unknown[0]}`);
+}
+
 /**
  * Checks hooks.json against the Copilot hook configuration format: version 1, camelCase events, and command entries
  * with both bash and PowerShell commands that run one shipped, dependency-free Node script from the plugin root.
@@ -645,6 +676,10 @@ async function validatePackagedHooks(outputRoot, manifest) {
   }
   const unused = [...scripts].filter((script) => !used.has(script));
   if (unused.length > 0) throw new Error(`Hook script is not referenced by hooks.json: ${unused[0]}`);
+  validateToolPolicy(
+    JSON.parse(await readFile(join(outputRoot, hooksRoot, manifest.hooks.toolPolicy), "utf8")),
+    manifest,
+  );
 }
 
 function lockedPackage(lock, name) {
@@ -977,6 +1012,11 @@ async function build(
     await writeOutputFile(outputDirectory, `${manifest.hooks.targetRoot}/${entry}`, content);
   }
   if (renderedHooks !== 1) throw new Error("Exactly one hook script must carry the pricing read-tools marker");
+  if (manifest.hooks.entries.length > 0) {
+    const policy = await mcpToolPolicy();
+    validateToolPolicy(policy, manifest);
+    await writeJsonOutput(outputDirectory, `${manifest.hooks.targetRoot}/${manifest.hooks.toolPolicy}`, policy);
+  }
   await copyDirectory(manifest.assets.sourceRoot, outputDirectory, manifest.assets.targetRoot);
 
   await validatePackagedAgents(outputDirectory, manifest.agents.targetRoot);
@@ -1013,6 +1053,7 @@ export {
   build,
   hashTree,
   hookCommands,
+  mcpToolPolicy,
   validateMcpJson,
   validatePackageManifest,
   validatePackagedAgents,

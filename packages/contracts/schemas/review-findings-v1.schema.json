@@ -3,6 +3,39 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
+    "capture": {
+      "additionalProperties": false,
+      "properties": {
+        "captureHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "nonce": {
+          "pattern": "^[0-9a-f]{32}$",
+          "type": "string"
+        },
+        "promptSha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "responseSha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "reviewer": {
+          "const": "rubber-duck",
+          "type": "string"
+        }
+      },
+      "required": [
+        "reviewer",
+        "nonce",
+        "captureHash",
+        "promptSha256",
+        "responseSha256"
+      ],
+      "type": "object"
+    },
     "criteria": {
       "items": {
         "additionalProperties": false,
@@ -189,6 +222,7 @@
     "subjectKind",
     "subjectHash",
     "reviewedAt",
+    "capture",
     "findings"
   ],
   "type": "object"

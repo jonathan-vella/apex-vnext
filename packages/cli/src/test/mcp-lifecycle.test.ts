@@ -877,15 +877,18 @@ test("input schema failures name the failing paths without invoking the service"
       throw new Error("completeReview must not run");
     },
   });
-  const response = await session.call("reviewComplete", {
-    taskId: "task-1",
-    findings: [{ id: "FINDING-001", severity: "urgent", title: "t", detail: "d" }],
-  });
+  // Obsolete agent-authored findings must not reach the kernel: reviewComplete takes only the task ID.
+  for (const extra of [
+    { findings: [{ id: "FINDING-001", severity: "high", title: "t", detail: "d" }] },
+    { criteria: [{ criterionId: "security", outcome: "pass", rationale: "r" }] },
+  ]) {
+    const response = await session.call("reviewComplete", { taskId: "task-1", ...extra });
+    assert.equal(response.isError, true);
+    const { error } = response.structuredContent as { error: { code: string; message: string } };
+    assert.equal(error.code, "APEX_VALIDATION");
+    assert.match(error.message, /^Invalid tool arguments: .*(?:findings|criteria)/u);
+  }
   assert.equal(calls, 0);
-  assert.equal(response.isError, true);
-  const { error } = response.structuredContent as { error: { code: string; message: string } };
-  assert.equal(error.code, "APEX_VALIDATION");
-  assert.match(error.message, /^Invalid tool arguments: \/findings\/0\/severity /u);
 });
 
 test("single-service MCP servers fail closed when the workspace resolves elsewhere", async (context) => {
@@ -905,26 +908,19 @@ test("single-service MCP servers fail closed when the workspace resolves elsewhe
   assert.equal(calls, 0);
 });
 
-test("review criteria without findingIds reach the service as an empty list", async (context) => {
-  let received: unknown;
+test("reviewComplete forwards only the task ID to the captured-review kernel path", async (context) => {
+  let received: unknown[] = [];
   const session = await connect(context, {
-    completeReview: async (_taskId, _findings, criteria) => {
-      received = criteria;
+    completeReview: async (...args: unknown[]) => {
+      received = args;
       throw new ApexError("APEX_CONFLICT", "stop after capture", EXIT_CODES.conflict);
     },
   });
-  await session.call("reviewComplete", {
-    taskId: "task-1",
-    findings: [],
-    criteria: [{ criterionId: "security", outcome: "pass", rationale: "Private endpoints only." }],
-  });
-  assert.deepEqual(received, [
-    { criterionId: "security", outcome: "pass", rationale: "Private endpoints only.", findingIds: [] },
-  ]);
+  await session.call("reviewComplete", { taskId: "task-1" });
+  assert.deepEqual(received, ["task-1"]);
   const reviewComplete = (await session.client.listTools()).tools.find(({ name }) => name === "reviewComplete")!;
-  const criterion = (reviewComplete.inputSchema.properties as { criteria: { items: { required?: string[] } } }).criteria
-    .items;
-  assert.equal(criterion.required?.includes("findingIds"), false);
+  assert.deepEqual(Object.keys(reviewComplete.inputSchema.properties ?? {}).sort(), ["taskId", "workspace"]);
+  assert.match(reviewComplete.description ?? "", /captured output/u);
 });
 
 test("repeated validation issues are grouped by field with a count", async (context) => {

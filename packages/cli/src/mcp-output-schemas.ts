@@ -9,6 +9,7 @@ import {
   NonEmptyStringSchema,
   NativeValidationReceiptV1Schema,
   ResourceInventoryV1Schema,
+  ReviewRequestV1Schema,
   RunConfigV1Schema,
   Sha256Schema,
   TaskEnvelopeV1Schema,
@@ -51,6 +52,7 @@ function contract(schema: TObject | TUnion<TObject[]>, options: { pageable?: boo
             "APEX_AUTHORIZATION",
             "APEX_CURSOR_INVALID",
             "APEX_RESULT_TOO_LARGE",
+            "APEX_REVIEW_PENDING",
             "APEX_INTERNAL",
           ].map((code) => Type.Literal(code)),
         ),
@@ -162,7 +164,6 @@ const reviewMetadata = object({
     }),
   ),
   evidenceRefs: Type.Array(Sha256Schema),
-  evidenceRefsRequired: Type.Literal(true),
 });
 const stagedArtifact = object({
   taskId: NonEmptyStringSchema,
@@ -257,6 +258,7 @@ export const MCP_OUTPUT_SCHEMAS = {
       reviewMetadataReference: Type.Optional(
         object({ selector: Type.Literal("review-metadata"), bytes: count, inlined: Type.Boolean() }),
       ),
+      reviewRequest: Type.Optional(ReviewRequestV1Schema),
       outputRoot: NonEmptyStringSchema,
       status: Type.Union([Type.Literal("completed"), Type.Literal("active")]),
       blockers: strings,
@@ -269,7 +271,6 @@ export const MCP_OUTPUT_SCHEMAS = {
       content: Type.String(),
       offset: count,
       nextOffset: Type.Optional(count),
-      outputTemplate: Type.Optional(Type.Unknown()),
     }),
     { pageable: true },
   ),
