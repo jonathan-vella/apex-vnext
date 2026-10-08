@@ -168,7 +168,7 @@ test("plugin layout, manifests, agents, skills and bundle are valid", async (con
   );
   const policy = await readJson(join(outputDirectory, "com.github.copilot/hooks/apex-mcp-tools.json"));
   assert.deepEqual(policy, mcpToolPolicy(), "the deny hook policy is derived from the MCP adapter");
-  assert.deepEqual(policy.readOnly, ["doctorChecks", "projectList", "status"]);
+  assert.deepEqual(policy.readOnly, ["projectList", "status"]);
   assert.equal(
     await readFile(join(outputDirectory, "com.github.copilot/hooks/apex-hook.mjs"), "utf8"),
     renderHookScript(

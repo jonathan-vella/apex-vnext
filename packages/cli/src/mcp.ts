@@ -14,6 +14,7 @@ import { MCP_DOCTOR_CHECK_LIMIT, MCP_OUTPUT_SCHEMAS } from "./mcp-output-schemas
 import { TARGET_SCOPE_HINT, TARGET_SCOPE_PATTERN } from "./target-scope.js";
 import { resolveMcpWorkspace } from "./workspace-root.js";
 import { runtimeMismatchError, runtimeMismatchStatus, workspaceRuntimeBinding } from "./runtime-binding.js";
+import { MCP_TOOL_EFFECTS, type McpToolEffect } from "./mcp-tool-effects.js";
 
 const errorMessages: Record<ApexErrorCode, string> = {
   APEX_USAGE: "Invalid operation arguments; check the tool input contract.",
@@ -159,58 +160,7 @@ const stagingInput = (optional: boolean) =>
       ],
     });
 
-/**
- * Effect class of every MCP tool, keyed by the output-schema registry so a new tool cannot be added unclassified.
- * - `read-only`: never writes state.
- * - `read`: adds no new effect; it may only finish recovering an already-committed run or customization transaction,
- *   so it holds the workspace lock like every other writer.
- * - `repeat-guarded`: changes state; each call runs through the kernel repeat guard, so an identical repeat while the
- *   selected run is unchanged returns the original result instead of executing again.
- * - `convergent`: changes state outside the run, so the run-scoped guard cannot tell whether a repeat is stale, and
- *   converges on its own: `doctor` re-applies the same repair to workspace installation files, and
- *   `improvementObserve` content-addresses observations, so a repeat returns the stored observation as deduplicated
- *   or recreates it after a supported deletion.
- */
-export type McpToolEffect = "read-only" | "read" | "repeat-guarded" | "convergent";
-export const MCP_TOOL_EFFECTS = {
-  status: "read-only",
-  projectList: "read-only",
-  doctorChecks: "read",
-  capabilityList: "read",
-  capabilityStatus: "read",
-  taskContext: "read",
-  readTaskInput: "read",
-  preview: "read",
-  inventory: "read",
-  diagnose: "read",
-  render: "read",
-  improvementObservations: "read",
-  improvementProposals: "read",
-  releaseWriter: "repeat-guarded",
-  nextTask: "repeat-guarded",
-  recordInput: "repeat-guarded",
-  governanceImport: "repeat-guarded",
-  governanceSelect: "repeat-guarded",
-  projectCreate: "repeat-guarded",
-  projectUse: "repeat-guarded",
-  projectDelete: "repeat-guarded",
-  gateDecide: "repeat-guarded",
-  reviewDecide: "repeat-guarded",
-  stageArtifact: "repeat-guarded",
-  stageFile: "repeat-guarded",
-  generateIac: "repeat-guarded",
-  validateTask: "repeat-guarded",
-  completeTask: "repeat-guarded",
-  requirementsComplete: "repeat-guarded",
-  architectureComplete: "repeat-guarded",
-  reviewComplete: "repeat-guarded",
-  planComplete: "repeat-guarded",
-  reconcile: "repeat-guarded",
-  promote: "repeat-guarded",
-  submitEvidence: "repeat-guarded",
-  improvementObserve: "convergent",
-  doctor: "convergent",
-} as const satisfies Record<keyof typeof MCP_OUTPUT_SCHEMAS, McpToolEffect>;
+export { MCP_TOOL_EFFECTS, MCP_TOOL_REVIEW_GUARDS, type McpToolEffect } from "./mcp-tool-effects.js";
 /** Arguments naming workspace files whose content, not only path, identifies a repeated call. */
 const repeatFileArguments: Partial<Record<keyof typeof MCP_OUTPUT_SCHEMAS, readonly string[]>> = {
   governanceImport: ["path"],

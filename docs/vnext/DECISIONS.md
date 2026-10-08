@@ -234,10 +234,10 @@ counts as findings. Accepted risk: its model is not pinned. Slice 11 finding R9 
 motivates kernel capture.
 
 Amendment 2026-10-08 (coordinator decision on PR #421, maintainer unavailable): hooks fail open when missing or timed
-out, so the kernel also refuses every operation that approves, deletes or publishes (one classification in
-`packages/cli/src/review-guard.ts`) with `APEX_REVIEW_PENDING` while any review in the workspace, or in another
-workspace the same MCP server serves, waits for its capture. Completing the review, or cancelling its task from the CLI
-after the user stops rubber-duck, lifts the guard; hooks still only capture and deny.
+out, so the kernel also refuses every operation that approves, deletes or publishes with `APEX_REVIEW_PENDING` while any
+review in the workspace, or in another workspace the same MCP server serves, waits for its capture. The blocked set
+extends the CP-10 MCP tool effect classification (`MCP_TOOL_REVIEW_GUARDS`). Completing the review, or cancelling its
+task from the CLI after the user stops rubber-duck, lifts the guard; hooks still only capture and deny.
 
 ## DECISION-032: Use One Interactive APEX Agent
 

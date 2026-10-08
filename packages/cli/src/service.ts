@@ -224,7 +224,7 @@ import {
 } from "./assets.js";
 import { dependencyRevision as calculateDependencyRevision } from "./dependency-revision.js";
 import { ApexError, EXIT_CODES, governanceBaselineApexError, retiredProjectionError } from "./errors.js";
-import { REVIEW_GUARDED_OPERATIONS, type ReviewGuardedOperation } from "./review-guard.js";
+import { MCP_TOOL_REVIEW_GUARDS, type ReviewGuardedTool } from "./mcp-tool-effects.js";
 import { APEX_VERSION, meetsMinimumVersion, MINIMUM_NODE_VERSION } from "./version.js";
 import {
   registerWorkflowValidators,
@@ -873,14 +873,12 @@ export class ApexService {
     rationale: string;
     externalRef?: string;
   }): Promise<ImprovementDecisionV1> {
-    await this.assertNoPendingReview("improvementDecide");
     const run = await this.currentRun();
     await this.acquireRunWriterLease(run);
     return (await this.improvements(run)).decide({ projectId: run.projectId, ...input });
   }
 
   async improvementDeleteObservation(observationId: string): Promise<{ deleted: string }> {
-    await this.assertNoPendingReview("improvementDeleteObservation");
     const run = await this.currentRun();
     const store = await this.improvements(run);
     const observation = (await store.listObservations()).find((item) => item.observationId === observationId);
@@ -893,7 +891,6 @@ export class ApexService {
   }
 
   async improvementPrune(): Promise<{ observations: number; decisions: number }> {
-    await this.assertNoPendingReview("improvementPrune");
     const run = await this.currentRun();
     await this.acquireRunWriterLease(run);
     return (await this.improvements(run)).prune();
@@ -1159,7 +1156,6 @@ export class ApexService {
   }
 
   async provisionGovernance(config: GovernanceSetupConfigV1, expectedHash: string, confirm: boolean) {
-    await this.assertNoPendingReview("provisionGovernance");
     if (confirm !== true)
       throw new ApexError(
         "APEX_AUTHORIZATION",
@@ -1419,7 +1415,6 @@ export class ApexService {
 
   /** Executes exactly the confirmed repository creation, remote and non-forced push actions. */
   async publishRepository(config: RepositoryPublishConfigV1, expectedHash: string, confirm: boolean) {
-    await this.assertNoPendingReview("publishRepository");
     if (confirm !== true)
       throw new ApexError(
         "APEX_AUTHORIZATION",
@@ -2081,7 +2076,7 @@ export class ApexService {
   }
 
   async deleteProject(projectId: ProjectId, confirmed: boolean): Promise<{ deleted: ProjectId; selected?: Selection }> {
-    await this.assertNoPendingReview("deleteProject");
+    await this.assertNoPendingReview("projectDelete");
     if (!confirmed)
       throw new ApexError("APEX_USAGE", "project deletion requires explicit confirmation", EXIT_CODES.usage);
     const projects = await this.listProjects();
@@ -2830,6 +2825,7 @@ export class ApexService {
   }
 
   async recordInput(input: InputSubmissionV1): Promise<{ recorded: true; requestId: string }> {
+    await this.assertNoPendingReview("recordInput");
     let run: RunConfigV1;
     try {
       const selection = await this.selection();
@@ -5173,9 +5169,9 @@ export class ApexService {
 
   /**
    * DECISION-031 amendment (2026-10-08): while a review waits for its capture, refuse operations that approve, delete
-   * or publish (REVIEW_GUARDED_OPERATIONS), so an inherited rubber-duck cannot use them even when hooks fail open.
+   * or publish (MCP_TOOL_REVIEW_GUARDS), so an inherited rubber-duck cannot use them even when hooks fail open.
    */
-  private async assertNoPendingReview(operation: ReviewGuardedOperation): Promise<void> {
+  private async assertNoPendingReview(operation: ReviewGuardedTool): Promise<void> {
     let pending: { projectId: string; runId: string; taskId: string; workspace?: string } | undefined = (
       await this.pendingReviews()
     )[0];
@@ -5188,7 +5184,7 @@ export class ApexService {
     if (pending === undefined) return;
     throw new ApexError(
       "APEX_REVIEW_PENDING",
-      `${operation} (${REVIEW_GUARDED_OPERATIONS[operation]}) is blocked while a rubber-duck review waits for its ` +
+      `${operation} (${MCP_TOOL_REVIEW_GUARDS[operation]}) is blocked while a rubber-duck review waits for its ` +
         `capture in ${pending.workspace === undefined ? "" : `workspace ${pending.workspace}, `}project ` +
         `${pending.projectId}, run ${pending.runId} (task ${pending.taskId}). Finish the review ` +
         `with reviewComplete, or stop any running rubber-duck and cancel it from a terminal: apex project use ` +
@@ -6212,7 +6208,7 @@ export class ApexService {
   }
 
   async resolveReview(resolution: ReviewResolution): Promise<void> {
-    await this.assertNoPendingReview("resolveReview");
+    await this.assertNoPendingReview("reviewDecide");
     const run = await this.currentRun();
     const events = await this.journal(run).replay();
     const reviewEvent = [...events]
@@ -6290,7 +6286,7 @@ export class ApexService {
     reviewHash: string,
     decisions: ReviewDecision[],
   ): Promise<{ status: "revision_requested" | "resolved" }> {
-    await this.assertNoPendingReview("decideReview");
+    await this.assertNoPendingReview("reviewDecide");
     if (decisions.length === 0 || new Set(decisions.map(({ findingId }) => findingId)).size !== decisions.length) {
       throw new ApexError("APEX_VALIDATION", "Review decisions must be nonempty and unique", EXIT_CODES.validation);
     }
@@ -6523,7 +6519,7 @@ export class ApexService {
     actor: string,
     options: GateDecisionOptions = {},
   ): Promise<ApprovalEvidenceV1> {
-    await this.assertNoPendingReview("decideGateNumber");
+    await this.assertNoPendingReview("gateDecide");
     const run = await this.currentRun();
     if (gateNumber === 4)
       await this.assertGeneratedReviewUnmodified(join(this.operationsReviewDirectory(run), "approval.md"));
@@ -7026,7 +7022,6 @@ export class ApexService {
   }
 
   async deploy(expectedPreviewHash?: string): Promise<{ operation: unknown; inventory: ResourceInventoryV1 }> {
-    await this.assertNoPendingReview("deploy");
     const run = await this.currentRun();
     const transferStore = new WriterTransferStore(this.projects.runDirectory(run.projectId, run.runId), this.clock);
     await this.assertCurrentWriterAuthority(run, transferStore);
@@ -7616,7 +7611,6 @@ export class ApexService {
     currentHead: string;
     ttlMs: number;
   }): Promise<unknown> {
-    await this.assertNoPendingReview("createWriterTransfer");
     const run = await this.currentRun();
     if (input.commit !== input.currentHead)
       throw new ApexError("APEX_STALE", "Transfer commit does not match current Git head", EXIT_CODES.stale);
@@ -7657,7 +7651,6 @@ export class ApexService {
   }
 
   async acceptWriterTransfer(claimHash: string, recipient: string, currentHead: string): Promise<unknown> {
-    await this.assertNoPendingReview("acceptWriterTransfer");
     const run = await this.currentRun();
     return new WriterTransferStore(this.projects.runDirectory(run.projectId, run.runId), this.clock).accept({
       claimHash,
@@ -7696,7 +7689,7 @@ export class ApexService {
     file?: string;
     required: boolean;
   }): Promise<unknown> {
-    await this.assertNoPendingReview("acceptEvidence");
+    await this.assertNoPendingReview("submitEvidence");
     if ((input.value === undefined) === (input.file === undefined))
       throw new ApexError("APEX_USAGE", "Evidence requires exactly one value or file", EXIT_CODES.usage);
     const store = await this.evidenceStore(input.kind, input.contentType);
@@ -7774,7 +7767,6 @@ export class ApexService {
     return (await this.evidenceStore()).exportTelemetry();
   }
   async deleteTelemetry(): Promise<{ deleted: true }> {
-    await this.assertNoPendingReview("deleteTelemetry");
     await (await this.evidenceStore()).deleteTelemetry();
     return { deleted: true };
   }

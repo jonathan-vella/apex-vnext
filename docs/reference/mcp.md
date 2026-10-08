@@ -92,26 +92,28 @@ and `validateTask` reject review tasks, and `reviewComplete` rejects agent-suppl
 Rubber-duck inherits the caller's tools. The managed `subagentStart` hook marks a rubber-duck run as active for the
 parent session and folder; `subagentStop` or a failed `task` call clears the mark, and marks expire after 30 minutes.
 While a mark is active, the `preToolUse` hook denies every APEX tool that is not read-only (only `status`,
-`projectList` and `doctorChecks` are) to each session in that folder that owns no active mark. Only one rubber-duck
-run per folder may be active, so a reviewer cannot make itself a parent and one run's stop event cannot clear another
-run's mark. A denied second rubber-duck call leaves a short-lived denial record under `denied/`; the failure event for
-that call consumes it, so the denial cannot clear the mark of the run that is still going.
-Subagent calls carry the subagent's own session ID, so this covers rubber-duck and any agent it starts. A concurrent
-worker waits until the mark clears. The read-only list ships as `apex-mcp-tools.json`, generated from the MCP
-adapter at plugin build time; without it every APEX tool is denied during a run.
+`projectList`, the `read-only` effect class, are) to each session in that folder that owns no active mark. Only one
+rubber-duck run per folder may be active, so a reviewer cannot make itself a parent and one run's stop event cannot
+clear another run's mark. A denied second rubber-duck call leaves a short-lived denial record under `denied/`; the
+failure event for that call consumes it, so the denial cannot clear the mark of the run that is still going. Subagent
+calls carry the subagent's own session ID, so this covers rubber-duck and any agent it starts. A concurrent worker waits
+until the mark clears. The read-only list ships as `apex-mcp-tools.json`, generated from the MCP adapter at plugin build
+time; without it every APEX tool is denied during a run.
 
 The kernel adds a guard that does not depend on hooks (DECISION-031 amendment of 2026-10-08). A review is pending while
 the last task issued in a run is a review task with a rubber-duck request that is not completed, not cancelled and not
-expired; a rejected capture keeps it pending until the next request. While any run in the workspace, or in another
-workspace the same MCP server process serves, has a pending review, every operation classified in
-`packages/cli/src/review-guard.ts` as approving, deleting or publishing fails with `APEX_REVIEW_PENDING` (exit code 4),
-whether it comes from MCP or the CLI. That covers `gateDecide`, `reviewDecide`, `projectDelete`, `promote` and
-`submitEvidence`, and also the CLI-only review resolution, deployment, repository publication, governance provisioning,
-writer transfer, improvement decision and deletion, and telemetry deletion. Reads, staging, `nextTask`, `taskContext`
-and `reviewComplete` stay available. To continue, finish the review with `reviewComplete`, or stop any running
-rubber-duck and then cancel the review from a terminal with `apex project use --project <id> --run <run>` and
-`apex task cancel --task <taskId>`; the CLI error names the project, run and task. The kernel cannot see whether
-rubber-duck is still running, so cancelling is a user action.
+expired; a rejected capture keeps it pending until the next request. The guard extends the effect classification below:
+`MCP_TOOL_REVIEW_GUARDS` in `packages/cli/src/mcp-tool-effects.ts` marks every state-changing tool as `approve`,
+`delete`, `publish` or unguarded, and a coverage test fails when a new state-changing tool is not marked. While any run
+in the workspace, or in another workspace the same MCP server process serves, has a pending review, the service refuses
+the marked operations with `APEX_REVIEW_PENDING` (exit code 4): `recordInput`, `gateDecide` and `reviewDecide`
+(approve), `projectDelete` (delete), `promote` and `submitEvidence` (publish). The CLI commands for the same operations
+(`gate decide`, `review resolve`, `project delete`, `project promote`, `evidence accept`) are refused too. CLI-only
+commands are not marked, because they need a terminal that neither the APEX agent nor rubber-duck has. Reads, staging,
+`nextTask`, `taskContext` and `reviewComplete` stay available. To continue, finish the review with `reviewComplete`, or
+stop any running rubber-duck and then cancel the review from a terminal with
+`apex project use --project <id> --run <run>` and `apex task cancel --task <taskId>`; the CLI error names the project,
+run and task. The kernel cannot see whether rubber-duck is still running, so cancelling is a user action.
 
 What this guarantees and what it does not:
 

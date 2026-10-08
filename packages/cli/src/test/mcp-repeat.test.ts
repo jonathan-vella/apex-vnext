@@ -19,7 +19,7 @@ import { execute, resolveMcpWorkspace } from "../cli.js";
 import { MCP_TOOL_EFFECTS, type McpServiceResolver } from "../mcp.js";
 import { ApexService } from "../service.js";
 import { fixtures, hash, request, selection, task, type ToolName } from "./mcp-fixtures.js";
-import { inputAnswers, tempRoot } from "./helpers.js";
+import { captureReview, inputAnswers, nextTaskAfterInput, requirements, tempRoot } from "./helpers.js";
 import { connectMcp } from "./mcp-client.js";
 
 const execFileAsync = promisify(execFile);
@@ -84,7 +84,7 @@ const duplicateCases: Record<GuardedTool, ToolCase> = {
     method: "completeArchitecture",
     input: { taskId: "task-1", architecture: {}, costEstimate: {}, decisionManifest: {}, policyMappings: [] },
   },
-  reviewComplete: { method: "completeReview", input: { taskId: "task-1", findings: [] } },
+  reviewComplete: { method: "completeReview", input: { taskId: "task-1" } },
   planComplete: {
     method: "completePlan",
     input: {
@@ -477,6 +477,35 @@ test("real workflow repeats return the original result and only a state change m
   assert.deepEqual(
     (await readRepeatEvents(runDirectory)).map(({ payload }) => (payload as { operation: string }).operation),
     ["nextTask", "recordInput", "projectUse"],
+  );
+});
+
+test("reviewComplete is repeat-guarded: a missing capture is retried and a repeat after ingestion is answered", async (context) => {
+  const { service, journal } = await initializedWorkspace();
+  const issued = await nextTaskAfterInput(service);
+  if (issued.status !== "task") throw new Error("Expected requirements task");
+  await service.completeRequirements(issued.task.taskId, requirements());
+  const review = await service.nextTask();
+  if (review.status !== "task" || review.task.taskType !== "requirements-review") throw new Error("Expected review");
+  const taskId = review.task.taskId;
+  const { client } = await connect(context, service, "repeat-review");
+  const call = () => client.callTool({ name: "reviewComplete", arguments: { workspace: service.root, taskId } });
+  // A failed call is never stored: without a capture the identical call runs again once rubber-duck has answered.
+  const missing = await call();
+  assert.equal(missing.isError, true);
+  assert.match(JSON.stringify(missing.structuredContent), /REVIEW_CAPTURE_MISSING|capture/u);
+  await captureReview(service, taskId, { findings: [] });
+  const completed = await call();
+  assertSuccess(completed, "reviewComplete");
+  const events = (await journal.replay()).length;
+  // The nonce is used up, so executing again would fail; the guard answers with the original ingestion instead.
+  assertSameResult(await call(), completed, "reviewComplete");
+  assert.equal((await journal.replay()).length, events);
+  assert.equal(
+    (await journal.replay()).filter(
+      ({ type, payload }) => type === "task.completed" && (payload as { taskId?: string }).taskId === taskId,
+    ).length,
+    1,
   );
 });
 
