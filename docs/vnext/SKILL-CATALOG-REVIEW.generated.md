@@ -14,7 +14,7 @@ Live provider and paired-client qualification are not run by this artifact or it
 
 | Source skill               | Matrix disposition | Consumer target              | Canonical owner                           | Lifecycle    | Capability | Renderer   | Live qualification |
 | -------------------------- | ------------------ | ---------------------------- | ----------------------------------------- | ------------ | ---------- | ---------- | ------------------ |
-| apex-unslop                | repository-only    | not-declared                 | Repository documentation maintainers      | not-declared | not-proven | not-proven | not-run            |
+| apex-unslop                | consumer           | apex-unslop                  | Repository documentation maintainers      | complete     | not-proven | not-proven | not-run            |
 | azure-adr                  | consumer           | apex-azure-adr               | APEX                                      | complete     | not-proven | not-proven | not-run            |
 | azure-artifacts            | consumer           | apex-artifacts               | kernel renderer                           | complete     | not-proven | not-proven | not-run            |
 | azure-bicep-patterns       | consumer           | apex-bicep-patterns          | APEX CodeGen                              | complete     | not-proven | not-proven | not-run            |

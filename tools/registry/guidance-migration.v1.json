@@ -3,9 +3,11 @@
   "skillDispositions": [
     {
       "source": "apex-unslop",
-      "disposition": "repository-only",
+      "disposition": "consumer",
+      "consumerSkill": "apex-unslop",
       "owner": "Repository documentation maintainers",
-      "reason": "Scoped prose cleanup used by manually invoked docs-writer; not a consumer runtime capability."
+      "lifecycle": "complete",
+      "resourceDispositions": []
     },
     {
       "source": "azure-adr",
