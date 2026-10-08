@@ -6,13 +6,13 @@ APEX vNext is pre-release. A projection being implemented does not mean that liv
 passed.
 
 Under [DECISION-033][decision-033] the supported clients are the VS Code Copilot harness and the GitHub Copilot app on
-native Windows, and GitHub Copilot CLI on Linux and WSL2. That change is in progress under the [client
-pivot](../vnext/ROADMAP.md#client-pivot). Today's package installs with npm, and `apex init` writes a thin workspace
-projection whose `.github/copilot/settings.json` installs the `apex` plugin; the sections below describe that behavior
-unless they say otherwise. VS Code Local is retired. Both
-ALZ-backed workloads and standalone labs/demos, independent COE import, conversational changes and complete
-design/operational output are release goals. They are not marked implemented by this support matrix. See the
-[checkpoint](../vnext/PROJECT.md) and [target client scenarios](../vnext/CLIENT-QUALIFICATION.md).
+native Windows, and GitHub Copilot CLI on Linux and WSL2. The `apex` plugin package and the thin `apex init` projection
+are implemented: `.github/copilot/settings.json` enables the plugin, which carries the agents, skills and MCP servers.
+No plugin release is published yet, and live qualification of the three clients is pending under the [client
+pivot](../vnext/ROADMAP.md#client-pivot). VS Code Local is retired. Both ALZ-backed workloads and standalone labs/demos,
+independent COE import, conversational changes and complete design/operational output are release goals. They are not
+marked implemented by this support matrix. See the [checkpoint](../vnext/PROJECT.md) and
+[target client scenarios](../vnext/CLIENT-QUALIFICATION.md).
 
 ## Support Matrix
 
@@ -21,7 +21,7 @@ design/operational output are release goals. They are not marked implemented by 
 | Direct APEX CLI                     | Implemented                                     | Required CI and package qualification    | Not applicable                  | Preview-supported |
 | GitHub Copilot CLI (Linux, WSL2)    | apex plugin: APEX agent plus hidden workers     | Plugin package and lifecycle tests       | Slice 11 exploratory runs       | Conditional       |
 | VS Code Copilot harness (Windows)   | Runs the apex plugin from the Copilot CLI store | Plugin package and lifecycle tests       | Pending on native Windows       | Target, pending   |
-| GitHub Copilot app (Windows)        | Plugin delivery and worktree support planned    | None yet                                 | Historical probes only          | Target, planned   |
+| GitHub Copilot app (Windows)        | Runs the apex plugin from the Copilot CLI store | Plugin package and lifecycle tests       | Pending on native Windows       | Target, pending   |
 | GitHub Copilot CLI (native Windows) | Not supported                                   | None                                     | None                            | Unsupported       |
 | Copilot CLI autonomous workers      | Enabled; permissions unchanged                  | Runtime authority and projection tests   | Bounded Luna workflow probes    | Conditional       |
 | Bicep track                         | Implemented                                     | Deterministic provider and package tests | Current cloud candidate pending | Conditional       |
@@ -59,9 +59,8 @@ You can run `/review` or `/security-review` yourself on promoted output, and `/r
 their findings as advice and record any change through APEX. General-purpose delegation, `/fleet`,
 `/delegate` and plan mode stay out of managed workflows.
 
-In VS Code, open the workspace, start a chat with the session target set to Copilot, and pick the `APEX` agent in the
-Agent picker; `/agent` is not a harness command. DECISION-033 moves VS Code to native Windows, where the apex-jon spike
-found plugin agents apply.
+In VS Code on native Windows, open the workspace, start a chat with the session target set to Copilot, and pick the
+`APEX` agent in the Agent picker; `/agent` is not a harness command. VS Code over WSL is not a supported APEX host.
 
 Hidden-user discovery does not implicitly disable model invocation. The adapter preserves explicit invocation-disable
 settings; isolated review-routing probes cover the canonical parent-to-Reviewer path on both tracks. This does not
@@ -94,18 +93,20 @@ at `jonathan-vella/apex-plugins`, so Copilot CLI and the cloud agent install the
 workspace keeps only instructions, the governance workflow and scripts, and `.apex/`; agents, skills and MCP servers
 come from the plugin. Plugin support must still be proven with exact client versions and lifecycle tests.
 
-## Planned Client Changes
+## Hosts And Prerequisites
 
-These follow DECISION-033 and are not implemented yet:
+[Manage installation](../how-to/manage-installation.md) owns the install, update and reset steps for each host.
 
-- **Hosts.** VS Code and the Copilot app run on native Windows 11 (25H2 or 24H2), without WSL. Copilot CLI runs on
-  Linux or WSL2. Each workspace uses one host.
+- **Hosts.** VS Code and the Copilot app run on native Windows 11 (25H2 or 24H2), without WSL. VS Code needs version
+  1.140 or later and the Copilot harness. Copilot CLI runs on Linux or WSL2. Each workspace uses one host.
 - **Sandbox.** Turn on client local sandboxing before using APEX. In the Copilot app it is a project setting; APEX
-  cannot set it for you. Outbound network stays allowed.
-- **Install.** VS Code reads the Copilot CLI store install that `.github/copilot/settings.json` triggers; do not also
-  install the plugin from the VS Code marketplace. Qualification still has to prove the app and VS Code pick it up.
-- **Models.** Pick the session model yourself (currently HydraFusion); agents no longer pin one.
-- **Copilot app worktrees.** Sessions in app-created worktrees share the main checkout's APEX state.
+  cannot set it for you and does not check it. Outbound network stays allowed.
+- **Install.** Install the plugin once per machine through the Copilot CLI store, which Copilot CLI and the app write
+  and VS Code reads. Do not also install it from the VS Code marketplace view. After a plugin change, run **Developer:
+  Restart Local Agent Host** in VS Code. On Windows, close VS Code before you update or remove the plugin, because VS
+  Code locks the installed plugin folder.
+- **Copilot app worktrees.** Sessions in app-created worktrees share the main checkout's `.apex/` state through the git
+  common directory. Live app qualification is pending.
 
 The [GitHub Copilot app requirement](../vnext/PRD.md#req-copilot-app-001-github-copilot-app) owns app acceptance.
 

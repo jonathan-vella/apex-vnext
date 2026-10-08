@@ -5,8 +5,10 @@
 This tutorial uses the repository build and the fake provider boundary. It does not deploy infrastructure or grant
 release authority.
 
-This source-build tutorial is for local candidate evaluation. Normal consumers use the
-[WSL2 consumer runbook](wsl2-vscode-consumer-runbook.md) and an available package without a devcontainer or source clone.
+This source-build tutorial is for local candidate evaluation. Normal consumers install released packages without a
+devcontainer or source clone: the [Windows 11 first run](windows-11-first-run.md) for VS Code or the GitHub Copilot app,
+and the [Copilot CLI on WSL2 runbook](wsl2-vscode-consumer-runbook.md) for Copilot CLI. No plugin release is published
+yet, so this tutorial installs the plugin you build.
 The fake provider is not evidence of either an ALZ-backed or standalone Azure deployment.
 
 ## Prerequisites
@@ -117,8 +119,19 @@ npx apex init \
 ```
 
 This writes `.github/copilot/settings.json`, the instructions, the governance workflow and scripts, and `.apex/`. The
-settings file tells Copilot to install the `apex` plugin, which carries the APEX agent, skills and MCP servers; trust
-the folder when Copilot asks. To select Terraform, replace `--iac bicep` with `--iac terraform`.
+settings file enables the `apex` plugin from the `apex-plugins` marketplace, which carries the APEX agent, skills and MCP
+servers; trust the folder when Copilot asks. To select Terraform, replace `--iac bicep` with `--iac terraform`.
+
+The marketplace has no release yet, so install the plugin you built, once per machine:
+
+```bash
+copilot plugin install /path/to/apex-vnext/dist/apex-plugin
+copilot plugin list
+```
+
+Copilot CLI warns that direct installs are deprecated. Run `copilot plugin uninstall apex` before you install a
+marketplace release. In VS Code on Windows, run **Developer: Restart Local Agent Host** after the install;
+[Manage installation](../how-to/manage-installation.md) covers update and reset for each host.
 
 ## Check Readiness
 
@@ -156,7 +169,8 @@ Delete the disposable consumer repository only when its local state is no longer
 
 ## Related
 
-- [Windows 11 first run](windows-11-first-run.md) - use the published-package onboarding flow on WSL2.
+- [Windows 11 first run](windows-11-first-run.md) - start APEX in VS Code or the app on native Windows.
+- [Copilot CLI on WSL2 runbook](wsl2-vscode-consumer-runbook.md) - start APEX in Copilot CLI.
 - [Manage installation](../how-to/manage-installation.md)
 - [Run the workflow](../how-to/run-workflow.md)
 - [CLI commands](../reference/cli.md)
