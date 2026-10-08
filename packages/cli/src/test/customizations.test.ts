@@ -547,7 +547,7 @@ test("update rejects and doctor repairs a modified local Git boundary", async ()
 test("init writes a real runtime lock and doctor detects managed tampering", async () => {
   const root = await tempRoot();
   const service = new ApexService(root, {
-    executableChecker: async () => true,
+    executableChecker: async (executable) => executable !== "code",
     azureAuthStatus: async () => ({ authenticated: true, detail: "injected" }),
   });
   const initialized = await service.init({ projectId: "demo", riskOwner: "partner" });
@@ -602,7 +602,7 @@ test("existing runs use their immutable runtime generation", async () => {
 test("doctor and core routes work without shipped governance discovery packs", async () => {
   const root = await tempRoot();
   const service = new ApexService(root, {
-    executableChecker: async () => true,
+    executableChecker: async (executable) => executable !== "code",
     azureAuthStatus: async () => ({ authenticated: true, detail: "injected" }),
   });
   const { runId } = await service.init({ projectId: "demo", riskOwner: "partner" });

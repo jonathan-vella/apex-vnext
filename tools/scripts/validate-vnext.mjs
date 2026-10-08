@@ -83,6 +83,8 @@ const CONFIG_SHAPES = {
   ],
 };
 const FORBIDDEN_TOOL = /(^|\/)(shell|terminal|filesystem|fs|edit|write|git|azure|az|bicep|terraform)(\/|$)/i;
+// DECISION-033: the supported VS Code Copilot harness requires VS Code 1.140.
+const VSCODE_HARNESS_MINIMUM = [1, 140, 0];
 const RETIRED_AGENT_FIELDS = ["argument-hint", "handoffs", "agents"];
 const RETIRED_INTERACTIVE_AGENTS = new Set(["APEX Requirements", "APEX Architect", "APEX Planner", "APEX Operator"]);
 const RETIRED_INTERACTIVE_AGENT_SOURCES = new Set([
@@ -526,6 +528,52 @@ function findSecret(value, trail = []) {
   return undefined;
 }
 
+function releaseVersion(value) {
+  const match = typeof value === "string" ? /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/u.exec(value) : null;
+  return match === null ? undefined : match.slice(1).map(Number);
+}
+
+function compareReleaseVersions(left, right) {
+  for (let index = 0; index < 3; index += 1) if (left[index] !== right[index]) return left[index] - right[index];
+  return 0;
+}
+
+function validateToolchainVscode(toolchain, findings) {
+  const source = "config/toolchain.v1.json";
+  const vscode = toolchain?.core?.vscode;
+  const minimum = releaseVersion(vscode?.minimumSupportedVersion);
+  if (minimum === undefined || compareReleaseVersions(minimum, VSCODE_HARNESS_MINIMUM) < 0) {
+    finding(
+      findings,
+      "toolchain.vscode-minimum",
+      `VS Code minimumSupportedVersion must be ${VSCODE_HARNESS_MINIMUM.join(".")} or newer (DECISION-033)`,
+      source,
+    );
+    return;
+  }
+  if (toolchain.compatibilitySet?.minimumVscode !== vscode.minimumSupportedVersion)
+    finding(
+      findings,
+      "toolchain.vscode-minimum",
+      "compatibilitySet.minimumVscode must equal core.vscode.minimumSupportedVersion",
+      source,
+    );
+  for (const [field, value] of [
+    ["newestObservedVersion", vscode.newestObservedVersion],
+    ["installedVersion", vscode.installedVersion],
+    ["postCutoffObservation.version", vscode.postCutoffObservation?.version],
+  ]) {
+    const version = releaseVersion(value);
+    if (version === undefined || compareReleaseVersions(version, minimum) < 0)
+      finding(
+        findings,
+        "toolchain.vscode-minimum",
+        `core.vscode.${field} must be a release version at or above minimumSupportedVersion`,
+        source,
+      );
+  }
+}
+
 function validateConfig(model, findings) {
   for (const [name, requiredKeys] of Object.entries(CONFIG_SHAPES)) {
     const value = model.config[name];
@@ -536,6 +584,7 @@ function validateConfig(model, findings) {
       if (!requiredKeys.includes(key))
         finding(findings, "config.shape", `${name} has unknown top-level field ${key}`, `config/${name}`);
   }
+  validateToolchainVscode(model.config["toolchain.v1.json"], findings);
   const workflow = model.config["workflow.v1.json"];
   const nodes = array(workflow.nodes);
   const nodeIds = nodes.map(({ id }) => id);

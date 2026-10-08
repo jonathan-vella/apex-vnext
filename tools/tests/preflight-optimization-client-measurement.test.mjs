@@ -117,6 +117,25 @@ test("preflight accepts newer VS Code and records the observed Copilot Chat vers
   assert.equal(buildOptimizationClientPreflight({ gate, toolchain, run }).status, "ready");
 });
 
+test("preflight requires the VS Code 1.140 Copilot harness minimum", () => {
+  assert.equal(toolchain.core.vscode.minimumSupportedVersion, "1.140.0");
+  const status = (version) =>
+    buildOptimizationClientPreflight({
+      gate,
+      toolchain,
+      run: commandRun({
+        "git rev-parse HEAD": `${gate.candidate.commit}\n`,
+        "git rev-parse HEAD^{tree}": `${gate.candidate.tree}\n`,
+        "git status --porcelain --untracked-files=no": "",
+        "code --version": `${version}\n`,
+        "code --list-extensions --show-versions": "github.copilot-chat@0.69.0\n",
+        "copilot --version": `${toolchain.core.copilotCli.selectedExactVersion}\n`,
+      }),
+    }).clients[0].status;
+  for (const version of ["1.139.0", "1.139.1"]) assert.equal(status(version), "version-mismatch", version);
+  assert.equal(status("1.140.0"), "ready");
+});
+
 test("preflight reports unparseable VS Code version output without claiming it is below minimum", () => {
   const run = commandRun({
     "git rev-parse HEAD": `${gate.candidate.commit}\n`,

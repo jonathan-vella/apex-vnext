@@ -39,22 +39,22 @@
     "vscode": {
       "authoritativeSource": "https://code.visualstudio.com/updates",
       "releaseChannel": "stable",
-      "newestObservedVersion": "1.138.0",
-      "minimumSupportedVersion": "1.138.0",
-      "installedVersion": "1.138.0",
-      "installedCopilotChatVersion": "0.66.0",
+      "newestObservedVersion": "1.141.0",
+      "minimumSupportedVersion": "1.140.0",
+      "installedVersion": "1.141.0",
+      "installedCopilotChatVersion": "0.69.0",
       "historicalFixtureVersion": "1.130.0",
       "historicalFixtureCopilotChatVersion": "0.58.0",
-      "observedAt": "2026-09-20",
+      "observedAt": "2026-10-08",
       "selectionStatus": "selected-qualification-required",
       "selectionEvidence": {
         "receipt": "tools/registry/client-context-baseline-receipt.json",
         "sha256": "197cbc48abfebc3d01c8511557d7b852ed35b5169e8cb2fdcb747d1dc013f42a"
       },
       "postCutoffObservation": {
-        "version": "1.138.0",
-        "copilotChatVersion": "0.66.0",
-        "observedAt": "2026-09-20",
+        "version": "1.141.0",
+        "copilotChatVersion": "0.69.0",
+        "observedAt": "2026-10-08",
         "disposition": "selected-current-candidate"
       },
       "requiredQualification": [
@@ -104,7 +104,7 @@
     "node": "24.21.0",
     "npm": "12.0.2",
     "typescript": "7.0.2",
-    "minimumVscode": "1.138.0",
+    "minimumVscode": "1.140.0",
     "copilotCli": "1.0.86"
   },
   "clientQualificationPolicy": {

@@ -258,7 +258,7 @@ export function renderConsumerInstaller(template, toolchain) {
   };
   let rendered = template;
   for (const [name, version] of Object.entries(versions)) {
-    if (typeof version !== "string" || !/^\d+\.\d+\.\d+$/u.test(version))
+    if (typeof version !== "string" || !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/u.test(version))
       throw new Error(`Invalid installer toolchain version: ${name}`);
     const marker = `__APEX_${name}_VERSION__`;
     if (rendered.split(marker).length !== 2) throw new Error(`Installer marker must occur once: ${name}`);

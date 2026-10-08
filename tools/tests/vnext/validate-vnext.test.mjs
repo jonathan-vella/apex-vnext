@@ -427,6 +427,43 @@ test("rejects a runtime package version mismatch", () => {
   assert.ok(hasRule(result, "runtime.version"));
 });
 
+test("requires the VS Code 1.140 Copilot harness minimum in the toolchain", () => {
+  const vscode = (change) =>
+    mutate((model) => {
+      change(model.config["toolchain.v1.json"]);
+    });
+  for (const version of ["1.139.0", "1.139.1", "1.140", "01.140.0", "1.140.00", "latest"]) {
+    const result = vscode((toolchain) => {
+      toolchain.core.vscode.minimumSupportedVersion = version;
+      toolchain.compatibilitySet.minimumVscode = version;
+    });
+    assert.ok(hasRule(result, "toolchain.vscode-minimum"), version);
+  }
+  assert.ok(
+    hasRule(
+      vscode((toolchain) => {
+        toolchain.compatibilitySet.minimumVscode = "1.139.0";
+      }),
+      "toolchain.vscode-minimum",
+    ),
+  );
+  assert.ok(
+    hasRule(
+      vscode((toolchain) => {
+        toolchain.core.vscode.installedVersion = "1.139.1";
+      }),
+      "toolchain.vscode-minimum",
+    ),
+  );
+  const accepted = vscode((toolchain) => {
+    for (const field of ["newestObservedVersion", "minimumSupportedVersion", "installedVersion"])
+      toolchain.core.vscode[field] = "1.140.0";
+    toolchain.core.vscode.postCutoffObservation.version = "1.140.0";
+    toolchain.compatibilitySet.minimumVscode = "1.140.0";
+  });
+  assert.equal(hasRule(accepted, "toolchain.vscode-minimum"), false);
+});
+
 test("rejects permissive or non-object contract union branches", () => {
   for (const mutation of [
     (branch) => {
