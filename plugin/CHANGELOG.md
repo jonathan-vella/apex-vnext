@@ -25,3 +25,6 @@ First marketplace release of APEX as one Agent Plugins 1.0 plugin.
   PNG as unavailable. The binaries add about 8.5 MB to the package.
 - Managed hooks that deny the APEX agent as a task target, and every `apex-azure-pricing` tool except the read-only
   pricing and cost tools from `tools/registry/arm-mcp-cost-pricing.v1.json`.
+- The `apex` MCP server refuses a workspace whose `.apex/apex.lock.json` names another `@apexops/cli` version with
+  `APEX_RUNTIME_MISMATCH`; `status` reports the mismatch read-only. Run `apex update` for an older workspace, or
+  install the plugin version that matches a newer one (CP-25).

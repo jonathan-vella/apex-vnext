@@ -14,6 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The APEX MCP server, from the plugin or `apex mcp serve`, now requires the workspace runtime lock
+  (`cliVersion` in `.apex/apex.lock.json`) to name its exact `@apexops/cli` version. Every tool except `status` fails
+  closed with `APEX_RUNTIME_MISMATCH` and a remediation (`apex update` for an older workspace, the matching plugin or
+  CLI version for a newer one); `status` returns a read-only `runtime_mismatch` result. Uninitialized workspaces are
+  unchanged.
 - `npm run validate:skills` now validates the shipped skills in `customizations/.github/skills/` as well as the
   repository authoring skills, requires every shipped skill to declare `user-invocable`, keeps skills loaded by the
   APEX agent, its workers or `apex-next` routing model-loadable, and records pre-existing errors in a shrink-only

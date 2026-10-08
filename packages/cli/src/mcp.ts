@@ -13,6 +13,7 @@ import { SECRET_VALUE_PATTERN } from "@apexops/contracts";
 import { MCP_DOCTOR_CHECK_LIMIT, MCP_OUTPUT_SCHEMAS } from "./mcp-output-schemas.js";
 import { TARGET_SCOPE_HINT, TARGET_SCOPE_PATTERN } from "./target-scope.js";
 import { resolveMcpWorkspace } from "./workspace-root.js";
+import { runtimeMismatchError, runtimeMismatchStatus, workspaceRuntimeBinding } from "./runtime-binding.js";
 
 const errorMessages: Record<ApexErrorCode, string> = {
   APEX_USAGE: "Invalid operation arguments; check the tool input contract.",
@@ -21,6 +22,7 @@ const errorMessages: Record<ApexErrorCode, string> = {
   APEX_WRITER_CONFLICT: "Another worktree owns this run's writer lease; retry from that worktree or release the lease.",
   APEX_WORKSPACE_UNSUPPORTED:
     "The workspace path cannot be resolved to a supported APEX checkout; use a non-bare checkout or worktree.",
+  APEX_RUNTIME_MISMATCH: "This APEX runtime does not match the workspace runtime lock version.",
   APEX_VALIDATION: "APEX validation failed; check the supplied input against the current task contract.",
   APEX_STALE: "Task is stale or expired; refresh status before retrying.",
   APEX_AUTHORIZATION:
@@ -724,12 +726,22 @@ export function createMcpServerFactory(
         checkCancelled();
         const { workspace, ...toolInput } = input.data as { workspace: string } & Record<string, unknown>;
         const resolved = await services.resolve(workspace);
+        // Every tool call passes this one runtime binding check before the service is touched. An initialized
+        // workspace must be locked to exactly this runtime version; only read-only status reports a mismatch.
+        const binding = await workspaceRuntimeBinding(resolved.service.root);
+        if (binding.state === "mismatch" && name !== "status") throw runtimeMismatchError(binding);
         resolved.service.setWorkspacePath?.(resolved.workspace);
         activeService = resolved.service;
         let response: ToolResult;
         try {
           const execute = async (): Promise<ToolResult> =>
-            await Reflect.apply(callback, undefined, config.inputSchema === undefined ? [extra] : [toolInput, extra]);
+            binding.state === "mismatch"
+              ? result(runtimeMismatchStatus(binding))
+              : await Reflect.apply(
+                  callback,
+                  undefined,
+                  config.inputSchema === undefined ? [extra] : [toolInput, extra],
+                );
           // The adapter only describes the call; the kernel repeat guard behind the service decides whether a repeat
           // is answered from the original result. A result that would fail the contract checks below is rejected
           // before the guard can store it, so a failed call is never replayed.
@@ -796,7 +808,9 @@ export function createMcpServerFactory(
         const { code } = normalized;
         if (
           serviceValidation === undefined &&
-          (code === "APEX_WRITER_CONFLICT" || code === "APEX_WORKSPACE_UNSUPPORTED") &&
+          (code === "APEX_WRITER_CONFLICT" ||
+            code === "APEX_WORKSPACE_UNSUPPORTED" ||
+            code === "APEX_RUNTIME_MISMATCH") &&
           !SECRET_VALUE_PATTERN.test(normalized.message)
         ) {
           serviceValidation = normalized.message;
