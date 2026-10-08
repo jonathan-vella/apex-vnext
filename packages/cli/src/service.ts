@@ -785,6 +785,7 @@ export class ApexService {
   private requirementsDocumentTemplate?: Promise<{ content: string; hash: string }>;
   private workspacePath: string;
   private readonly reviewHomeOverride: string | undefined;
+  private reviewGuardPeers: () => Iterable<ApexService> = () => [];
 
   constructor(root: string, options: ServiceOptions = {}) {
     this.root = resolve(root);
@@ -824,6 +825,14 @@ export class ApexService {
 
   setWorkspacePath(workspacePath: string): void {
     this.workspacePath = canonicalWorkspacePath(workspacePath);
+  }
+
+  /**
+   * Other workspaces served by the same process (the MCP server resolves each caller-supplied workspace to its own
+   * service). The pending-review guard scans them too, so pointing an inherited tool at another workspace cannot evade it.
+   */
+  setReviewGuardPeers(peers: () => Iterable<ApexService>): void {
+    this.reviewGuardPeers = peers;
   }
 
   async improvementObserve(input: {
@@ -5167,12 +5176,21 @@ export class ApexService {
    * or publish (REVIEW_GUARDED_OPERATIONS), so an inherited rubber-duck cannot use them even when hooks fail open.
    */
   private async assertNoPendingReview(operation: ReviewGuardedOperation): Promise<void> {
-    const [pending] = await this.pendingReviews();
+    let pending: { projectId: string; runId: string; taskId: string; workspace?: string } | undefined = (
+      await this.pendingReviews()
+    )[0];
+    for (const peer of this.reviewGuardPeers()) {
+      if (pending !== undefined) break;
+      if (peer === this || peer.root === this.root) continue;
+      const [found] = await peer.pendingReviews();
+      if (found !== undefined) pending = { ...found, workspace: peer.root };
+    }
     if (pending === undefined) return;
     throw new ApexError(
       "APEX_REVIEW_PENDING",
       `${operation} (${REVIEW_GUARDED_OPERATIONS[operation]}) is blocked while a rubber-duck review waits for its ` +
-        `capture in project ${pending.projectId}, run ${pending.runId} (task ${pending.taskId}). Finish the review ` +
+        `capture in ${pending.workspace === undefined ? "" : `workspace ${pending.workspace}, `}project ` +
+        `${pending.projectId}, run ${pending.runId} (task ${pending.taskId}). Finish the review ` +
         `with reviewComplete, or stop any running rubber-duck and cancel it from a terminal: apex project use ` +
         `--project ${pending.projectId} --run ` +
         `${pending.runId}, then apex task cancel --task ${pending.taskId}.`,

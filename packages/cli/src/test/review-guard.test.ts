@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { mcpServiceResolver } from "../cli.js";
 import { ApexError } from "../errors.js";
 import { REVIEW_GUARDED_OPERATIONS, type ReviewGuardedOperation } from "../review-guard.js";
 import { ApexService } from "../service.js";
@@ -159,4 +160,39 @@ test("MCP returns APEX_REVIEW_PENDING with a finish-or-cancel remediation", asyn
   }
   const status = await client.callTool({ name: "status", arguments: { workspace: service.root } });
   assert.notEqual(status.isError, true);
+});
+
+test("a guarded call aimed at another served workspace is refused while one has a pending review", async (context) => {
+  const { service: reviewed, taskId } = await pendingReview();
+  const other = new ApexService(await tempRoot());
+  await other.init({ projectId: "other", riskOwner: "partner" });
+  const resolver = mcpServiceResolver(reviewed, async (workspaceRoot) => new ApexService(workspaceRoot));
+  const { client, close } = await connectMcp(resolver, { name: "review-guard-peers" });
+  context.after(close);
+  const call = (name: string, args: Record<string, unknown>) =>
+    client.callTool({ name, arguments: { workspace: other.root, ...args } });
+  assert.notEqual((await call("status", {})).isError, true, "the other workspace is served and readable");
+  for (const [name, args] of [
+    ["projectDelete", { projectId: "other", confirm: true }],
+    ["gateDecide", { gate: 1, decision: "approved", confirm: true }],
+  ] as const) {
+    const response = await call(name, args);
+    assert.equal(response.isError, true, name);
+    assert.equal((response.structuredContent as { error: { code: string } }).error.code, "APEX_REVIEW_PENDING", name);
+  }
+  // Without the shared peers, the other workspace's own scan finds nothing; with them, the error names the workspace.
+  assert.notEqual(await outcome(other.deleteProject("missing" as never, true)), "APEX_REVIEW_PENDING");
+  other.setReviewGuardPeers(() => [reviewed, other]);
+  await assert.rejects(other.deleteProject("missing" as never, true), (error: unknown) => {
+    assert.ok(error instanceof ApexError);
+    assert.equal(error.code, "APEX_REVIEW_PENDING");
+    assert.deepEqual(
+      {
+        workspace: (error.details as { workspace?: string }).workspace,
+        taskId: (error.details as { taskId: string }).taskId,
+      },
+      { workspace: reviewed.root, taskId },
+    );
+    return true;
+  });
 });

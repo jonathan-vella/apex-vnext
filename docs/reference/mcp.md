@@ -102,15 +102,16 @@ adapter at plugin build time; without it every APEX tool is denied during a run.
 
 The kernel adds a guard that does not depend on hooks (DECISION-031 amendment of 2026-10-08). A review is pending while
 the last task issued in a run is a review task with a rubber-duck request that is not completed, not cancelled and not
-expired; a rejected capture keeps it pending until the next request. While any run in the workspace has a pending
-review, every operation classified in `packages/cli/src/review-guard.ts` as approving, deleting or publishing fails
-with `APEX_REVIEW_PENDING` (exit code 4), whether it comes from MCP or the CLI. That covers `gateDecide`,
-`reviewDecide`, `projectDelete`, `promote` and `submitEvidence`, and also the CLI-only review resolution, deployment,
-repository publication, governance provisioning, writer transfer, improvement decision and deletion, and telemetry
-deletion. Reads, staging, `nextTask`, `taskContext` and `reviewComplete` stay available. To continue, finish the review
-with `reviewComplete`, or stop any running rubber-duck and then cancel the review from a terminal with
-`apex project use --project <id> --run <run>` and `apex task cancel --task <taskId>`; the CLI error names the project,
-run and task. The kernel cannot see whether rubber-duck is still running, so cancelling is a user action.
+expired; a rejected capture keeps it pending until the next request. While any run in the workspace, or in another
+workspace the same MCP server process serves, has a pending review, every operation classified in
+`packages/cli/src/review-guard.ts` as approving, deleting or publishing fails with `APEX_REVIEW_PENDING` (exit code 4),
+whether it comes from MCP or the CLI. That covers `gateDecide`, `reviewDecide`, `projectDelete`, `promote` and
+`submitEvidence`, and also the CLI-only review resolution, deployment, repository publication, governance provisioning,
+writer transfer, improvement decision and deletion, and telemetry deletion. Reads, staging, `nextTask`, `taskContext`
+and `reviewComplete` stay available. To continue, finish the review with `reviewComplete`, or stop any running
+rubber-duck and then cancel the review from a terminal with `apex project use --project <id> --run <run>` and
+`apex task cancel --task <taskId>`; the CLI error names the project, run and task. The kernel cannot see whether
+rubber-duck is still running, so cancelling is a user action.
 
 What this guarantees and what it does not:
 
