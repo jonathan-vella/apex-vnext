@@ -26,7 +26,8 @@
  *   live in the review home (`$APEX_REVIEW_HOME`, else `~/.apex/reviews`), outside every workspace.
  * - subagentStart marks a rubber-duck run as active for its parent session and folder; subagentStop and
  *   postToolUseFailure clear one mark; marks expire after MARKER_TTL_MS. A rubber-duck call that preToolUse denied
- *   leaves a denial record, which its postToolUseFailure event consumes instead of clearing the running run's mark.
+ *   leaves a denial record, which its postToolUseFailure event consumes instead of clearing the running run's mark;
+ *   if the record cannot be written, the marks that failure could clear are duplicated instead.
  * - preToolUse denies APEX state-changing MCP tools to every session in that folder that owns no active mark: a
  *   subagent's tool calls carry the subagent's own sessionId, while subagentStart carries the parent's. Only one
  *   rubber-duck run per folder may be active, so a reviewer cannot make itself a parent.
@@ -356,7 +357,23 @@ function recordRubberDuckDenial(sessionId, cwd, { env = process.env, now = new D
     const denial = { sessionId, cwd, deniedAt: now.toISOString() };
     writeNewFile(join(directory, `${now.getTime()}-${randomBytes(6).toString("hex")}.json`), JSON.stringify(denial));
   } catch {
-    // The call is still denied; at worst its failure event clears a mark early, as without this record.
+    // Without a record, the call's failure event would clear a live mark. Duplicate the marks it could clear instead,
+    // so one unmatched failure still leaves each run marked; duplicates add no new parent, so no session gains the
+    // parent exemption. If the mark directory cannot take them either, a failure event cannot remove a mark from it.
+    try {
+      for (const mark of activeRubberDuckMarks({ env, now: now.getTime() }))
+        if (
+          typeof mark.parentSessionId === "string" &&
+          (sessionId === null || mark.parentSessionId === sessionId) &&
+          (cwd === null || mark.cwd === cwd)
+        )
+          writeNewFile(
+            join(markerDirectory(env), `${Date.parse(mark.startedAt)}-${randomBytes(6).toString("hex")}.json`),
+            JSON.stringify({ parentSessionId: mark.parentSessionId, cwd: mark.cwd, startedAt: mark.startedAt }),
+          );
+    } catch {
+      // The call is still denied, and the kernel's pending-review guard still refuses approve, delete and publish.
+    }
   }
 }
 
