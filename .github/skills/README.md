@@ -41,5 +41,7 @@ need metadata/reference checks, and shared runtime or packaging changes need the
 ## Adding Or Retiring Guidance
 
 Update the existing owner, consumer mapping and relevant tests together. Validate invocation metadata and references with
-`npm run validate:skills` and `npm run validate:guidance-migration`. Preserve licenses and attributions. Historical storage
+`npm run validate:skills` and `npm run validate:guidance-migration`. `validate:skills` checks the shipped
+`customizations/.github/skills/` and this directory with per-root rules; pre-existing errors live only in the shrink-only
+[skill validation baseline](../../tools/registry/skill-validation-baseline.json). Preserve licenses and attributions. Historical storage
 is optional; current source, documentation and required checks must remain usable without it.

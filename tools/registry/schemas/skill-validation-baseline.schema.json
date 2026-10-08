@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.apexops.dev/skill-validation-baseline-v1.json",
+  "title": "APEX skill validation baseline",
+  "description": "Shrink-only record of pre-existing validate:skills errors. Each entry suppresses one rule for one skill in one skill root; validate:skills fails when an entry no longer matches a violation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "policy", "entries"],
+  "properties": {
+    "$schema": { "type": "string", "minLength": 1 },
+    "schemaVersion": { "const": "1.0.0" },
+    "policy": { "type": "string", "minLength": 1 },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["root", "skill", "rule", "violation", "recorded", "tracking"],
+        "properties": {
+          "root": { "enum": ["shipped", "authoring"] },
+          "skill": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+          "rule": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+          "violation": { "type": "string", "minLength": 1 },
+          "recorded": { "type": "string", "format": "date" },
+          "tracking": { "type": "string", "pattern": "^#[0-9]+$" }
+        }
+      }
+    }
+  }
+}
