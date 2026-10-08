@@ -1,9 +1,9 @@
 import type { EventV1, ProjectId, RunId } from "@apexops/contracts";
 import { constants } from "node:fs";
-import { lstat, open, rm } from "node:fs/promises";
-import { hostname } from "node:os";
-import { join, resolve } from "node:path";
+import { lstat, open } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
 import { sha256Json, sha256Text } from "./canonical.js";
+import { DirectoryLock } from "./directory-lock.js";
 import { EventJournal } from "./event-journal.js";
 import { atomicWriteJson } from "./files.js";
 import { canonicalWorktreePath } from "./run-repository.js";
@@ -13,12 +13,13 @@ export const REPEAT_GUARD_FILE = ".repeat-guard.json";
 /** Run-scoped, hash-chained audit journal of answered repeats. Separate from the run journal, whose head it keeps. */
 export const REPEAT_JOURNAL_DIRECTORY = "repeats";
 export const REPEAT_EVENT_TYPE = "call.repeated";
-/** Run-scoped lock serializing guarded calls across processes from record lookup through record publication. */
+/**
+ * Workspace-scoped directory lock serializing guarded calls across processes from record lookup through record
+ * publication. It does not depend on the selected run, so calls that change the selection are serialized too.
+ */
 export const REPEAT_LOCK_FILE = ".repeat-guard.lock";
 export const DEFAULT_REPEAT_LOCK_WAIT_MS = 30_000;
-const REPEAT_LOCK_RETRY_MS = 25;
-const FOREIGN_REPEAT_LOCK_STALE_MS = 60 * 60 * 1000;
-const INCOMPLETE_REPEAT_LOCK_GRACE_MS = 10_000;
+const REPEAT_LOCK_TTL_MS = 30_000;
 export const DEFAULT_REPEAT_WINDOW_MS = 10 * 60 * 1000;
 export const MAX_REPEAT_RECORDS = 16;
 export const MAX_REPEAT_RESULT_BYTES = 64 * 1024;
@@ -56,6 +57,11 @@ export interface RepeatScope {
 }
 
 export interface RepeatSafeHooks<T> {
+  /**
+   * Machine-local workspace directory that holds the repeat lock, created when missing. While its parent does not exist
+   * there is no workspace state yet, and calls run unserialized.
+   */
+  lockDirectory: string;
   /** Current selected run and state token, or undefined when no run is selected. */
   scope(): Promise<RepeatScope | undefined>;
   /** Ownership check for an answered repeat, such as the run writer lease. Must not write state. */
@@ -75,14 +81,14 @@ export interface RepeatSafeOptions {
   idSource?: () => string;
   windowMs?: number;
   maxRecords?: number;
-  /** Longest wait for another process's guarded call on the same run before failing with {@link RepeatGuardBusyError}. */
+  /** Longest wait for another guarded call in the workspace before failing with {@link RepeatGuardBusyError}. */
   lockWaitMs?: number;
 }
 
-/** Another process is running a guarded call on the same run; the caller should refresh state and retry later. */
+/** Another guarded call in the workspace is still running; the caller should refresh state and retry later. */
 export class RepeatGuardBusyError extends Error {
   constructor() {
-    super("Another state-changing call on this run is still in progress");
+    super("Another state-changing call in this workspace is still in progress");
     this.name = "RepeatGuardBusyError";
   }
 }
@@ -267,115 +273,13 @@ async function storeRepeatRecord(
   await atomicWriteJson(join(scope.runDirectory, REPEAT_GUARD_FILE), { version: 1, records });
 }
 
-interface RepeatLock {
-  token: string;
-  pid: number;
-  host: string;
-  createdAt: string;
-}
-
-function repeatLockStale(current: RepeatLockSnapshot, now: number): boolean {
-  const { lock } = current;
-  // A holder creates the file and then writes its metadata, so an unreadable lock may still be in the middle of that
-  // write; it is only recovered once it is older than any such write could take.
-  if (lock === undefined || typeof lock.pid !== "number" || typeof lock.host !== "string")
-    return now - current.modifiedMs > INCOMPLETE_REPEAT_LOCK_GRACE_MS;
-  if (lock.host !== hostname()) return now - Date.parse(lock.createdAt ?? "") > FOREIGN_REPEAT_LOCK_STALE_MS;
-  try {
-    process.kill(lock.pid, 0);
-    return false;
-  } catch (error) {
-    return (error as NodeJS.ErrnoException).code === "ESRCH";
-  }
-}
-
-interface RepeatLockSnapshot {
-  /** Bytes plus file identity, so a lock recreated with identical bytes is not mistaken for the one judged stale. */
-  identity: string;
-  modifiedMs: number;
-  lock?: Partial<RepeatLock>;
-}
-
-async function readRepeatLock(path: string): Promise<RepeatLockSnapshot | undefined> {
-  let handle;
-  try {
-    handle = await open(path, constants.O_RDONLY);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
-    throw error;
-  }
-  let bytes: string;
-  let modifiedMs: number;
-  let identity: string;
-  try {
-    const stat = await handle.stat({ bigint: true });
-    if (stat.size > 4096n) throw new Error("Repeat lock metadata is unsafe");
-    bytes = await handle.readFile("utf8");
-    modifiedMs = Number(stat.mtimeMs);
-    identity = [stat.dev, stat.ino, stat.size, stat.mtimeNs, bytes].join("\u0000");
-  } finally {
-    await handle.close();
-  }
-  try {
-    return { identity, modifiedMs, lock: JSON.parse(bytes) as Partial<RepeatLock> };
-  } catch {
-    return { identity, modifiedMs };
-  }
-}
-
-/**
- * Holds the run's repeat lock while `operation` runs. The lock is a separate file from the run mutation lock, which the
- * operation itself may take, so lock order is always repeat lock then mutation lock. A lock left by a process that no
- * longer runs on this host is recovered; a live holder is waited for up to `waitMs`.
- */
-async function withRepeatLock<T>(
-  runDirectory: string,
-  idSource: () => string,
-  waitMs: number,
-  operation: () => Promise<T>,
-): Promise<T> {
-  const path = join(runDirectory, REPEAT_LOCK_FILE);
-  const token = idSource();
-  const metadata: RepeatLock = { token, pid: process.pid, host: hostname(), createdAt: new Date().toISOString() };
-  const deadline = Date.now() + waitMs;
-  for (;;) {
-    try {
-      const handle = await open(path, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY, 0o600);
-      try {
-        await handle.writeFile(JSON.stringify(metadata));
-      } catch (error) {
-        await handle.close();
-        await rm(path, { force: true });
-        throw error;
-      }
-      await handle.close();
-      break;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-    }
-    const current = await readRepeatLock(path);
-    if (current !== undefined && repeatLockStale(current, Date.now())) {
-      // Remove the stale lock only if it is still the one judged stale.
-      if ((await readRepeatLock(path))?.identity === current.identity) await rm(path, { force: true });
-      continue;
-    }
-    if (Date.now() >= deadline) throw new RepeatGuardBusyError();
-    await new Promise((done) => setTimeout(done, REPEAT_LOCK_RETRY_MS));
-  }
-  try {
-    return await operation();
-  } finally {
-    const current = await readRepeatLock(path).catch(() => undefined);
-    if (current?.lock?.token === token) await rm(path, { force: true });
-  }
-}
-
 /**
  * Executes a state-changing call at most once per run state. An identical call (same operation, worktree and
  * arguments) made while the selected run is unchanged since the original succeeded, and within the window, returns the
  * original serialized result and appends a `call.repeated` audit event instead of executing again. Any intervening
  * state change, an expired window, a failed original call or a missing record makes the call a new request. Guarded
- * calls on the same run are serialized across processes from record lookup through record publication.
+ * calls in one workspace are serialized across processes from record lookup through record publication, including
+ * calls that create or change the selected run.
  */
 export async function executeRepeatSafe<T extends object>(
   call: RepeatCall,
@@ -393,13 +297,23 @@ export async function executeRepeatSafe<T extends object>(
   if (!Number.isSafeInteger(lockWaitMs) || lockWaitMs < 0)
     throw new RangeError("Repeat lock wait must not be negative");
   const callHash = repeatCallHash(call);
-  const target = await hooks.scope().catch(() => undefined);
-  // Without a selected run there is nothing to deduplicate against, so the call runs under normal kernel checks.
-  if (target === undefined)
-    return { value: await hooks.execute(), repeated: false, fingerprint: repeatFingerprint(callHash, null) };
-  return withRepeatLock(target.runDirectory, idSource, lockWaitMs, () =>
-    guardedCall(call, callHash, hooks, clock, idSource, windowMs, maxRecords),
-  );
+  const guarded = () => guardedCall(call, callHash, hooks, clock, idSource, windowMs, maxRecords);
+  try {
+    await lstat(dirname(hooks.lockDirectory));
+  } catch (error) {
+    // Without workspace state there is no run to deduplicate against or race with; normal kernel checks decide.
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return guarded();
+    throw error;
+  }
+  const lock = new DirectoryLock(join(hooks.lockDirectory, REPEAT_LOCK_FILE), {
+    label: "Repeat guard lock",
+    clock: () => new Date(),
+    idSource: () => crypto.randomUUID(),
+    ttlMs: REPEAT_LOCK_TTL_MS,
+    platform: process.platform,
+    busyError: () => new RepeatGuardBusyError(),
+  });
+  return lock.run(guarded, { waitMs: lockWaitMs });
 }
 
 async function guardedCall<T extends object>(

@@ -2484,6 +2484,7 @@ export class ApexService {
         arguments: call.fileArguments === undefined ? call.arguments : { input: call.arguments, files },
       },
       {
+        lockDirectory: join(this.root, ".apex", "local"),
         scope: () => this.repeatScope(),
         assertReplayAllowed: async (scope) =>
           this.runRepository(scope).assertWriterAvailable({ workspacePath: workspacePath }),

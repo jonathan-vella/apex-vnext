@@ -208,10 +208,13 @@ a result is not stored when that file changed while the call ran.
 The run state is a hash of the selection, the project set, the selected run document, its journal head, the writer
 lease holder (lease renewals do not change it) and a stat signature of the run's staged work tree and latest generated
 source tree, so an external edit to staged or generated files also makes an identical call new. The recorded fingerprint
-binds the call to the state it applied to. Guarded calls on one run are serialized across processes by a run-scoped
-`.repeat-guard.lock` from record lookup through record publication; a caller that waits more than 30 seconds for another
-process's call gets `APEX_CONFLICT`. A lock left by a process that no longer runs is recovered, and a lock without
-readable holder metadata is recovered once it is older than 10 seconds.
+binds the call to the state it applied to. Every guarded call in a workspace holds a workspace-scoped lock,
+`.apex/local/.repeat-guard.lock`, from record lookup through record publication, so concurrent identical calls from
+separate processes execute once, including calls such as `projectCreate` and `projectUse` that create or change the
+selected run. A call made before any run exists is recorded against the run it creates, so a repeated first
+`projectCreate` returns the original result. A caller that waits more than 30 seconds for another process's call gets
+`APEX_CONFLICT`. The lock uses the run mutation lock's protocol: an expired lock whose holder process no longer runs on
+this host is taken over into a permanent tombstone, so a delayed contender can never remove a replacement lock.
 
 An identical call is answered from the original result only when all of these hold:
 
@@ -230,8 +233,8 @@ head, records no new gate decision or evidence, and appends a hash-chained `call
 separate `repeats/` journal. Records live in the run's `.repeat-guard.json`, written atomically, so they survive an
 `apex mcp serve` restart. The file holds at most 16 records with results of at most 64 KiB each; records whose post-call
 state differs from the current state are dropped on every write because they can never match again. A malformed record
-file disables replay instead of returning a forged result. State transfer excludes the record and lock files and
-carries the audit journal.
+file disables replay instead of returning a forged result. State transfer excludes the record file and carries the
+audit journal.
 
 ## Authority
 

@@ -427,6 +427,30 @@ test("real workflow repeats return the original result and only a state change m
   );
 });
 
+test("the first projectCreate in a workspace without a project is answered as a repeat", async (context) => {
+  const service = new ApexService(await tempRoot(), {
+    executableChecker: async () => true,
+    azureAuthStatus: async () => ({ authenticated: false, detail: "Offline repeat test" }),
+  });
+  await service.initializeWorkspace({ clientId: "github-copilot-cli" });
+  const { client } = await connect(context, service, "repeat-first-project");
+  const call = () =>
+    client.callTool({
+      name: "projectCreate",
+      arguments: { workspace: service.root, ...duplicateCases.projectCreate.input },
+    });
+  const first = await call();
+  assertSuccess(first, "projectCreate");
+  assertSameResult(await call(), first, "projectCreate");
+  const { run } = await service.status();
+  const runDirectory = join(service.root, ".apex", "projects", run.projectId, "runs", run.runId);
+  assert.deepEqual(await readdir(join(service.root, ".apex", "projects")), ["other"]);
+  assert.deepEqual(
+    (await readRepeatEvents(runDirectory)).map(({ payload }) => (payload as { operation: string }).operation),
+    ["projectCreate"],
+  );
+});
+
 test("a repeat survives an MCP server restart within the run", async (context) => {
   const { service, journal } = await initializedWorkspace();
   const first = await connectMcp(service, { name: "repeat-before-restart" });

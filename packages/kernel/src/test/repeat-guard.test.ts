@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, symlink, utimes, writeFile } from "node:fs/promises";
+import * as fs from "node:fs";
+import { lstat, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { hostname, tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -21,6 +22,7 @@ import {
   repeatFingerprint,
   repeatStateToken,
   type RepeatCall,
+  type RepeatSafeOutcome,
   type RepeatScope,
 } from "../index.js";
 
@@ -39,6 +41,7 @@ async function fixture(start = "2026-01-01T00:00:00.000Z") {
   });
   await store.createRun("demo", { environment: "dev", targetScope: "local", runtimeLockHash: "a".repeat(64) });
   const runDirectory = store.runDirectory("demo", "run-1");
+  const lockDirectory = join(root, ".apex", "local");
   const repository = new RunRepository(runDirectory, { clock, idSource });
   const worktree = await mkdtemp(join(root, "worktree-"));
   const other = await mkdtemp(join(root, "worktree-other-"));
@@ -80,6 +83,7 @@ async function fixture(start = "2026-01-01T00:00:00.000Z") {
     executeRepeatSafe(
       { operation: "stageArtifact", workspace: options.workspace ?? worktree, arguments: args },
       {
+        lockDirectory,
         scope,
         assertReplayAllowed:
           options.assertReplayAllowed ??
@@ -102,6 +106,8 @@ async function fixture(start = "2026-01-01T00:00:00.000Z") {
     );
   return {
     root,
+    store,
+    lockDirectory,
     runDirectory,
     repository,
     worktree,
@@ -247,7 +253,7 @@ test("failed calls are not recorded and a repeat re-runs normal checks", async (
 });
 
 test("repeat events keep the caller's worktree spelling while Windows identity is case-insensitive", async (context) => {
-  const { runDirectory, root, scope } = await fixture();
+  const { runDirectory, root, lockDirectory, scope } = await fixture();
   const worktree = join(root, "WorkTree-Upper");
   await mkdir(worktree);
   // Simulate Windows: canonical worktree keys are case-folded, but audit records must not be.
@@ -258,7 +264,12 @@ test("repeat events keep the caller's worktree spelling while Windows identity i
   const run = (workspace: string) =>
     executeRepeatSafe(
       { operation: "projectUse", workspace, arguments: { projectId: "demo" } },
-      { scope, assertReplayAllowed: async () => undefined, execute: async () => ({ executions: ++executions }) },
+      {
+        lockDirectory,
+        scope,
+        assertReplayAllowed: async () => undefined,
+        execute: async () => ({ executions: ++executions }),
+      },
     );
   assert.equal((await run(worktree)).repeated, false);
   assert.equal((await run(worktree)).repeated, true);
@@ -270,13 +281,14 @@ test("repeat events keep the caller's worktree spelling while Windows identity i
   );
 });
 
-test("concurrent identical calls on one run execute once", async () => {
-  const { runDirectory, repository, worktree, scope, appendRunEvent } = await fixture();
+test("concurrent identical calls in one workspace execute once", async () => {
+  const { lockDirectory, repository, worktree, scope, appendRunEvent } = await fixture();
   let executions = 0;
   const run = () =>
     executeRepeatSafe(
       { operation: "projectUse", workspace: worktree, arguments: { projectId: "demo" } },
       {
+        lockDirectory,
         scope,
         assertReplayAllowed: async () => repository.assertWriterAvailable({ workspacePath: worktree }),
         execute: async () => {
@@ -291,46 +303,221 @@ test("concurrent identical calls on one run execute once", async () => {
   assert.equal(executions, 1);
   assert.deepEqual(outcomes.map(({ repeated }) => repeated).sort(), [false, true, true]);
   assert.equal((await repository.journal.replay()).filter(({ type }) => type === "selection.changed").length, 1);
-  await assert.rejects(readFile(join(runDirectory, REPEAT_LOCK_FILE)), { code: "ENOENT" });
+  await assert.rejects(lstat(join(lockDirectory, REPEAT_LOCK_FILE)), { code: "ENOENT" });
+  assert.deepEqual(await readdir(join(lockDirectory, ".repeat-guard.retired")), []);
 });
 
-test("a live repeat lock makes callers wait and fail closed; a dead holder's lock is recovered", async () => {
-  const { runDirectory, worktree, scope } = await fixture();
+test("a call that changes the selected run still serializes identical calls", async () => {
+  const { store, lockDirectory, worktree, scope } = await fixture();
+  await store.initializeProject({
+    projectId: "next",
+    displayName: "Next",
+    defaultIacTool: "bicep",
+    riskOwner: "partner",
+  });
+  await store.createRun("next", { environment: "dev", targetScope: "local", runtimeLockHash: "a".repeat(64) });
+  const nextRepository = new RunRepository(store.runDirectory("next", "run-1"));
+  let selected: "demo" | "next" = "demo";
+  const currentScope = async (): Promise<RepeatScope> => {
+    if (selected === "demo") return scope();
+    const state = await nextRepository.repeatState();
+    return {
+      runDirectory: store.runDirectory("next", "run-1"),
+      projectId: "next",
+      runId: "run-1",
+      ownerEpoch: state.ownerEpoch,
+      state: repeatStateToken({
+        selection: { projectId: "next", runId: "run-1" },
+        projects: ["demo", "next"],
+        ...state,
+      }),
+    };
+  };
+  let executions = 0;
+  let second: Promise<RepeatSafeOutcome<{ projectId: string }>> | undefined;
+  const run = (): Promise<RepeatSafeOutcome<{ projectId: string }>> =>
+    executeRepeatSafe(
+      { operation: "projectUse", workspace: worktree, arguments: { projectId: "next" } },
+      {
+        lockDirectory,
+        scope: currentScope,
+        assertReplayAllowed: async () => undefined,
+        execute: async () => {
+          executions += 1;
+          selected = "next";
+          // An identical call that starts once the new selection is visible, before this call publishes its record.
+          second ??= run();
+          await new Promise((done) => setTimeout(done, 50));
+          return { projectId: "next" };
+        },
+      },
+    );
+  const first = await run();
+  const repeated = await second!;
+  assert.equal(executions, 1);
+  assert.equal(first.repeated, false);
+  assert.equal(repeated.repeated, true);
+});
+
+test("the call that creates the first selection is answered as a repeat", async () => {
+  const root = await mkdtemp(join(tmpdir(), "apex-repeat-first-"));
+  const lockDirectory = join(root, ".apex", "local");
+  await mkdir(join(root, ".apex"));
+  const store = new ProjectStore(
+    root,
+    () => new Date(),
+    () => "run-1",
+  );
+  let repository: RunRepository | undefined;
+  const scope = async (): Promise<RepeatScope | undefined> => {
+    if (repository === undefined) return undefined;
+    const state = await repository.repeatState();
+    return {
+      runDirectory: store.runDirectory("demo", "run-1"),
+      projectId: "demo",
+      runId: "run-1",
+      ownerEpoch: state.ownerEpoch,
+      state: repeatStateToken({ selection: { projectId: "demo", runId: "run-1" }, projects: ["demo"], ...state }),
+    };
+  };
+  let executions = 0;
+  const run = () =>
+    executeRepeatSafe(
+      { operation: "projectCreate", workspace: root, arguments: { projectId: "demo" } },
+      {
+        lockDirectory,
+        scope,
+        assertReplayAllowed: async () => undefined,
+        execute: async () => {
+          executions += 1;
+          if (repository !== undefined) throw new Error("project exists");
+          await store.initializeProject({
+            projectId: "demo",
+            displayName: "Demo",
+            defaultIacTool: "bicep",
+            riskOwner: "partner",
+          });
+          await store.createRun("demo", { environment: "dev", targetScope: "local", runtimeLockHash: "a".repeat(64) });
+          repository = new RunRepository(store.runDirectory("demo", "run-1"));
+          return { created: "demo" };
+        },
+      },
+    );
+  const first = await run();
+  const again = await run();
+  assert.equal(first.repeated, false);
+  assert.equal(again.repeated, true);
+  assert.deepEqual(again.value, first.value);
+  assert.equal(executions, 1);
+});
+
+test("a live repeat lock makes callers fail closed; an expired dead holder's lock is taken over", async () => {
+  const { lockDirectory, worktree, scope } = await fixture();
   const call = (lockWaitMs: number) =>
     executeRepeatSafe(
       { operation: "projectUse", workspace: worktree, arguments: {} },
-      { scope, assertReplayAllowed: async () => undefined, execute: async () => ({ ok: true }) },
+      { lockDirectory, scope, assertReplayAllowed: async () => undefined, execute: async () => ({ ok: true }) },
       { lockWaitMs },
     );
-  const lock = join(runDirectory, REPEAT_LOCK_FILE);
-  await writeFile(
-    lock,
-    JSON.stringify({ token: "live", pid: process.pid, host: hostname(), createdAt: new Date().toISOString() }),
-  );
+  const lock = join(lockDirectory, REPEAT_LOCK_FILE);
+  const publish = async (token: string, pid: number, expiresAt: Date) => {
+    await mkdir(lock, { recursive: true });
+    await writeFile(
+      join(lock, "metadata.json"),
+      JSON.stringify({
+        token,
+        pid,
+        host: hostname(),
+        createdAt: new Date(expiresAt.getTime() - 30_000).toISOString(),
+        expiresAt: expiresAt.toISOString(),
+      }),
+    );
+  };
+  // A live holder is never taken over, even after its generation expired.
+  await publish("live", process.pid, new Date(Date.now() - 1_000));
   await assert.rejects(call(60), RepeatGuardBusyError);
-  await writeFile(
-    lock,
-    JSON.stringify({ token: "dead", pid: 2 ** 22 + 7, host: hostname(), createdAt: new Date().toISOString() }),
-  );
+  await rm(lock, { recursive: true });
+  await publish("dead", 2_147_483_647, new Date(Date.now() - 1_000));
   assert.equal((await call(0)).repeated, false);
-  // A holder that created the lock but has not written its metadata yet keeps it; an abandoned one is recovered.
-  await writeFile(lock, "");
-  await assert.rejects(call(60), RepeatGuardBusyError);
-  await writeFile(lock, "not json");
-  await assert.rejects(call(60), RepeatGuardBusyError);
-  const abandoned = new Date(Date.now() - 60_000);
-  await utimes(lock, abandoned, abandoned);
-  assert.equal((await call(0)).repeated, true);
-  await assert.rejects(readFile(lock), { code: "ENOENT" });
+  await assert.rejects(lstat(lock), { code: "ENOENT" });
+  const tombstones = await readdir(join(lockDirectory, ".repeat-guard.retired"));
+  assert.equal(tombstones.length, 1);
+  assert.equal(
+    JSON.parse(await readFile(join(lockDirectory, ".repeat-guard.retired", tombstones[0]!, "metadata.json"), "utf8"))
+      .token,
+    "dead",
+  );
+});
+
+test("a delayed stale repeat-lock contender cannot remove a replacement lock", async () => {
+  const { lockDirectory, worktree, scope } = await fixture();
+  const lock = join(lockDirectory, REPEAT_LOCK_FILE);
+  const deadPid = 2_147_483_647;
+  await mkdir(lock, { recursive: true });
+  await writeFile(
+    join(lock, "metadata.json"),
+    JSON.stringify({
+      token: "dead",
+      pid: deadPid,
+      host: hostname(),
+      createdAt: new Date(Date.now() - 60_000).toISOString(),
+      expiresAt: new Date(Date.now() - 30_000).toISOString(),
+    }),
+  );
+  const originalKill = process.kill;
+  let swapped = false;
+  // Between the contender's snapshot and its liveness check, another contender takes the stale lock over and a new
+  // owner publishes a replacement.
+  process.kill = ((pid: number, signal?: string | number) => {
+    if (pid !== deadPid) return originalKill.call(process, pid, signal);
+    if (!swapped) {
+      swapped = true;
+      fs.rmSync(lock, { recursive: true });
+      fs.mkdirSync(lock);
+      fs.writeFileSync(
+        join(lock, "metadata.json"),
+        JSON.stringify({
+          token: "replacement",
+          pid: process.pid,
+          host: hostname(),
+          createdAt: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + 30_000).toISOString(),
+        }),
+      );
+    }
+    throw Object.assign(new Error("ESRCH: injected"), { code: "ESRCH" });
+  }) as typeof process.kill;
+  let executed = false;
+  try {
+    await assert.rejects(
+      executeRepeatSafe(
+        { operation: "projectUse", workspace: worktree, arguments: {} },
+        {
+          lockDirectory,
+          scope,
+          assertReplayAllowed: async () => undefined,
+          execute: async () => ({ ok: (executed = true) }),
+        },
+        { lockWaitMs: 60 },
+      ),
+      RepeatGuardBusyError,
+    );
+  } finally {
+    process.kill = originalKill;
+  }
+  assert.equal(swapped, true);
+  assert.equal(executed, false);
+  assert.equal(JSON.parse(await readFile(join(lock, "metadata.json"), "utf8")).token, "replacement");
 });
 
 test("a call whose identity changed while it ran is returned but not stored", async () => {
-  const { runDirectory, repository, worktree, scope } = await fixture();
+  const { runDirectory, repository, worktree, lockDirectory, scope } = await fixture();
   let executions = 0;
   const run = (stable: boolean) =>
     executeRepeatSafe(
       { operation: "governanceImport", workspace: worktree, arguments: { path: "baseline.json" } },
       {
+        lockDirectory,
         scope,
         assertReplayAllowed: async () => repository.assertWriterAvailable({ workspacePath: worktree }),
         execute: async () => ({ executions: ++executions }),
@@ -345,7 +532,7 @@ test("a call whose identity changed while it ran is returned but not stored", as
 });
 
 test("repeat records survive a restart because they are stored with the run", async () => {
-  const { call, runDirectory, worktree } = await fixture();
+  const { call, runDirectory, worktree, lockDirectory } = await fixture();
   const first = await call();
   const stored = JSON.parse(await readFile(join(runDirectory, REPEAT_GUARD_FILE), "utf8")) as {
     version: number;
@@ -361,6 +548,7 @@ test("repeat records survive a restart because they are stored with the run", as
   const again = await executeRepeatSafe(
     { operation: "stageArtifact", workspace: worktree, arguments: { taskId: "task-1", value: { b: 1, a: [1, 2] } } },
     {
+      lockDirectory,
       scope: async () => {
         const state = await restarted.repeatState();
         return {
