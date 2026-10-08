@@ -138,6 +138,7 @@ qualification.
 | DECISION-033 hosts and sandbox     | `REQ-HOST-001`, `REQ-COPILOT-APP-001`               | CP-01 to CP-04, CP-12, CP-20 | CLIENT-012, CLIENT-035                                       |
 | DECISION-033 plugin and onboarding | `REQ-DIST-001`, `REQ-ONBOARDING-001`, `REQ-MCP-001` | CP-05 to CP-11, CP-19, CP-22 | CLIENT-009, CLIENT-011, CLIENT-020, CLIENT-028 to CLIENT-030 |
 | DECISION-034 MCP SDK v2            | `REQ-MCP-001`, `REQ-DIST-001`                       | CP-06, CP-09, CP-23          | CLIENT-038                                                   |
+| DECISION-035 azd and pipelines     | `REQ-DIST-001`, `REQ-SECURITY-001`                  | CP-18, CP-26                 | CLIENT-035                                                   |
 | DECISION-033 models and worktrees  | `REQ-CUSTOMIZATION-001`, `REQ-STATE-001`            | CP-05, CP-10, CP-14          | CLIENT-034, CLIENT-036, CLIENT-037                           |
 | Governance and content follow-ups  | `REQ-GOV-001`, `REQ-GUIDANCE-001`                   | CP-17, CP-18, CP-21          | CLIENT-018                                                   |
 
@@ -168,10 +169,13 @@ qualification.
 | [CP-21](https://github.com/jonathan-vella/apex-vnext/issues/401) | Content         | Review the shipped skills against Anthropic's Agent Skills best practices, together with CP-18                                                                                                                       | Each guideline has a disposition; `validate:skills` checks the shipped skills                     |
 | [CP-22](https://github.com/jonathan-vella/apex-vnext/issues/402) | Plugin          | Upgrade the MCP TypeScript SDK on the v1 line; keep protocol `2025-11-25`                                                                                                                                            | SDK pin is current and MCP tests pass                                                             |
 | [CP-23](https://github.com/jonathan-vella/apex-vnext/issues/407) | Plugin          | Migrate APEX MCP to the TypeScript SDK v2 with a low-level `Server`; target protocol `2026-07-28`; drop v1                                                                                                           | `tools/list` unchanged; MCP tests pass on `2026-07-28`; v1 SDK removed                            |
+| [CP-24](https://github.com/jonathan-vella/apex-vnext/issues/412) | Plugin          | Ship pinned native PNG rendering in the plugin bundle (`win32-x64`, `linux-x64` glibc)                                                                                                                               | PNG diagrams render from the built plugin on Linux and Windows                                    |
+| [CP-25](https://github.com/jonathan-vella/apex-vnext/issues/425) | Plugin          | Fail closed when the MCP runtime version differs from the workspace lock                                                                                                                                             | `APEX_RUNTIME_MISMATCH` on every tool; `status` reports it read-only                              |
+| [CP-26](https://github.com/jonathan-vella/apex-vnext/issues/443) | Deploy          | azd deployment track for labs and `azd pipeline config` GitHub Actions pipelines for production                                                                                                                      | azd preview bound to Gate 4; pipeline evidence through `submitEvidence`                           |
 
 Order: CP-01 to CP-04 and CP-17 and CP-18 can start now. CP-05 precedes CP-06 to CP-11. CP-09, then CP-23, precede
-CP-06, CP-08, CP-10 and CP-15. CP-13 and CP-14 precede CP-15 and CP-16. CP-21 runs with CP-18. CP-19 and CP-20 come
-last.
+CP-06, CP-08, CP-10 and CP-15. CP-13 and CP-14 precede CP-15 and CP-16. CP-21 runs with CP-18. CP-25 precedes the
+first plugin release. CP-26 follows CP-12 and informs the CP-18 deploy skills. CP-19 and CP-20 come last.
 
 ## Phase 1: Align Without Rebuilding
 

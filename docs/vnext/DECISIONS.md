@@ -314,3 +314,20 @@ apex-jon server moved to the v2 SDK on 2026-10-04 and its `apex-plugin` build se
 v2 `Server` over stdio, falling back to `2025-11-25` because it does not use `serveStdio`. A local probe on 2026-10-07
 confirmed that only `serveStdio` answers `server/discover` and returns `2026-07-28` results. Live client evidence is
 recorded in CP-20.
+
+## DECISION-035: Deploy With azd For Labs And GitHub Actions Pipelines For Production
+
+Maintainer direction on 2026-10-08. Production deployments run through GitHub Actions pipelines; labs deploy from a
+local device with azd. Both keep the kernel's deployment authority.
+
+- **Labs.** `apex deploy` gains an `azd` track alongside the Bicep and Terraform tracks. The preview is
+  `azd provision --preview`; the human approves it at Gate 4; `azd up` then runs bound to that exact preview, under the
+  same commit, dependency revision, hash and expiry rules as the other tracks.
+- **Production.** APEX generates `azure.yaml` and the GitHub Actions pipeline with `azd pipeline config` as reviewable
+  artifacts that pass the normal gates, using OIDC federated credentials and no secrets in files. The pipeline deploys,
+  and its run evidence returns through `submitEvidence`, bound to the approved plan.
+- **Agent commands.** The APEX agent never runs a command that changes Azure. Read and diagnostic `az` commands may run
+  directly. Skills keep their azd and CLI guidance (CP-18), with mutations routed through `apex deploy` or the pipeline.
+
+Today's tracks: Bicep previews with `az deployment group|sub what-if` and deploys with `az deployment group|sub create`;
+Terraform previews with `terraform plan -out` and applies that saved plan. CP-26 owns delivery.
