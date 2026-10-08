@@ -180,6 +180,7 @@ import {
   loadReviewCaptures,
   parseReviewAnswer,
   removeReviewCaptures,
+  rejectedReviewCapture,
   reviewCaptureKey,
   reviewHome,
   reviewPromptSha256,
@@ -5133,15 +5134,18 @@ export class ApexService {
     validatedHead: string,
   ): Promise<void> {
     await this.acquireRunWriterLease(run);
-    // Rejected captures move into the run's object store as audit evidence, so the shared review home stays bounded.
+    // Rejected captures move into the run's object store as typed JSON audit evidence, so the shared review home stays
+    // bounded and state transfer can still carry (and secret-check) every journal-referenced object.
     const captureHashes: string[] = [];
-    for (const { bytes } of files) if (bytes !== undefined) captureHashes.push(await this.objects.putBytes(bytes));
+    const unarchivable: typeof files = [];
+    for (const file of files) {
+      const evidence = file.bytes === undefined ? undefined : rejectedReviewCapture(file.bytes);
+      if (evidence === undefined) unarchivable.push(file);
+      else captureHashes.push(await this.objects.putJson(evidence));
+    }
     // Move captures that cannot be archived before the event, so it records only moves that happened; the quarantine
     // keeps them even if the event then loses the race to another writer.
-    const quarantine = await quarantineReviewCaptures(
-      files.filter(({ bytes }) => bytes === undefined),
-      this.reviewHomeOverride ?? reviewHome(),
-    );
+    const quarantine = await quarantineReviewCaptures(unarchivable, this.reviewHomeOverride ?? reviewHome());
     try {
       // Compare-and-swap on the head completeReview validated: a concurrent rejection or completion consumes the
       // nonce first, so this one fails stale instead of counting the same attempt twice.
@@ -5171,7 +5175,7 @@ export class ApexService {
         );
       throw error;
     }
-    await removeReviewCaptures(files.filter(({ bytes }) => bytes !== undefined));
+    await removeReviewCaptures(files.filter((file) => !unarchivable.includes(file)));
   }
 
   /**

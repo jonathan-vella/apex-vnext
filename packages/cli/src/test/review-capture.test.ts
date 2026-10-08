@@ -10,12 +10,14 @@ import {
   reviewPromptSha256,
   REVIEW_MAX_FINDINGS,
   sha256Bytes,
+  type RejectedReviewCaptureV1,
   type ReviewCaptureRecordV1,
 } from "@apexops/kernel";
 import type { ReviewFindingsV1 } from "@apexops/contracts";
 import { ApexError } from "../errors.js";
 import { MCP_MAX_SERIALIZED_RESULT_BYTES } from "../mcp.js";
 import { ApexService } from "../service.js";
+import { createStateTransferBundle } from "../state-transfer.js";
 import { captureReview, nextTaskAfterInput, requirements, reviewAnswer, tempRoot } from "./helpers.js";
 
 async function reviewTask(service: ApexService): Promise<string> {
@@ -179,8 +181,10 @@ test("edited, forged, replayed, ambiguous and mismatched captures fail closed an
     },
   );
   assert.equal(rejectedPayload.captureHashes.length, 1);
+  const archived = (await new ObjectStore(root).getJson(rejectedPayload.captureHashes[0]!)) as RejectedReviewCaptureV1;
+  assert.equal(archived.schema, "apex.rejected-review-capture.v1");
   assert.equal(
-    ((await new ObjectStore(root).getJson(rejectedPayload.captureHashes[0]!)) as ReviewCaptureRecordV1).response,
+    (JSON.parse(archived.content) as ReviewCaptureRecordV1).response,
     reviewAnswer({ findings: [] }),
     "the edited capture is kept as audit evidence",
   );
@@ -251,10 +255,18 @@ test("edited, forged, replayed, ambiguous and mismatched captures fail closed an
   const rejections = (await journal.replay()).filter(({ type }) => type === "review.capture-rejected");
   const malformed = rejections.at(-1)!.payload as { reason: string; captureHashes: string[] };
   assert.equal(malformed.reason, "malformed");
-  assert.equal(
-    (await new ObjectStore(root).getBytes(malformed.captureHashes[0]!)).toString("utf8"),
-    "{not json",
-    "a malformed capture is archived byte for byte",
+  const archivedMalformed = (await new ObjectStore(root).getJson(
+    malformed.captureHashes[0]!,
+  )) as RejectedReviewCaptureV1;
+  assert.deepEqual(
+    archivedMalformed,
+    {
+      schema: "apex.rejected-review-capture.v1",
+      sha256: sha256Bytes(Buffer.from("{not json")),
+      bytes: 9,
+      content: "{not json",
+    },
+    "a malformed capture is archived exactly, as typed JSON",
   );
   const reasons = rejections.map(({ payload }) => (payload as { reason: string }).reason);
   assert.deepEqual(reasons, [
@@ -397,6 +409,41 @@ test("an oversized capture is rejected and quarantined rather than deleted", asy
   assert.deepEqual(await captureFiles(nonce), []);
   const quarantine = await readdir(join(reviewHome(), "quarantine"));
   assert.ok(quarantine.some((name) => name.endsWith(`${nonce}-0000000000000000.json`)));
+});
+
+test("rejected captures keep state transfer working, and non-UTF-8 captures are quarantined", async () => {
+  const { root, service, journal, taskId } = await setup();
+  const { nonce } = (await service.taskContext(taskId)).reviewRequest!;
+  const malformed = join(reviewHome(), "captures", `${nonce}-0000000000000000.json`);
+  const binary = join(reviewHome(), "captures", `${nonce}-1111111111111111.json`);
+  await writeFile(malformed, "{not json");
+  await writeFile(binary, Buffer.from([0x7b, 0xff, 0xfe, 0x7d]));
+  await rejectsWith(() => service.completeReview(taskId), "REVIEW_CAPTURE_AMBIGUOUS");
+  const payload = (await journal.replay()).findLast(({ type }) => type === "review.capture-rejected")!.payload as {
+    captureHashes: string[];
+    quarantined: string[];
+  };
+  assert.equal(payload.captureHashes.length, 1);
+  assert.deepEqual(payload.quarantined, [`${nonce}-1111111111111111.json`]);
+  assert.deepEqual(await captureFiles(nonce), []);
+  // State transfer carries every journal-referenced object and requires each to be JSON.
+  await rm(join(root, ".apex", "runtime"), { recursive: true, force: true });
+  await rm(join(root, ".apex", "runtime-generations"), { recursive: true, force: true });
+  await mkdir(join(root, ".apex", "runtime"), { recursive: true });
+  const transfer = (await service.createWriterTransfer({
+    repository: "owner/repository",
+    branch: "qualification",
+    commit: "candidate-commit",
+    workflowId: "qualification.yml",
+    approvalEnvironment: "vnext-qualification",
+    sender: "local",
+    recipient: "ci",
+    currentHead: "candidate-commit",
+    ttlMs: 60 * 60 * 1_000,
+  })) as { hash: string };
+  const bundle = await createStateTransferBundle(root, { claimHash: transfer.hash, recipient: "ci", ttlMs: 1 });
+  const hash = payload.captureHashes[0]!;
+  assert.ok(bundle.files.some(({ path }) => path === `objects/sha256/${hash.slice(0, 2)}/${hash.slice(2)}`));
 });
 
 test("the largest accepted review still fits the bounded nextTask result", async () => {

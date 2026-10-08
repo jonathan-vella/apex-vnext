@@ -449,8 +449,32 @@ export interface ReviewCaptureFile {
   bytes?: Buffer;
 }
 
+export const REJECTED_REVIEW_CAPTURE_SCHEMA = "apex.rejected-review-capture.v1";
+
 /**
- * Moves captures that could not be archived (oversized, unreadable or not regular files) into `quarantine/` in the
+ * A rejected capture file as JSON audit evidence: the exact UTF-8 text with the hash and size of the original bytes.
+ * Run objects must stay JSON so state transfer can carry them and check them for secrets.
+ */
+export interface RejectedReviewCaptureV1 {
+  schema: typeof REJECTED_REVIEW_CAPTURE_SCHEMA;
+  sha256: string;
+  bytes: number;
+  content: string;
+}
+
+/** Wraps capture bytes for the object store, or returns undefined when they are not valid UTF-8 (quarantine those). */
+export function rejectedReviewCapture(bytes: Buffer): RejectedReviewCaptureV1 | undefined {
+  let content: string;
+  try {
+    content = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
+  } catch {
+    return undefined;
+  }
+  return { schema: REJECTED_REVIEW_CAPTURE_SCHEMA, sha256: sha256Bytes(bytes), bytes: bytes.byteLength, content };
+}
+
+/**
+ * Moves captures that could not be archived (oversized, unreadable, not UTF-8 or not regular files) into `quarantine/` in the
  * review home, so the only copy of rejected evidence is kept for inspection rather than deleted.
  */
 export async function quarantineReviewCaptures(

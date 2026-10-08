@@ -55,9 +55,13 @@ values either way, and cancellation records nothing. See
 [input qualification](../vnext/CLIENT-QUALIFICATION.md#multiple-selection-input) for required evidence.
 
 The foreground APEX agent may use the built-in Explore agent for read-only questions about named workspace paths.
-Managed agents do not use Rubber-duck, Code-review or Security-review, because they inherit the caller's APEX tools.
-You can run `/review` or `/security-review` yourself on promoted output, and `/research` for background reading. Treat
-their findings as advice and record any change through APEX. General-purpose delegation, `/fleet`,
+It runs the built-in `rubber-duck` agent only for kernel-issued Requirements, Architecture and Plan reviews, with the
+exact review prompt. Rubber-duck inherits the caller's APEX tools, so the managed `preToolUse` hook denies its
+state-changing APEX calls, and the kernel accepts only its captured output (see
+[rubber-duck reviews](mcp.md#rubber-duck-reviews)). Managed agents do not use rubber-duck as an advisory helper, nor
+Code-review or Security-review, because these also inherit the caller's APEX tools. You can run `/review` or
+`/security-review` yourself on promoted output, and `/research` for background reading. Treat their findings as advice
+and record any change through APEX. General-purpose delegation, `/fleet`,
 `/delegate` and plan mode stay out of managed workflows.
 
 In VS Code on native Windows, open the workspace, start a chat with the session target set to Copilot, and pick the

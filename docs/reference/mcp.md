@@ -82,8 +82,10 @@ A missing capture leaves the request open: run rubber-duck once more with the sa
 nonce, an edited or forged record, a different prompt, a nonce from another request, a changed artifact, an edited or
 missing review input file or an answer that does not parse fails closed. The kernel records `review.capture-rejected`
 (except for a missing capture), so the nonce cannot be reused, and the next `nextTask` issues a new request. Rejected
-captures move into the run's object store as audit evidence (their hashes are in the rejection event) and leave the
-review home; captures too large or unreadable to archive move to the review home's `quarantine/` folder instead.
+captures move into the run's object store as audit evidence and leave the review home. Each is stored as an
+`apex.rejected-review-capture.v1` JSON record holding the exact text with its hash and size, so state transfer can carry
+and secret-check it, and the rejection event lists the record hashes. Captures that are too large, unreadable or not
+UTF-8 move to the review home's `quarantine/` folder instead.
 After two failed attempts the error tells the agent to stop and report to the user. `completeTask`, `stageArtifact`
 and `validateTask` reject review tasks, and `reviewComplete` rejects agent-supplied `findings` or `criteria`.
 
