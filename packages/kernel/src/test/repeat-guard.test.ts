@@ -556,6 +556,26 @@ test("a suspended holder keeps the lock when its state is unreadable and fails c
     );
   });
 
+  // A caller cancelled during the wait does not continue, even when the lock is free to take again.
+  const controller = new AbortController();
+  let resumed = false;
+  await assert.rejects(
+    withRepeatGuardLock(
+      lockDirectory,
+      async (hold) => {
+        await hold.suspend(
+          async () => controller.abort(),
+          async () => "s",
+        );
+        resumed = true;
+      },
+      { signal: controller.signal },
+    ),
+    RepeatGuardCancelledError,
+  );
+  assert.equal(resumed, false);
+  assert.equal(await lockFree(), "acquired");
+
   // Suspensions do not nest.
   await withRepeatGuardLock(lockDirectory, async (hold) => {
     await hold.suspend(

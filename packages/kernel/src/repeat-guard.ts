@@ -365,6 +365,7 @@ export async function withRepeatGuardLock<T>(
         await releasing?.release();
         const value = await wait();
         held = await acquireRepeatGuardLock(lockDirectory, lockWaitMs, signal);
+        if (cancelled()) throw new RepeatGuardCancelledError();
         if ((await state().catch(() => undefined)) !== before.token) throw new RepeatGuardStaleError();
         return value;
       } finally {
