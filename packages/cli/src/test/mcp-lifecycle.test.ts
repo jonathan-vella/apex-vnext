@@ -5,7 +5,7 @@ import { mkdir, readFile, readdir, realpath, symlink, writeFile } from "node:fs/
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { PassThrough } from "node:stream";
-import test, { type TestContext } from "node:test";
+import test, { before, describe, type TestContext } from "node:test";
 import { setImmediate as nextTurn } from "node:timers/promises";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
@@ -16,6 +16,7 @@ import { MCP_DOCTOR_CHECK_LIMIT, MCP_OUTPUT_SCHEMAS } from "../mcp-output-schema
 import { MCP_MAX_SERIALIZED_RESULT_BYTES, MCP_SERVER_INSTRUCTIONS, serveMcp, type McpServiceResolver } from "../mcp.js";
 import { ApexError, EXIT_CODES } from "../errors.js";
 import { GovernanceBaselineError } from "@apexops/capabilities";
+import { withRepeatGuardLock } from "@apexops/kernel";
 import { ApexService } from "../service.js";
 import { requirements, tempRoot } from "./helpers.js";
 import { MCP_PROTOCOL_VERSION, connectMcp, modernMcpClient } from "./mcp-client.js";
@@ -666,50 +667,100 @@ test(
   },
 );
 
-test(
-  "a real mutation started before disconnect completes and persists after the transport closes",
-  { timeout: 60_000 },
-  async (context) => {
-    const root = await tempRoot();
-    const service = new ApexService(root);
-    await service.init({ projectId: "payments", riskOwner: "partner" });
-    const entered = deferred();
-    const release = deferred();
-    const createProject = service.createProject.bind(service);
-    let settled: Promise<unknown> | undefined;
-    service.createProject = async (projectInput) => {
-      entered.resolve();
-      await release.promise;
-      settled = createProject(projectInput);
-      return (await settled) as Awaited<ReturnType<ApexService["createProject"]>>;
-    };
-    const { client, close } = await connectMcp(service, { name: "disconnect-persistence-test" });
-    context.after(close);
-    const active = client.callTool({
-      name: "projectCreate",
-      arguments: {
-        workspace: root,
-        projectId: "data-platform",
-        displayName: "Data platform",
-        environment: "dev",
-        targetScope: "local",
-        iacTool: "terraform",
-        riskOwner: "partner",
-      },
-    });
-    await entered.promise;
-    const disconnected = assert.rejects(active, /Connection closed/i);
-    await close();
-    await disconnected;
-    release.resolve();
-    while (settled === undefined) await nextTurn();
-    await settled;
-    assert.ok(
-      (await new ApexService(root).listProjects()).some(({ projectId }) => projectId === "data-platform"),
-      "the started mutation must persist",
-    );
-  },
-);
+/**
+ * Initializes a real workspace in the enclosing suite's `before` hook and returns its root. `init` writes and fsyncs
+ * every managed file; on a loaded Windows runner that alone has taken over a minute, so the fixture is built outside
+ * the timeout that bounds the MCP behavior under test.
+ */
+function initializedWorkspaceFixture(projectId: string): () => string {
+  let root: string | undefined;
+  before(
+    async () => {
+      const workspace = await tempRoot();
+      await new ApexService(workspace).init({ projectId, riskOwner: "partner" });
+      root = workspace;
+    },
+    { timeout: 300_000 },
+  );
+  return () => {
+    assert.ok(root, "the initialized workspace fixture is missing");
+    return root;
+  };
+}
+
+/** Lock directories (`*.lock`) and staged lock generations (`*.pending-*`) left anywhere under `directory`. */
+async function heldLocks(directory: string): Promise<string[]> {
+  const entries = await readdir(directory, { recursive: true, withFileTypes: true });
+  return entries
+    .filter((entry) => entry.isDirectory() && (entry.name.endsWith(".lock") || entry.name.includes(".pending-")))
+    .map((entry) => join(entry.parentPath, entry.name));
+}
+
+async function within<T>(promise: Promise<T>, milliseconds: number, expectation: string): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  const expired = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${expectation} within ${milliseconds} ms`)), milliseconds);
+  });
+  try {
+    return await Promise.race([promise, expired]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+describe("a real mutation in flight at disconnect", () => {
+  const workspace = initializedWorkspaceFixture("payments");
+
+  test(
+    "a real mutation started before disconnect completes and persists after the transport closes",
+    { timeout: 60_000 },
+    async (context) => {
+      const root = workspace();
+      const service = new ApexService(root);
+      const entered = deferred();
+      const release = deferred();
+      const createProject = service.createProject.bind(service);
+      let settled: Promise<unknown> | undefined;
+      service.createProject = async (projectInput) => {
+        entered.resolve();
+        await release.promise;
+        settled = createProject(projectInput);
+        return (await settled) as Awaited<ReturnType<ApexService["createProject"]>>;
+      };
+      const { client, close } = await connectMcp(service, { name: "disconnect-persistence-test" });
+      context.after(close);
+      const active = client.callTool({
+        name: "projectCreate",
+        arguments: {
+          workspace: root,
+          projectId: "data-platform",
+          displayName: "Data platform",
+          environment: "dev",
+          targetScope: "local",
+          iacTool: "terraform",
+          riskOwner: "partner",
+        },
+      });
+      // A call that settles before reaching the service fails here with its response instead of timing out.
+      await Promise.race([
+        entered.promise,
+        active.then((response) =>
+          assert.fail(`projectCreate settled before the mutation: ${JSON.stringify(response)}`),
+        ),
+      ]);
+      const disconnected = assert.rejects(active, /Connection closed/i);
+      await close();
+      await disconnected;
+      release.resolve();
+      while (settled === undefined) await nextTurn();
+      await settled;
+      assert.ok(
+        (await new ApexService(root).listProjects()).some(({ projectId }) => projectId === "data-platform"),
+        "the started mutation must persist",
+      );
+    },
+  );
+});
 
 test(
   "the 32-call bound returns a sanitized error and recovers after draining",
@@ -1264,6 +1315,82 @@ test(
     assert.deepEqual(await exited, [0, null]);
   },
 );
+
+describe("real stdio CLI with a mutation in flight at stdin end", () => {
+  const workspace = initializedWorkspaceFixture("payments");
+
+  test(
+    "the server process lets the mutation settle, leaves no lock held, and exits",
+    { timeout: 60_000 },
+    async (context) => {
+      const root = workspace();
+      // The preload holds createProject until the server has seen stdin end, so the transport closes mid-mutation.
+      const child = spawn(
+        process.execPath,
+        [
+          "--import",
+          new URL("./mcp-held-mutation.js", import.meta.url).href,
+          fileURLToPath(new URL("../cli.js", import.meta.url)),
+          "mcp",
+          "serve",
+        ],
+        { cwd: root, stdio: "pipe" },
+      );
+      context.after(() => {
+        if (child.exitCode === null && child.signalCode === null) child.kill();
+      });
+      const exited = once(child, "exit") as Promise<[number | null, NodeJS.Signals | null]>;
+      let stdout = "";
+      let stderr = "";
+      const entered = Promise.withResolvers<void>();
+      const answered = Promise.withResolvers<void>();
+      child.stdout.on("data", (chunk: Buffer) => {
+        stdout += chunk.toString("utf8");
+        answered.resolve();
+      });
+      child.stderr.on("data", (chunk: Buffer) => {
+        stderr += chunk.toString("utf8");
+        if (stderr.includes("apex-test: held mutation entered")) entered.resolve();
+      });
+      child.stdin.write(
+        `${JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "tools/call",
+          params: {
+            name: "projectCreate",
+            arguments: {
+              workspace: root,
+              projectId: "held-mutation",
+              displayName: "Held mutation",
+              environment: "dev",
+              targetScope: "local",
+              iacTool: "bicep",
+              riskOwner: "partner",
+            },
+            ...modernEnvelope("held-mutation-test"),
+          },
+        })}\n`,
+      );
+      await Promise.race([
+        entered.promise,
+        answered.promise.then(() => assert.fail(`projectCreate was answered before the mutation: ${stdout}`)),
+        exited.then(([code, signal]) =>
+          assert.fail(`server exited (${code}, ${signal}) before the mutation: ${stderr}`),
+        ),
+      ]);
+      child.stdin.end();
+      assert.deepEqual(await within(exited, 30_000, "the server must exit after stdin end"), [0, null], stderr);
+      assert.equal(stdout, "", "a call in flight when stdin ends is not answered");
+      assert.ok(
+        (await new ApexService(root).listProjects()).some(({ projectId }) => projectId === "held-mutation"),
+        "the started mutation must persist",
+      );
+      assert.deepEqual(await heldLocks(join(root, ".apex")), []);
+      await withRepeatGuardLock(join(root, ".apex", "local"), async () => undefined, { lockWaitMs: 0 });
+    },
+  );
+});
 
 test("invalid staging forms are rejected before staging", { timeout: 10_000 }, async (context) => {
   let calls = 0;
