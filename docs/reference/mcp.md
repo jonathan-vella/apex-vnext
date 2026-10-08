@@ -170,7 +170,8 @@ Versions compare by SemVer precedence; a lock that differs only in build metadat
 keeps its version. On a mismatch, `status` stays read-only and does not read workspace state. It returns
 `{ "status": "runtime_mismatch", "reason", "runtimeVersion", "workspaceRuntimeVersion", "nextAction" }`, where
 `workspaceRuntimeVersion` is `null` for an invalid lock and `nextAction` is the remediation. Every other tool returns
-`APEX_RUNTIME_MISMATCH` without calling the service, and its message names both versions. CLI commands, including
+`APEX_RUNTIME_MISMATCH` without calling the service. Its message names both versions for an older or newer lock, and
+only the serving runtime version for an invalid lock. CLI commands, including
 `apex update`, are not gated, so the fix path always runs. Do not downgrade a newer workspace with an older runtime.
 
 ## Inputs And Lifecycle

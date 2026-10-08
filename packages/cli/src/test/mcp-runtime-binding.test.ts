@@ -310,6 +310,7 @@ test("workspace runtime binding classifies locks and fails closed on anything un
     [{ cliVersion: "1.2.2" }, mismatch("RUNTIME_WORKSPACE_OLDER", "1.2.2")],
     [{ cliVersion: "1.2.3-next.9" }, mismatch("RUNTIME_WORKSPACE_OLDER", "1.2.3-next.9")],
     [{ cliVersion: "1.10.0" }, mismatch("RUNTIME_WORKSPACE_NEWER", "1.10.0")],
+    [{ cliVersion: "9007199254740993.0.0" }, mismatch("RUNTIME_WORKSPACE_NEWER", "9007199254740993.0.0")],
     [{ cliVersion: "1.2.3+build.1" }, mismatch("RUNTIME_WORKSPACE_NEWER", "1.2.3+build.1")],
     [{}, mismatch("RUNTIME_LOCK_INVALID", null)],
     [{ cliVersion: 123 }, mismatch("RUNTIME_LOCK_INVALID", null)],
@@ -343,6 +344,11 @@ test("runtime versions compare by SemVer precedence", () => {
     "0.10.0",
     "0.10.1",
     "1.0.0",
+    "9007199254740992.0.0",
+    "9007199254740993.0.0",
+    "9007199254740993.0.1-9007199254740992",
+    "9007199254740993.0.1-9007199254740993",
+    "9007199254740993.0.1",
   ];
   for (const [index, lower] of ordered.slice(0, -1).entries()) {
     const higher = ordered[index + 1]!;

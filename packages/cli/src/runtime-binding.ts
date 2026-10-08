@@ -24,15 +24,23 @@ export type WorkspaceRuntimeBinding =
       workspaceRuntimeVersion: string | null;
     };
 
-type ParsedVersion = { core: [number, number, number]; prerelease: string[] };
+type ParsedVersion = { core: [string, string, string]; prerelease: string[] };
 
 function parseVersion(version: string): ParsedVersion | undefined {
   if (version.length > MAX_VERSION_LENGTH) return undefined;
   const match = SEMVER.exec(version);
   if (match === null) return undefined;
-  const core = [Number(match[1]), Number(match[2]), Number(match[3])] as [number, number, number];
-  if (!core.every(Number.isSafeInteger)) return undefined;
-  return { core, prerelease: match[4] === undefined ? [] : match[4].split(".") };
+  return {
+    core: [match[1]!, match[2]!, match[3]!],
+    prerelease: match[4] === undefined ? [] : match[4].split("."),
+  };
+}
+
+// SemVer numeric identifiers have no leading zeroes and no size limit, so compare them as digit strings: the longer is
+// larger, and equal lengths compare lexicographically. Converting to number would lose precision past 2^53.
+function compareNumeric(left: string, right: string): number {
+  if (left.length !== right.length) return left.length < right.length ? -1 : 1;
+  return left === right ? 0 : left < right ? -1 : 1;
 }
 
 /** SemVer 2.0.0 precedence; build metadata is ignored. */
@@ -41,7 +49,8 @@ export function compareRuntimeVersions(left: string, right: string): number {
   const b = parseVersion(right);
   if (a === undefined || b === undefined) throw new Error("Runtime versions must be SemVer");
   for (let index = 0; index < 3; index += 1) {
-    if (a.core[index] !== b.core[index]) return a.core[index]! < b.core[index]! ? -1 : 1;
+    const order = compareNumeric(a.core[index]!, b.core[index]!);
+    if (order !== 0) return order;
   }
   if (a.prerelease.length === 0 || b.prerelease.length === 0)
     return a.prerelease.length === b.prerelease.length ? 0 : a.prerelease.length === 0 ? 1 : -1;
@@ -53,7 +62,7 @@ export function compareRuntimeVersions(left: string, right: string): number {
     if (x === y) continue;
     const xNumeric = /^\d+$/u.test(x);
     const yNumeric = /^\d+$/u.test(y);
-    if (xNumeric && yNumeric) return Number(x) < Number(y) ? -1 : 1;
+    if (xNumeric && yNumeric) return compareNumeric(x, y);
     if (xNumeric !== yNumeric) return xNumeric ? -1 : 1;
     return x < y ? -1 : 1;
   }
