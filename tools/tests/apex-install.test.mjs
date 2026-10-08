@@ -63,6 +63,8 @@ test("consumer installer rendering binds canonical versions and rejects malforme
   for (const value of [toolchain.node, toolchain.npm, toolchain.copilotCli, toolchain.minimumVscode])
     assert.ok(rendered.includes(value));
   assert.throws(() => renderConsumerInstaller(template, { ...toolchain, node: "latest; unsafe" }), /Invalid installer/);
+  for (const minimumVscode of ["01.140.0", "1.140.00"])
+    assert.throws(() => renderConsumerInstaller(template, { ...toolchain, minimumVscode }), /Invalid installer/);
   assert.throws(() => renderConsumerInstaller(`${template}\n__APEX_NODE_VERSION__`, toolchain), /occur once/);
   const result = bash("require_host() { exit 91; }; main --version 1.2.3 --install --yes");
   assert.equal(result.status, 2);

@@ -529,7 +529,7 @@ function findSecret(value, trail = []) {
 }
 
 function releaseVersion(value) {
-  const match = typeof value === "string" ? /^(\d+)\.(\d+)\.(\d+)$/u.exec(value) : null;
+  const match = typeof value === "string" ? /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/u.exec(value) : null;
   return match === null ? undefined : match.slice(1).map(Number);
 }
 

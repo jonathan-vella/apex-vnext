@@ -468,6 +468,43 @@ test("CLI Node minimum compares complete stable versions", () => {
   assert.equal(meetsMinimumVersion("invalid", MINIMUM_NODE_VERSION), false);
 });
 
+test("doctor requires the canonical VS Code minimum only when VS Code is installed", async () => {
+  const toolchain = JSON.parse(
+    await readFile(join(import.meta.dirname, "../../../../config/toolchain.v1.json"), "utf8"),
+  ) as { compatibilitySet: { minimumVscode: string } };
+  assert.equal(toolchain.compatibilitySet.minimumVscode, "1.140.0");
+  const vscode = async (installed: boolean, output: string, exitCode = 0) => {
+    const calls: ProcessRequest[] = [];
+    const service = new ApexService(await tempRoot(), {
+      executableChecker: async (executable) => installed && executable === "code",
+      processRunner: {
+        run: async (request: ProcessRequest) => {
+          calls.push(request);
+          return { exitCode, signal: null, stdout: output, stderr: "", timedOut: false, outputTruncated: false };
+        },
+      },
+    });
+    const check = (await service.doctor()).checks.find(({ id }) => id === "vscode");
+    assert.ok(check);
+    assert.deepEqual(
+      calls.map(({ executable, args }) => [executable, ...args]),
+      installed ? [["code", "--version"]] : [],
+    );
+    return check;
+  };
+  for (const version of ["1.139.0", "1.139.1"]) {
+    const check = await vscode(true, `${version}\n${"a".repeat(40)}\nx64\n`);
+    assert.equal(check.ok, false, version);
+    assert.equal(check.value, version);
+    assert.match(check.remedy ?? "", /1\.140\.0 or newer/u);
+  }
+  for (const version of ["1.140.0", "1.141.0"])
+    assert.equal((await vscode(true, `${version}\n${"a".repeat(40)}\nx64\n`)).ok, true, version);
+  assert.equal((await vscode(true, "1.141.0\n", 1)).ok, false);
+  assert.equal((await vscode(true, "unparseable\n")).ok, false);
+  assert.equal((await vscode(false, "")).ok, true);
+});
+
 test("CLI renders concise human status and doctor output", () => {
   assert.equal(
     formatHumanResult(["status"], {

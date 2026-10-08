@@ -432,7 +432,7 @@ test("requires the VS Code 1.140 Copilot harness minimum in the toolchain", () =
     mutate((model) => {
       change(model.config["toolchain.v1.json"]);
     });
-  for (const version of ["1.139.0", "1.139.1", "1.140", "latest"]) {
+  for (const version of ["1.139.0", "1.139.1", "1.140", "01.140.0", "1.140.00", "latest"]) {
     const result = vscode((toolchain) => {
       toolchain.core.vscode.minimumSupportedVersion = version;
       toolchain.compatibilitySet.minimumVscode = version;

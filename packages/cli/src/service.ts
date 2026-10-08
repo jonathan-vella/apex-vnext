@@ -413,6 +413,8 @@ interface DoctorCheck {
   remedy?: string;
 }
 
+const RELEASE_VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/u;
+
 const DERIVED_DECISION_KEYS: ReadonlySet<string> = new Set([
   "projectId",
   "runId",
@@ -7090,6 +7092,7 @@ export class ApexService {
       },
       { id: "workspace", ok: await this.exists(this.root), value: this.root, remedy: "Restore the workspace root" },
       { id: "apex", ok: apexExists, value: join(this.root, ".apex"), remedy: "Run apex init" },
+      await this.vscodeCheck(),
     ];
     if (apexExists && (await this.workspaceHasNoProjects())) {
       checks.push(
@@ -10551,6 +10554,56 @@ export class ApexService {
     if (entry === undefined || bytes === undefined || sha256Bytes(bytes) !== entry.sha256)
       throw new ApexError("APEX_VALIDATION", "Bundled governance reference failed verification", EXIT_CODES.validation);
     return bytes;
+  }
+
+  private async bundledVscodeMinimum(): Promise<string | undefined> {
+    try {
+      const assets = await resolveBundledAssets();
+      const entry = assets.manifest.files.find(({ path }) => path === "config/toolchain.v1.json");
+      const bytes = entry === undefined ? undefined : await readBundledFile(assets.root, entry.path);
+      if (entry === undefined || bytes === undefined || sha256Bytes(bytes) !== entry.sha256) return undefined;
+      const minimum = (JSON.parse(bytes.toString("utf8")) as { compatibilitySet?: { minimumVscode?: unknown } })
+        .compatibilitySet?.minimumVscode;
+      return typeof minimum === "string" && RELEASE_VERSION.test(minimum) ? minimum : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  // VS Code is optional (Copilot CLI and the Copilot app do not need it), but an installed one must run the harness.
+  private async vscodeCheck(): Promise<DoctorCheck> {
+    const minimum = await this.bundledVscodeMinimum();
+    if (minimum === undefined)
+      return {
+        id: "vscode",
+        ok: false,
+        value: "bundled VS Code minimum unavailable",
+        remedy: "Reinstall the apex CLI package",
+      };
+    const remedy = `Update VS Code to ${minimum} or newer to use the Copilot harness`;
+    if (!(await this.executableChecker("code")))
+      return { id: "vscode", ok: true, value: `not found; ${minimum} or newer needed only for the VS Code harness` };
+    let version: string | undefined;
+    try {
+      const result = await this.processRunner.run({
+        executable: "code",
+        args: ["--version"],
+        cwd: this.root,
+        timeoutMs: 15_000,
+        maxOutputBytes: 4_096,
+      });
+      const first = result.stdout.split(/\r?\n/u)[0]?.trim() ?? "";
+      if (result.exitCode === 0 && !result.timedOut && !result.outputTruncated && RELEASE_VERSION.test(first))
+        version = first;
+    } catch {
+      version = undefined;
+    }
+    return {
+      id: "vscode",
+      ok: version !== undefined && meetsMinimumVersion(version, minimum),
+      value: version ?? "version unavailable from code --version",
+      remedy,
+    };
   }
 
   private async runtimeRootForRun(run: RunConfigV1): Promise<string> {
