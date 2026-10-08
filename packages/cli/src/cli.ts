@@ -459,6 +459,24 @@ export async function execute(argv: string[], root = process.cwd(), options: Ser
   const command = words.join(" ");
   if (command === "mcp serve") root = await realpath(await mcpWorkspaceRoot(root));
   const service = await createApexService(root, flags, command, options);
+  // State-changing commands share the workspace lock that repeat-guarded MCP calls hold.
+  if (UNSERIALIZED_COMMANDS.has(command)) return dispatch(service, command, flags, root, options);
+  return service.withWorkspaceWriteLock(() => dispatch(service, command, flags, root, options));
+}
+
+/**
+ * Commands that never write workspace state, not even by finishing a pending recovery, so they do not take the
+ * workspace lock: the long-lived MCP server and the reads that mirror the `read-only` MCP tools.
+ */
+const UNSERIALIZED_COMMANDS = new Set(["mcp serve", "version", "status", "project list"]);
+
+async function dispatch(
+  service: ApexService,
+  command: string,
+  flags: Flags,
+  root: string,
+  options: ServiceOptions,
+): Promise<unknown> {
   switch (command) {
     case "mcp serve": {
       const cache = new Map<string, ApexService>([[service.root, service]]);

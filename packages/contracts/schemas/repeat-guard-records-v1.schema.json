@@ -1,0 +1,76 @@
+{
+  "$id": "https://schemas.apexops.dev/repeat-guard-records-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "records": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "callHash": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "fingerprint": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "operation": {
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$",
+            "type": "string"
+          },
+          "recordedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "result": {
+            "maxLength": 65536,
+            "minLength": 2,
+            "type": "string"
+          },
+          "stateAfter": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "stateBefore": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "fingerprint",
+          "callHash",
+          "operation",
+          "stateBefore",
+          "stateAfter",
+          "recordedAt",
+          "expiresAt",
+          "result"
+        ],
+        "type": "object"
+      },
+      "maxItems": 16,
+      "type": "array"
+    },
+    "schemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "records"
+  ],
+  "type": "object"
+}

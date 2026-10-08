@@ -52,6 +52,7 @@ import {
   RequirementsV1Schema,
   RequirementsAmendmentV1Schema,
   RequirementsChangeProposalV1Schema,
+  RepeatGuardRecordsV1Schema,
   ReviewFindingsV1Schema,
   RuntimeBundleLockV1Schema,
   ScenarioV1Schema,
@@ -897,6 +898,33 @@ describe("Wave 1 contracts", () => {
     assert.ok(contractSchemas.length > 0);
     for (const schema of contractSchemas) {
       assert.match(schema.$id ?? "", /^https:\/\/schemas\.apexops\.dev\//);
+    }
+  });
+
+  it("validates strict bounded repeat-guard records", () => {
+    const record = {
+      fingerprint: hash,
+      callHash: otherHash,
+      operation: "stageArtifact",
+      stateBefore: null,
+      stateAfter: hash,
+      recordedAt: timestamp,
+      expiresAt: timestamp,
+      result: '{"staged":true}',
+    };
+    const file = { schemaVersion: CONTRACT_VERSION, records: [record, { ...record, stateBefore: otherHash }] };
+    assert.equal(Value.Check(RepeatGuardRecordsV1Schema, file), true);
+    assert.equal(contractMetadata[RepeatGuardRecordsV1Schema.$id!]?.sensitivity, "confidential");
+    for (const invalid of [
+      { ...file, unexpected: true },
+      { ...file, schemaVersion: "2.0.0" },
+      { ...file, records: [{ ...record, unexpected: true }] },
+      { ...file, records: [{ ...record, callHash: "not-a-hash" }] },
+      { ...file, records: [{ ...record, operation: "1bad" }] },
+      { ...file, records: [{ ...record, result: "x".repeat(65_537) }] },
+      { ...file, records: Array.from({ length: 17 }, () => record) },
+    ]) {
+      assert.equal(Value.Check(RepeatGuardRecordsV1Schema, invalid), false);
     }
   });
 

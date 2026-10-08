@@ -122,12 +122,15 @@ test("state transfer excludes local locks and refuses pending run mutations", as
   const source = await sourceState();
   const runPrefix = `projects/${source.projectId}/runs/${source.runId}`;
   const runRoot = join(source.root, ".apex", runPrefix);
+  await writeJson(join(runRoot, ".repeat-guard.json"), { version: 1, records: [] });
   const bundle = await createStateTransferBundle(
     source.root,
     { claimHash: source.claimHash, recipient: "ci", ttlMs: 1 },
     instant,
   );
+  assert(!bundle.files.some(({ path }) => path.endsWith("/.repeat-guard.json")));
   for (const name of [
+    ".repeat-guard.json",
     ".run-mutation.retired",
     ".run-mutation.pending-test",
     ".run-mutation.lock",

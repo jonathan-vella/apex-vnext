@@ -339,8 +339,9 @@ answers without relying on chat history.
   rubber-duck calls. Other built-in helpers are advisory and never produce kernel
   evidence, completion or approval. A managed `preToolUse` hook denies the APEX agent as a `task` target.
 - Agent files carry no `model`, `model-policy` or `reasoning-effort`; the user selects the session model.
-  State-changing MCP tools are safe to call twice with the same input, and every MCP tool takes an explicit workspace
-  path.
+  State-changing MCP tools are safe to call twice with the same input: while the run is unchanged, the kernel answers
+  an identical repeat with the original result, and convergent tools that change state outside the run reach the same
+  outcome. Every MCP tool takes an explicit workspace path.
 
 General-purpose delegation, `/fleet`, `/delegate` and plan mode are not part of managed workflows. Agents, skills,
 hooks, the MCP inventory and the plugin lifecycle are qualified per client. Qualify both environment profiles and COE
@@ -441,7 +442,8 @@ targets protocol `2026-07-28`, which all supported Copilot clients negotiate. Ac
 3. Publish output schemas, starting with intake, task context and bounded reads, reusing canonical contracts. Reject
    unexpected arguments and ambiguous staging forms before mutation. Test every registered tool's response shape.
 4. Describe side effects truthfully and supply behavior annotations without treating them as authorization. Do not
-   mark task issuance or terminal bookkeeping as read-only or retry-safe. Prefer a genuinely read-only status path.
+   mark task issuance or terminal bookkeeping as read-only or retry-safe; kernel repeat suppression is bounded by run
+   state and time, so it does not make them idempotent. Prefer a genuinely read-only status path.
 5. Bound requests and propagate cancellation at safe operation boundaries. Test disconnects, committed partial effects
    and recovery; a timeout must not imply rollback or permit blind mutation retries.
 6. Verify stdio cleanliness, `server/discover`, the negotiated `2026-07-28` version and exact-client behavior in each

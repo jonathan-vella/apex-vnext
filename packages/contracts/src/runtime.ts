@@ -328,7 +328,34 @@ export const EventV1Schema = Type.Object(
   { $id: "https://schemas.apexops.dev/event-v1.json", additionalProperties: false },
 );
 
+/** One stored result of a repeat-guarded call, answerable only while the run state equals `stateAfter`. */
+export const RepeatGuardRecordV1Schema = Type.Object(
+  {
+    fingerprint: Sha256Schema,
+    callHash: Sha256Schema,
+    operation: Type.String({ pattern: "^[A-Za-z][A-Za-z0-9_-]{0,63}$" }),
+    stateBefore: Type.Union([Sha256Schema, Type.Null()]),
+    stateAfter: Sha256Schema,
+    recordedAt: IsoDateTimeSchema,
+    expiresAt: IsoDateTimeSchema,
+    /** Serialized JSON object result, at most 64 KiB. */
+    result: Type.String({ minLength: 2, maxLength: 65_536 }),
+  },
+  { additionalProperties: false },
+);
+
+/** Machine-local, run-scoped repeat records (`.repeat-guard.json`); never transferred between machines. */
+export const RepeatGuardRecordsV1Schema = Type.Object(
+  {
+    schemaVersion: ContractVersionSchema,
+    records: Type.Array(RepeatGuardRecordV1Schema, { maxItems: 16 }),
+  },
+  { $id: "https://schemas.apexops.dev/repeat-guard-records-v1.json", additionalProperties: false },
+);
+
 export type RuntimeBundleLockV1 = Static<typeof RuntimeBundleLockV1Schema>;
+export type RepeatGuardRecordV1 = Static<typeof RepeatGuardRecordV1Schema>;
+export type RepeatGuardRecordsV1 = Static<typeof RepeatGuardRecordsV1Schema>;
 export type ProjectConfigV1 = Static<typeof ProjectConfigV1Schema>;
 export type GateRecordV1 = Static<typeof GateRecordV1Schema>;
 export type RunConfigV1 = Static<typeof RunConfigV1Schema>;
