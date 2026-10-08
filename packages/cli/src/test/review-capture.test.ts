@@ -416,3 +416,25 @@ test("the largest accepted review still fits the bounded nextTask result", async
   const envelope = Buffer.byteLength(JSON.stringify({ content: [{ type: "text", text }], structuredContent: next }));
   assert.ok(envelope <= MCP_MAX_SERIALIZED_RESULT_BYTES, `${envelope} bytes`);
 });
+
+test("a review task issued without a rubber-duck request is replaced by a fresh one", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  await service.init({ projectId: "demo", riskOwner: "partner" });
+  const issued = await nextTaskAfterInput(service);
+  if (issued.status !== "task") throw new Error("Expected requirements task");
+  await service.completeRequirements(issued.task.taskId, requirements());
+  // Simulate a review task issued by an earlier runtime, before review requests existed.
+  const internal = service as unknown as { prepareReviewRequest: () => Promise<undefined> };
+  const prepare = internal.prepareReviewRequest;
+  internal.prepareReviewRequest = async () => undefined;
+  const legacy = await reviewTask(service);
+  internal.prepareReviewRequest = prepare;
+  await assert.rejects(service.taskContext(legacy), /no issued rubber-duck request/u);
+  const fresh = await reviewTask(service);
+  assert.notEqual(fresh, legacy);
+  const { reviewRequest } = await service.taskContext(fresh);
+  assert.ok(reviewRequest?.nonce);
+  await captureReview(service, fresh, { findings: [] });
+  assert.ok((await service.completeReview(fresh)).outputHashes["review-findings"]);
+});

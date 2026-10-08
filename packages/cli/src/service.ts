@@ -2793,8 +2793,16 @@ export class ApexService {
     taskType: string,
   ): Promise<TaskEnvelopeV1 | undefined> {
     const last = events.at(-1);
-    const payload = last?.payload as { taskId?: unknown; taskType?: unknown } | undefined;
+    const payload = last?.payload as
+      { taskId?: unknown; taskType?: unknown; review?: { requestHash?: unknown } } | undefined;
     if (last?.type !== "task.issued" || payload?.taskType !== taskType || typeof payload.taskId !== "string")
+      return undefined;
+    // A review task without a rubber-duck request binding (issued by an earlier runtime) can never complete; issue a
+    // fresh task with its own request instead of returning it.
+    if (
+      TASKS.find(({ id }) => id === taskType)?.reviewSubject !== undefined &&
+      typeof payload.review?.requestHash !== "string"
+    )
       return undefined;
     const task = await this.readTask(run, payload.taskId);
     return task.expectedHead === last.hash &&
