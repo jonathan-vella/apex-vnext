@@ -314,7 +314,7 @@ test("wizard configures a real empty workspace without asking or inventing proje
     assert.doesNotMatch(questions.join("\n"), /Project ID|Environment \[|target scope|IaC track/i);
     assert.deepEqual(await new ApexService(root).listProjects(), []);
     await assert.rejects(readFile(join(root, ".apex/config.json")), { code: "ENOENT" });
-    assert.equal((await new ApexService(root).doctor()).healthy, true);
+    assert.equal((await new ApexService(root, { executableChecker: async () => false }).doctor()).healthy, true);
   }
 });
 

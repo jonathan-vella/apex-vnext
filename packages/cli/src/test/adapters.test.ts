@@ -682,7 +682,7 @@ test("governance setup CLI reads only bounded GitHub evidence and never mutates 
 
 test("workspace installation leaves first project creation to APEX", async () => {
   const root = await tempRoot();
-  const service = new ApexService(root);
+  const service = new ApexService(root, { executableChecker: async () => false });
   const installed = await service.initializeWorkspace({ clientId: "github-copilot-cli" });
   assert.deepEqual(installed, { workspaceReady: true, projectCreated: false });
   assert.deepEqual(await service.listProjects(), []);
