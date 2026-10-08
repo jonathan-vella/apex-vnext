@@ -69,6 +69,21 @@ test("consumer installer rendering binds canonical versions and rejects malforme
   assert.match(result.stderr, /generated release installer/);
 });
 
+test("rendered consumer installer requires the VS Code 1.140 Copilot harness minimum", () => {
+  const toolchain = JSON.parse(readFileSync("config/toolchain.v1.json", "utf8"));
+  assert.equal(toolchain.compatibilitySet.minimumVscode, "1.140.0");
+  assert.equal(toolchain.core.vscode.minimumSupportedVersion, toolchain.compatibilitySet.minimumVscode);
+  const rendered = renderConsumerInstaller(readFileSync(script, "utf8"), toolchain.compatibilitySet);
+  const compatible = (version) =>
+    spawnSync("bash", ["-c", `source <(printf '%s' "$RENDERED_INSTALLER"); compatible code '${version}'`], {
+      encoding: "utf8",
+      env: { ...process.env, RENDERED_INSTALLER: rendered },
+      timeout: 10_000,
+    }).status;
+  for (const version of ["1.138.0", "1.139.0", "1.139.1", "1.139.99"]) assert.equal(compatible(version), 1, version);
+  for (const version of ["1.140.0", "1.140.1", "1.141.0", "2.0.0"]) assert.equal(compatible(version), 0, version);
+});
+
 test("consumer installer refuses unapproved system changes and unowned local binaries", () => {
   const system = bash("system=false; sudo() { exit 91; }; system_packages git");
   assert.equal(system.status, 1);
