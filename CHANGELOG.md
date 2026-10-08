@@ -17,7 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `npm run validate:skills` now validates the shipped skills in `customizations/.github/skills/` as well as the
   repository authoring skills, requires every shipped skill to declare `user-invocable`, keeps skills loaded by the
   APEX agent, its workers or `apex-next` routing model-loadable, and records pre-existing errors in a shrink-only
-  baseline (`tools/registry/skill-validation-baseline.json`). Stale allowlist and baseline entries now fail.
+  baseline (`tools/registry/skill-validation-baseline.json`). Stale allowlist and baseline entries, and entries
+  missing from the baseline at the merge base, now fail.
 - `apex init` writes a thin workspace projection: `.github/copilot/settings.json` enabling `apex@apex-plugins`,
   instructions, the governance workflow and scripts, and `.apex/`. Agents, skills and MCP servers come from the
   `apex` plugin; `apex update` and `apex doctor --fix --yes` retire unedited workspace copies and report edited ones.

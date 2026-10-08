@@ -9,8 +9,9 @@
  *
  * Pre-existing error findings are suppressed only by explicit, dated entries in
  * `tools/registry/skill-validation-baseline.json`. The baseline is shrink-only:
- * an entry whose violation no longer occurs, or that names an unknown root,
- * skill or rule, fails validation. Warnings are never baselined.
+ * an entry whose violation no longer occurs, that names an unknown root, skill
+ * or rule, or that is absent from the baseline at the merge base with the
+ * target branch fails validation. Warnings are never baselined.
  *
  * @example
  * node tools/scripts/validate-skills.mjs
@@ -18,7 +19,9 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 import process from "node:process";
+import { load as loadYaml } from "js-yaml";
 import { getAgents, getSkills, getInstructions } from "./_lib/workspace-index.mjs";
 import { getRawFrontmatter } from "./_lib/parse-frontmatter.mjs";
 import { loadValidator } from "./_lib/ajv-validator.mjs";
@@ -55,6 +58,7 @@ export const RULES = {
   "skill-size-with-references": { severity: "warn", roots: ALL_ROOTS, baselinable: false },
   "skill-reference-orphaned": { severity: "warn", roots: ALL_ROOTS, baselinable: false },
   "skill-redirect-missing-target": { severity: "error", roots: ALL_ROOTS, baselinable: true },
+  "skill-frontmatter-yaml": { severity: "error", roots: SHIPPED_ONLY, baselinable: true },
   "skill-user-invocable-explicit": { severity: "error", roots: SHIPPED_ONLY, baselinable: true },
   "skill-model-invocation-routed": { severity: "error", roots: SHIPPED_ONLY, baselinable: true },
   "instruction-reference-orphaned": { severity: "warn", roots: REPOSITORY, baselinable: false },
@@ -62,6 +66,9 @@ export const RULES = {
   "config-stale-entry": { severity: "error", roots: REPOSITORY, baselinable: false },
   "baseline-invalid": { severity: "error", roots: REPOSITORY, baselinable: false },
   "baseline-entry-unused": { severity: "error", roots: REPOSITORY, baselinable: false },
+  "baseline-entry-added": { severity: "error", roots: REPOSITORY, baselinable: false },
+  // Downgraded to a warning outside GitHub Actions.
+  "baseline-base-unavailable": { severity: "error", roots: REPOSITORY, baselinable: false },
 };
 
 const FORBIDDEN_FRONTMATTER_PATTERNS = [
@@ -122,10 +129,6 @@ function finding(rule, root, skill, message, file) {
   const result = { rule, severity: RULES[rule].severity, root, skill, message };
   if (file) result.file = file;
   return result;
-}
-
-function isTrue(value) {
-  return value === true || value === "true";
 }
 
 function listSkillJsonFiles(skill) {
@@ -374,14 +377,28 @@ export function collectModelLoadedSkills({ agents, skills, routerSkill = ROUTER_
 
 /**
  * Shipped-only invocation consistency (maintainer decision 2026-10-07): every
- * shipped skill declares `user-invocable` explicitly, and skills loaded by the
- * APEX agent, its workers or `apex-next` routing stay model-loadable.
+ * shipped skill declares `user-invocable` explicitly as a YAML boolean, and
+ * skills loaded by the APEX agent, its workers or `apex-next` routing stay
+ * model-loadable. Fields are read with a YAML parser (as the plugin build
+ * does), so inline comments and quoting are interpreted correctly.
  */
 export function checkInvocation(rootId, skills, modelLoadedSkills) {
   const findings = [];
   for (const [skillName, skill] of skills) {
-    const frontmatter = skill.frontmatter;
-    if (!frontmatter) continue;
+    if (!skill.frontmatter) continue;
+    let frontmatter;
+    try {
+      frontmatter = loadYaml(getRawFrontmatter(skill.content));
+    } catch (error) {
+      findings.push(
+        finding("skill-frontmatter-yaml", rootId, skillName, `frontmatter is not valid YAML: ${error.reason ?? error}`),
+      );
+      continue;
+    }
+    if (frontmatter === null || typeof frontmatter !== "object" || Array.isArray(frontmatter)) {
+      findings.push(finding("skill-frontmatter-yaml", rootId, skillName, "frontmatter must be a YAML mapping"));
+      continue;
+    }
     if (!Object.hasOwn(frontmatter, "user-invocable")) {
       findings.push(
         finding(
@@ -391,17 +408,17 @@ export function checkInvocation(rootId, skills, modelLoadedSkills) {
           "frontmatter must declare 'user-invocable' explicitly (true or false)",
         ),
       );
-    } else if (![true, false, "true", "false"].includes(frontmatter["user-invocable"])) {
+    } else if (typeof frontmatter["user-invocable"] !== "boolean") {
       findings.push(
         finding(
           "skill-user-invocable-explicit",
           rootId,
           skillName,
-          `'user-invocable' must be true or false (got "${frontmatter["user-invocable"]}")`,
+          `'user-invocable' must be a YAML boolean (got ${JSON.stringify(frontmatter["user-invocable"])})`,
         ),
       );
     }
-    if (modelLoadedSkills.has(skillName) && isTrue(frontmatter["disable-model-invocation"])) {
+    if (modelLoadedSkills.has(skillName) && frontmatter["disable-model-invocation"] === true) {
       findings.push(
         finding(
           "skill-model-invocation-routed",
@@ -557,10 +574,13 @@ const baselineKey = (root, skill, rule) => `${root}\u0000${skill}\u0000${rule}`;
 /**
  * Applies the shrink-only baseline. Matching error findings are marked
  * `baselined`; invalid, stale or unused entries become non-baselinable errors.
+ * When `baseBaseline` (the baseline at the trusted base revision) is given,
+ * entries absent from it are rejected and suppress nothing, so the baseline
+ * cannot grow.
  *
  * @returns {{ findings: object[], entries: object[] }}
  */
-export function applyBaseline({ findings, baseline, validateSchema, skillNamesByRoot }) {
+export function applyBaseline({ findings, baseline, validateSchema, skillNamesByRoot, baseBaseline }) {
   const problems = [];
   const invalid = (message) => problems.push(finding("baseline-invalid", "repository", null, message));
 
@@ -571,6 +591,9 @@ export function applyBaseline({ findings, baseline, validateSchema, skillNamesBy
     return { findings: [...findings, ...problems], entries: [] };
   }
 
+  const baseEntryKeys = Array.isArray(baseBaseline?.entries)
+    ? new Set(baseBaseline.entries.map((entry) => baselineKey(entry.root, entry.skill, entry.rule)))
+    : null;
   const entries = new Map();
   for (const entry of baseline.entries) {
     const label = `${entry.root}/${entry.skill} [${entry.rule}]`;
@@ -594,6 +617,17 @@ export function applyBaseline({ findings, baseline, validateSchema, skillNamesBy
     }
     if (!rule.baselinable || !rule.roots.includes(entry.root)) {
       invalid(`baseline entry ${label}: rule "${entry.rule}" cannot be baselined for the ${entry.root} root`);
+      continue;
+    }
+    if (baseEntryKeys && !baseEntryKeys.has(key)) {
+      problems.push(
+        finding(
+          "baseline-entry-added",
+          "repository",
+          null,
+          `baseline entry ${label} is not in the baseline at the base revision; the baseline is shrink-only — fix the violation instead`,
+        ),
+      );
       continue;
     }
     entries.set(key, { entry, used: false });
@@ -641,6 +675,7 @@ export function runSkillValidation({
   agents,
   instructions,
   baseline,
+  baseBaseline,
   validateSchema,
   nonSkillRedirects = NON_SKILL_REDIRECTS,
   retiredSkills = RETIRED_SKILLS,
@@ -670,7 +705,46 @@ export function runSkillValidation({
   }
   findings.push(...checkRetiredSkillConfig(retiredSkills, skillNamesByRoot), ...repositoryFindings);
 
-  return applyBaseline({ findings, baseline, validateSchema, skillNamesByRoot });
+  return applyBaseline({ findings, baseline, baseBaseline, validateSchema, skillNamesByRoot });
+}
+
+function runGit(args) {
+  return execFileSync("git", args, { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
+}
+
+/**
+ * Reads the baseline at the trusted base revision: the merge base of HEAD and
+ * `SKILL_BASELINE_BASE_REF`, `origin/$GITHUB_BASE_REF` or `origin/main`.
+ * Returns `baseBaseline: null` when the baseline does not exist there yet
+ * (the change that introduces it). An unreachable base fails in CI and warns
+ * locally.
+ *
+ * @returns {{ baseBaseline: object | null, revision: string | null, findings: object[] }}
+ */
+export function loadBaseBaseline({ env = process.env, git = runGit } = {}) {
+  const ref = env.SKILL_BASELINE_BASE_REF || (env.GITHUB_BASE_REF ? `origin/${env.GITHUB_BASE_REF}` : "origin/main");
+  let revision;
+  try {
+    revision = git(["merge-base", "HEAD", ref]).trim();
+  } catch {
+    const item = finding(
+      "baseline-base-unavailable",
+      "repository",
+      null,
+      `cannot resolve the merge base with ${ref}; baseline growth was not checked (set SKILL_BASELINE_BASE_REF or fetch ${ref})`,
+    );
+    return {
+      baseBaseline: null,
+      revision: null,
+      findings: [env.GITHUB_ACTIONS === "true" ? item : { ...item, severity: "warn" }],
+    };
+  }
+  try {
+    git(["cat-file", "-e", `${revision}:${BASELINE_PATH}`]);
+  } catch {
+    return { baseBaseline: null, revision, findings: [] };
+  }
+  return { baseBaseline: JSON.parse(git(["show", `${revision}:${BASELINE_PATH}`])), revision, findings: [] };
 }
 
 /** Loads repository inputs relative to the current working directory. */
@@ -686,13 +760,21 @@ export function loadRepositoryInputs() {
   const missingRoots = roots
     .filter((root) => !fs.existsSync(root.dir))
     .map((root) => finding("config-stale-entry", "repository", null, `skill root "${root.dir}" does not exist`));
+  const base = loadBaseBaseline();
   return {
     roots,
     agents,
     instructions,
     baseline: JSON.parse(fs.readFileSync(BASELINE_PATH, "utf-8")),
+    baseBaseline: base.baseBaseline,
+    baseRevision: base.revision,
     validateSchema: loadValidator(BASELINE_SCHEMA_PATH),
-    repositoryFindings: [...missingRoots, ...checkInstructionReferences(searchableContent), ...scanRetiredReferences()],
+    repositoryFindings: [
+      ...missingRoots,
+      ...base.findings,
+      ...checkInstructionReferences(searchableContent),
+      ...scanRetiredReferences(),
+    ],
   };
 }
 
@@ -760,6 +842,13 @@ function main() {
   const ruleCounts = Object.entries(byRule).map(([rule, count]) => `${rule} ×${count}`);
   console.log(`\n═══ baseline — ${BASELINE_PATH} ═══`);
   console.log(`  entries: ${entries.length}${ruleCounts.length ? ` (${ruleCounts.join(", ")})` : ""}`);
+  if (inputs.baseRevision) {
+    console.log(
+      inputs.baseBaseline
+        ? `  growth check: compared with the baseline at ${inputs.baseRevision.slice(0, 12)}`
+        : `  growth check: no baseline at ${inputs.baseRevision.slice(0, 12)} yet (introducing change)`,
+    );
+  }
 
   console.log("\n═══ summary ═══");
   for (const row of summary) {

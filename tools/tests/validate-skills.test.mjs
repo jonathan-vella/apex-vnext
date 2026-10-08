@@ -11,6 +11,7 @@ import {
   collectModelLoadedSkills,
   findRetiredReferences,
   hasBlockingErrors,
+  loadBaseBaseline,
   loadRepositoryInputs,
   runSkillValidation,
 } from "../scripts/validate-skills.mjs";
@@ -111,6 +112,31 @@ test("routed skills reject disable-model-invocation: true; other skills may set 
   assert.deepEqual(rules(findings), ["skill-model-invocation-routed:apex-workflow"]);
 });
 
+test("invocation fields are read as YAML, so inline comments and quoting are interpreted", () => {
+  const { findings } = run({
+    shipped: new Map([
+      skill("apex-next", `${description}\nuser-invocable: true`, { body: "Route `apex-workflow` tasks.\n" }),
+      skill(
+        "apex-workflow",
+        `${description}\nuser-invocable: false # hidden\ndisable-model-invocation: true # manual-only`,
+      ),
+      skill("apex-quoted", `${description}\nuser-invocable: "true"`),
+      skill("apex-commented", `${description}\nuser-invocable: false # hidden stage skill`),
+    ]),
+  });
+  assert.deepEqual(rules(findings).sort(), [
+    "skill-model-invocation-routed:apex-workflow",
+    "skill-user-invocable-explicit:apex-quoted",
+  ]);
+});
+
+test("invalid shipped frontmatter YAML is reported", () => {
+  const { findings } = run({
+    shipped: shippedSkills([skill("apex-broken", `${description}\nuser-invocable: [true`)]),
+  });
+  assert.deepEqual(rules(findings), ["skill-frontmatter-yaml:apex-broken"]);
+});
+
 test("model-loaded skills come from shipped agent paths and apex-next routing", () => {
   const skills = shippedSkills([skill("apex-unrouted", description)]);
   const loaded = collectModelLoadedSkills({ agents: agentsMap(), skills });
@@ -191,6 +217,76 @@ test("a baseline entry that is no longer needed fails", () => {
   assert.deepEqual(rules(findings), ["baseline-entry-unused:null"]);
   assert.match(findings[0].message, /shrink-only/);
   assert.equal(hasBlockingErrors(findings), true);
+});
+
+test("a new violation and its baseline entry added together fail", () => {
+  const baseBaseline = emptyBaseline([entry("apex-missing", "skill-user-invocable-explicit")]);
+  const { findings, entries } = run({
+    shipped: shippedSkills([skill("apex-missing", description), skill("apex-new", description)]),
+    baseline: emptyBaseline([
+      entry("apex-missing", "skill-user-invocable-explicit"),
+      entry("apex-new", "skill-user-invocable-explicit"),
+    ]),
+    baseBaseline,
+  });
+  assert.deepEqual(
+    entries.map((item) => item.skill),
+    ["apex-missing"],
+  );
+  const blocking = findings.filter((item) => item.severity === "error" && !item.baselined);
+  assert.deepEqual(rules(blocking).sort(), ["baseline-entry-added:null", "skill-user-invocable-explicit:apex-new"]);
+  assert.equal(hasBlockingErrors(findings), true);
+
+  const shrunk = run({
+    shipped: shippedSkills([skill("apex-missing", description)]),
+    baseline: emptyBaseline([entry("apex-missing", "skill-user-invocable-explicit")]),
+    baseBaseline: emptyBaseline([
+      entry("apex-missing", "skill-user-invocable-explicit"),
+      entry("apex-workflow", "skill-user-invocable-explicit"),
+    ]),
+  });
+  assert.equal(hasBlockingErrors(shrunk.findings), false);
+});
+
+test("the base baseline comes from the merge base and fails closed in CI", () => {
+  const baseline = emptyBaseline([entry("apex-missing", "skill-user-invocable-explicit")]);
+  const calls = [];
+  const found = loadBaseBaseline({
+    env: { GITHUB_BASE_REF: "main" },
+    git: (args) => {
+      calls.push(args.join(" "));
+      if (args[0] === "merge-base") return "abc123\n";
+      return args[0] === "show" ? JSON.stringify(baseline) : "";
+    },
+  });
+  assert.deepEqual(calls, [
+    "merge-base HEAD origin/main",
+    "cat-file -e abc123:tools/registry/skill-validation-baseline.json",
+    "show abc123:tools/registry/skill-validation-baseline.json",
+  ]);
+  assert.deepEqual(found.baseBaseline, baseline);
+  assert.deepEqual(found.findings, []);
+
+  const introducing = loadBaseBaseline({
+    env: { SKILL_BASELINE_BASE_REF: "upstream/main" },
+    git: (args) => {
+      if (args[0] === "merge-base") return "def456\n";
+      throw new Error("missing");
+    },
+  });
+  assert.equal(introducing.baseBaseline, null);
+  assert.equal(introducing.revision, "def456");
+
+  const unreachable = (env) =>
+    loadBaseBaseline({
+      env,
+      git: () => {
+        throw new Error("no ref");
+      },
+    }).findings[0];
+  assert.equal(unreachable({ GITHUB_ACTIONS: "true" }).severity, "error");
+  assert.equal(unreachable({}).severity, "warn");
+  assert.equal(unreachable({}).rule, "baseline-base-unavailable");
 });
 
 test("baseline entries for unknown skills, roots, rules or non-baselinable rules fail", () => {
