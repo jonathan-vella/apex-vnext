@@ -218,14 +218,11 @@ test("a guarded call aimed at another served workspace is refused while one has 
   const call = (name: string, args: Record<string, unknown>) =>
     client.callTool({ name, arguments: { workspace: other.root, ...args } });
   assert.notEqual((await call("status", {})).isError, true, "the other workspace is served and readable");
-  for (const [name, args] of [
-    ["projectDelete", { projectId: "other", confirm: true }],
-    ["gateDecide", { gate: 1, decision: "approved", confirm: true }],
-  ] as const) {
-    const response = await call(name, args);
-    assert.equal(response.isError, true, name);
-    assert.equal((response.structuredContent as { error: { code: string } }).error.code, "APEX_REVIEW_PENDING", name);
-  }
+  // Every guarded tool, including recordInput, is refused there; submitEvidence names a task of that workspace.
+  const otherTask = await nextTaskAfterInput(other);
+  if (otherTask.status !== "task") throw new Error("Expected a task in the other workspace");
+  for (const tool of guardedTools)
+    assert.equal(mcpCode(await call(tool, invocations[tool].mcp(otherTask.task.taskId))), "APEX_REVIEW_PENDING", tool);
   // Without the shared peers, the other workspace's own scan finds nothing; with them, the error names the workspace.
   assert.notEqual(await outcome(other.deleteProject("missing" as never, true)), "APEX_REVIEW_PENDING");
   other.setReviewGuardPeers(() => [reviewed, other]);
