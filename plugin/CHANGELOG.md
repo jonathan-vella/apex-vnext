@@ -10,6 +10,8 @@ When you prepare a release, rename `## [Unreleased]` to the new version.
 
 ## [Unreleased]
 
+## [0.11.0-next.0] - 2026-10-08
+
 First marketplace release of APEX as one Agent Plugins 1.0 plugin.
 
 - The APEX agent, hidden workers (CodeGen and Validator) and skills from the managed customizations. Agents are rendered

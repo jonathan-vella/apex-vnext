@@ -1,6 +1,6 @@
 {
   "name": "@apexops/contracts",
-  "version": "0.10.0-next.5",
+  "version": "0.11.0-next.0",
   "description": "Versioned persisted and published contracts for APEX vNext",
   "license": "MIT",
   "repository": {

@@ -12,6 +12,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0-next.0] — Preview
+
+First preview of the client pivot (DECISION-031 to DECISION-035). APEX now ships as one Agent Plugins 1.0 plugin,
+`apex@apex-plugins`, for the VS Code Copilot harness and the GitHub Copilot app on Windows 11 and for Copilot CLI on
+Linux and WSL2. The plugin carries one APEX agent with hidden CodeGen and Validator workers, the managed skills and
+hooks, the `apex` MCP server on the MCP TypeScript SDK v2 (protocol `2026-07-28`) bundled with this CLI, and the
+`apex-azure-pricing` server. Built-in rubber-duck reviews, captured in the kernel journal, replace the APEX Reviewer.
+`apex init` writes a thin workspace projection. State-changing MCP tools are repeat-safe, and the MCP server binds to
+the workspace runtime version. Plugin and CLI versions move in lockstep; see `plugin/CHANGELOG.md`.
+
 ### Changed
 
 - `apex doctor` checks the client prerequisites of its host. On native Windows it requires VS Code 1.140 or later

@@ -131,7 +131,7 @@ const delay = (milliseconds) => new Promise((resolvePromise) => setTimeout(resol
 test("npm pack results accept array and workspace-keyed formats", () => {
   const entry = {
     name: "@apexops/contracts",
-    filename: "apexops-contracts-0.10.0-next.5.tgz",
+    filename: "apexops-contracts-0.11.0-next.0.tgz",
     files: [{ path: "package.json" }],
   };
   for (const result of [[entry], { [entry.name]: entry }]) {
@@ -555,7 +555,7 @@ test("packs and clean-installs the vNext runtime reproducibly", { timeout: 240_0
   const version = JSON.parse((await runInTest(apexBin, ["version", "--json"], project)).stdout);
   assert.deepEqual(version, {
     ok: true,
-    result: { version: "0.10.0-next.5", bundleVersion: "0.10.0-next.5", configVersion: "1.0.0" },
+    result: { version: "0.11.0-next.0", bundleVersion: "0.11.0-next.0", configVersion: "1.0.0" },
   });
   await runInTest("git", ["init", "--initial-branch", "qualification"], project);
   await runInTest(
