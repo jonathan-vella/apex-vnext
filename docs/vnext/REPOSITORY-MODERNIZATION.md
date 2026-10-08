@@ -123,9 +123,10 @@ root with `main.tf`, continues through all roots, returns nonzero for any failed
 `TF_DATA_DIR` so stale local provider caches cannot influence results.
 
 Run locks preserve live local owners even after TTL expiry. Only expired locks whose local owner is confirmed dead
-are reclaimed automatically; unknown-host owners fail closed. Complete generations retire atomically into permanent
-local tombstones so delayed contenders cannot remove a replacement lock. These tombstones are excluded from state
-transfer and retained for concurrency safety; automatic tombstone garbage collection is not implemented.
+are reclaimed automatically; unknown-host owners fail closed. Reclaimed generations retire atomically into permanent
+local tombstones so delayed contenders cannot remove a replacement lock; a contender re-confirms the generation after
+its liveness check, so generations released by their live owner need no tombstone and are deleted after release.
+Tombstones and released leftovers are excluded from state transfer; tombstones accumulate only per crashed lock owner.
 State transfer rejects active locks and pending transactions rather than exporting incomplete mutation state.
 
 ## Checkpoint

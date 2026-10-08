@@ -102,17 +102,12 @@ test("run repository reclaims an expired dead-owner generation into a permanent 
     else assert.match(String(result.reason), /Run mutation is already in progress/u);
   }
   await assert.rejects(readFile(lockPath), (error: unknown) => (error as NodeJS.ErrnoException).code === "ENOENT");
+  // Released generations are deleted; only the reclaimed dead-owner generation stays as a permanent tombstone.
   const tombstones = await readdir(join(directory, ".run-mutation.retired"));
-  assert.equal(tombstones.length, results.filter(({ status }) => status === "fulfilled").length + 1);
+  assert.equal(tombstones.length, 1);
   assert.equal(
-    (
-      await Promise.all(
-        tombstones.map(async (name) =>
-          JSON.parse(await readFile(join(directory, ".run-mutation.retired", name, "metadata.json"), "utf8")),
-        ),
-      )
-    ).some(({ token }) => token === "expired-lock"),
-    true,
+    JSON.parse(await readFile(join(directory, ".run-mutation.retired", tombstones[0]!, "metadata.json"), "utf8")).token,
+    "expired-lock",
   );
 });
 
@@ -494,4 +489,179 @@ test("a busy run mutation lock is reported as a conflict only when another workt
     repository.acquireWriterLease({ workspacePath: "/workspace/main", sessionId: "session-a" }),
     RunMutationBusyError,
   );
+});
+
+async function lockEntries(directory: string): Promise<{ top: string[]; retired: string[] }> {
+  const top = (await readdir(directory)).filter((name) => name.startsWith(".run-mutation"));
+  const retired = await readdir(join(directory, ".run-mutation.retired")).catch((error: unknown) => {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+    throw error;
+  });
+  return { top, retired };
+}
+
+async function mutateOnce(repository: RunRepository, eventId: string, expectedRunHash?: string) {
+  return repository.mutate({
+    expectedRunHash: expectedRunHash ?? (await repository.hash()),
+    event: {
+      eventId,
+      projectId: "demo",
+      runId: "run-1",
+      type: "owner-changed",
+      timestamp: "2026-01-01T00:01:00.000Z",
+      ownerEpoch: 1,
+      payload: { eventId },
+    },
+    update: (run) => run,
+  });
+}
+
+async function withReleasedLockRemovalFailure<T>(
+  code: string,
+  failures: number,
+  action: () => Promise<T>,
+): Promise<{ result: T; injected: number }> {
+  const promises = fs.promises as unknown as { rm: typeof fs.promises.rm };
+  const original = promises.rm;
+  let remaining = failures;
+  let injected = 0;
+  promises.rm = (async (path: fs.PathLike, options?: fs.RmOptions) => {
+    if (remaining > 0 && /[\\/]released-[^\\/]+$/u.test(String(path))) {
+      remaining -= 1;
+      injected += 1;
+      throw Object.assign(new Error(`${code}: injected`), { code });
+    }
+    return await original(path, options);
+  }) as typeof original;
+  syncBuiltinESMExports();
+  try {
+    return { result: await action(), injected };
+  } finally {
+    promises.rm = original;
+    syncBuiltinESMExports();
+  }
+}
+
+test("repeated run mutations leave a bounded number of lock entries", async () => {
+  const now = { value: new Date("2026-01-01T00:00:00.000Z") };
+  const { directory } = await writerLeaseFixture(now);
+  const repository = new RunRepository(directory, { clock: () => now.value, platform: "linux" });
+  const windows = new RunRepository(directory, { clock: () => now.value, platform: "win32" });
+  for (let index = 0; index < 25; index += 1) {
+    await mutateOnce(index % 2 === 0 ? repository : windows, `event-${index}`);
+    await repository.read();
+    assert.deepEqual(await lockEntries(directory), { top: [".run-mutation.retired"], retired: [] });
+  }
+  assert.equal((await repository.journal.replay()).length, 25);
+});
+
+test("two repositories contending on one run keep CAS semantics and leave no released generations", async () => {
+  const now = { value: new Date("2026-01-01T00:00:00.000Z") };
+  const { directory } = await writerLeaseFixture(now);
+  const left = new RunRepository(directory, { clock: () => now.value });
+  const right = new RunRepository(directory, { clock: () => now.value });
+  let fulfilled = 0;
+  for (let round = 0; round < 10; round += 1) {
+    const results = await Promise.allSettled([
+      mutateOnce(left, `left-${round}`),
+      mutateOnce(right, `right-${round}`),
+      left.read(),
+      right.read(),
+    ]);
+    for (const [index, result] of results.entries()) {
+      if (result.status === "rejected")
+        assert.match(String(result.reason), /Run mutation is already in progress|Stale run hash/u);
+      else if (index < 2) fulfilled += 1;
+    }
+  }
+  // Contention may reject every racing call in a round; uncontended calls from both repositories still succeed.
+  await mutateOnce(left, "left-final");
+  await mutateOnce(right, "right-final");
+  assert.equal((await left.journal.replay()).length, fulfilled + 2);
+  assert.deepEqual(await lockEntries(directory), { top: [".run-mutation.retired"], retired: [] });
+});
+
+test("a failed released-lock cleanup never fails the mutation and is swept by the next one", async () => {
+  const now = { value: new Date("2026-01-01T00:00:00.000Z") };
+  const { directory } = await writerLeaseFixture(now);
+  const linux = new RunRepository(directory, { clock: () => now.value, platform: "linux" });
+  const windows = new RunRepository(directory, { clock: () => now.value, platform: "win32" });
+  let sequence = 0;
+  const expectLeftover = async (repository: RunRepository, code: string, failures: number, injected: number) => {
+    const expectedRunHash = await repository.hash();
+    const outcome = await withReleasedLockRemovalFailure(code, failures, () =>
+      mutateOnce(repository, `event-${(sequence += 1)}`, expectedRunHash),
+    );
+    assert.equal(outcome.injected, injected);
+    const { retired } = await lockEntries(directory);
+    assert.equal(retired.length, 1);
+    assert.match(retired[0]!, /^released-/u);
+    await mutateOnce(linux, `event-${(sequence += 1)}`);
+    assert.deepEqual(await lockEntries(directory), { top: [".run-mutation.retired"], retired: [] });
+  };
+  // Off Windows a removal failure is not retried; the next mutation's sweep removes the leftover.
+  await expectLeftover(linux, "EPERM", 1, 1);
+  // A non-transient failure is not retried on Windows either.
+  await expectLeftover(windows, "EIO", 1, 1);
+  // Persistent Windows sharing violations exhaust the bounded retry and are left for the next sweep.
+  await expectLeftover(windows, "EBUSY", 100, 5);
+  // Brief Windows sharing violations are retried within the same release.
+  for (const code of ["EPERM", "EACCES", "EBUSY", "ENOTEMPTY"]) {
+    const expectedRunHash = await windows.hash();
+    const outcome = await withReleasedLockRemovalFailure(code, 2, () =>
+      mutateOnce(windows, `event-${(sequence += 1)}`, expectedRunHash),
+    );
+    assert.equal(outcome.injected, 2);
+    assert.deepEqual(await lockEntries(directory), { top: [".run-mutation.retired"], retired: [] });
+  }
+  assert.equal((await linux.journal.replay()).length, sequence);
+});
+
+test("a delayed stale-lock contender cannot retire a replacement generation", async () => {
+  const now = { value: new Date("2026-01-01T00:00:00.000Z") };
+  const { directory, repository } = await writerLeaseFixture(now);
+  const lockPath = join(directory, ".run-mutation.lock");
+  const deadPid = 2_147_483_647;
+  await mkdir(lockPath);
+  await writeFile(
+    join(lockPath, "metadata.json"),
+    JSON.stringify({
+      token: "expired-lock",
+      pid: deadPid,
+      host: hostname(),
+      createdAt: "2025-12-31T23:58:00.000Z",
+      expiresAt: "2025-12-31T23:59:00.000Z",
+    }),
+  );
+  const originalKill = process.kill;
+  let swapped = false;
+  // Between the contender's snapshot and its liveness check, the old owner releases (without a tombstone) and exits,
+  // and another process publishes a replacement generation.
+  process.kill = ((pid: number, signal?: string | number) => {
+    if (pid !== deadPid) return originalKill.call(process, pid, signal);
+    if (!swapped) {
+      swapped = true;
+      fs.rmSync(lockPath, { recursive: true });
+      fs.mkdirSync(lockPath);
+      fs.writeFileSync(
+        join(lockPath, "metadata.json"),
+        JSON.stringify({
+          token: "replacement",
+          pid: process.pid,
+          host: hostname(),
+          createdAt: "2026-01-01T00:00:00.000Z",
+          expiresAt: "2026-01-01T00:00:30.000Z",
+        }),
+      );
+    }
+    throw Object.assign(new Error("ESRCH: injected"), { code: "ESRCH" });
+  }) as typeof process.kill;
+  try {
+    await assert.rejects(repository.read(), RunMutationBusyError);
+  } finally {
+    process.kill = originalKill;
+  }
+  assert.equal(swapped, true);
+  assert.equal(JSON.parse(await readFile(join(lockPath, "metadata.json"), "utf8")).token, "replacement");
+  assert.deepEqual((await lockEntries(directory)).retired, []);
 });

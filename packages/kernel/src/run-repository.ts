@@ -1,6 +1,6 @@
 import type { RunConfigV1 } from "@apexops/contracts";
 import { constants, realpathSync } from "node:fs";
-import { lstat, mkdir, mkdtemp, open, readFile, rm } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, open, readFile, readdir, rm } from "node:fs/promises";
 import { hostname } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { canonicalJsonBytes, sha256Bytes, sha256Json, type JsonValue } from "./canonical.js";
@@ -105,6 +105,11 @@ const MAX_WRITER_LEASE_BYTES = 64 * 1024;
 const WRITER_LEASE_LOCK_WAIT_MS = 10_000;
 const WRITER_LEASE_LOCK_RETRY_MS = 10;
 const TRANSIENT_LOCK_RENAME_CODES = new Set(["EPERM", "EACCES", "EBUSY"]);
+// Released generations are parked under the retired-lock root with this prefix and deleted; every other entry there
+// is a permanent takeover tombstone named by its recovery id.
+const RELEASED_LOCK_PREFIX = "released-";
+const RELEASED_LOCK_REMOVE_ATTEMPTS = 5;
+const TRANSIENT_LOCK_REMOVE_CODES = new Set(["EPERM", "EACCES", "EBUSY", "ENOTEMPTY"]);
 
 function lockExpiry(value: unknown): number | undefined {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return undefined;
@@ -405,23 +410,24 @@ export class RunRepository {
           const current = await this.readLock();
           if (current === undefined) continue;
           if (current.expiresAt <= this.clock().getTime() && !this.ownerMayBeAlive(current.metadata)) {
-            if (await this.retireLock(current.recoveryId)) continue;
+            if (await this.retireStaleLock(current)) continue;
           }
         }
         if (await this.readLock().then((current) => current?.metadata.token === token)) break;
         throw new RunMutationBusyError();
       }
-      if (!(await this.retireLock(existing.recoveryId))) throw new RunMutationBusyError();
+      if (!(await this.retireStaleLock(existing))) throw new RunMutationBusyError();
     }
     try {
       return await operation();
     } finally {
       try {
         const current = await this.readLock();
-        if (current?.metadata.token === token) await this.retireLock(current.recoveryId);
+        if (current?.metadata.token === token) await this.releaseLock();
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
       }
+      await this.sweepReleasedLocks();
     }
   }
 
@@ -581,12 +587,26 @@ export class RunRepository {
     }
   }
 
+  /**
+   * Take over an expired generation whose local owner was confirmed dead after `snapshot` was read. Re-reading the lock
+   * after that liveness check is what lets released generations skip tombstones: a generation still present after its
+   * owner died can no longer be released by that owner, so it can only leave the lock path through another takeover,
+   * which leaves the permanent tombstone that makes this rename fail instead of retiring a replacement generation.
+   */
+  private async retireStaleLock(snapshot: MutationLockSnapshot): Promise<boolean> {
+    const confirmed = await this.readLock();
+    if (confirmed?.recoveryId !== snapshot.recoveryId) return false;
+    return this.retireLock(snapshot.recoveryId);
+  }
+
+  /**
+   * Retire a taken-over generation into a permanent tombstone named by its recovery id. Rename is not compare-and-swap,
+   * so the tombstone is the guard: a delayed contender that confirmed the same generation renames onto the existing
+   * non-empty tombstone and fails rather than moving a replacement lock. Tombstones are therefore never swept; they
+   * accumulate only once per crashed lock owner, not per mutation.
+   */
   private async retireLock(recoveryId: string): Promise<boolean> {
-    await mkdir(this.retiredLockPath, { recursive: true, mode: 0o700 });
-    const retiredRoot = await lstat(this.retiredLockPath);
-    if (!retiredRoot.isDirectory() || retiredRoot.isSymbolicLink()) {
-      throw new Error("Run mutation retired-lock directory is unsafe");
-    }
+    await this.ensureRetiredRoot();
     try {
       await renameWithRetry(this.lockPath, join(this.retiredLockPath, recoveryId));
       return true;
@@ -594,6 +614,62 @@ export class RunRepository {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
       if (["EEXIST", "ENOTEMPTY"].includes((error as NodeJS.ErrnoException).code ?? "")) return false;
       throw error;
+    }
+  }
+
+  /**
+   * Release a generation this process owns. While the owner is alive no contender can take its generation over (see
+   * `retireStaleLock`), so the rename moves exactly this generation and needs no tombstone: it is parked under a fresh
+   * unique name and deleted by `sweepReleasedLocks`.
+   */
+  private async releaseLock(): Promise<void> {
+    await this.ensureRetiredRoot();
+    await renameWithRetry(this.lockPath, join(this.retiredLockPath, `${RELEASED_LOCK_PREFIX}${crypto.randomUUID()}`));
+  }
+
+  private async ensureRetiredRoot(): Promise<void> {
+    await mkdir(this.retiredLockPath, { recursive: true, mode: 0o700 });
+    const retiredRoot = await lstat(this.retiredLockPath);
+    if (!retiredRoot.isDirectory() || retiredRoot.isSymbolicLink()) {
+      throw new Error("Run mutation retired-lock directory is unsafe");
+    }
+  }
+
+  /**
+   * Best-effort deletion of every released generation, including ones left by earlier cleanup failures or crashes
+   * between release and deletion. Any process may delete any released entry at any time: each has a unique name that
+   * only its releasing owner ever renames to, and nothing reads, renames, or locks through it afterwards. Takeover
+   * tombstones, the live lock, and other processes' `.pending-` staging directories are never touched. Failures never
+   * fail the caller; Windows sharing violations (for example a contender's metadata handle still open) are retried
+   * briefly and otherwise left for the next sweep.
+   */
+  private async sweepReleasedLocks(): Promise<void> {
+    let entries;
+    try {
+      const retiredRoot = await lstat(this.retiredLockPath);
+      if (!retiredRoot.isDirectory() || retiredRoot.isSymbolicLink()) return;
+      entries = await readdir(this.retiredLockPath, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (entry.isDirectory() && entry.name.startsWith(RELEASED_LOCK_PREFIX)) {
+        await this.removeReleasedLock(join(this.retiredLockPath, entry.name));
+      }
+    }
+  }
+
+  private async removeReleasedLock(path: string): Promise<void> {
+    const attempts = this.platform === "win32" ? RELEASED_LOCK_REMOVE_ATTEMPTS : 1;
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        await rm(path, { recursive: true, force: true });
+        return;
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code ?? "";
+        if (attempt >= attempts || !TRANSIENT_LOCK_REMOVE_CODES.has(code)) return;
+        await sleep(10 * 2 ** (attempt - 1));
+      }
     }
   }
 }
