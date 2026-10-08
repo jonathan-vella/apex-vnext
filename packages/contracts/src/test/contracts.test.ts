@@ -746,7 +746,7 @@ describe("Wave 1 contracts", () => {
       schemaVersion: "1.0.0",
       config: { schemaVersion: "1.0.0", projectId: "demo" },
       configHash: "a".repeat(64),
-      runtimeVersion: "0.10.0-next.5",
+      runtimeVersion: "0.11.0-next.0",
       scope: "local-bootstrap-preflight-v1",
       status: "pending",
       checks: ["repository", "workspace-runtime", "apex-state"].map((id) => ({

@@ -525,7 +525,7 @@ test("asset generator refuses a source root replaced before pinning completes", 
 
 test("asset generator rejects inconsistent bundle declarations", () => {
   const customization = {
-    version: "0.10.0-next.5",
+    version: "0.11.0-next.0",
     bundle: {
       id: "apex-managed-workspace",
       authority: "npm:@apexops/cli",
@@ -536,10 +536,10 @@ test("asset generator rejects inconsistent bundle declarations", () => {
   };
   const runtime = {
     schemaVersion: "1.0.0",
-    bundleVersion: "0.10.0-next.5",
+    bundleVersion: "0.11.0-next.0",
     components: {
       customizationBundle: {
-        version: "0.10.0-next.5",
+        version: "0.11.0-next.0",
         manifest: "@apexops/cli/assets/customizations/manifest.json",
         assetManifest: "@apexops/cli/assets/manifest.json",
         compositionId: "apex-managed-workspace",
