@@ -22,4 +22,4 @@
 
 Route capacity gaps to an authorized planning or quota-request path. This skill
 does not submit an increase, select a subscription, or promise allocation; an
-approved increase is delivered through `apex deploy` (Gate 4) or the pipeline.
+approved increase is delivered through `apex deploy` (Gate 4) or the approved pipeline.

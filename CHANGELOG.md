@@ -64,8 +64,11 @@ the workspace runtime version. Plugin and CLI versions move in lockstep; see `pl
   and cost tool limits. The skills keep their upstream Azure CLI and azd guidance in new references (quota, role,
   storage, Resource Graph, Key Vault, azqr, remediation, cost, policy, `az ad`, Microsoft Graph Bicep and Learn CLI
   commands). Read and diagnostic commands may run directly; every command that changes Azure is marked
-  `# Changes Azure` and routed through `apex preview`, Gate 4 and `apex deploy`, or through the generated GitHub
-  Actions pipeline. `tools/registry/skill-upstream-pins.v1.json` records the upstream commit and adaptations per skill.
+  `# Changes Azure` and routed through `apex preview`, Gate 4 and `apex deploy`, or through the approved GitHub Actions
+  pipeline, which runs only the preview that local Gate 4 bound to its CI recipient. APEX never runs `azd up`:
+  `azd provision` and `azd deploy` are separate Gate 4 operations, and `azd pipeline config` runs only after its own
+  preview and Gate 4 decision. `tools/registry/skill-upstream-pins.v1.json` records the upstream commit and adaptations
+  per skill.
 - `npm run validate:skills` now validates the shipped skills in `customizations/.github/skills/` as well as the
   repository authoring skills, requires every shipped skill to declare `user-invocable`, keeps skills loaded by the
   APEX agent, its workers or `apex-next` routing model-loadable, and records pre-existing errors in a shrink-only

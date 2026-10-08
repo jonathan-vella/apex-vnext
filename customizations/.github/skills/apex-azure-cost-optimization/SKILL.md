@@ -66,10 +66,11 @@ blocker for findings that need it, never permission to estimate from memory.
   `az monitor metrics list`, `az redis list|show`, azqr scans, and the Cost Management Query API through
   `az rest --method post` as a fallback) may run directly against the approved scope. Their output is an observation;
   a finding still carries a labeled evidence class.
-- **Commands that change Azure** (deletes, resizes, stops, tier or SKU changes, purchases, budgets) are never run by the
-  agent. They reach Azure through `apex preview`, Gate 4 and `apex deploy` (Bicep, Terraform or the azd track for
-  labs), or through the generated GitHub Actions pipeline (`azd pipeline config`, OIDC federated credentials, run
-  evidence returned through `apex/submitEvidence`).
+- **Commands that change Azure** (deletes, resizes, stops, tier or SKU changes, purchases, budgets) are never run by
+  the agent. They reach Azure only through `apex preview`, a Gate 4 decision and `apex deploy` (Bicep, Terraform, or
+  `azd provision` and `azd deploy` for labs), or through the approved GitHub Actions workflow, which runs only the
+  preview that local Gate 4 bound to its CI recipient. Production CI apply stays blocked until recipient-bound
+  transport is qualified.
 
 Prerequisites for the CLI path: `az login` for the intended tenant, the `costmanagement` and `resource-graph`
 extensions, azqr for orphan discovery, and Cost Management Reader, Monitoring Reader and Reader on the scope.

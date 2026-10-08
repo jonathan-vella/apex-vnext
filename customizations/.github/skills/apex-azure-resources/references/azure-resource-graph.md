@@ -48,7 +48,7 @@ Lookup constraints:
 - Scope every query with `--subscriptions`; `--first` limits rows, not authorization scope.
 - Never use ARG for real-time monitoring; the index lags behind changes.
 - ARG cannot change resources. Any remediation it suggests changes Azure and routes through `apex deploy` (Gate 4) or
-  the generated pipeline.
+  the approved pipeline.
 
 | Error | Cause | Fix |
 | --- | --- | --- |

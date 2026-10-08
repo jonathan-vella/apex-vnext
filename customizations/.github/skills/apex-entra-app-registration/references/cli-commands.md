@@ -10,10 +10,10 @@ Reference for managing Microsoft Entra app registrations with the Azure CLI, por
 | --- | --- | --- |
 | Local client setup | `az version`, `az login`, `az account set` | Directly; changes only the local CLI |
 | Read and diagnostic | `az ad app list`, `az ad app show`, `az ad app credential list`, `az ad app permission list`, `az ad app owner list`, `az ad sp list`, `az ad sp show`, `az ad user show`, `az ad user list`, `az ad signed-in-user show`, `az account show` | Directly, for the intended tenant. Never print credential values, tokens or `--debug` output |
-| Changes Entra ID | `az ad app create`, `az ad app update`, `az ad app delete`, `az ad app credential reset`, `az ad app credential delete`, `az ad app permission add`, `az ad app permission admin-consent`, `az ad app permission delete`, `az ad sp create`, `az ad sp delete`, `az ad app owner add`, `az ad app owner remove` | Never by the agent. The registration ships as Microsoft Graph Bicep through `apex preview`, Gate 4 and `apex deploy` (see [Graph Bicep example](graph-bicep-example.md)), or as a step in the generated GitHub Actions pipeline. Admin consent stays an authorized owner's decision |
+| Changes Entra ID | `az ad app create`, `az ad app update`, `az ad app delete`, `az ad app credential reset`, `az ad app credential delete`, `az ad app permission add`, `az ad app permission admin-consent`, `az ad app permission delete`, `az ad sp create`, `az ad sp delete`, `az ad app owner add`, `az ad app owner remove` | Never by the agent. The registration ships as Microsoft Graph Bicep through `apex preview`, Gate 4 and `apex deploy` (see [Graph Bicep example](graph-bicep-example.md)), or through the approved GitHub Actions pipeline, which runs only the preview that local Gate 4 bound to its CI recipient (production CI apply stays blocked until that transport is qualified). Admin consent stays an authorized owner's decision |
 
 Read output is an observation; identity design still cites accepted capability receipts. Commands that change Entra ID
-are marked `# Changes Azure`; the CLI forms document the operation and are the shape of a pipeline step.
+are marked `# Changes Azure`; the CLI forms document the operation and the shape of an approved pipeline step.
 
 ## Prerequisites
 
@@ -35,14 +35,14 @@ az account set --subscription "<subscription-name-or-id>"
 **Basic app registration:**
 
 ```bash
-# Changes Azure: route through apex deploy (Gate 4) or the pipeline. Never run directly.
+# Changes Azure: route through apex deploy (Gate 4) or the approved pipeline. Never run directly.
 az ad app create --display-name "MyApplication"
 ```
 
 **Web application with redirect URI:**
 
 ```bash
-# Changes Azure: route through apex deploy (Gate 4) or the pipeline. Never run directly.
+# Changes Azure: route through apex deploy (Gate 4) or the approved pipeline. Never run directly.
 az ad app create \
   --display-name "MyWebApp" \
   --web-redirect-uris "https://myapp.com/callback" \
@@ -52,7 +52,7 @@ az ad app create \
 **Single Page Application (SPA):**
 
 ```bash
-# Changes Azure: route through apex deploy (Gate 4) or the pipeline. Never run directly.
+# Changes Azure: route through apex deploy (Gate 4) or the approved pipeline. Never run directly.
 az ad app create \
   --display-name "MySpaApp" \
   --spa-redirect-uris "http://localhost:3000" \
@@ -62,7 +62,7 @@ az ad app create \
 **Public client (Desktop/Mobile app):**
 
 ```bash
-# Changes Azure: route through apex deploy (Gate 4) or the pipeline. Never run directly.
+# Changes Azure: route through apex deploy (Gate 4) or the approved pipeline. Never run directly.
 az ad app create \
   --display-name "MyDesktopApp" \
   --public-client-redirect-uris "http://localhost" \
@@ -72,7 +72,7 @@ az ad app create \
 **Multi-tenant application:**
 
 ```bash
-# Changes Azure: route through apex deploy (Gate 4) or the pipeline. Never run directly.
+# Changes Azure: route through apex deploy (Gate 4) or the approved pipeline. Never run directly.
 az ad app create \
   --display-name "MyMultiTenantApp" \
   --web-redirect-uris "https://myapp.com/callback" \
@@ -137,7 +137,7 @@ echo "Object ID: $OBJECT_ID"
 **Web app:**
 
 ```bash
-# Changes Azure: route through apex deploy (Gate 4) or the pipeline. Never run directly.
+# Changes Azure: route through apex deploy (Gate 4) or the approved pipeline. Never run directly.
 az ad app update --id $APP_ID \
   --web-redirect-uris "https://myapp.com/callback" "https://myapp.com/auth"
 ```
@@ -145,7 +145,7 @@ az ad app update --id $APP_ID \
 **SPA:**
 
 ```bash
-# Changes Azure: route through apex deploy (Gate 4) or the pipeline. Never run directly.
+# Changes Azure: route through apex deploy (Gate 4) or the approved pipeline. Never run directly.
 az ad app update --id $APP_ID \
   --spa-redirect-uris "http://localhost:3000" "http://localhost:5000"
 ```
@@ -153,7 +153,7 @@ az ad app update --id $APP_ID \
 **Public client:**
 
 ```bash
-# Changes Azure: route through apex deploy (Gate 4) or the pipeline. Never run directly.
+# Changes Azure: route through apex deploy (Gate 4) or the approved pipeline. Never run directly.
 az ad app update --id $APP_ID \
   --public-client-redirect-uris "http://localhost" "myapp://auth"
 ```
@@ -163,12 +163,13 @@ az ad app update --id $APP_ID \
 ### Create client secret
 
 Require explicit approval for the intended tenant, application ID, credential type and expiry. Prefer federated identity
-or certificates when supported. The agent never runs this command and never sees the value. Upstream frames it as a
-user-run private-terminal operation; in APEX it runs only as a reviewed step of the generated pipeline that stores the
-value directly in Key Vault, or as that user-run operation outside APEX when no pipeline exists:
+or certificates; they avoid this command entirely. The agent never runs it and never sees the value. Upstream frames it
+as a user-run private-terminal operation; APEX does not use that path. In APEX it runs only as a reviewed step of the
+approved pipeline that stores the value directly in Key Vault, after its own Gate 4 decision, and is unavailable while
+production CI apply is blocked:
 
 ```bash
-# Changes Azure: route through apex deploy (Gate 4) or the pipeline. Never run directly.
+# Changes Azure: route through apex deploy (Gate 4) or the approved pipeline. Never run directly.
 az ad app credential reset --id "$APP_ID" --append --years 1
 ```
 
@@ -200,7 +201,7 @@ az ad app credential list --id "$APP_ID" --cert --query "[].{keyId:keyId,display
 az ad app credential list --id "$APP_ID" --query "[].{KeyId:keyId,Name:displayName}" -o table
 
 # Delete specific credential
-# Changes Azure: route through apex deploy (Gate 4) or the pipeline. Never run directly.
+# Changes Azure: route through apex deploy (Gate 4) or the approved pipeline. Never run directly.
 az ad app credential delete --id "$APP_ID" --key-id "APPROVED_OLD_KEY_ID"
 ```
 
@@ -210,7 +211,7 @@ approved key ID. Never delete by display name or retire credentials before consu
 ### Upload certificate
 
 ```bash
-# Changes Azure: route through apex deploy (Gate 4) or the pipeline. Never run directly.
+# Changes Azure: route through apex deploy (Gate 4) or the approved pipeline. Never run directly.
 # Upload certificate from file
 az ad app credential reset --id "$APP_ID" --append --cert "@path/to/public-cert.pem" --output none
 ```
@@ -228,7 +229,7 @@ outside the repository and tool output; preserve existing credentials during val
 GRAPH_RESOURCE_ID="00000003-0000-0000-c000-000000000000"  # Microsoft Graph
 USER_READ_ID="e1fe6dd8-ba31-4d61-89e7-88639da4683d"      # User.Read permission
 
-# Changes Azure: route through apex deploy (Gate 4) or the pipeline. Never run directly.
+# Changes Azure: route through apex deploy (Gate 4) or the approved pipeline. Never run directly.
 az ad app permission add --id $APP_ID \
   --api $GRAPH_RESOURCE_ID \
   --api-permissions "$USER_READ_ID=Scope"
@@ -239,7 +240,7 @@ az ad app permission add --id $APP_ID \
 ```bash
 MAIL_READ_ID="570282fd-fa5c-430d-a7fd-fc8dc98a9dca"      # Mail.Read permission
 
-# Changes Azure: route through apex deploy (Gate 4) or the pipeline. Never run directly.
+# Changes Azure: route through apex deploy (Gate 4) or the approved pipeline. Never run directly.
 az ad app permission add --id $APP_ID \
   --api $GRAPH_RESOURCE_ID \
   --api-permissions "$MAIL_READ_ID=Scope"
@@ -250,7 +251,7 @@ az ad app permission add --id $APP_ID \
 ```bash
 USER_READ_ALL_ID="df021288-bdef-4463-88db-98f22de89214"  # User.Read.All application permission
 
-# Changes Azure: route through apex deploy (Gate 4) or the pipeline. Never run directly.
+# Changes Azure: route through apex deploy (Gate 4) or the approved pipeline. Never run directly.
 az ad app permission add --id $APP_ID \
   --api $GRAPH_RESOURCE_ID \
   --api-permissions "$USER_READ_ALL_ID=Role"
@@ -275,7 +276,7 @@ az ad app permission add --id $APP_ID \
 ### Grant admin consent
 
 ```bash
-# Changes Azure: route through apex deploy (Gate 4) or the pipeline. Never run directly.
+# Changes Azure: route through apex deploy (Gate 4) or the approved pipeline. Never run directly.
 # Grant admin consent for all permissions
 az ad app permission admin-consent --id $APP_ID
 ```
@@ -291,7 +292,7 @@ az ad app permission list --id $APP_ID
 ### Delete permission
 
 ```bash
-# Changes Azure: route through apex deploy (Gate 4) or the pipeline. Never run directly.
+# Changes Azure: route through apex deploy (Gate 4) or the approved pipeline. Never run directly.
 # Remove specific permission
 az ad app permission delete --id $APP_ID \
   --api $GRAPH_RESOURCE_ID \
@@ -303,7 +304,7 @@ az ad app permission delete --id $APP_ID \
 ### Create service principal
 
 ```bash
-# Changes Azure: route through apex deploy (Gate 4) or the pipeline. Never run directly.
+# Changes Azure: route through apex deploy (Gate 4) or the approved pipeline. Never run directly.
 # Create service principal for the app
 az ad sp create --id $APP_ID
 ```
@@ -323,7 +324,7 @@ az ad sp show --id $APP_ID
 ### Delete service principal
 
 ```bash
-# Changes Azure: route through apex deploy (Gate 4) or the pipeline. Never run directly.
+# Changes Azure: route through apex deploy (Gate 4) or the approved pipeline. Never run directly.
 az ad sp delete --id $APP_ID
 ```
 
@@ -354,21 +355,21 @@ az ad app owner list --id $APP_ID
 ```bash
 # Add user as owner
 USER_OBJECT_ID=$(az ad user show --id "user@domain.com" --query "id" -o tsv)
-# Changes Azure: route through apex deploy (Gate 4) or the pipeline. Never run directly.
+# Changes Azure: route through apex deploy (Gate 4) or the approved pipeline. Never run directly.
 az ad app owner add --id $APP_ID --owner-object-id $USER_OBJECT_ID
 ```
 
 ### Remove owner
 
 ```bash
-# Changes Azure: route through apex deploy (Gate 4) or the pipeline. Never run directly.
+# Changes Azure: route through apex deploy (Gate 4) or the approved pipeline. Never run directly.
 az ad app owner remove --id $APP_ID --owner-object-id $USER_OBJECT_ID
 ```
 
 ## Delete App Registration
 
 ```bash
-# Changes Azure: route through apex deploy (Gate 4) or the pipeline. Never run directly.
+# Changes Azure: route through apex deploy (Gate 4) or the approved pipeline. Never run directly.
 # Delete app registration (and associated service principal)
 az ad app delete --id $APP_ID
 ```
@@ -411,7 +412,7 @@ az ad user list --output table
 
 ```bash
 #!/bin/bash
-# Changes Azure: route through apex deploy (Gate 4) or the pipeline. Never run directly.
+# Changes Azure: route through apex deploy (Gate 4) or the approved pipeline. Never run directly.
 
 # Variables
 APP_NAME="MyApplication"
@@ -455,7 +456,7 @@ routed path, never by the agent. Deleted registrations can be restored for 30 da
 
 ```bash
 #!/bin/bash
-# Changes Azure: route through apex deploy (Gate 4) or the pipeline. Never run directly.
+# Changes Azure: route through apex deploy (Gate 4) or the approved pipeline. Never run directly.
 set -euo pipefail
 PREFIX="${1:?Usage: cleanup.sh <display-name-prefix> [--confirm]}"
 FILTER="startswith(displayName,'${PREFIX//\'/\'\'}')"

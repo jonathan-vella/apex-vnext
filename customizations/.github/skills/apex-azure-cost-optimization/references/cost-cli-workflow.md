@@ -11,7 +11,7 @@ listings) and serves as a fallback when a required tool operation is unavailable
 | --- | --- | --- |
 | Local client setup | `az extension add --name costmanagement`, `az extension add --name resource-graph`, `az login` | Directly; changes only the local CLI |
 | Read and diagnostic | `az account show`, `az account list`, `az resource list`, `az graph query`, `az monitor metrics list`, `az redis list`, `az redis show`, azqr scans, `az rest --method post` to the Cost Management Query API | Directly, against the approved scope. The Cost Management query is a POST but only reads |
-| Changes Azure | Deletes, resizes, stops, tier or SKU changes, reservation or savings plan purchases, budgets | Never by the agent. Delivered through `apex preview`, Gate 4 and `apex deploy`, or through the generated GitHub Actions pipeline |
+| Changes Azure | Deletes, resizes, stops, tier or SKU changes, reservation or savings plan purchases, budgets | Never by the agent. Delivered through `apex preview`, Gate 4 and `apex deploy`, or through the approved GitHub Actions pipeline, which runs only the preview that local Gate 4 bound to its CI recipient (production CI apply stays blocked until that transport is qualified) |
 
 Read output is an observation. A finding still cites labeled evidence (see
 [cost tool guardrails](cost-tool-guardrails.md#evidence-labels)), and an opportunity is never an approved action.
@@ -70,7 +70,7 @@ az redis show --name <cache-name> --resource-group <rg-name> --subscription <sub
 ```
 
 Redis mutation commands belong only in a separately approved remediation plan routed through `apex deploy` (Gate 4) or
-the pipeline, never in an assessment.
+the approved pipeline, never in an assessment.
 
 ## Step 2: Orphan Discovery With azqr
 
@@ -207,7 +207,7 @@ The assessment output the task stages carries:
   savings with its method.
 - Monthly and annual estimated savings.
 - Implementation as routed changes: each opportunity names the IaC or pipeline change that would deliver it through
-  `apex deploy` (Gate 4) or the pipeline, never a command for the agent to run.
+  `apex deploy` (Gate 4) or the approved pipeline, never a command for the agent to run.
 - The data sources: cost query and response, pricing queries and meters, and applicable free allowances.
 
 Portal link format:
@@ -232,8 +232,8 @@ root, pre-existing files or evidence automatically.
 
 ## Safety
 
-- Every delete, resize, stop, tier change or purchase changes Azure and needs explicit approval through Gate 4 or the
-  pipeline; the agent never runs it.
+- Every delete, resize, stop, tier change or purchase changes Azure. It needs a local Gate 4 decision and runs only
+  through `apex deploy` or the approved pipeline; the agent never runs it.
 - Test changes in non-production first.
 - Provide dry-run or `what-if` previews (read-only) for review.
 - Include rollback procedures and monitor impact after the routed change.

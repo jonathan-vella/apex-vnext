@@ -51,11 +51,12 @@ requirements.
   may run directly against the approved account with `--auth-mode login`. Their output is an observation; storage
   decisions still cite accepted evidence from `apex/taskContext`. A download also writes a local file and needs
   separate authorization for the exact blob and path.
-- **Commands that change Azure** (uploads, account, container, tier, lifecycle, network or redundancy changes, deletes)
-  are never run by the agent. Configuration reaches Azure through `apex preview`, Gate 4 and `apex deploy` (Bicep,
-  Terraform or the azd track for labs); data writes run as steps of the generated GitHub Actions pipeline (`azd
-  pipeline config`, OIDC federated credentials, run evidence returned through `apex/submitEvidence`). The reference
-  marks these commands with `# Changes Azure`.
+- **Commands that change Azure** (uploads, account, container, tier, lifecycle, network or redundancy changes,
+  deletes) are never run by the agent. Configuration ships as IaC and data writes as reviewed workflow steps; both
+  reach Azure only through `apex preview`, a Gate 4 decision and `apex deploy` (Bicep, Terraform, or `azd provision`
+  and `azd deploy` for labs), or through the approved GitHub Actions workflow, which runs only the preview that local
+  Gate 4 bound to its CI recipient. Production CI apply stays blocked until recipient-bound transport is qualified.
+  The reference marks these commands with `# Changes Azure`.
 
 ## Boundaries
 

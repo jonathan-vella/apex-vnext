@@ -59,11 +59,12 @@ task state, evidence freshness, authorization, artifact acceptance, and all stat
   output is an observation; identity design still cites accepted capability receipts. Never print credential values or
   tokens.
 - **Commands that change Entra ID** (creating, updating or deleting registrations and service principals, credentials,
-  permissions, admin consent, owners) are never run by the agent. The registration ships as Microsoft Graph Bicep
-  through `apex preview`, Gate 4 and `apex deploy` (Bicep, Terraform or the azd track for labs), or through the
-  generated GitHub Actions pipeline (`azd pipeline config`, OIDC federated credentials, run evidence returned through
-  `apex/submitEvidence`). Admin consent stays an authorized owner's decision. References mark these commands with
-  `# Changes Azure`.
+  permissions, admin consent, owners) are never run by the agent. The registration ships as Microsoft Graph Bicep and
+  reaches Entra ID only through `apex preview`, a Gate 4 decision and `apex deploy` (Bicep, Terraform, or `azd
+  provision` and `azd deploy` for labs), or through the approved GitHub Actions workflow, which runs only the preview
+  that local Gate 4 bound to its CI recipient. Production CI apply stays blocked until recipient-bound transport is
+  qualified. Admin consent stays an authorized owner's decision. References mark these commands with `# Changes
+  Azure`.
 
 ## Boundaries
 

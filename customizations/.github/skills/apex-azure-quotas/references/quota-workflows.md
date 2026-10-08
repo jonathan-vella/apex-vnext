@@ -68,10 +68,10 @@ done
 Use this when current quota is insufficient for the planned deployment. The agent records the shortfall, proposes the
 scope, quota name, new limit and buffer, and stops. The increase changes the subscription, so it is never run by the
 agent: the human approves it and it is delivered through `apex preview`, Gate 4 and `apex deploy` as a reviewed
-`Microsoft.Quota/quotas` change, or as a step in the generated GitHub Actions pipeline.
+`Microsoft.Quota/quotas` change, or through the approved GitHub Actions pipeline.
 
 ```bash
-# Changes Azure: route through apex deploy (Gate 4) or the pipeline. Never run directly.
+# Changes Azure: route through apex deploy (Gate 4) or the approved pipeline. Never run directly.
 az quota update \
   --resource-name standardDSv3Family \
   --scope /subscriptions/<subscription-id>/providers/Microsoft.Compute/locations/<region> \

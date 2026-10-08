@@ -39,6 +39,6 @@ indefinitely or to add a second broader assignment.
 ## Delivery Constraint
 
 Role assignment changes must be represented through the selected IaC binding and approved deployment workflow
-(`apex deploy` after Gate 4, or the generated pipeline). The `az role` commands and IaC shapes in
+(`apex deploy` after Gate 4, or the approved pipeline). The `az role` commands and IaC shapes in
 [role CLI commands and delivery shapes](role-cli-and-iac.md) document the operation; the agent never runs a command that
 creates a role or an assignment. Never put credential material in the advisory output.

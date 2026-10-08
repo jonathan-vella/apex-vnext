@@ -492,9 +492,9 @@
           "source": "references/azqr-remediation-patterns.md",
           "disposition": "adapt",
           "targets": ["references/remediation-patterns.md"],
-          "reason": "Restores the upstream Azure CLI guidance under DECISION-035: read commands run directly; commands that change Azure route through apex deploy (Gate 4) or the pipeline.",
+          "reason": "Restores the upstream Azure CLI guidance under DECISION-035: read commands run directly; commands that change Azure route through apex deploy (Gate 4) or the approved pipeline.",
           "replacementProof": "Shipped reference classifies every command as read/diagnostic or routed, and marks each command that changes Azure.",
-          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the pipeline.",
+          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the approved pipeline.",
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
@@ -510,18 +510,18 @@
           "source": "references/azure-quick-review.md",
           "disposition": "adapt",
           "targets": ["references/azure-quick-review.md"],
-          "reason": "Restores the upstream Azure CLI guidance under DECISION-035: read commands run directly; commands that change Azure route through apex deploy (Gate 4) or the pipeline.",
+          "reason": "Restores the upstream Azure CLI guidance under DECISION-035: read commands run directly; commands that change Azure route through apex deploy (Gate 4) or the approved pipeline.",
           "replacementProof": "Shipped reference classifies every command as read/diagnostic or routed, and marks each command that changes Azure.",
-          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the pipeline.",
+          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the approved pipeline.",
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/azure-resource-graph.md",
           "disposition": "adapt",
           "targets": ["references/azure-resource-graph.md"],
-          "reason": "Restores the upstream Azure CLI guidance under DECISION-035: read commands run directly; commands that change Azure route through apex deploy (Gate 4) or the pipeline.",
+          "reason": "Restores the upstream Azure CLI guidance under DECISION-035: read commands run directly; commands that change Azure route through apex deploy (Gate 4) or the approved pipeline.",
           "replacementProof": "Shipped reference classifies every command as read/diagnostic or routed, and marks each command that changes Azure.",
-          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the pipeline.",
+          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the approved pipeline.",
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
@@ -682,45 +682,45 @@
           "source": "references/azure-quick-review.md",
           "disposition": "adapt",
           "targets": ["references/cost-cli-workflow.md"],
-          "reason": "Restores the upstream Azure CLI guidance under DECISION-035: read commands run directly; commands that change Azure route through apex deploy (Gate 4) or the pipeline.",
+          "reason": "Restores the upstream Azure CLI guidance under DECISION-035: read commands run directly; commands that change Azure route through apex deploy (Gate 4) or the approved pipeline.",
           "replacementProof": "Shipped reference classifies every command as read/diagnostic or routed, and marks each command that changes Azure.",
-          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the pipeline.",
+          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the approved pipeline.",
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/azure-redis.md",
           "disposition": "adapt",
           "targets": ["references/cost-cli-workflow.md"],
-          "reason": "Restores the upstream Azure CLI guidance under DECISION-035: read commands run directly; commands that change Azure route through apex deploy (Gate 4) or the pipeline.",
+          "reason": "Restores the upstream Azure CLI guidance under DECISION-035: read commands run directly; commands that change Azure route through apex deploy (Gate 4) or the approved pipeline.",
           "replacementProof": "Shipped reference classifies every command as read/diagnostic or routed, and marks each command that changes Azure.",
-          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the pipeline.",
+          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the approved pipeline.",
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/azure-resource-graph.md",
           "disposition": "adapt",
           "targets": ["references/azure-resource-graph.md"],
-          "reason": "Restores the upstream Azure CLI guidance under DECISION-035: read commands run directly; commands that change Azure route through apex deploy (Gate 4) or the pipeline.",
+          "reason": "Restores the upstream Azure CLI guidance under DECISION-035: read commands run directly; commands that change Azure route through apex deploy (Gate 4) or the approved pipeline.",
           "replacementProof": "Shipped reference classifies every command as read/diagnostic or routed, and marks each command that changes Azure.",
-          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the pipeline.",
+          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the approved pipeline.",
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/best-practices-notes.md",
           "disposition": "adapt",
           "targets": ["references/cost-cli-workflow.md"],
-          "reason": "Restores the upstream Azure CLI guidance under DECISION-035: read commands run directly; commands that change Azure route through apex deploy (Gate 4) or the pipeline.",
+          "reason": "Restores the upstream Azure CLI guidance under DECISION-035: read commands run directly; commands that change Azure route through apex deploy (Gate 4) or the approved pipeline.",
           "replacementProof": "Shipped reference classifies every command as read/diagnostic or routed, and marks each command that changes Azure.",
-          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the pipeline.",
+          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the approved pipeline.",
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/detailed-workflow-steps.md",
           "disposition": "adapt",
           "targets": ["references/cost-cli-workflow.md"],
-          "reason": "Restores the upstream Azure CLI guidance under DECISION-035: read commands run directly; commands that change Azure route through apex deploy (Gate 4) or the pipeline.",
+          "reason": "Restores the upstream Azure CLI guidance under DECISION-035: read commands run directly; commands that change Azure route through apex deploy (Gate 4) or the approved pipeline.",
           "replacementProof": "Shipped reference classifies every command as read/diagnostic or routed, and marks each command that changes Azure.",
-          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the pipeline.",
+          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the approved pipeline.",
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
@@ -737,9 +737,9 @@
           "source": "references/workflow-steps.md",
           "disposition": "adapt",
           "targets": ["references/cost-cli-workflow.md"],
-          "reason": "Restores the upstream Azure CLI guidance under DECISION-035: read commands run directly; commands that change Azure route through apex deploy (Gate 4) or the pipeline.",
+          "reason": "Restores the upstream Azure CLI guidance under DECISION-035: read commands run directly; commands that change Azure route through apex deploy (Gate 4) or the approved pipeline.",
           "replacementProof": "Shipped reference classifies every command as read/diagnostic or routed, and marks each command that changes Azure.",
-          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the pipeline.",
+          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the approved pipeline.",
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
@@ -785,9 +785,9 @@
           "source": "references/azure-cli-auth-validation.md",
           "disposition": "adapt",
           "targets": ["references/azure-cli-and-azd.md"],
-          "reason": "Restores the upstream Azure CLI guidance under DECISION-035: read commands run directly; commands that change Azure route through apex deploy (Gate 4) or the pipeline.",
+          "reason": "Restores the upstream Azure CLI guidance under DECISION-035: read commands run directly; commands that change Azure route through apex deploy (Gate 4) or the approved pipeline.",
           "replacementProof": "Shipped reference classifies every command as read/diagnostic or routed, and marks each command that changes Azure.",
-          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the pipeline.",
+          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the approved pipeline.",
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
@@ -2306,27 +2306,27 @@
           "source": "references/advanced-commands.md",
           "disposition": "adapt",
           "targets": ["references/quota-cli-commands.md"],
-          "reason": "Restores the upstream Azure CLI guidance under DECISION-035: read commands run directly; commands that change Azure route through apex deploy (Gate 4) or the pipeline.",
+          "reason": "Restores the upstream Azure CLI guidance under DECISION-035: read commands run directly; commands that change Azure route through apex deploy (Gate 4) or the approved pipeline.",
           "replacementProof": "Shipped reference classifies every command as read/diagnostic or routed, and marks each command that changes Azure.",
-          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the pipeline.",
+          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the approved pipeline.",
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/commands.md",
           "disposition": "adapt",
           "targets": ["references/quota-cli-commands.md"],
-          "reason": "Restores the upstream Azure CLI guidance under DECISION-035: read commands run directly; commands that change Azure route through apex deploy (Gate 4) or the pipeline.",
+          "reason": "Restores the upstream Azure CLI guidance under DECISION-035: read commands run directly; commands that change Azure route through apex deploy (Gate 4) or the approved pipeline.",
           "replacementProof": "Shipped reference classifies every command as read/diagnostic or routed, and marks each command that changes Azure.",
-          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the pipeline.",
+          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the approved pipeline.",
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/core-workflows.md",
           "disposition": "adapt",
           "targets": ["references/quota-workflows.md"],
-          "reason": "Restores the upstream Azure CLI guidance under DECISION-035: read commands run directly; commands that change Azure route through apex deploy (Gate 4) or the pipeline.",
+          "reason": "Restores the upstream Azure CLI guidance under DECISION-035: read commands run directly; commands that change Azure route through apex deploy (Gate 4) or the approved pipeline.",
           "replacementProof": "Shipped reference classifies every command as read/diagnostic or routed, and marks each command that changes Azure.",
-          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the pipeline.",
+          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the approved pipeline.",
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
@@ -2344,7 +2344,7 @@
           "targets": ["references/capacity-decision-rules.md", "references/quota-cli-commands.md"],
           "reason": "Preserves unsupported-provider, invalid-scope, and hard-limit blocker semantics and restores the error table with read-only fixes under DECISION-035.",
           "replacementProof": "Managed capacity guidance classifies failures; registration and increases are routed changes.",
-          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the pipeline.",
+          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the approved pipeline.",
           "scenarioIds": ["guidance-migration-ledger"]
         }
       ]
@@ -2709,7 +2709,7 @@
           "targets": ["references/graph-bicep-example.md"],
           "reason": "Restores the Microsoft Graph Bicep registration as the routed IaC form of the az ad commands under DECISION-035.",
           "replacementProof": "Shipped reference classifies every command as read/diagnostic or routed, and marks each command that changes Azure.",
-          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the pipeline.",
+          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the approved pipeline.",
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
@@ -2718,7 +2718,7 @@
           "targets": ["references/design-and-diagnostics.md", "references/cli-commands.md"],
           "reason": "The managed references retain delegated versus application selection, least-privilege mapping, and consent blockers, and restore the permission lookup and admin-consent commands under DECISION-035 with consent routed to an authorized owner.",
           "replacementProof": "The managed references record operation-to-permission intent and consent ownership; the CLI reference marks permission and consent changes as routed.",
-          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the pipeline.",
+          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the approved pipeline.",
           "scenarioIds": ["entra-guidance-parity"]
         },
         {
@@ -2734,9 +2734,9 @@
           "source": "references/cli-commands.md",
           "disposition": "adapt",
           "targets": ["references/cli-commands.md"],
-          "reason": "Restores the upstream Azure CLI guidance under DECISION-035: read commands run directly; commands that change Azure route through apex deploy (Gate 4) or the pipeline.",
+          "reason": "Restores the upstream Azure CLI guidance under DECISION-035: read commands run directly; commands that change Azure route through apex deploy (Gate 4) or the approved pipeline.",
           "replacementProof": "Shipped reference classifies every command as read/diagnostic or routed, and marks each command that changes Azure.",
-          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the pipeline.",
+          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the approved pipeline.",
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
@@ -2862,7 +2862,7 @@
           "targets": ["references/design-and-diagnostics.md", "references/cli-commands.md"],
           "reason": "The managed references retain failure classification and restore the read-only troubleshooting checks under DECISION-035; fixes are routed changes.",
           "replacementProof": "Diagnostic rules return evidence gaps and owners; the CLI reference pairs each read-only check with its routed fix.",
-          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the pipeline.",
+          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the approved pipeline.",
           "scenarioIds": ["entra-guidance-parity"]
         }
       ]

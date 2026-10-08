@@ -6,11 +6,12 @@ Remediation templates for frequently identified compliance findings, ported in f
 ## Routing
 
 Every remediation here changes Azure. The agent never runs these commands. A fix ships as an IaC change through
-`apex preview`, Gate 4 and `apex deploy` (Bicep, Terraform or the azd track for labs), or as a step in the generated
-GitHub Actions pipeline (`azd pipeline config`, OIDC federated credentials, run evidence returned through
-`apex/submitEvidence`). The Azure CLI blocks document the equivalent operation and are marked `# Changes Azure`. The
-Bicep snippets show the target setting; generated IaC sets the same property through the AVM module input where one
-exists. `$(az ... show ... --query id -o tsv)` lookups inside a command are reads, but the surrounding command is not.
+`apex preview`, a Gate 4 decision and `apex deploy` (Bicep, Terraform, or `azd provision` for labs), or through the
+approved GitHub Actions pipeline, which runs only the preview that local Gate 4 bound to its CI recipient and returns
+its run evidence through `apex/submitEvidence`. Production CI apply stays blocked until that transport is qualified.
+The Azure CLI blocks document the equivalent operation and are marked `# Changes Azure`. The Bicep snippets show the
+target setting; generated IaC sets the same property through the AVM module input where one exists.
+`$(az ... show ... --query id -o tsv)` lookups inside a command are reads, but the surrounding command is not.
 
 ## Storage Account Issues
 
@@ -21,7 +22,7 @@ exists. `$(az ... show ... --query id -o tsv)` lookups inside a command are read
 **Azure CLI (equivalent operation):**
 
 ```bash
-# Changes Azure: route through apex deploy (Gate 4) or the pipeline. Never run directly.
+# Changes Azure: route through apex deploy (Gate 4) or the approved pipeline. Never run directly.
 # Create private endpoint
 az network private-endpoint create \
   --name pe-storage \
@@ -69,7 +70,7 @@ resource privateEndpoint 'Microsoft.Network/privateEndpoints@2025-09-01' = {
 **Azure CLI (equivalent operation):**
 
 ```bash
-# Changes Azure: route through apex deploy (Gate 4) or the pipeline. Never run directly.
+# Changes Azure: route through apex deploy (Gate 4) or the approved pipeline. Never run directly.
 az storage account blob-service-properties update \
   --account-name <storage-name> \
   --resource-group <rg-name> \
@@ -109,7 +110,7 @@ resource blobServices 'Microsoft.Storage/storageAccounts/blobServices@2026-04-01
 **Azure CLI (equivalent operation):**
 
 ```bash
-# Changes Azure: route through apex deploy (Gate 4) or the pipeline. Never run directly.
+# Changes Azure: route through apex deploy (Gate 4) or the approved pipeline. Never run directly.
 az keyvault update \
   --name <vault-name> \
   --resource-group <rg-name> \
@@ -138,7 +139,7 @@ resource keyVault 'Microsoft.KeyVault/vaults@2026-02-01' = {
 **Azure CLI (equivalent operation):**
 
 ```bash
-# Changes Azure: route through apex deploy (Gate 4) or the pipeline. Never run directly.
+# Changes Azure: route through apex deploy (Gate 4) or the approved pipeline. Never run directly.
 az keyvault update \
   --name <vault-name> \
   --resource-group <rg-name> \
@@ -156,7 +157,7 @@ az keyvault update \
 **Azure CLI (equivalent operation):**
 
 ```bash
-# Changes Azure: route through apex deploy (Gate 4) or the pipeline. Never run directly.
+# Changes Azure: route through apex deploy (Gate 4) or the approved pipeline. Never run directly.
 # Create Log Analytics workspace (if needed)
 az monitor log-analytics workspace create \
   --resource-group <rg-name> \
@@ -195,7 +196,7 @@ resource diagnosticSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-pr
 **Azure CLI (equivalent operation):**
 
 ```bash
-# Changes Azure: route through apex deploy (Gate 4) or the pipeline. Never run directly.
+# Changes Azure: route through apex deploy (Gate 4) or the approved pipeline. Never run directly.
 # Create Recovery Services vault (if needed)
 az backup vault create \
   --resource-group <rg-name> \
@@ -221,7 +222,7 @@ az backup protection enable-for-vm \
 **Azure CLI (equivalent operation):**
 
 ```bash
-# Changes Azure: route through apex deploy (Gate 4) or the pipeline. Never run directly.
+# Changes Azure: route through apex deploy (Gate 4) or the approved pipeline. Never run directly.
 az aks update \
   --resource-group <rg-name> \
   --name <cluster-name> \
@@ -255,7 +256,7 @@ resource aksCluster 'Microsoft.ContainerService/managedClusters@2026-05-01' = {
 **Azure CLI (equivalent operation):**
 
 ```bash
-# Changes Azure: route through apex deploy (Gate 4) or the pipeline. Never run directly.
+# Changes Azure: route through apex deploy (Gate 4) or the approved pipeline. Never run directly.
 az aks update \
   --resource-group <rg-name> \
   --name <cluster-name> \
@@ -273,7 +274,7 @@ az aks update \
 **Azure CLI (equivalent operation):**
 
 ```bash
-# Changes Azure: route through apex deploy (Gate 4) or the pipeline. Never run directly.
+# Changes Azure: route through apex deploy (Gate 4) or the approved pipeline. Never run directly.
 # Enable to Log Analytics
 az sql server audit-policy update \
   --resource-group <rg-name> \
@@ -304,7 +305,7 @@ resource sqlAudit 'Microsoft.Sql/servers/auditingSettings@2025-01-01' = {
 **Azure CLI (equivalent operation):**
 
 ```bash
-# Changes Azure: route through apex deploy (Gate 4) or the pipeline. Never run directly.
+# Changes Azure: route through apex deploy (Gate 4) or the approved pipeline. Never run directly.
 # Create private endpoint
 az network private-endpoint create \
   --name pe-sql \
@@ -333,7 +334,7 @@ az sql server update \
 **Azure CLI (equivalent operation):**
 
 ```bash
-# Changes Azure: route through apex deploy (Gate 4) or the pipeline. Never run directly.
+# Changes Azure: route through apex deploy (Gate 4) or the approved pipeline. Never run directly.
 az webapp identity assign \
   --resource-group <rg-name> \
   --name <app-name>
@@ -361,7 +362,7 @@ resource webApp 'Microsoft.Web/sites@2025-03-01' = {
 **Azure CLI (equivalent operation):**
 
 ```bash
-# Changes Azure: route through apex deploy (Gate 4) or the pipeline. Never run directly.
+# Changes Azure: route through apex deploy (Gate 4) or the approved pipeline. Never run directly.
 az webapp update \
   --resource-group <rg-name> \
   --name <app-name> \
@@ -375,7 +376,7 @@ az webapp update \
 **Azure CLI (equivalent operation):**
 
 ```bash
-# Changes Azure: route through apex deploy (Gate 4) or the pipeline. Never run directly.
+# Changes Azure: route through apex deploy (Gate 4) or the approved pipeline. Never run directly.
 az webapp config set \
   --resource-group <rg-name> \
   --name <app-name> \
@@ -387,10 +388,10 @@ az webapp config set \
 ## Bulk Remediation Script
 
 For multiple resources of the same type, the upstream loop is shown below. In APEX, a bulk change is a reviewed IaC or
-pipeline change like any other; the loop documents the operation and is never run by the agent.
+approved pipeline change like any other; the loop documents the operation and is never run by the agent.
 
 ```powershell
-# Changes Azure: route through apex deploy (Gate 4) or the pipeline. Never run directly.
+# Changes Azure: route through apex deploy (Gate 4) or the approved pipeline. Never run directly.
 # Example: Enable soft delete on all storage accounts
 $storageAccounts = az storage account list --query "[].{name:name, rg:resourceGroup}" -o json | ConvertFrom-Json
 

@@ -15,7 +15,7 @@
         "IaC invariants (governance wins, security floor, one stable uniqueness token, AVM-first exact pins, verified lifecycle, explicit network and cost decisions) restated as decision rules that reference runtime securityInvariants and azureDefaults instead of values",
         "CAF abbreviation hints, greenfield tag checklist and tag purposes, tag-casing facts, per-effect CodeGen binding treatment, recurring AVM default and lifecycle pitfalls, AVM version evidence through the APEX agent's allowlisted registry lookups, VNet triggers and subnet sizing starting points with Learn links",
         "New retail-pricing reference ported from pricing-guidance for apex-azure-pricing/get_retail_prices",
-        "Azure CLI and azd guidance restored in references/azure-cli-and-azd.md: the command routing rule (read and diagnostic commands may run directly; commands that change Azure are marked '# Changes Azure' and routed through apex preview, Gate 4 and apex deploy or the generated GitHub Actions pipeline (DECISION-035)), az token validation, azd auth and pipeline OIDC sign-in, azd command classes, governance REST diagnostics, existing-VNet probe, Graph permission preflight, AVM registry curl lookups, cost-monitoring checks and az provider show"
+        "Azure CLI and azd guidance restored in references/azure-cli-and-azd.md: the command routing rule (read and diagnostic commands may run directly; commands that change Azure are marked '# Changes Azure' and routed through apex preview, Gate 4 and apex deploy or the approved GitHub Actions pipeline that runs only the locally approved preview (DECISION-035, ADR-0002)), az token validation, azd auth and pipeline OIDC sign-in, azd command classes (APEX never runs azd up; azd provision and azd deploy are separate Gate 4 operations; azd pipeline config runs only after its own preview and Gate 4 decision), governance REST diagnostics, existing-VNet probe, Graph permission preflight, AVM registry curl lookups, cost-monitoring checks and az provider show"
       ],
       "dropped": [
         "Repository npm validators, bicep/terraform build commands, apex-recall decisions, sku-manifest.json and 04-governance-constraints.json file contracts",
@@ -53,7 +53,7 @@
         "Rules: single VM unless a fleet is evidenced, Flexible orchestration, two or three candidates, documentation-verified specifications, VMSS price at minimum and maximum instances, commitments as review options",
         "VM family map, decision tree, size-name decoding, trade-offs, orchestration comparison, autoscale patterns and load-balancer choice",
         "Retail Prices API usage rewritten for apex-azure-pricing/get_retail_prices; quota and availability follow the Architecture assumption rule",
-        "Retail Prices API curl and PowerShell queries restored in references/retail-prices-api.md as a read-only fallback to apex-azure-pricing/get_retail_prices, with example regions replaced by placeholders; read and diagnostic commands may run directly; commands that change Azure are marked '# Changes Azure' and routed through apex preview, Gate 4 and apex deploy or the generated GitHub Actions pipeline (DECISION-035)"
+        "Retail Prices API curl and PowerShell queries restored in references/retail-prices-api.md as a read-only fallback to apex-azure-pricing/get_retail_prices, with example regions replaced by placeholders; read and diagnostic commands may run directly; commands that change Azure are marked '# Changes Azure' and routed through apex preview, Gate 4 and apex deploy or the approved GitHub Actions pipeline that runs only the locally approved preview (DECISION-035, ADR-0002)"
       ],
       "dropped": [
         "web_fetch verification steps, apex-azure-prepare provisioning route",
@@ -72,7 +72,7 @@
         "Rules: managed identity over keys, no public blob access, tier by observed access with minimum retention, redundancy by recovery objectives, lifecycle, Premium only on evidence, right service",
         "Access-tier minimum retention and retrieval table, redundancy protection table, data-plane versus management-plane access, credential posture by environment, per-sub-resource private endpoints",
         "Deduplicated the service-selection text previously repeated in two references",
-        "az storage commands restored in references/storage-cli-commands.md with --auth-mode login, data-plane role requirements and a routing table: read and diagnostic commands may run directly; commands that change Azure are marked '# Changes Azure' and routed through apex preview, Gate 4 and apex deploy or the generated GitHub Actions pipeline (DECISION-035); downloads need separate authorization for the local file"
+        "az storage commands restored in references/storage-cli-commands.md with --auth-mode login, data-plane role requirements and a routing table: read and diagnostic commands may run directly; commands that change Azure are marked '# Changes Azure' and routed through apex preview, Gate 4 and apex deploy or the approved GitHub Actions pipeline that runs only the locally approved preview (DECISION-035, ADR-0002); downloads need separate authorization for the local file"
       ],
       "dropped": ["SDK quick references and code samples", "Durability figures and Azure MCP documentation calls"]
     },
@@ -87,7 +87,7 @@
         "WHEN/DO NOT USE FOR description with quoted triggers and (use ...) redirects to shipped skills; explicit user-invocable: false and disable-model-invocation: false",
         "Effective-permission evaluation rules (actions minus notActions, dataActions minus notDataActions, wildcard matching, per-block exclusions, conditions, deny assignments, eligible-assignment activation)",
         "Common plane-split role examples, AVM role-assignment input preference, definition-ID references, principal type from evidence, User Access Administrator as least-privilege assigner, Azure RBAC versus Graph consent",
-        "az role commands, custom-role JSON and AVM, raw Bicep and Terraform assignment shapes restored in references/role-cli-and-iac.md; read and diagnostic commands may run directly; commands that change Azure are marked '# Changes Azure' and routed through apex preview, Gate 4 and apex deploy or the generated GitHub Actions pipeline (DECISION-035)"
+        "az role commands, custom-role JSON and AVM, raw Bicep and Terraform assignment shapes restored in references/role-cli-and-iac.md; read and diagnostic commands may run directly; commands that change Azure are marked '# Changes Azure' and routed through apex preview, Gate 4 and apex deploy or the approved GitHub Actions pipeline that runs only the locally approved preview (DECISION-035, ADR-0002)"
       ],
       "dropped": ["Documentation MCP calls from the skill"]
     },
@@ -103,7 +103,7 @@
         "Three independent checks (quota headroom, SKU availability, allocation capacity) and the Architecture assumption rule",
         "New sku-availability reference: AVAILABLE/RESTRICTED/NOT_OFFERED/UNKNOWN status contract, per-service evidence sources, deployment-time allocation failures",
         "ARM-type to quota-resource mapping hints and failure classification",
-        "az quota command reference, checked-headroom and SKU-availability helpers, workflows, per-service az listing commands, prerequisites and troubleshooting restored in references/quota-cli-commands.md, references/quota-workflows.md and references/sku-availability.md; quota increases and provider registration are routed as Microsoft.Quota/quotas changes; read and diagnostic commands may run directly; commands that change Azure are marked '# Changes Azure' and routed through apex preview, Gate 4 and apex deploy or the generated GitHub Actions pipeline (DECISION-035)"
+        "az quota command reference, checked-headroom and SKU-availability helpers, workflows, per-service az listing commands, prerequisites and troubleshooting restored in references/quota-cli-commands.md, references/quota-workflows.md and references/sku-availability.md; quota increases and provider registration are routed as Microsoft.Quota/quotas changes; read and diagnostic commands may run directly; commands that change Azure are marked '# Changes Azure' and routed through apex preview, Gate 4 and apex deploy or the approved GitHub Actions pipeline that runs only the locally approved preview (DECISION-035, ADR-0002)"
       ],
       "dropped": ["Portal alert configuration steps"]
     },
@@ -119,7 +119,7 @@
         "Routing to read-only apex-azure-pricing tools (query_costs, query_aks_costs, forecast_costs, get_retail_prices, benefit and reservation reads); whole-bill rule; Redis-only branching rule",
         "New cost-tool-guardrails reference: scopes, query and forecast limits, evidence labels, error handling",
         "Storage review signals with tier retention and early-deletion costs",
-        "CLI workflow restored in references/cost-cli-workflow.md (prerequisites, tool fallback table, Redis az commands, azqr, az resource list, Cost Management Query API through az rest, az monitor metrics, report content, pitfalls) and Resource Graph cost and orphan queries in references/azure-resource-graph.md; read and diagnostic commands may run directly; commands that change Azure are marked '# Changes Azure' and routed through apex preview, Gate 4 and apex deploy or the generated GitHub Actions pipeline (DECISION-035)"
+        "CLI workflow restored in references/cost-cli-workflow.md (prerequisites, tool fallback table, Redis az commands, azqr, az resource list, Cost Management Query API through az rest, az monitor metrics, report content, pitfalls) and Resource Graph cost and orphan queries in references/azure-resource-graph.md; read and diagnostic commands may run directly; commands that change Azure are marked '# Changes Azure' and routed through apex preview, Gate 4 and apex deploy or the approved GitHub Actions pipeline that runs only the locally approved preview (DECISION-035, ADR-0002)"
       ],
       "dropped": [
         "Redis SDK and report templates",
@@ -137,7 +137,7 @@
         "WHEN/DO NOT USE FOR description with quoted triggers and (use ...) redirects to shipped skills; explicit user-invocable: false and disable-model-invocation: false",
         "Effective parameter resolution, allowed-location interpretation (empty list is not unrestricted), exemption validity as necessary-not-sufficient conditions",
         "Contents line for the reference that now exceeds 100 lines; cleaned list formatting",
-        "Read-only policy diagnostics restored in references/policy-cli-diagnostics.md (assignment REST call with management-group inheritance, definition drill-down, PolicyResources query, az policy state list); they never replace accepted governance evidence; read and diagnostic commands may run directly; commands that change Azure are marked '# Changes Azure' and routed through apex preview, Gate 4 and apex deploy or the generated GitHub Actions pipeline (DECISION-035)"
+        "Read-only policy diagnostics restored in references/policy-cli-diagnostics.md (assignment REST call with management-group inheritance, definition drill-down, PolicyResources query, az policy state list); they never replace accepted governance evidence; read and diagnostic commands may run directly; commands that change Azure are marked '# Changes Azure' and routed through apex preview, Gate 4 and apex deploy or the approved GitHub Actions pipeline that runs only the locally approved preview (DECISION-035, ADR-0002)"
       ],
       "dropped": [
         "discover.py and Python collector scripts, terminal commands, cache and L0 envelope internals, preview Markdown",
@@ -155,7 +155,7 @@
         "WHEN/DO NOT USE FOR description with quoted triggers and (use ...) redirects to shipped skills; explicit user-invocable: false and disable-model-invocation: false",
         "Rules: report never remediate, metadata only, explicit coverage, provenance, reassessment cadence",
         "Recommendation source table, category examples, Key Vault expiration severity bands relative to the approved threshold, certificate-backed secret coverage rule",
-        "azqr assessment, metadata-only Key Vault CLI commands, Resource Graph compliance queries and the full remediation pattern set restored in references/azure-quick-review.md, references/keyvault-expiration-audit.md, references/azure-resource-graph.md and references/remediation-patterns.md; read and diagnostic commands may run directly; commands that change Azure are marked '# Changes Azure' and routed through apex preview, Gate 4 and apex deploy or the generated GitHub Actions pipeline (DECISION-035)"
+        "azqr assessment, metadata-only Key Vault CLI commands, Resource Graph compliance queries and the full remediation pattern set restored in references/azure-quick-review.md, references/keyvault-expiration-audit.md, references/azure-resource-graph.md and references/remediation-patterns.md; read and diagnostic commands may run directly; commands that change Azure are marked '# Changes Azure' and routed through apex preview, Gate 4 and apex deploy or the approved GitHub Actions pipeline that runs only the locally approved preview (DECISION-035, ADR-0002)"
       ],
       "dropped": ["SDK quick references", "azqr recommendation IDs"]
     },
@@ -170,7 +170,7 @@
         "WHEN/DO NOT USE FOR description with quoted triggers and (use ...) redirects to shipped skills; explicit user-invocable: false and disable-model-invocation: false",
         "apex/inventory as the reader of recorded inventory; scoped, indexed-not-live, candidate and no-secret rules; diagrams only of accepted inventory through apex-mermaid",
         "Orphan candidate definitions and resource-ID retention rule",
-        "az graph query usage, lookup workflow and the full KQL pattern set restored in references/azure-resource-graph.md, with Azure MCP tool routing replaced by service list commands; read and diagnostic commands may run directly; commands that change Azure are marked '# Changes Azure' and routed through apex preview, Gate 4 and apex deploy or the generated GitHub Actions pipeline (DECISION-035)"
+        "az graph query usage, lookup workflow and the full KQL pattern set restored in references/azure-resource-graph.md, with Azure MCP tool routing replaced by service list commands; read and diagnostic commands may run directly; commands that change Azure are marked '# Changes Azure' and routed through apex preview, Gate 4 and apex deploy or the approved GitHub Actions pipeline that runs only the locally approved preview (DECISION-035, ADR-0002)"
       ],
       "dropped": [
         "Azure MCP dedicated-tool routing and extension_cli_generate",
@@ -188,7 +188,7 @@
         "WHEN/DO NOT USE FOR description with quoted triggers and (use ...) redirects to shipped skills; explicit user-invocable: false and disable-model-invocation: false",
         "Rules: least privilege, credentials by environment, consent as a decision, additive rotation, exact HTTPS redirects, token validation, Graph versus Azure RBAC",
         "Access-model contract, admin consent conditions, delegated-permission intersection, exposed API design, sign-in error code table corrected against the Microsoft Learn error reference",
-        "az ad command reference, setup and cleanup scripts, troubleshooting checks and the Microsoft Graph Bicep example restored in references/cli-commands.md and references/graph-bicep-example.md; client-secret creation runs only as a pipeline step into Key Vault or a user-run private operation; read and diagnostic commands may run directly; commands that change Azure are marked '# Changes Azure' and routed through apex preview, Gate 4 and apex deploy or the generated GitHub Actions pipeline (DECISION-035)"
+        "az ad command reference, setup and cleanup scripts, troubleshooting checks and the Microsoft Graph Bicep example restored in references/cli-commands.md and references/graph-bicep-example.md; client-secret creation runs only as a pipeline step into Key Vault or a user-run private operation; read and diagnostic commands may run directly; commands that change Azure are marked '# Changes Azure' and routed through apex preview, Gate 4 and apex deploy or the approved GitHub Actions pipeline that runs only the locally approved preview (DECISION-035, ADR-0002)"
       ],
       "dropped": [
         "Portal and MSAL code examples, first-registration walkthrough, SDK quick references",

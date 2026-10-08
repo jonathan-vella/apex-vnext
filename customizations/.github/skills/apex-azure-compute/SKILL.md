@@ -55,9 +55,10 @@ Ask for a missing user-owned input through the kernel input request rather than 
   `az vm list-sizes`) may run directly. Their output is an observation; the recommendation still cites accepted
   evidence, and `apex-azure-pricing/get_retail_prices` stays the price evidence source.
 - **Commands that change Azure** (creating, resizing or scaling VMs and scale sets, autoscale rules) are never run by
-  the agent. They reach Azure through `apex preview`, Gate 4 and `apex deploy` (Bicep, Terraform or the azd track for
-  labs), or through the generated GitHub Actions pipeline (`azd pipeline config`, OIDC federated credentials, run
-  evidence returned through `apex/submitEvidence`).
+  the agent. They reach Azure only through `apex preview`, a Gate 4 decision and `apex deploy` (Bicep, Terraform, or
+  `azd provision` and `azd deploy` for labs), or through the approved GitHub Actions workflow, which runs only the
+  preview that local Gate 4 bound to its CI recipient. Production CI apply stays blocked until recipient-bound
+  transport is qualified.
 
 ## Boundaries
 

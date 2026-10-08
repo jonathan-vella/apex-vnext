@@ -11,24 +11,41 @@ Azure CLI and Azure Developer CLI (azd) guidance ported from the upstream `azure
 | --- | --- | --- |
 | Local client setup | `az login`, `az account set`, `az extension add`, `azd auth login`, `azd env select` | Directly; changes only the local CLI or azd state, for the intended tenant and subscription |
 | Read and diagnostic | `show`, `list`, `query`, `az account get-access-token`, `az deployment group what-if`, `az deployment sub what-if`, `azd provision --preview`, `azd show`, `azd env get-values`, registry version lookups | Directly, against the approved subscription and scope |
-| Changes Azure | `create`, `update`, `delete`, `assign`, `register`, `az deployment group create`, `az deployment sub create`, `azd up`, `azd provision`, `azd deploy`, `azd down` | Never by the agent. Routed as described below |
+| Changes Azure, Entra ID or GitHub settings | `create`, `update`, `delete`, `assign`, `register`, `az deployment group create`, `az deployment sub create`, `azd provision`, `azd deploy`, `azd pipeline config`, `azd down` | Never by the agent. Routed as described below |
+| Not used by APEX | `azd up` | Never: no single preview covers both provisioning and service deployment |
 
 Read output is an observation. A typed APEX decision still cites accepted evidence from `apex/taskContext`; a direct
 read never replaces governance, quota, pricing or inventory evidence the kernel accepted.
 
 ### Routes For Commands That Change Azure
 
-- **`apex deploy` and Gate 4.** `apex preview` produces the exact change set, the human approves it at Gate 4 with
-  `apex gate decide`, and `apex deploy --preview <hash>` applies that preview. The Bicep track previews with
-  `az deployment group|sub what-if` and applies with `az deployment group|sub create`; the Terraform track applies the
-  exact saved `terraform plan -out` file. For labs, the azd track previews with `azd provision --preview` and runs
-  `azd up` bound to the approved preview under the same commit, dependency revision, hash and expiry rules.
-- **GitHub Actions pipeline.** For production, APEX generates `azure.yaml` and the workflow with `azd pipeline config`
-  as reviewable artifacts that pass the normal gates. The pipeline signs in with OIDC federated credentials, keeps no
-  secrets in files, deploys, and returns its run evidence through `apex/submitEvidence`, bound to the approved plan.
+Local Gate 4 is the only deployment approval. Every route below starts from an `apex preview`, a Gate 4 decision with
+`apex gate decide`, and `apex deploy --preview <hash>`, bound to the same commit, dependency revision, hash, recipient
+and expiry rules.
+
+- **Bicep and Terraform tracks.** The Bicep track previews with `az deployment group|sub what-if` and applies with
+  `az deployment group|sub create`; the Terraform track applies the exact saved `terraform plan -out` file.
+- **azd track (labs).** Provisioning and service deployment are separate operations, each with its own preview and
+  Gate 4 decision:
+  - `azd provision --preview` is the provisioning preview; after Gate 4 approves it, `azd provision` runs bound to that
+    exact preview.
+  - Service deployment from `azure.yaml` has its own Gate 4 decision that binds the service list and the package
+    digests; `azd deploy` then runs only those packages.
+  - APEX never runs `azd up`, because no single preview covers both steps. Upstream guidance that says `azd up` is
+    context only.
+- **Pipeline setup.** APEX generates `azure.yaml` and the GitHub Actions workflow as static, reviewable files that pass
+  the normal gates, with OIDC federated credentials and no secrets in files. `azd pipeline config` creates Entra
+  identities, federated credentials, role assignments and GitHub variables, so it is its own state-changing operation:
+  it runs only after its own preview and Gate 4 decision, through `apex deploy`. Neither the agent nor the user runs it
+  outside that flow.
+- **Production CI.** Local Gate 4 approves the exact preview and binds the CI recipient. CI accepts the one-hop transfer,
+  executes only that imported preview, and returns its run evidence through `apex/submitEvidence`. CI cannot create,
+  replace or refresh a Gate 4 approval. Production CI apply stays blocked until recipient-bound encrypted transport is
+  qualified.
 
 Never substitute an unbound provider command for the kernel operation. In references, a command that changes Azure
-starts with the comment `# Changes Azure: route through apex deploy (Gate 4) or the pipeline. Never run directly.`
+starts with the comment `# Changes Azure: route through apex deploy (Gate 4) or the approved pipeline. Never run
+directly.`
 
 ## Azure CLI Token Validation
 
@@ -79,7 +96,7 @@ If either command fails, the user refreshes authentication before continuing.
 
 ### azd In The Pipeline
 
-The generated pipeline signs in with an OIDC federated credential, never a client secret:
+The approved workflow signs in with an OIDC federated credential, never a client secret:
 
 ```bash
 azd auth login \
@@ -89,8 +106,8 @@ azd auth login \
 ```
 
 `azd pipeline config` creates or reuses the deployment identity, adds its federated credential and role assignment, and
-writes the workflow and its repository variables. It changes Entra ID and Azure RBAC, so the agent never runs it: the
-user runs it once to set up the pipeline route, after reviewing the generated `azure.yaml` and workflow.
+sets the repository variables. It changes Entra ID, Azure RBAC and GitHub settings, so it runs only after its own
+preview and Gate 4 decision through `apex deploy`, never directly by the agent or the user.
 
 ### azd Commands
 
@@ -98,8 +115,11 @@ user runs it once to set up the pipeline route, after reviewing the generated `a
 | --- | --- |
 | `azd provision --preview` | Read: previews the infrastructure change |
 | `azd show`, `azd env list`, `azd env get-values` | Read |
-| `azd up`, `azd provision`, `azd deploy` | Changes Azure: only through `apex deploy` (azd track, Gate 4) or the pipeline |
+| `azd provision` | Changes Azure: only through `apex deploy`, bound to the `azd provision --preview` approved at Gate 4 |
+| `azd deploy` | Changes Azure: only through `apex deploy`, after a separate Gate 4 decision that binds the service list and package digests |
+| `azd pipeline config` | Changes Entra ID, Azure RBAC and GitHub settings: only through `apex deploy` after its own preview and Gate 4 decision |
 | `azd down` | Changes Azure (deletes resources): only through a destroy preview approved at Gate 4 |
+| `azd up` | Not used by APEX: no single preview covers both provisioning and service deployment |
 
 ## Governance Diagnostics
 

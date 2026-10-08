@@ -9,7 +9,7 @@ identity (`--auth-mode login`), never account keys or SAS tokens.
 | --- | --- | --- |
 | Read and diagnostic | `az storage account list`, `az storage account show`, `az storage container list`, `az storage blob list`, `az storage queue list`, `az storage table list`, `az storage share list`, `az storage fs list`, `az storage sku list` | Directly, against the approved account and scope |
 | Reads that write local files | `az storage blob download` | Only with separate authorization for the exact blob and local path; never overwrite local files without it |
-| Changes Azure | `az storage blob upload`, account, container, lifecycle, tier, network or redundancy changes, deletes | Never by the agent. Account and configuration changes ship in IaC through `apex preview`, Gate 4 and `apex deploy`; data writes are application or pipeline steps in the generated GitHub Actions pipeline |
+| Changes Azure | `az storage blob upload`, account, container, lifecycle, tier, network or redundancy changes, deletes | Never by the agent. Account and configuration changes ship in IaC through `apex preview`, Gate 4 and `apex deploy`; data writes are reviewed workflow steps that run only through the approved GitHub Actions pipeline, which runs only the preview that local Gate 4 bound to its CI recipient (production CI apply stays blocked until that transport is qualified) |
 
 Read output is an observation; storage decisions still cite accepted evidence from `apex/taskContext`.
 
@@ -46,7 +46,7 @@ az storage blob download --account-name ACCOUNT --container-name CONTAINER --nam
 Uploading writes data into Azure:
 
 ```bash
-# Changes Azure: route through apex deploy (Gate 4) or the pipeline. Never run directly.
+# Changes Azure: route through apex deploy (Gate 4) or the approved pipeline. Never run directly.
 az storage blob upload --account-name ACCOUNT --container-name CONTAINER --name BLOB --file LOCAL_PATH --auth-mode login
 ```
 

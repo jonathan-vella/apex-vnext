@@ -56,9 +56,10 @@ compliance state.
   directly against the approved subscription and management-group ancestry. Their output is an observation; it never
   replaces or renews accepted governance evidence.
 - **Commands that change Azure** (policy assignments, exemptions, remediation tasks) are never run by the agent. They
-  are a governance owner's change, delivered through `apex preview`, Gate 4 and `apex deploy` (Bicep, Terraform or the
-  azd track for labs), or through the generated GitHub Actions pipeline (`azd pipeline config`, OIDC federated
-  credentials, run evidence returned through `apex/submitEvidence`).
+  are a governance owner's change and reach Azure only through `apex preview`, a Gate 4 decision and `apex deploy`
+  (Bicep, Terraform, or `azd provision` and `azd deploy` for labs), or through the approved GitHub Actions workflow,
+  which runs only the preview that local Gate 4 bound to its CI recipient. Production CI apply stays blocked until
+  recipient-bound transport is qualified.
 
 ## Boundaries
 
