@@ -2468,11 +2468,6 @@ export class ApexService {
   }
 
   /**
-   * Runs one state-changing call through the kernel repeat guard. An identical call from the same worktree while the
-   * selected run is unchanged since the original succeeded returns the original result and is audited instead of
-   * executing again; anything else executes normally under the usual kernel checks.
-   */
-  /**
    * Runs a state-changing operation that is not repeat-guarded, such as a CLI command, under the workspace repeat lock
    * that guarded calls hold, so it cannot land between a guarded call's state reads, execution and record publication.
    */
@@ -2488,6 +2483,11 @@ export class ApexService {
     return join(this.root, ".apex", "local");
   }
 
+  /**
+   * Runs one state-changing call through the kernel repeat guard. An identical call from the same worktree while the
+   * selected run is unchanged since the original succeeded returns the original result and is audited instead of
+   * executing again; anything else executes normally under the usual kernel checks.
+   */
   async repeatSafe<T extends Record<string, unknown>>(
     call: RepeatSafeCall,
     execute: () => Promise<T>,

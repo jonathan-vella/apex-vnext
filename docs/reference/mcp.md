@@ -188,15 +188,15 @@ Session models can issue the same tool call twice. Every tool has an effect clas
 [`packages/cli/src/mcp.ts`](../../packages/cli/src/mcp.ts), and a test fails when a state-changing tool lacks a
 duplicate-call case:
 
-| Class            | Tools                                   | Repeat behavior                                          |
-| ---------------- | --------------------------------------- | -------------------------------------------------------- |
-| `read-only`      | `status`, `projectList`, `doctorChecks` | Never writes.                                            |
-| `read`           | The read tools listed below             | Always executes; may only finish a committed recovery.   |
-| `repeat-guarded` | Every other tool                        | The kernel repeat guard below decides.                   |
-| `convergent`     | `doctor`, `improvementObserve`          | Always executes; a repeat converges on the same outcome. |
+| Class            | Tools                          | Repeat behavior                                          |
+| ---------------- | ------------------------------ | -------------------------------------------------------- |
+| `read-only`      | `status`, `projectList`        | Never writes.                                            |
+| `read`           | The read tools listed below    | Always executes; may only finish a committed recovery.   |
+| `repeat-guarded` | Every other tool               | The kernel repeat guard below decides.                   |
+| `convergent`     | `doctor`, `improvementObserve` | Always executes; a repeat converges on the same outcome. |
 
-The `read` tools are `capabilityList`, `capabilityStatus`, `taskContext`, `readTaskInput`, `preview`, `inventory`,
-`diagnose`, `render`, `improvementObservations` and `improvementProposals`.
+The `read` tools are `doctorChecks`, `capabilityList`, `capabilityStatus`, `taskContext`, `readTaskInput`, `preview`,
+`inventory`, `diagnose`, `render`, `improvementObservations` and `improvementProposals`.
 
 `doctor` repairs workspace installation files outside the run, so a run-scoped record could hide a newly broken file.
 It is not deduplicated; a repair that reproduces the current customization lock keeps the existing rollback chain.

@@ -171,7 +171,7 @@ export type McpToolEffect = "read-only" | "read" | "repeat-guarded" | "convergen
 export const MCP_TOOL_EFFECTS = {
   status: "read-only",
   projectList: "read-only",
-  doctorChecks: "read-only",
+  doctorChecks: "read",
   capabilityList: "read",
   capabilityStatus: "read",
   taskContext: "read",
@@ -746,6 +746,9 @@ export function createMcpServerFactory(
                       const value = (await execute()).structuredContent;
                       if (!outputSchema.safeParse(value).success) throw new Error("Invalid MCP result contract");
                       if (resultEnvelopeBytes(value) > MCP_MAX_SERIALIZED_RESULT_BYTES) throw tooLargeError(name);
+                      // Apply the final result budget before the guard can store the value, so a result the adapter
+                      // rejects is never replayed.
+                      assertBoundedInput(value);
                       return value;
                     },
                     signal,

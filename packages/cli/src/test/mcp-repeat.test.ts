@@ -256,6 +256,26 @@ test("a result that fails the MCP contract is not stored and its repeat executes
   assert.equal(invocations, 2);
 });
 
+test("a result over the adapter's nesting budget is not stored and its repeat executes again", async (context) => {
+  const { service, runDirectory } = await initializedWorkspace();
+  let deep: Record<string, unknown> = { leaf: true };
+  for (let depth = 0; depth < 70; depth += 1) deep = { nested: deep };
+  let invocations = 0;
+  context.mock.method(service, "reconcile", async () => {
+    invocations += 1;
+    const value = serviceValue("reconcile") as { resources: Array<{ properties: Record<string, unknown> }> };
+    if (invocations === 1) value.resources[0]!.properties = deep;
+    return value;
+  });
+  const { client } = await connect(context, service, "repeat-deep-result");
+  const call = () => client.callTool({ name: "reconcile", arguments: { workspace: service.root } });
+  const failed = await call();
+  assert.equal(failed.isError, true);
+  assert.deepEqual(await readRepeatRecords(runDirectory), []);
+  assertSuccess(await call(), "reconcile");
+  assert.equal(invocations, 2);
+});
+
 test("a governance file replaced while the call runs never binds the result to other bytes", async (context) => {
   const { service, runDirectory } = await initializedWorkspace();
   const baseline = join(service.root, "baseline.json");
