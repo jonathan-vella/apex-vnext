@@ -897,7 +897,8 @@ async function architectureTask(plugin) {
     const next = await fixtures.nextTaskAfterInput(service);
     assert.equal(next.status, "task", JSON.stringify(next));
     assert.equal(next.task.taskType, taskType);
-    return service.completeTaskOutputs(next.task.taskId, outputs);
+    // Review findings come only from captured rubber-duck answers; completeOutputs writes one for review tasks.
+    return fixtures.completeOutputs(service, next.task.taskId, outputs);
   };
   const requirements = await complete("requirements", [
     { kind: "requirements", value: fixtures.requirements(projectId) },

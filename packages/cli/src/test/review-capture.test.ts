@@ -411,6 +411,42 @@ test("an oversized capture is rejected and quarantined rather than deleted", asy
   assert.ok(quarantine.some((name) => name.endsWith(`${nonce}-0000000000000000.json`)));
 });
 
+test("a capture consumed by a concurrent reviewComplete reports a conflict, not a rerun", async () => {
+  const { service, journal, taskId } = await setup();
+  await captureReview(service, taskId, { findings: [] });
+  const before = await journal.replay();
+  await service.completeReview(taskId);
+  // Replay the journal as it was until the capture lookup, as if the other completion committed in between.
+  const internal = service as unknown as { journal: (run: unknown) => EventJournal; reviewHomeOverride?: string };
+  const journalOf = internal.journal.bind(service);
+  let concurrent = false;
+  Object.defineProperty(service, "reviewHomeOverride", {
+    get: () => {
+      concurrent = true;
+      return undefined;
+    },
+  });
+  internal.journal = (run) => {
+    const real = journalOf(run);
+    return concurrent
+      ? real
+      : (new Proxy(real, {
+          get: (target, property) => {
+            if (property === "replay") return async () => before;
+            const value: unknown = Reflect.get(target, property, target);
+            return typeof value === "function" ? (value as (...args: unknown[]) => unknown).bind(target) : value;
+          },
+        }) as EventJournal);
+  };
+  await assert.rejects(service.completeReview(taskId), (thrown: unknown) => {
+    assert.ok(thrown instanceof ApexError);
+    assert.equal(thrown.code, "APEX_CONFLICT");
+    assert.match(thrown.message, /completed or rejected concurrently; do not rerun rubber-duck/u);
+    return true;
+  });
+  assert.ok(concurrent, "the capture lookup ran after the stale journal read");
+});
+
 test("rejected captures keep state transfer working, and non-UTF-8 captures are quarantined", async () => {
   const { root, service, journal, taskId } = await setup();
   const { nonce } = (await service.taskContext(taskId)).reviewRequest!;

@@ -5070,6 +5070,23 @@ export class ApexService {
         await releaseConsumed();
         throw error;
       }
+      if (failure.reason === "missing") {
+        // A concurrent reviewComplete may have consumed the nonce and removed its capture after this call read the
+        // journal; a rerun would then only leave a capture for a stale task.
+        const latest = await this.journal(run).replay();
+        if (this.reviewNonceConsumed(latest, request.nonce))
+          throw new ApexError(
+            "APEX_CONFLICT",
+            "This review request was completed or rejected concurrently; do not rerun rubber-duck, call nextTask",
+            EXIT_CODES.conflict,
+          );
+        if (latest.at(-1)?.hash !== head)
+          throw new ApexError(
+            "APEX_STALE",
+            "The run changed while the capture was checked; call nextTask before running rubber-duck again",
+            EXIT_CODES.stale,
+          );
+      }
       if (failure.reason !== "missing")
         await this.rejectReviewCapture(run, descriptor.id, request, requestHash, failure.reason, files, head).catch(
           async (rejection: unknown) => {
