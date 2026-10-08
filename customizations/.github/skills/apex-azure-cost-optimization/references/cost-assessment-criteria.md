@@ -76,7 +76,9 @@ authorized capability.
 ## Capability Boundary
 
 Actual cost, forecast, commitment, and retail price evidence comes from the read-only `apex-azure-pricing` tools.
-Resource inventory, utilization metrics, advisor recommendations, billing exports, and report rendering need separately
-qualified producers. Their absence is a blocker for findings that depend on them, not permission to substitute a
-browser lookup, terminal command, or a reference-only report outline. Keep any requested report as an assessment
+Resource inventory, utilization metrics and advisor recommendations come from the read-only Azure CLI commands in
+[cost CLI workflow](cost-cli-workflow.md) and [Azure Resource Graph cost queries](azure-resource-graph.md); billing
+exports and report rendering need separately qualified producers. When no source is available, the gap is a blocker for
+findings that depend on it, not permission to substitute a browser lookup, an estimate from memory, or a
+reference-only report outline. Keep any requested report as an assessment
 finding until a registered producer and renderer return a receipt.

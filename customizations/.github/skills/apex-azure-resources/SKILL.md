@@ -48,9 +48,23 @@ partial page as a complete inventory, and do not infer resource state from names
    intent.
 7. When the user asks for a diagram of accepted inventory, use `apex-mermaid`; never diagram unrecorded resources.
 
+## Azure CLI and azd
+
+[Azure Resource Graph queries](references/azure-resource-graph.md) keeps the upstream `az graph query` commands, lookup
+workflow and KQL patterns for inventory, orphan candidates, tags, health and services.
+
+- **Read and diagnostic** commands (`az graph query`, `az resource list`, service `list` and `show` commands) may run
+  directly against the approved subscriptions. Their output is an observation; the typed inventory decision still cites
+  accepted evidence from `apex/taskContext` or `apex/inventory`.
+- **Commands that change Azure** (create, update, delete, tag, move) are never run by the agent. Remediation reaches
+  Azure through `apex preview`, Gate 4 and `apex deploy` (Bicep, Terraform or the azd track for labs), or through the
+  generated GitHub Actions pipeline (`azd pipeline config`, OIDC federated credentials, run evidence returned through
+  `apex/submitEvidence`).
+
 ## Boundaries
 
-- This skill does not execute Azure discovery, run Resource Graph or KQL, create files, or modify resources.
+- This skill does not create files or modify resources. A direct Resource Graph read is an observation, not accepted
+  inventory evidence.
 - Inventory evidence is not real-time monitoring, compliance certification, cost analysis, or deployment authorization.
 - Remediation and resource changes require their authorized capability and gate; this skill may only describe the
   evidence-backed need.
@@ -59,5 +73,7 @@ partial page as a complete inventory, and do not infer resource state from names
 
 - [Inventory and query patterns](references/inventory-query-patterns.md) - scope rules, pattern selection, orphan
   candidate definitions, and interpretation limits.
+- [Azure Resource Graph queries](references/azure-resource-graph.md) - `az graph query` usage, lookup workflow, key
+  tables, and KQL patterns.
 - [Operational checklist](references/operational-checklist.md) - inventory intent, bounded results, and candidate
   handling.

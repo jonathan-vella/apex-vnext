@@ -35,6 +35,10 @@ fail allocation at deployment. None of them is deployment approval.
 Return a blocker when evidence is missing, stale, incomplete, or outside the requested provider, subscription, region,
 or resource boundary. Do not assume a quota value or infer a quota resource name from an ARM resource type.
 
+Read-only checks with the Azure CLI need Azure CLI 2.50 or later signed in with `az login`, the `quota` extension
+(`az extension add --name quota`) and `Reader` on the scope. Submitting an increase needs `Quota Request Operator`,
+held by the identity that runs the routed change.
+
 ## Workflow
 
 1. Confirm the evidence scope matches the deployment intent and each candidate region.
@@ -48,19 +52,37 @@ or resource boundary. Do not assume a quota value or infer a quota resource name
    names a SKU or zones.
 6. Compare only regions with equally fresh, compatible evidence and preserve the selected region's evidence identifier
    in the typed decision.
-7. Route insufficient capacity to an authorized quota-request or deployment planning path with a proposed buffer; do
-   not request increases from this skill.
+7. Route insufficient capacity to an authorized quota-request or deployment planning path with a proposed buffer. The
+   increase is a routed change (see below); never submit it from this skill.
+
+## Azure CLI and azd
+
+[Quota CLI commands](references/quota-cli-commands.md) and [quota workflows](references/quota-workflows.md) keep the
+upstream `az quota` commands, and [SKU availability](references/sku-availability.md) keeps the per-service listing
+commands.
+
+- **Read and diagnostic** commands (`az quota list`, `az quota show`, `az quota usage list|show`,
+  `az quota request status list|show`, `az vm list-skus`, `az provider show`) may run directly against the approved
+  subscription and region. Their output is an observation; a typed capacity decision still cites accepted evidence
+  from `apex/taskContext`.
+- **Commands that change Azure** (`az quota update`, `az quota create`, `az provider register`) are never run by the
+  agent. They reach Azure through `apex preview`, Gate 4 and `apex deploy` (Bicep, Terraform or the azd track for
+  labs), or through the generated GitHub Actions pipeline (`azd pipeline config`, OIDC federated credentials, run
+  evidence returned through `apex/submitEvidence`). References mark these commands with `# Changes Azure`.
 
 ## Boundaries
 
-- This skill does not discover quotas, check live usage, select subscriptions, request increases, register providers,
-  configure alerts, or alter resources or files.
+- This skill does not select subscriptions, submit quota increases, register providers, configure alerts, or alter
+  resources or files. Live quota and usage reads are observations, not accepted evidence.
 - Quota sufficiency is not a deployment approval, price estimate, or service availability guarantee.
 - A capacity claim may not be extended beyond the accepted provider, region, resource family, subscription, and
   observation time.
 
 ## References
 
+- [Quota CLI commands](references/quota-cli-commands.md) - `az quota` command reference, evidence and fallback,
+  checked headroom helper, name mapping, and troubleshooting.
+- [Quota workflows](references/quota-workflows.md) - check, compare regions, routed increase, and list workflows.
 - [Capacity decision rules](references/capacity-decision-rules.md) - scope, resource-name mapping, calculation,
   failure classification, and outcomes.
 - [SKU availability](references/sku-availability.md) - status contract, per-service evidence, and deployment-time

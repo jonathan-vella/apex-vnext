@@ -46,16 +46,32 @@ recorded identity decisions are authoritative.
 If a role definition, principal, target scope, or authorized delivery path is unresolved, return a blocker. Never widen
 access to compensate for missing evidence.
 
+## Azure CLI and azd
+
+[Role CLI commands and delivery shapes](references/role-cli-and-iac.md) keeps the upstream `az role` commands and the
+AVM, Bicep and Terraform assignment shapes.
+
+- **Read and diagnostic** commands (`az role definition list`, `az role assignment list`) may run directly against the
+  approved scope. Their output is an observation; the typed assignment intent still cites accepted evidence from
+  `apex/taskContext`.
+- **Commands that change Azure** (`az role definition create`, `az role assignment create|delete`) are never run by the
+  agent. Role changes reach Azure through the selected IaC binding with `apex preview`, Gate 4 and `apex deploy`
+  (Bicep, Terraform or the azd track for labs), or through the generated GitHub Actions pipeline (`azd pipeline
+  config`, OIDC federated credentials, run evidence returned through `apex/submitEvidence`). The reference marks these
+  commands with `# Changes Azure`.
+
 ## Boundaries
 
-Do not call Azure CLI, Microsoft Graph, ARM, or documentation tools; assign roles; generate direct Bicep/Terraform role
-assignment code; create custom roles; or expose principal IDs, credentials, or secrets. Approved role changes belong in
+Do not assign roles, create custom roles, or expose principal IDs, credentials, or secrets. The assignment shapes in the
+reference show what the selected IaC binding delivers; CodeGen owns the generated code. Approved role changes belong in
 the selected IaC/deployment capability and kernel authorization flow.
 
 ## References
 
 - Read [least-privilege role selection](references/least-privilege-selection.md) when choosing a built-in or custom role.
 - Read [assignment intent fields](references/assignment-intent.md) when recording a future assignment binding.
+- Read [role CLI commands and delivery shapes](references/role-cli-and-iac.md) when verifying a role against the live
+  catalog or showing how an assignment is delivered.
 
 ## Output
 

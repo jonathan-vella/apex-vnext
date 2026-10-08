@@ -20,21 +20,68 @@ check separate from quota headroom and from allocation capacity, which stays unk
 - Check zones whenever the design requires zone redundancy.
 - Propose a substitute SKU or region only when it is `AVAILABLE` and its quota headroom is sufficient.
 
-## Evidence Sources By Service
+## Checks By Service
 
-The capability, not this skill, collects the evidence. A listing must include SKUs the subscription cannot use, so that
-restrictions stay visible instead of disappearing from the result.
+Run every command with the confirmed subscription and region. All are read-only. Their output is an observation; the
+typed decision cites accepted evidence from `apex/taskContext`.
 
-| Service | SKU-level evidence the capability must provide |
-| --- | --- |
-| VMs, scale sets, AKS node pools, managed disks | Compute SKU listing with locations, zones, and restrictions |
-| Storage accounts | Storage SKU listing filtered by account kind |
-| App Service plans | Regions offering the plan SKU for the required operating system |
-| Azure SQL Database | Available editions and service objectives in the region |
-| PostgreSQL or MySQL flexible server | SKU list for the tier, including zone-redundant high-availability support |
-| Container Apps workload profiles | Supported workload profiles in the region |
-| AKS versions | Supported Kubernetes versions in the region; node sizes use the compute check |
-| Other services | Usually region-level resource-type locations only; the SKU status stays `UNKNOWN` |
+| Service | Command | Read |
+| --- | --- | --- |
+| VMs, scale sets, AKS node pools, managed disks | `az vm list-skus --all --location <region> --size <sku> --output json` | [Checked SKU availability](#checked-sku-availability) helper |
+| Storage accounts | `az storage sku list --output json` | Same helper; filter by `kind` first when a SKU exists for several kinds |
+| App Service plans | `az appservice list-locations --sku <sku> [--linux-workers-enabled] --output json` | Region display name present (compare lowercase without spaces) |
+| Azure SQL Database | `az sql db list-editions --location <region> --available --edition <tier> --service-objective <slo> -o json` | Non-empty result with the requested service objective |
+| PostgreSQL or MySQL flexible server | `az postgres flexible-server list-skus --location <region> -o json` (or `az mysql ...`) | SKU under the requested tier; zone-redundant high-availability support when required |
+| Container Apps workload profiles | `az containerapp env workload-profile list-supported --location <region> -o json` | Profile `name` present; Consumption follows service availability |
+| AKS versions | `az aks get-versions --location <region> -o json` | Requested version present; node sizes use the VM check |
+| Other services (Redis, Cosmos DB, ...) | `az provider show --namespace <namespace> --query "resourceTypes[?resourceType=='<type>'].locations"` | Region-level only: the SKU status stays `UNKNOWN` unless a service-specific source exists |
+
+`--all` includes sizes the subscription cannot use, so restrictions stay visible instead of disappearing from the list.
+
+## Checked SKU Availability
+
+This Bash helper reads `az vm list-skus` or `az storage sku list` JSON saved to a file. The optional fourth argument
+lists required zones, for example `1,2,3`. Exit 0 means `AVAILABLE`, 1 `RESTRICTED` or `NOT_OFFERED`, 2 `UNKNOWN`. It
+always reports allocation capacity as unknown. It needs `jq`.
+
+```bash
+sku_availability() {
+  local file="$1" region="$2" sku="$3" zones="${4:-}"
+  if [[ ! "$region" =~ ^[a-z0-9]+$ || ! "$sku" =~ ^[A-Za-z0-9_.-]+$ || ! "$zones" =~ ^([1-9](,[1-9])*)?$ ]]; then
+    echo "UNKNOWN: invalid region, SKU or zone list" >&2
+    return 2
+  fi
+  local result
+  if ! result=$(jq -er --arg region "$region" --arg sku "$sku" --arg zones "$zones" '
+    def here: any(.[]?; ascii_downcase == $region);
+    if type != "array" then error("not a SKU list") else . end
+    | map(select((.name | ascii_downcase) == ($sku | ascii_downcase) and (.locations | here)))
+    | if length == 0 then "NOT_OFFERED: \($sku) is not listed in \($region)"
+      else .[0] as $entry
+      | ([$entry.restrictions[]? | select((.type == "Location") and ((.restrictionInfo.locations // .values) | here))] | first) as $blocked
+      | if $blocked then "RESTRICTED: \($blocked.reasonCode // "unspecified reason")"
+        else ([$entry.locationInfo[]? | select((.location | ascii_downcase) == $region) | .zones[]?]) as $offered
+        | ([$entry.restrictions[]? | select((.type == "Zone") and ((.restrictionInfo.locations // .values) | here)) | .restrictionInfo.zones[]?]) as $restricted
+        | ($zones | split(",") | map(select(length > 0))) as $required
+        | ($required - ($offered - $restricted)) as $missing
+        | if ($missing | length) > 0 then "RESTRICTED: zones \($missing | join(",")) unavailable"
+          else "AVAILABLE" end
+        end
+      end' "$file" 2>/dev/null); then
+    echo "UNKNOWN: unreadable SKU evidence" >&2
+    return 2
+  fi
+  echo "$result; allocation capacity: unknown"
+  [[ "$result" == AVAILABLE ]]
+}
+```
+
+Example: save the listing, then check the SKU with three required zones.
+
+```bash
+az vm list-skus --all --location <region> --size Standard_D4s_v5 --output json > skus.json
+sku_availability skus.json <region> Standard_D4s_v5 1,2,3
+```
 
 ## At Deployment
 

@@ -117,5 +117,6 @@ renewal and semantic policy change are distinct: import time is not observation 
 Selection-v1 snapshots are unsupported, including for renewal and revision. There is no legacy snapshot migration.
 Start a new run with current descendant-coverage evidence; never copy old approvals or state into it.
 
-Discovery scripts, pack execution, and terminal commands remain outside this skill until a separately qualified typed
-capability owns them.
+Discovery scripts and pack execution remain outside this skill until a separately qualified typed capability owns
+them. The read-only commands in [policy CLI diagnostics](policy-cli-diagnostics.md) may explain or cross-check accepted
+evidence; they never replace or renew it.

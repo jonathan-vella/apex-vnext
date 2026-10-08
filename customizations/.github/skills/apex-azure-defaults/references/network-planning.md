@@ -18,7 +18,8 @@ cannot defer the plan.
 - Growth, scale, availability-zone, environment, and ownership expectations
 
 An existing VNet requires accepted inventory or validation evidence. A user-supplied resource ID alone does not prove
-address space, region, reachability, ownership, or available capacity.
+address space, region, reachability, ownership, or available capacity. The read-only probe in
+[existing VNet validation](azure-cli-and-azd.md#existing-vnet-validation) checks the ID and live address prefixes.
 
 ## Planning Workflow
 

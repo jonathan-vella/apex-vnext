@@ -57,5 +57,6 @@ Report an unlisted code as unclassified rather than guessing its meaning.
 A tenant without a service principal for the application cannot sign in to it even though the registration exists;
 classify that as an identity-boundary gap for the tenant owner.
 
-Return the evidence gap, responsible owner, and required kernel-authorized next task. Direct configuration, consent,
-credential, SDK, CLI, IaC, and HTTP remediation stays outside this skill.
+Return the evidence gap, responsible owner, and required kernel-authorized next task. The read-only checks in
+[troubleshooting commands](cli-commands.md#troubleshooting-commands) may run directly; configuration, consent and
+credential fixes are routed changes, and SDK and HTTP remediation stays outside this skill.

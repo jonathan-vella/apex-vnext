@@ -59,7 +59,8 @@ match these conditions. Confirm with dependency and owner evidence before any re
 
 ## Resource Graph Boundary
 
-Azure Resource Graph lookup and provider-specific resource discovery are deferred capabilities. Request a bounded query
-pattern and result shape, but do not execute KQL, invoke CLI or SDK tools, or infer omitted pages. Architecture diagram
+Read-only Resource Graph queries and provider `list` or `show` commands may run directly, following
+[Azure Resource Graph queries](azure-resource-graph.md). Their output is an observation until accepted as inventory
+evidence. Request a bounded query pattern and result shape, and never infer omitted pages. Architecture diagram
 templates and visualization assets are excluded from inventory guidance; visual output requires separately accepted
 inventory evidence and an authorized presentation path.

@@ -49,12 +49,28 @@ task state, evidence freshness, authorization, artifact acceptance, and all stat
 6. Classify observed identity failures with [identity design and diagnostic rules](references/design-and-diagnostics.md).
    Return the responsible owner and evidence gap without attempting remediation.
 
+## Azure CLI and azd
+
+[CLI commands](references/cli-commands.md) keeps the upstream `az ad` commands, scripts and troubleshooting checks, and
+[Graph Bicep example](references/graph-bicep-example.md) keeps the Microsoft Graph Bicep registration.
+
+- **Read and diagnostic** commands (`az ad app list|show`, `az ad app credential list`, `az ad app permission list`,
+  `az ad sp list|show`, `az ad signed-in-user show`, `az account show`) may run directly for the intended tenant. Their
+  output is an observation; identity design still cites accepted capability receipts. Never print credential values or
+  tokens.
+- **Commands that change Entra ID** (creating, updating or deleting registrations and service principals, credentials,
+  permissions, admin consent, owners) are never run by the agent. The registration ships as Microsoft Graph Bicep
+  through `apex preview`, Gate 4 and `apex deploy` (Bicep, Terraform or the azd track for labs), or through the
+  generated GitHub Actions pipeline (`azd pipeline config`, OIDC federated credentials, run evidence returned through
+  `apex/submitEvidence`). Admin consent stays an authorized owner's decision. References mark these commands with
+  `# Changes Azure`.
+
 ## Boundaries
 
-Do not use portal, CLI, Microsoft Graph, SDK, HTTP, IaC, repository, source-scanning, or file-mutation actions. Do
-not create registrations, configure redirect URIs, grant consent, assign permissions, create or handle credentials,
-expose identifiers, tokens, or secret material, test authentication, or deploy. Direct operational requests must be
-converted into bounded intent and an authorized capability handoff.
+Do not use portal, Microsoft Graph, SDK, HTTP, repository, source-scanning, or file-mutation actions, or any command
+that changes Entra ID. Do not create registrations, configure redirect URIs, grant consent, assign permissions, create
+or handle credentials, expose identifiers beyond the task boundary, tokens, or secret material, test authentication,
+or deploy. Direct operational requests must be converted into bounded intent and an authorized capability handoff.
 
 ## References
 
@@ -65,6 +81,10 @@ converted into bounded intent and an authorized capability handoff.
 - [Capability receipt and handoff](references/capability-receipts.md) - required evidence, blockers, and next-task rules.
 - [Identity design and diagnostic rules](references/design-and-diagnostics.md) - flow, permission, and sign-in error
   classification without configuration or protocol operations.
+- [CLI commands](references/cli-commands.md) - `az ad` app, credential, permission, service principal and owner
+  commands, scripts, and troubleshooting checks.
+- [Graph Bicep example](references/graph-bicep-example.md) - the routed IaC form of a registration and service
+  principal.
 
 ## Output
 

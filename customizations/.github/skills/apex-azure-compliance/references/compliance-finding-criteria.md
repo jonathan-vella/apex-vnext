@@ -80,8 +80,9 @@ those secret values are never fetched. Production vaults take priority over non-
 
 Report aggregate counts and redacted identifiers only as the task permits. Keep
 the target scope, control mapping, evidence hash, freshness, and uncertainty
-alongside every summary. Handoff asks for owner review; it does not contain
-mutation instructions or claim that a finding has been resolved.
+alongside every summary. Handoff asks for owner review; any fix it names is a routed
+change (see [remediation patterns](remediation-patterns.md)), and it never
+claims that a finding has been resolved.
 
 ## Recommendation And Authentication Signals
 
@@ -90,5 +91,7 @@ Authentication evidence should distinguish identity posture, least-privilege sco
 proof of access. Managed identity and narrow RBAC are recommendation criteria, not instructions to create identities,
 assign roles, inspect secrets, or remediate a resource.
 
-AzQR, Resource Graph, Key Vault metadata collection, and all SDK operations are deferred provider capabilities. They
-may supply redacted evidence to this assessment only after separate qualification; this guidance never invokes them.
+AzQR scans, Resource Graph queries and Key Vault metadata listings are read-only and may run directly, following
+[Azure Quick Review](azure-quick-review.md), [Azure Resource Graph](azure-resource-graph.md) and
+[Key Vault expiration audit](keyvault-expiration-audit.md). Their output is an observation until it is accepted as
+redacted evidence. SDK operations remain implementation work outside this skill.

@@ -47,9 +47,21 @@ Ask for a missing user-owned input through the kernel input request rather than 
    fit, and trade-off, then record the selected option and rejected alternatives in the typed artifact.
 5. Return missing or stale evidence as a blocker; submit no state change except through APEX MCP.
 
+## Azure CLI and azd
+
+[Azure Retail Prices API](references/retail-prices-api.md) keeps the upstream `curl` and PowerShell price queries.
+
+- **Read and diagnostic** calls (Retail Prices API queries, and listings such as `az vm list-skus` or
+  `az vm list-sizes`) may run directly. Their output is an observation; the recommendation still cites accepted
+  evidence, and `apex-azure-pricing/get_retail_prices` stays the price evidence source.
+- **Commands that change Azure** (creating, resizing or scaling VMs and scale sets, autoscale rules) are never run by
+  the agent. They reach Azure through `apex preview`, Gate 4 and `apex deploy` (Bicep, Terraform or the azd track for
+  labs), or through the generated GitHub Actions pipeline (`azd pipeline config`, OIDC federated credentials, run
+  evidence returned through `apex/submitEvidence`).
+
 ## Boundaries
 
-- This skill is advisory; it does not execute commands, edit files, or invoke Azure control-plane operations.
+- This skill is advisory; it does not edit files or change Azure resources.
 - Evidence never replaces governance, approval, or deployment checks. A published SKU name is not deployment
   feasibility.
 - CodeGen may generate IaC only after kernel authorization.
@@ -60,3 +72,5 @@ Ask for a missing user-owned input through the kernel input request rather than 
 - [Recommendation and scale rules](references/recommendation-and-scale-rules.md) - orchestration, autoscale,
   networking, and the recommendation record.
 - [Pricing evidence](references/pricing-evidence.md) - VM price queries, comparison basis, and uncertainty rules.
+- [Azure Retail Prices API](references/retail-prices-api.md) - direct API endpoint, VM queries, filters, response
+  fields, and pagination.

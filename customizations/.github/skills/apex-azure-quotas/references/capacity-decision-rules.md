@@ -65,5 +65,7 @@ Coverage is specific to resource type, region, subscription, and API version. Un
 ## Provider And Troubleshooting Boundary
 
 Record provider support, extension or command failure, invalid scope, unavailable quota surface, and service hard-limit
-signals as evidence gaps or blockers. CLI discovery, command execution, monitoring configuration, and quota-increase
-workflows are deferred provider capabilities. A troubleshooting note must not turn into a command or a request action.
+signals as evidence gaps or blockers. Read-only `az quota` checks may run directly, following
+[quota CLI commands](quota-cli-commands.md); their output is an observation until accepted as evidence. Quota increases,
+provider registration and monitoring configuration change Azure and are routed through `apex deploy` (Gate 4) or the
+generated pipeline. A troubleshooting note must not turn into a direct change.

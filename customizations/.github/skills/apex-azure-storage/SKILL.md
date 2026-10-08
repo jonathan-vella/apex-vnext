@@ -10,8 +10,8 @@ When calling any `apex/*` MCP tool, include the current session checkout or work
 
 # APEX Azure Storage
 
-Use this skill only for an active architecture or planning task. It records storage service and security intent; it does
-not list, read, upload, or modify data.
+Use this skill only for an active architecture or planning task. It records storage service and security intent; it
+never uploads or modifies data.
 
 ## Prerequisites
 
@@ -42,9 +42,24 @@ not list, read, upload, or modify data.
    [authentication and SDK boundary](references/service-auth-and-sdk-boundary.md) to typed intent.
 4. Return missing classification, RPO/RTO, policy, or network evidence as a blocker.
 
+## Azure CLI and azd
+
+[Storage CLI commands](references/storage-cli-commands.md) keeps the upstream `az storage` commands and their access
+requirements.
+
+- **Read and diagnostic** commands (`az storage account list`, `az storage container list`, `az storage blob list`)
+  may run directly against the approved account with `--auth-mode login`. Their output is an observation; storage
+  decisions still cite accepted evidence from `apex/taskContext`. A download also writes a local file and needs
+  separate authorization for the exact blob and path.
+- **Commands that change Azure** (uploads, account, container, tier, lifecycle, network or redundancy changes, deletes)
+  are never run by the agent. Configuration reaches Azure through `apex preview`, Gate 4 and `apex deploy` (Bicep,
+  Terraform or the azd track for labs); data writes run as steps of the generated GitHub Actions pipeline (`azd
+  pipeline config`, OIDC federated credentials, run evidence returned through `apex/submitEvidence`). The reference
+  marks these commands with `# Changes Azure`.
+
 ## Boundaries
 
-- This skill is advisory; it does not issue storage commands, use keys, create data, or modify resources.
+- This skill is advisory; it does not use keys, create data, or modify resources.
 - Inventory and diagnostics require accepted capability evidence; deployment remains an approved lifecycle operation.
 - The kernel owns state, gates, and evidence acceptance.
 
@@ -55,3 +70,5 @@ not list, read, upload, or modify data.
 - [Security and governance](references/security-and-governance.md) - identity, private access, and policy mapping.
 - [Authentication and SDK boundary](references/service-auth-and-sdk-boundary.md) - credential posture, data-plane
   roles, and the implementation boundary.
+- [Storage CLI commands](references/storage-cli-commands.md) - `az storage` commands by service, command routing, and
+  data-plane access requirements.

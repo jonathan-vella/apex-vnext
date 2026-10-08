@@ -1,7 +1,7 @@
 # Storage Authentication And SDK Boundary
 
-Use this reference to record storage access intent. It is not permission to access a storage account, install an SDK,
-or create, read, upload, or delete data.
+Use this reference to record storage access intent. It is not permission to install an SDK or to create, upload, or
+delete data. Read-only `az storage` commands follow [storage CLI commands](storage-cli-commands.md).
 
 ## Credential Posture
 

@@ -45,10 +45,25 @@ an agent.
    architecture decision, using the effective values from the evidence rather than definition defaults.
 6. Record the evidence identifier, scope, completeness signature, and any unresolved constraint in the staged artifact.
 
+## Azure CLI and azd
+
+[Policy CLI diagnostics](references/policy-cli-diagnostics.md) keeps the upstream policy discovery commands: the
+assignment REST call that includes management-group inheritance, definition drill-down, `PolicyResources` queries and
+compliance state.
+
+- **Read and diagnostic** commands (`az rest --method GET` on policy assignments, `az policy assignment list`,
+  `az policy definition show`, `az policy set-definition show`, `az policy state list`, `az graph query`) may run
+  directly against the approved subscription and management-group ancestry. Their output is an observation; it never
+  replaces or renews accepted governance evidence.
+- **Commands that change Azure** (policy assignments, exemptions, remediation tasks) are never run by the agent. They
+  are a governance owner's change, delivered through `apex preview`, Gate 4 and `apex deploy` (Bicep, Terraform or the
+  azd track for labs), or through the generated GitHub Actions pipeline (`azd pipeline config`, OIDC federated
+  credentials, run evidence returned through `apex/submitEvidence`).
+
 ## Boundaries
 
-- This skill is advisory. It does not discover policy state, query Azure, refresh evidence, or modify resources, files,
-  or task state.
+- This skill is advisory. It does not collect or refresh accepted evidence, or modify resources, files, or task state.
+  Accepted evidence comes from `apex governance select` and `apex governance import`.
 - Governance evidence constrains a design; it does not grant an exemption or override an unresolved policy. There is
   no override path in APEX: an option blocked by a `Deny` stays blocked until accepted governance evidence changes.
 - Refresh is optional below 30 days, including before deployment; native preflight and Azure enforcement are not.
@@ -62,3 +77,5 @@ an agent.
   locations, exemptions, and blocker routing.
 - [Operational checklist](references/operational-checklist.md) - resume conditions, effect handling, and evidence
   handoff.
+- [Policy CLI diagnostics](references/policy-cli-diagnostics.md) - read-only policy assignment, definition, Resource
+  Graph and compliance-state commands.

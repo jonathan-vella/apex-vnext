@@ -10,8 +10,8 @@ When calling any `apex/*` MCP tool, include the current session checkout or work
 
 # APEX Azure Compliance Assessment
 
-Use this skill for an active APEX task that evaluates accepted posture evidence. It does not certify compliance, perform
-a scan, disclose sensitive material, or authorize remediation.
+Use this skill for an active APEX task that evaluates accepted posture evidence. It does not certify compliance, disclose
+sensitive material, or apply or authorize remediation.
 
 ## Prerequisites
 
@@ -21,6 +21,8 @@ a scan, disclose sensitive material, or authorize remediation.
   redactions, and control mapping.
 - A finding is traceable to an observed configuration or item metadata. A recommendation without mapped evidence
   remains an observation.
+- Direct read-only checks need an Azure sign-in for the intended tenant (`az login`), `Reader` on the target scope, and
+  metadata-only Key Vault access such as Key Vault Reader. Follow the identity guidance in `apex-entra-app-registration`.
 
 ## Rules
 
@@ -46,13 +48,28 @@ a scan, disclose sensitive material, or authorize remediation.
 5. Return a triaged, redacted finding set and route remediation decisions to the kernel-authorized owner. Escalate
    potential active exposure or outage indicators without asserting exploitation or incident cause.
 
+## Azure CLI and azd
+
+Four references keep the upstream commands: [Azure Quick Review](references/azure-quick-review.md) (azqr scans),
+[Key Vault expiration audit](references/keyvault-expiration-audit.md) (`az keyvault ... list|show` metadata),
+[Azure Resource Graph](references/azure-resource-graph.md) (`az graph query` compliance patterns) and
+[remediation patterns](references/remediation-patterns.md) (CLI and Bicep fixes).
+
+- **Read and diagnostic** commands (azqr scans, `az graph query`, `az keyvault key|certificate list|show`,
+  `az keyvault secret list|list-versions`) may run directly against the approved scope. Their output is an
+  observation; a finding still cites accepted evidence from `apex/taskContext`. Never run a command that returns a
+  secret value.
+- **Commands that change Azure** (every remediation, rotation, policy or configuration change) are never run by the
+  agent. They reach Azure through `apex preview`, Gate 4 and `apex deploy` (Bicep, Terraform or the azd track for
+  labs), or through the generated GitHub Actions pipeline (`azd pipeline config`, OIDC federated credentials, run
+  evidence returned through `apex/submitEvidence`). References mark these commands with `# Changes Azure`.
+
 ## Boundaries
 
-- Do not run external assessments, enumerate resources, inspect vault content, or request secret values. All
-  observations are scoped capability-produced evidence and must remain redacted to the task's approved boundary.
+- Do not inspect vault content or request secret values. Observations remain redacted to the task's approved boundary.
 - Do not represent a partial assessment as compliant, noncompliant, or secure.
-- Do not prescribe, apply, or validate remediation. This skill identifies the evidence-backed need and escalation
-  boundary only.
+- Do not apply or approve remediation. The remediation patterns describe the routed change; this skill identifies the
+  evidence-backed need and escalation boundary.
 - Route spend questions to cost assessment, live service symptoms to diagnostic assessment, and policy-scope
   interpretation to the applicable governance task.
 
@@ -67,3 +84,8 @@ severity rationale, uncertainty, escalation need, and kernel-provided next actio
   interpretation, and escalation.
 - [Operational checklist](references/operational-checklist.md) - assessment coverage, finding correlation, and
   redaction limits.
+- [Azure Quick Review](references/azure-quick-review.md) - azqr scope, scan, result sheets, categories, and summary.
+- [Key Vault expiration audit](references/keyvault-expiration-audit.md) - metadata-only CLI commands, fields, and
+  priorities.
+- [Azure Resource Graph](references/azure-resource-graph.md) - `az graph query` usage and compliance KQL patterns.
+- [Remediation patterns](references/remediation-patterns.md) - routed CLI and Bicep fixes for common findings.

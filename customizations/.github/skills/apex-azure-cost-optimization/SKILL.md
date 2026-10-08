@@ -31,10 +31,12 @@ evidence informs findings, and the kernel decides whether a later task may autho
 | Are commitments used well? | `list_benefit_utilization`, `get_benefit_recommendations`, `list_reservation_transactions` |
 | Where can we save? | The assessment workflow below |
 
-Use only the read-only `apex-azure-pricing` tools the active agent declares, within the limits in
+Use the read-only `apex-azure-pricing` tools the active agent declares first, within the limits in
 [cost tool guardrails](references/cost-tool-guardrails.md). Never call `create_budget` or price-sheet download tools.
-Resource inventory, utilization metrics, and advisor recommendations are not part of the shipped tool set; their
-absence is a blocker for findings that need them, never permission to substitute a CLI, script, or memory.
+Resource inventory, utilization metrics, Redis listings and advisor recommendations come from the read-only Azure CLI
+commands in [cost CLI workflow](references/cost-cli-workflow.md) and
+[Azure Resource Graph cost queries](references/azure-resource-graph.md). When neither source is available, the gap is a
+blocker for findings that need it, never permission to estimate from memory.
 
 ## Rules
 
@@ -58,6 +60,20 @@ absence is a blocker for findings that need them, never permission to substitute
 6. Return ranked opportunities, non-actionable observations, and blockers. Send any proposed configuration, purchase,
    scaling, or deletion decision to the kernel-authorized owning workflow.
 
+## Azure CLI and azd
+
+- **Read and diagnostic** commands (`az account show|list`, `az resource list`, `az graph query`,
+  `az monitor metrics list`, `az redis list|show`, azqr scans, and the Cost Management Query API through
+  `az rest --method post` as a fallback) may run directly against the approved scope. Their output is an observation;
+  a finding still carries a labeled evidence class.
+- **Commands that change Azure** (deletes, resizes, stops, tier or SKU changes, purchases, budgets) are never run by the
+  agent. They reach Azure through `apex preview`, Gate 4 and `apex deploy` (Bicep, Terraform or the azd track for
+  labs), or through the generated GitHub Actions pipeline (`azd pipeline config`, OIDC federated credentials, run
+  evidence returned through `apex/submitEvidence`).
+
+Prerequisites for the CLI path: `az login` for the intended tenant, the `costmanagement` and `resource-graph`
+extensions, azqr for orphan discovery, and Cost Management Reader, Monitoring Reader and Reader on the scope.
+
 ## Boundaries
 
 - Do not treat an orphan candidate, an unused-looking resource, or a missing tag as proof that removal or downsizing is
@@ -80,3 +96,7 @@ cannot support the conclusion.
   signals, classification, and uncertainty.
 - [Operational checklist](references/operational-checklist.md) - normalization, candidate safety, and savings
   traceability.
+- [Cost CLI workflow](references/cost-cli-workflow.md) - prerequisites, tool fallbacks, Redis branch, azqr, cost query
+  API fallback, utilization metrics, report content, and pitfalls.
+- [Azure Resource Graph cost queries](references/azure-resource-graph.md) - `az graph query` usage, orphan candidates,
+  SKU and tag coverage, and Advisor cost recommendations.
