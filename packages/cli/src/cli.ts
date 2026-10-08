@@ -32,7 +32,7 @@ import { exportProviderTransfer, importProviderTransfer } from "./provider-trans
 import { ApexService, type ServiceOptions, type TaskOutput } from "./service.js";
 import { exportStateTransfer, importStateTransfer } from "./state-transfer.js";
 import { APEX_VERSION } from "./version.js";
-import { interactiveBootstrap } from "./bootstrap-wizard.js";
+import { interactiveBootstrap, type BootstrapInteraction } from "./bootstrap-wizard.js";
 import { mcpWorkspaceRoot, resolveMcpWorkspace } from "./workspace-root.js";
 
 export { mcpWorkspaceRoot, resolveMcpWorkspace } from "./workspace-root.js";
@@ -480,14 +480,26 @@ export function mcpServiceResolver(
   };
 }
 
-export async function execute(argv: string[], root = process.cwd(), options: ServiceOptions = {}): Promise<unknown> {
+/** Terminal seams for interactive commands; tests substitute them for a real terminal. */
+export interface CliInteraction {
+  bootstrap?: BootstrapInteraction;
+}
+
+export async function execute(
+  argv: string[],
+  root = process.cwd(),
+  options: ServiceOptions = {},
+  interaction: CliInteraction = {},
+): Promise<unknown> {
   const { words, flags } = parse(argv);
   const command = words.join(" ");
   if (command === "mcp serve") root = await realpath(await mcpWorkspaceRoot(root));
   const service = await createApexService(root, flags, command, options);
-  // State-changing commands share the workspace lock that repeat-guarded MCP calls hold.
-  if (UNSERIALIZED_COMMANDS.has(command)) return dispatch(service, command, flags, root, options);
-  return service.withWorkspaceWriteLock(() => dispatch(service, command, flags, root, options));
+  const run = () => dispatch(service, command, flags, root, options, interaction);
+  if (UNSERIALIZED_COMMANDS.has(command)) return run();
+  // State-changing commands share the workspace lock that repeat-guarded MCP calls hold. They give it up only while
+  // they wait for interactive input, and fail stale if the workspace changed meanwhile.
+  return service.withWorkspaceWriteLock(run, undefined, { suspendable: true });
 }
 
 /**
@@ -502,6 +514,7 @@ async function dispatch(
   flags: Flags,
   root: string,
   options: ServiceOptions,
+  interaction: CliInteraction,
 ): Promise<unknown> {
   switch (command) {
     case "mcp serve":
@@ -542,7 +555,7 @@ async function dispatch(
           "The wizard requires per-plan interactive confirmation; omit --yes and --json",
           EXIT_CODES.usage,
         );
-      return interactiveBootstrap(root);
+      return interactiveBootstrap(root, service, { interaction: interaction.bootstrap });
     case "bootstrap governance-plan":
       return service.planGovernanceSetup((await inputJson(flags)) as GovernanceSetupConfigV1);
     case "bootstrap governance-provision-plan":
@@ -575,7 +588,8 @@ async function dispatch(
         true,
       );
     case "bootstrap": {
-      if (Object.keys(flags).length === 0) return interactiveBootstrap(root);
+      if (Object.keys(flags).length === 0)
+        return interactiveBootstrap(root, service, { interaction: interaction.bootstrap });
       confirmed(flags, "bootstrap");
       const config = await onboardingConfig(flags, root);
       return service.bootstrap({

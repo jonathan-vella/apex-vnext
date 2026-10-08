@@ -223,6 +223,11 @@ seconds for an in-progress tool call or another command exits with `APEX_CONFLIC
 run or customization recovery take the lock too. Only `status`, `project list`, `version` and `mcp serve` itself do
 not.
 
+A command releases the lock while it waits for interactive input, such as an `apex bootstrap` question, so MCP tools
+and other commands can run meanwhile. Before continuing, it takes the lock again. If the selected run or the workspace
+setup in `.apex` changed during the wait, it exits with `APEX_STALE` without applying the answer; refresh status and
+run it again. Commands keep the lock while provider, Git, GitHub or Azure CLI processes run.
+
 ## Exit Codes
 
 | Code | Error                                                                                   |

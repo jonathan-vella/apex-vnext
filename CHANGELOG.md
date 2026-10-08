@@ -34,6 +34,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   executable-control alignment separately from implemented commands, existing safety checks and historical
   qualification evidence.
 
+### Fixed
+
+- A CLI command waiting for interactive input no longer holds the workspace lock, so MCP calls in the same workspace
+  no longer fail with `APEX_CONFLICT` while `apex bootstrap` waits at a question. The command takes the lock again
+  before it continues and fails with `APEX_STALE` if the workspace changed during the wait, so an answer is never
+  applied to state it was not given against. Other waits, such as provider and Azure CLI processes, still hold the
+  lock.
+
 ## [0.10.0-next.5] — Preview
 
 ### Changed

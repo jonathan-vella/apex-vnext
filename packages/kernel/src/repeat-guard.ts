@@ -119,6 +119,28 @@ export class RepeatGuardBusyError extends Error {
   }
 }
 
+/**
+ * The workspace changed while its lock holder waited without the lock, so a decision taken during the wait would apply
+ * to state it was not taken against. Nothing after the wait ran; the caller should refresh state and run again.
+ */
+export class RepeatGuardStaleError extends Error {
+  constructor() {
+    super("Workspace state changed while the command waited without the workspace lock");
+    this.name = "RepeatGuardStaleError";
+  }
+}
+
+/** The workspace lock as held by one {@link withRepeatGuardLock} operation. */
+export interface WorkspaceLockHold {
+  /**
+   * Gives the workspace lock up while `wait` runs, for example while a command waits for interactive input, then takes
+   * it again and throws {@link RepeatGuardStaleError} unless `state` returns the token it returned before the wait.
+   * When `state` fails before the wait the lock is kept, because an unchanged state could not be proven afterwards. A
+   * workspace created during the wait is locked from then on. Not reentrant: one suspension at a time.
+   */
+  suspend<R>(wait: () => Promise<R>, state: () => Promise<string>): Promise<R>;
+}
+
 export interface RepeatSafeOutcome<T> {
   value: T;
   repeated: boolean;
@@ -311,28 +333,66 @@ export async function executeRepeatSafe<T extends object>(
  * Runs `operation` while holding the workspace repeat lock in `lockDirectory`. Guarded calls take it, and so must every
  * other writer of the same workspace (such as state-changing CLI commands), so that no write lands between a guarded
  * call's state reads, execution and record publication. While the parent of `lockDirectory` does not exist there is no
- * workspace state yet, and `operation` runs unserialized. The lock is not reentrant.
+ * workspace state yet, and `operation` runs unserialized. The lock is not reentrant. `operation` may give the lock up
+ * while it waits, for example for interactive input, through {@link WorkspaceLockHold.suspend}; guarded calls never do.
  */
 export async function withRepeatGuardLock<T>(
   lockDirectory: string,
-  operation: () => Promise<T>,
+  operation: (hold: WorkspaceLockHold) => Promise<T>,
   options: { lockWaitMs?: number; signal?: AbortSignal } = {},
 ): Promise<T> {
   const lockWaitMs = options.lockWaitMs ?? DEFAULT_REPEAT_LOCK_WAIT_MS;
   if (!Number.isSafeInteger(lockWaitMs) || lockWaitMs < 0)
     throw new RangeError("Repeat lock wait must not be negative");
   const { signal } = options;
-  const cancelled = () => (signal?.aborted === true ? new RepeatGuardCancelledError() : undefined);
-  const started = async () => {
-    const error = cancelled();
-    if (error !== undefined) throw error;
-    return operation();
+  const cancelled = () => signal?.aborted === true;
+  if (cancelled()) throw new RepeatGuardCancelledError();
+  let held = await acquireRepeatGuardLock(lockDirectory, lockWaitMs, signal);
+  let suspended = false;
+  const hold: WorkspaceLockHold = {
+    suspend: async (wait, state) => {
+      if (suspended) throw new Error("The workspace lock is already suspended");
+      suspended = true;
+      try {
+        // Without a readable state token there is no way to prove the state unchanged afterwards, so keep the lock.
+        const before = await state().then(
+          (token) => ({ token }),
+          () => undefined,
+        );
+        if (before === undefined) return await wait();
+        const releasing = held;
+        held = undefined;
+        await releasing?.release();
+        const value = await wait();
+        held = await acquireRepeatGuardLock(lockDirectory, lockWaitMs, signal);
+        if (cancelled()) throw new RepeatGuardCancelledError();
+        if ((await state().catch(() => undefined)) !== before.token) throw new RepeatGuardStaleError();
+        return value;
+      } finally {
+        suspended = false;
+      }
+    },
   };
-  if (signal?.aborted === true) throw new RepeatGuardCancelledError();
+  try {
+    // Cancellation while waiting for the lock is reported by the lock; once it is held, nothing has started yet.
+    if (cancelled()) throw new RepeatGuardCancelledError();
+    return await operation(hold);
+  } finally {
+    await held?.release();
+  }
+}
+
+/** Acquires the workspace repeat lock, or returns undefined while the workspace has no state to serialize yet. */
+async function acquireRepeatGuardLock(
+  lockDirectory: string,
+  lockWaitMs: number,
+  signal: AbortSignal | undefined,
+): Promise<{ release(): Promise<void> } | undefined> {
+  const cancelled = () => (signal?.aborted === true ? new RepeatGuardCancelledError() : undefined);
   try {
     await lstat(dirname(lockDirectory));
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return started();
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
     throw error;
   }
   await mkdir(lockDirectory, { recursive: true });
@@ -347,7 +407,7 @@ export async function withRepeatGuardLock<T>(
     platform: process.platform,
     busyError: () => new RepeatGuardBusyError(),
   });
-  return lock.run(started, { waitMs: lockWaitMs, onContention: async () => cancelled() });
+  return lock.acquire({ waitMs: lockWaitMs, onContention: async () => cancelled() });
 }
 
 async function guardedCall<T extends object>(

@@ -14,6 +14,7 @@ import {
   REPEAT_LOCK_FILE,
   RepeatGuardBusyError,
   RepeatGuardCancelledError,
+  RepeatGuardStaleError,
   RunRepository,
   RunWriterConflictError,
   executeRepeatSafe,
@@ -474,6 +475,169 @@ test("a call cancelled before or while it waits for the lock never executes", as
   assert.ok(Date.now() - started < 5_000);
   assert.equal(executed, false);
   assert.deepEqual(await readRepeatRecords((await scope()).runDirectory), []);
+});
+
+test("a holder suspended at a wait frees the lock and resumes only on unchanged state", async () => {
+  const { lockDirectory } = await fixture();
+  const lockFree = () => withRepeatGuardLock(lockDirectory, async () => "acquired", { lockWaitMs: 0 });
+  let state = "s1";
+  const token = async () => state;
+
+  // While the holder waits, another caller takes and releases the lock; the unchanged state lets the holder continue
+  // with the lock held again.
+  const resumed = await withRepeatGuardLock(lockDirectory, async (hold) => {
+    await assert.rejects(lockFree(), RepeatGuardBusyError);
+    const answer = await hold.suspend(async () => {
+      assert.equal(await lockFree(), "acquired");
+      return "yes";
+    }, token);
+    await assert.rejects(lockFree(), RepeatGuardBusyError);
+    return answer;
+  });
+  assert.equal(resumed, "yes");
+  assert.equal(await lockFree(), "acquired");
+
+  // A write during the wait makes the continuation stale; nothing after the wait runs and the lock is released.
+  let continued = false;
+  await assert.rejects(
+    withRepeatGuardLock(lockDirectory, async (hold) => {
+      await hold.suspend(async () => {
+        await withRepeatGuardLock(lockDirectory, async () => {
+          state = "s2";
+        });
+      }, token);
+      continued = true;
+    }),
+    RepeatGuardStaleError,
+  );
+  assert.equal(continued, false);
+  assert.equal(await lockFree(), "acquired");
+
+  // A state that cannot be read after the wait cannot be proven unchanged.
+  await assert.rejects(
+    withRepeatGuardLock(lockDirectory, async (hold) => {
+      let reads = 0;
+      await hold.suspend(
+        async () => undefined,
+        async () => {
+          if (++reads > 1) throw new Error("unreadable");
+          return state;
+        },
+      );
+    }),
+    RepeatGuardStaleError,
+  );
+
+  // A failed wait ends the operation without taking the lock again.
+  await assert.rejects(
+    withRepeatGuardLock(lockDirectory, async (hold) => {
+      await hold.suspend(async () => {
+        throw new Error("terminal closed");
+      }, token);
+    }),
+    /terminal closed/,
+  );
+  assert.equal(await lockFree(), "acquired");
+});
+
+test("a suspended holder keeps the lock when its state is unreadable and fails closed when it cannot resume", async () => {
+  const { lockDirectory } = await fixture();
+  const lockFree = () => withRepeatGuardLock(lockDirectory, async () => "acquired", { lockWaitMs: 0 });
+
+  // Without a state token there is nothing to compare after the wait, so the lock stays held through it.
+  await withRepeatGuardLock(lockDirectory, async (hold) => {
+    await hold.suspend(
+      async () => {
+        await assert.rejects(lockFree(), RepeatGuardBusyError);
+      },
+      async () => {
+        throw new Error("unreadable");
+      },
+    );
+  });
+
+  // A caller cancelled during the wait does not continue, even when the lock is free to take again.
+  const controller = new AbortController();
+  let resumed = false;
+  await assert.rejects(
+    withRepeatGuardLock(
+      lockDirectory,
+      async (hold) => {
+        await hold.suspend(
+          async () => controller.abort(),
+          async () => "s",
+        );
+        resumed = true;
+      },
+      { signal: controller.signal },
+    ),
+    RepeatGuardCancelledError,
+  );
+  assert.equal(resumed, false);
+  assert.equal(await lockFree(), "acquired");
+
+  // Suspensions do not nest.
+  await withRepeatGuardLock(lockDirectory, async (hold) => {
+    await hold.suspend(
+      async () => {
+        await assert.rejects(
+          hold.suspend(
+            async () => undefined,
+            async () => "s",
+          ),
+          /already suspended/,
+        );
+      },
+      async () => "s",
+    );
+  });
+
+  // Another holder that keeps the lock past the wait budget makes the resume fail as busy, not continue unlocked.
+  let release!: () => void;
+  const blocker = new Promise<void>((done) => (release = done));
+  let blocking: Promise<unknown> | undefined;
+  await assert.rejects(
+    withRepeatGuardLock(
+      lockDirectory,
+      async (hold) => {
+        await hold.suspend(
+          async () => {
+            let acquired!: () => void;
+            const held = new Promise<void>((done) => (acquired = done));
+            blocking = withRepeatGuardLock(lockDirectory, async () => {
+              acquired();
+              await blocker;
+            });
+            await held;
+          },
+          async () => "s",
+        );
+      },
+      { lockWaitMs: 50 },
+    ),
+    RepeatGuardBusyError,
+  );
+  release();
+  await blocking;
+  assert.equal(await lockFree(), "acquired");
+});
+
+test("a workspace created while an unserialized holder waits is locked when the holder resumes", async () => {
+  const root = await mkdtemp(join(tmpdir(), "apex-repeat-guard-"));
+  const lockDirectory = join(root, ".apex", "local");
+  await withRepeatGuardLock(lockDirectory, async (hold) => {
+    await hold.suspend(
+      async () => {
+        await mkdir(join(root, ".apex"));
+      },
+      async () => "s",
+    );
+    await assert.rejects(
+      withRepeatGuardLock(lockDirectory, async () => undefined, { lockWaitMs: 0 }),
+      RepeatGuardBusyError,
+    );
+  });
+  assert.equal(await withRepeatGuardLock(lockDirectory, async () => "acquired", { lockWaitMs: 0 }), "acquired");
 });
 
 test("a live repeat lock makes callers fail closed; an expired dead holder's lock is taken over", async () => {

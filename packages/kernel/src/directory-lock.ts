@@ -99,6 +99,21 @@ export class DirectoryLock {
     operation: () => Promise<T>,
     options: { onContention?: () => Promise<Error | undefined>; waitMs?: number } = {},
   ): Promise<T> {
+    const held = await this.acquire(options);
+    try {
+      return await operation();
+    } finally {
+      await held.release();
+    }
+  }
+
+  /**
+   * Acquires the lock and returns its release, for holders that give the lock up and take it again while they run.
+   * Throws the configured busy error when it cannot be acquired in time. Release is idempotent.
+   */
+  async acquire(
+    options: { onContention?: () => Promise<Error | undefined>; waitMs?: number } = {},
+  ): Promise<{ release(): Promise<void> }> {
     await mkdir(dirname(this.lockPath), { recursive: true });
     const token = this.idSource();
     const createdAt = this.clock();
@@ -132,17 +147,20 @@ export class DirectoryLock {
       }
       if (!(await this.retireStaleLock(existing))) throw this.busyError();
     }
-    try {
-      return await operation();
-    } finally {
-      try {
-        const current = await this.readLock();
-        if (current?.metadata.token === token) await this.releaseLock();
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-      }
-      await this.sweepReleasedLocks();
-    }
+    let released = false;
+    return {
+      release: async () => {
+        if (released) return;
+        released = true;
+        try {
+          const current = await this.readLock();
+          if (current?.metadata.token === token) await this.releaseLock();
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+        }
+        await this.sweepReleasedLocks();
+      },
+    };
   }
 
   private async acquireLock(metadata: LockMetadata): Promise<boolean> {

@@ -336,7 +336,12 @@ selected run. A call made before any run exists is recorded against the run it c
 the workspace shares the lock: CLI commands, the `convergent` tools and the `read` tools (which may finish a pending
 run or customization recovery) hold it while they run, so no write lands between a guarded call's state reads,
 execution and record publication. Only the `read-only` tools, their CLI counterparts `status` and `project list`,
-`version` and `apex mcp serve` itself do not take it. The lock uses the run mutation lock's protocol: an expired lock
+`version` and `apex mcp serve` itself do not take it. A CLI command gives the lock up only while it waits for
+interactive input, such as an `apex bootstrap` question, so MCP calls are not blocked meanwhile. Before it continues
+it takes the lock again and compares the selected run state above and the workspace setup files in `.apex` with their
+state before the wait; if anything changed, it fails with `APEX_STALE` without applying the answer. Waits for provider,
+Git, GitHub and Azure CLI processes keep the lock, because their results bind to the state they started from.
+Guarded calls never give the lock up. The lock uses the run mutation lock's protocol: an expired lock
 whose holder process no longer runs on this host is taken over into a permanent tombstone, so a delayed contender can
 never remove a replacement lock.
 

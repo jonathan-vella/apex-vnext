@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { runBootstrapWizard } from "../bootstrap-wizard.js";
+import { interactiveBootstrap, runBootstrapWizard } from "../bootstrap-wizard.js";
+import { withRepeatGuardLock } from "@apexops/kernel";
 import { ApexService } from "../service.js";
 import { tempRoot } from "./helpers.js";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
@@ -25,6 +26,109 @@ test("bootstrap wizard cancellation and declined plans never initialize a worksp
     assert.ok(["cancelled", "pending"].includes(result.status));
     assert.deepEqual(await readdir(root), []);
   }
+});
+
+test("bootstrap wizard never applies a confirmation to a local plan that changed while it waited", async (context) => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  const setup = context.mock.method(service, "bootstrap", async () => ({ runtimeInstalled: true }));
+  const answers: Array<string | (() => Promise<string>)> = [
+    "no",
+    "yes",
+    async () => {
+      await mkdir(join(root, ".git"));
+      return "yes";
+    },
+  ];
+  const result = await runBootstrapWizard(
+    root,
+    {
+      ask: async () => {
+        const answer = answers.shift();
+        assert.ok(answer !== undefined);
+        return typeof answer === "string" ? answer : answer();
+      },
+      show: () => {},
+    },
+    () => service,
+  );
+  assert.equal(result.status, "blocked");
+  assert.match(result.nextAction, /plan changed after it was shown/);
+  assert.equal(setup.mock.callCount(), 0);
+  assert.equal(answers.length, 0);
+});
+
+test("wizard questions for a copied workspace wait outside its lock and fail stale after a write there", async (context) => {
+  const root = await tempRoot();
+  const child = join(root, "api-copy");
+  await mkdir(join(root, ".apex"));
+  await mkdir(join(child, ".apex"), { recursive: true });
+  const lockFree = (directory: string) =>
+    withRepeatGuardLock(join(directory, ".apex", "local"), async () => true, { lockWaitMs: 0 }).catch(() => false);
+  const parent = new ApexService(root);
+  const run = async (answers: Array<string | (() => Promise<string>)>) => {
+    const copy = new ApexService(child);
+    context.mock.method(parent, "listArchetypes", async () => ({ candidates: [{ selectedPath: "archetypes/api" }] }));
+    context.mock.method(parent, "planArchetypeBatch", async () => ({ planHash: "a".repeat(64), entries: [] }));
+    context.mock.method(parent, "importArchetypeBatch", async () => ({ status: "copied" }));
+    const plan = { status: "pending", checks: [] };
+    context.mock.method(copy, "planBootstrap", async () => plan);
+    // Copied-workspace operations run while the wizard holds both workspace locks.
+    const locked: boolean[] = [];
+    const setup = context.mock.method(copy, "bootstrap", async () => {
+      locked.push(!(await lockFree(root)), !(await lockFree(child)));
+      return { runtimeInstalled: true };
+    });
+    const result = await parent.withWorkspaceWriteLock(
+      () =>
+        interactiveBootstrap(root, parent, {
+          interaction: {
+            ask: async () => {
+              const answer = answers.shift();
+              assert.ok(answer !== undefined);
+              return typeof answer === "string" ? answer : answer();
+            },
+            show: () => {},
+          },
+          serviceAt: (directory) => (directory === root ? parent : copy),
+        }),
+      undefined,
+      { suspendable: true },
+    );
+    return { result, setup, locked };
+  };
+  const coe = ["yes", "https://github.com/example/coe", "a".repeat(40), "", "1", "api-copy", "yes"];
+
+  // Questions about the copy are asked with neither lock held; its setup then runs with both held.
+  const unchanged = await run([
+    ...coe,
+    async () => {
+      assert.deepEqual([await lockFree(root), await lockFree(child)], [true, true]);
+      return "no";
+    },
+    "yes",
+    "no",
+    "later",
+  ]);
+  assert.equal((unchanged.result as { status: string }).status, "pending");
+  assert.equal(unchanged.setup.mock.callCount(), 1);
+  assert.deepEqual(unchanged.locked, [true, true]);
+
+  // A write in the copied workspace while the wizard waits makes it stale; nothing after the wait runs.
+  const remaining = [
+    ...coe,
+    async () => {
+      await withRepeatGuardLock(join(child, ".apex", "local"), async () => {
+        await writeFile(join(child, ".apex", "config.json"), "{}");
+      });
+      return "no";
+    },
+    "yes",
+  ];
+  const stale = run(remaining);
+  await assert.rejects(stale, (error: unknown) => (error as { code?: unknown }).code === "APEX_STALE");
+  assert.equal(remaining.length, 1);
+  assert.deepEqual([await lockFree(root), await lockFree(child)], [true, true]);
 });
 
 test(
