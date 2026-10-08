@@ -6,7 +6,9 @@ export type McpToolName = keyof typeof MCP_OUTPUT_SCHEMAS;
  * Effect class of every MCP tool, keyed by the output-schema registry so a new tool cannot be added unclassified.
  * - `read-only`: never writes state.
  * - `read`: adds no new effect; it may only finish recovering an already-committed run or customization transaction,
- *   so it holds the workspace lock like every other writer.
+ *   so it holds the workspace lock like every other writer. While a CLI command holds the lock only to wait for an
+ *   external process, such as a provider preview or apply, it is answered from a validated snapshot without the lock
+ *   instead, and waits for the lock when it would need to recover.
  * - `repeat-guarded`: changes state; each call runs through the kernel repeat guard, so an identical repeat while the
  *   selected run is unchanged returns the original result instead of executing again.
  * - `convergent`: changes state outside the run, so the run-scoped guard cannot tell whether a repeat is stale, and

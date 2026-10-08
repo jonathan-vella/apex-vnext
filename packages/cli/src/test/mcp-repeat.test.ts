@@ -6,10 +6,12 @@ import { join, relative } from "node:path";
 import test, { type TestContext } from "node:test";
 import { promisify } from "node:util";
 import type { Client } from "@modelcontextprotocol/client";
+import type { IacProvider } from "@apexops/capabilities";
 import {
   EventJournal,
   REPEAT_EVENT_TYPE,
   REPEAT_GUARD_FILE,
+  RepeatGuardBusyError,
   RunRepository,
   readRepeatEvents,
   readRepeatRecords,
@@ -19,7 +21,14 @@ import { execute, resolveMcpWorkspace } from "../cli.js";
 import { MCP_TOOL_EFFECTS, type McpServiceResolver } from "../mcp.js";
 import { ApexService } from "../service.js";
 import { fixtures, hash, request, selection, task, type ToolName } from "./mcp-fixtures.js";
-import { captureReview, inputAnswers, nextTaskAfterInput, requirements, tempRoot } from "./helpers.js";
+import {
+  captureReview,
+  inputAnswers,
+  nextTaskAfterInput,
+  prepareValidatedRun,
+  requirements,
+  tempRoot,
+} from "./helpers.js";
 import { connectMcp } from "./mcp-client.js";
 
 const execFileAsync = promisify(execFile);
@@ -636,6 +645,85 @@ test("a CLI command waiting at a prompt does not hold the workspace lock and fai
   });
   assert.equal(changed.pending(), 0, "nothing after the wait may run");
   assert.equal(await lockFree(), true);
+});
+
+test("MCP reads are served while a CLI command waits for a long provider operation, and writes still wait", async (context) => {
+  const root = await tempRoot();
+  const service = new ApexService(root, {
+    executableChecker: async () => true,
+    azureAuthStatus: async () => ({ authenticated: false, detail: "Offline provider-wait test" }),
+  });
+  const { runId } = await service.init({ projectId: "demo", riskOwner: "partner", iacTool: "terraform" });
+  await prepareValidatedRun(service, runId, "terraform");
+  // A provider preview that runs until the test lets it finish, standing in for a long Terraform plan.
+  let entered!: () => void;
+  const inProvider = new Promise<void>((done) => (entered = done));
+  let finish!: () => void;
+  const finished = new Promise<void>((done) => (finish = done));
+  const stopped = new Error("Simulated provider preview stopped");
+  const longPreview = async () => {
+    entered();
+    await finished;
+    throw stopped;
+  };
+  const unused = async () => {
+    throw new Error("not used");
+  };
+  const provider: IacProvider = {
+    track: "terraform",
+    validationMode: "simulated",
+    validate: async () => [],
+    previewApply: longPreview,
+    previewDestroy: longPreview,
+    apply: unused,
+    destroy: unused,
+    inventory: unused,
+    reconcile: async () => undefined,
+  };
+  const { client } = await connect(context, service, "provider-wait");
+  const call = (name: string, input: Record<string, unknown> = {}) =>
+    client.callTool({ name, arguments: { workspace: service.root, ...input } });
+  const lockDirectory = join(service.root, ".apex", "local");
+  const before = await call("render", { kind: "status" });
+  assertSuccess(before, "render before");
+
+  const command = execute(["preview", "--operation", "apply", "--provider", "terraform"], service.root, {
+    providers: { terraform: provider },
+  });
+  await inProvider;
+  // The command keeps the workspace lock for writers while the provider runs.
+  await assert.rejects(
+    withRepeatGuardLock(lockDirectory, async () => undefined, { lockWaitMs: 0 }),
+    RepeatGuardBusyError,
+  );
+  const started = Date.now();
+  for (const [name, input] of [
+    ["status", {}],
+    ["render", { kind: "status" }],
+    ["diagnose", {}],
+    ["doctorChecks", {}],
+    ["capabilityList", {}],
+  ] as const) {
+    assertSuccess(await call(name, input), name);
+  }
+  // The snapshot is the state the command started the provider from.
+  assert.deepEqual((await call("render", { kind: "status" })).structuredContent, before.structuredContent);
+  assert.ok(Date.now() - started < 10_000, "MCP reads must not wait for the provider operation");
+
+  // A state-changing call still waits for the command.
+  let settled = false;
+  const write = call("nextTask").finally(() => (settled = true));
+  await new Promise((done) => setTimeout(done, 300));
+  assert.equal(settled, false, "a write must wait while the command holds the workspace lock");
+  finish();
+  await assert.rejects(command, (error: unknown) => error === stopped);
+  const written = await write;
+  assert.notEqual(
+    (written.structuredContent as { error?: { code?: string } }).error?.code,
+    "APEX_CONFLICT",
+    JSON.stringify(written.structuredContent),
+  );
+  assert.equal(await withRepeatGuardLock(lockDirectory, async () => true, { lockWaitMs: 0 }), true);
 });
 
 test("repeat records stay out of Git through the managed .apex boundary", async (context) => {

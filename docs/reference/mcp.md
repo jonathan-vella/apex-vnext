@@ -343,11 +343,19 @@ execution and record publication. Only the `read-only` tools, their CLI counterp
 `version` and `apex mcp serve` itself do not take it. A CLI command gives the lock up only while it waits for
 interactive input, such as an `apex bootstrap` question, so MCP calls are not blocked meanwhile. Before it continues
 it takes the lock again and compares the selected run state above and the workspace setup files in `.apex` with their
-state before the wait; if anything changed, it fails with `APEX_STALE` without applying the answer. Waits for provider,
-Git, GitHub and Azure CLI processes keep the lock, because their results bind to the state they started from.
-Guarded calls never give the lock up. The lock uses the run mutation lock's protocol: an expired lock
-whose holder process no longer runs on this host is taken over into a permanent tombstone, so a delayed contender can
-never remove a replacement lock.
+state before the wait; if anything changed, it fails with `APEX_STALE` without applying the answer. Waits for provider
+(preview, apply, destroy, inventory, native validation), Git, GitHub and Azure CLI processes keep the lock, because
+their results bind to the state they started from, but a CLI command shares it with `read` tools while such a process
+runs: it marks the held lock as shared, writes no workspace state until the process ends, and closes the share before it
+writes again. If the share cannot be closed, the command writes nothing more and fails with `APEX_CONFLICT` once it has
+released the lock, which ends the share; the external operation may already have taken effect, so inspect its target
+before running the command again. A `read` tool that finds the lock held and shared runs without it in snapshot mode and
+is answered only if the same share was still open when it finished; otherwise it retries. A read that would have to
+finish a pending run or customization recovery is not retried as a snapshot; it waits for the lock. Writers, including
+guarded and `convergent` calls, still wait for the command, and the 30-second limit still applies to them. Guarded calls
+never give the lock up or share it. The lock uses the run mutation lock's protocol: an expired lock whose holder process
+no longer runs on this host is taken over into a permanent tombstone, so a delayed contender can never remove a
+replacement lock.
 
 An identical call is answered from the original result only when all of these hold:
 

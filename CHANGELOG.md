@@ -51,6 +51,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   only if those files still hold their content from the start of the call, changed only by the call's own writes, so an
   edit while a call runs, or one that keeps a file's size and modification time, is never answered from a result
   computed on other content.
+- MCP `read` tools (`taskContext`, `readTaskInput`, `preview`, `render`, `inventory`, `diagnose`, `doctorChecks`,
+  `capabilityList`, `capabilityStatus`, `improvementObservations`, `improvementProposals`) no longer fail with
+  `APEX_CONFLICT` after 30 seconds while a CLI command waits for a long provider preview, apply, destroy, inventory or
+  native validation, or for a Git, GitHub or Azure CLI process. The command keeps the workspace lock for writers but
+  shares it with readers for the duration of the process, and a read is answered from the unchanged workspace only if
+  the command wrote nothing while it ran; a read that would have to finish a pending recovery still waits for the
+  lock. State-changing calls stay serialized.
 
 ### Security
 
