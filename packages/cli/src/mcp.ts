@@ -713,7 +713,9 @@ export function createMcpServerFactory(
                 )
               : effect === "read-only"
                 ? await execute()
-                : await resolved.service.withWorkspaceWriteLock(execute, signal);
+                : effect === "read"
+                  ? await resolved.service.withWorkspaceReadLock(execute, signal)
+                  : await resolved.service.withWorkspaceWriteLock(execute, signal);
         } catch (error) {
           const normalized = normalizeError(error);
           const governance =

@@ -154,8 +154,11 @@ import {
   REPEAT_GUARD_FILE,
   RepeatGuardBusyError,
   RepeatGuardCancelledError,
+  RepeatGuardShareCloseError,
+  RepeatGuardSnapshotUnavailableError,
   RepeatGuardStaleError,
   withRepeatGuardLock,
+  withRepeatGuardReadLock,
   repeatStateToken,
   repeatFilesDigest,
   snapshotRepeatFiles,
@@ -265,6 +268,14 @@ function repeatGuardError(error: unknown): unknown {
     return new ApexError("APEX_CONFLICT", error.message, EXIT_CODES.conflict, undefined, error);
   if (error instanceof RepeatGuardCancelledError)
     return new ApexError("APEX_CONFLICT", "Cancelled", EXIT_CODES.conflict, undefined, error);
+  if (error instanceof RepeatGuardShareCloseError)
+    return new ApexError(
+      "APEX_CONFLICT",
+      "The workspace lock could not be closed to MCP readers after an external process, so the command stopped without recording further state. The external operation may already have taken effect: inspect its target outside APEX (deployed Azure resources or Terraform state, the Git remote, GitHub or Azure setup) and refresh status before you run the command again.",
+      EXIT_CODES.conflict,
+      undefined,
+      error,
+    );
   if (error instanceof RepeatGuardStaleError)
     return new ApexError(
       "APEX_STALE",
@@ -824,6 +835,8 @@ export class ApexService {
   private readonly host: HostEnvironment;
   /** Writes the running repeat-guarded call makes to the files its repeat record binds. */
   private readonly repeatWrites = new AsyncLocalStorage<RepeatFileWrites>();
+  /** Set while a read runs as a snapshot without the workspace lock; any write or recovery then needs the lock. */
+  private readonly snapshotRead = new AsyncLocalStorage<boolean>();
   private readonly improvementPolicy: ImprovementPolicyV1 | undefined;
   private improvementRuntime?: ImprovementStore;
   private requirementsDocumentTemplate?: Promise<{ content: string; hash: string }>;
@@ -1042,7 +1055,7 @@ export class ApexService {
       );
     const read = async (endpoint: string): Promise<unknown> => {
       try {
-        const result = await this.processRunner.run({
+        const result = await this.runExternalProcess({
           executable: "gh",
           args: ["api", "--hostname", "github.com", "--method", "GET", endpoint],
           cwd: this.root,
@@ -1070,7 +1083,7 @@ export class ApexService {
 
   private async governanceSetupRead(executable: "az" | "gh", args: string[]): Promise<unknown> {
     try {
-      const result = await this.processRunner.run({
+      const result = await this.runExternalProcess({
         executable,
         args,
         cwd: this.root,
@@ -1322,7 +1335,7 @@ export class ApexService {
           ];
         }
         try {
-          const result = await this.processRunner.run({
+          const result = await this.runExternalProcess({
             executable: "az",
             args,
             cwd: this.root,
@@ -1380,7 +1393,7 @@ export class ApexService {
       this.governanceSetupRead("gh", ["api", "--hostname", "github.com", "--method", "GET", endpoint]);
     const git = async (args: string[]): Promise<string | null> => {
       try {
-        const result = await this.processRunner.run({
+        const result = await this.runExternalProcess({
           executable: "git",
           args,
           cwd: this.root,
@@ -1534,7 +1547,7 @@ export class ApexService {
                   args: ["push", "--set-upstream", config.remote, `${initial.push.branch}:${initial.push.branch}`],
                 };
         try {
-          const result = await this.processRunner.run({
+          const result = await this.runExternalProcess({
             ...request,
             cwd: this.root,
             env: { ...process.env, GH_PROMPT_DISABLED: "1", GH_PAGER: "cat" },
@@ -2530,7 +2543,7 @@ export class ApexService {
 
   private async readArchetypeRemoteJson(endpoint: string): Promise<unknown> {
     try {
-      const result = await this.processRunner.run({
+      const result = await this.runExternalProcess({
         executable: "gh",
         args: ["api", "--hostname", "github.com", "--method", "GET", endpoint],
         cwd: this.root,
@@ -2591,6 +2604,43 @@ export class ApexService {
     ).catch((error: unknown) => {
       throw repeatGuardError(error);
     });
+  }
+
+  /**
+   * Runs a `read` operation, one that writes nothing except by finishing a pending run or customization recovery. It
+   * takes the workspace lock when it is free. While a CLI command holds the lock and waits for an external process
+   * through {@link whileExternalProcessRuns}, the read runs as a snapshot without the lock instead and is answered only
+   * if the command wrote nothing meanwhile; a read that would need to recover state waits for the lock.
+   */
+  async withWorkspaceReadLock<T>(operation: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+    return withRepeatGuardReadLock(
+      this.repeatLockDirectory(),
+      (mode) => this.workspaceLockHold.run(undefined, () => this.snapshotRead.run(mode === "snapshot", operation)),
+      { ...(signal === undefined ? {} : { signal }) },
+    ).catch((error: unknown) => {
+      throw repeatGuardError(error);
+    });
+  }
+
+  /**
+   * Runs an external process, such as a provider preview, apply or destroy, or a Git, GitHub or Azure CLI call, that
+   * writes no workspace state itself. A CLI command keeps the workspace lock meanwhile, so writers still wait, but
+   * shares it with {@link withWorkspaceReadLock} snapshot readers. Elsewhere `operation` runs as is.
+   */
+  private async whileExternalProcessRuns<T>(operation: () => Promise<T>): Promise<T> {
+    const hold = this.workspaceLockHold.getStore();
+    return hold === undefined ? operation() : hold.share(operation);
+  }
+
+  private async runExternalProcess(
+    request: Parameters<ProcessRunnerLike["run"]>[0],
+  ): ReturnType<ProcessRunnerLike["run"]> {
+    return this.whileExternalProcessRuns(() => this.processRunner.run(request));
+  }
+
+  /** Refuses a write or recovery inside a snapshot read, which then waits for the workspace lock instead. */
+  private assertNotSnapshotRead(): void {
+    if (this.snapshotRead.getStore() === true) throw new RepeatGuardSnapshotUnavailableError();
   }
 
   /**
@@ -4466,7 +4516,7 @@ export class ApexService {
       };
       const policyValidation = this.policyValidationInput(run.iacTool, policy, manifest, true);
       const diagnosticsTargets = await this.storageDiagnosticsTargets(manifest, handoff);
-      const receipt = await provider.validateSource({
+      const validationRequest: NativeValidationRequest = {
         ...binding,
         generatedSource: { rootPath, treeHash: handoff.treeHash },
         policyValidation: structuredClone(policyValidation),
@@ -4478,7 +4528,9 @@ export class ApexService {
               storageDiagnosticsTargets: diagnosticsTargets,
             }
           : {}),
-      });
+      };
+      const validateSource = provider.validateSource.bind(provider);
+      const receipt = await this.whileExternalProcessRuns(() => validateSource(validationRequest));
       if (
         !hasValidNativeValidationReceipt(receipt, binding) ||
         !this.hasRequiredNativePolicyEvidence(receipt, policyValidation) ||
@@ -6922,8 +6974,9 @@ export class ApexService {
           ? {}
           : { generatedSource: { rootPath: generatedRoot, treeHash: handoff.treeHash } }),
       };
-      const preview =
-        options.operation === "apply" ? await provider.previewApply(request) : await provider.previewDestroy(request);
+      const preview = await this.whileExternalProcessRuns(() =>
+        options.operation === "apply" ? provider.previewApply(request) : provider.previewDestroy(request),
+      );
       this.assertValid("preview", preview);
       const policyReceipt =
         policyValidation === undefined ? undefined : provider.policyValidation?.(preview.previewHash);
@@ -7276,9 +7329,9 @@ export class ApexService {
       );
       let operation: OperationRecordV1;
       try {
-        operation =
+        operation = await this.whileExternalProcessRuns(() =>
           preview.operation === "apply"
-            ? await provider.apply(preview, approval, {
+            ? provider.apply(preview, approval, {
                 head: preview.commit,
                 dependencyRevision,
                 ownerEpoch: run.ownerEpoch,
@@ -7287,7 +7340,7 @@ export class ApexService {
                   : { previousOwnerEpoch: preview.ownerEpoch, writerTransferClaimHash }),
                 recipientIdentity: approval.recipientIdentity ?? "local",
               })
-            : await provider.destroy(preview, approval, {
+            : provider.destroy(preview, approval, {
                 head: preview.commit,
                 dependencyRevision,
                 ownerEpoch: run.ownerEpoch,
@@ -7295,7 +7348,8 @@ export class ApexService {
                   ? {}
                   : { previousOwnerEpoch: preview.ownerEpoch, writerTransferClaimHash }),
                 recipientIdentity: approval.recipientIdentity ?? "local",
-              });
+              }),
+        );
       } catch (error) {
         await this.append(run, "deployment.indeterminate", {
           provider: providerName.provider,
@@ -7444,7 +7498,7 @@ export class ApexService {
     }
     await this.acquireRunWriterLease(run);
     const operationHash = await this.objects.putJson(operation);
-    const inventory = await provider.inventory(run.projectId, run.runId);
+    const inventory = await this.whileExternalProcessRuns(() => provider.inventory(run.projectId, run.runId));
     this.assertValid("inventory", inventory);
     if (providerName === "bicep") {
       const managed = new Map(
@@ -8232,6 +8286,7 @@ export class ApexService {
     payload: JsonValue,
     expectedJournalHead?: string | null,
   ): Promise<void> {
+    this.assertNotSnapshotRead();
     const repository = this.runRepository(before);
     try {
       await this.acquireRunWriterLease(before);
@@ -8565,16 +8620,19 @@ export class ApexService {
   }
   private async run(selection: Selection, options: { readOnly?: boolean } = {}): Promise<RunConfigV1> {
     const directory = this.projects.runDirectory(selection.projectId, selection.runId);
-    if (options.readOnly) {
+    // A snapshot read must not take the run mutation lock or recover, so it reads like a read-only call.
+    const readOnly = options.readOnly === true || this.snapshotRead.getStore() === true;
+    if (readOnly) {
       const pending = await readFile(join(directory, ".run-transaction.json")).catch((error: unknown) => {
         if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
         throw error;
       });
       if (pending !== undefined) {
+        this.assertNotSnapshotRead();
         throw new ApexError("APEX_CONFLICT", "Run transaction recovery is required", EXIT_CODES.conflict);
       }
     }
-    const run = options.readOnly
+    const run = readOnly
       ? (JSON.parse(await readFile(join(directory, "run.json"), "utf8")) as RunConfigV1)
       : await this.runRepository(selection).read();
     const events = await this.journal(run).replay();
@@ -8643,6 +8701,7 @@ export class ApexService {
   }
 
   private async acquireRunWriterLease(run: RunConfigV1): Promise<void> {
+    this.assertNotSnapshotRead();
     await this.refreshWorkspacePath();
     await this.runRepository(run).acquireWriterLease(this.writerLeaseOwner());
   }
@@ -8672,6 +8731,7 @@ export class ApexService {
     return JSON.parse(await readFile(join(this.root, ".apex", "config.json"), "utf8")) as Selection;
   }
   private async writeSelection(selection: Selection): Promise<void> {
+    this.assertNotSnapshotRead();
     await atomicWriteJson(join(this.root, ".apex", "config.json"), selection);
   }
 
@@ -10271,7 +10331,7 @@ export class ApexService {
           artifacts["logical-resource-manifest"] as LogicalResourceManifestV1 | undefined,
           handoff,
         );
-        const receipt = await provider.validateSource({
+        const validationRequest: NativeValidationRequest = {
           ...binding,
           generatedSource: { rootPath, treeHash: handoff.treeHash },
           policyValidation: structuredClone(policyValidation),
@@ -10287,7 +10347,9 @@ export class ApexService {
                 storageDiagnosticsTargets: diagnosticsTargets,
               }
             : {}),
-        });
+        };
+        const validateSource = provider.validateSource.bind(provider);
+        const receipt = await this.whileExternalProcessRuns(() => validateSource(validationRequest));
         if (!hasValidNativeValidationReceipt(receipt, binding))
           throw new ApexError(
             "APEX_VALIDATION",
@@ -10830,6 +10892,7 @@ export class ApexService {
   }
 
   private async refreshTaskHead(run: RunConfigV1, task: TaskEnvelopeV1): Promise<void> {
+    this.assertNotSnapshotRead();
     const expectedHead = await this.journal(run).head();
     if (expectedHead === null) throw new ApexError("APEX_STALE", "Task journal is empty", EXIT_CODES.stale);
     await atomicWriteJson(join(this.projects.runDirectory(run.projectId, run.runId), "tasks", `${task.taskId}.json`), {
@@ -11637,6 +11700,10 @@ export class ApexService {
 
   private async recoverCustomizationTransaction(): Promise<void> {
     const pointer = join(this.root, ".apex", "local", "customization-transaction.json");
+    if (this.snapshotRead.getStore() === true) {
+      if (await this.pathExistsLstat(pointer)) this.assertNotSnapshotRead();
+      return;
+    }
     try {
       const { transactionPath } = JSON.parse(await readFile(pointer, "utf8")) as { transactionPath: string };
       const localRoot = join(this.root, ".apex", "local");

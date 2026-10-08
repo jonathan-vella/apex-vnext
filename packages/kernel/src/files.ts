@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { constants, type Stats } from "node:fs";
 import { link, lstat, mkdir, open, readFile, rename, rm } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
@@ -117,11 +118,86 @@ export interface AtomicWriteOptions {
   refuseOverwrite?: boolean;
 }
 
+/**
+ * Coordinates the atomic writes of one operation, such as a workspace lock holder, with its quiet sections, during
+ * which another process may read the state those writes change. A write in the fenced async context waits while a
+ * quiet section runs, and a quiet section starts only once no such write is in flight, so readers inside a quiet
+ * section never see the operation's writes land. Writes made inside a quiet section itself are not held back: the
+ * section's own work, such as an external provider's private records, is outside the state readers depend on. Once
+ * `error` is set, every later fenced write throws it instead of writing.
+ */
+export class WriteFence {
+  error?: Error;
+  private writes = 0;
+  private quiets = 0;
+  private pendingQuiets = 0;
+  private waiters: Array<() => void> = [];
+
+  /** Runs `operation` as a quiet section; a section started inside another one of this fence joins it. */
+  async quiet<T>(operation: () => Promise<T>): Promise<T> {
+    if (quietSections.getStore()?.has(this) === true) return operation();
+    this.pendingQuiets += 1;
+    try {
+      while (this.writes > 0) await this.changed();
+    } finally {
+      this.pendingQuiets -= 1;
+    }
+    this.quiets += 1;
+    try {
+      return await quietSections.run(new Set(quietSections.getStore() ?? []).add(this), operation);
+    } finally {
+      this.quiets -= 1;
+      this.notify();
+    }
+  }
+
+  async write<T>(operation: () => Promise<T>): Promise<T> {
+    if (this.error !== undefined) throw this.error;
+    if (quietSections.getStore()?.has(this) === true) return operation();
+    // Waiting quiet sections go first, so a stream of writes cannot hold a reader window off indefinitely.
+    while (this.quiets > 0 || this.pendingQuiets > 0) {
+      await this.changed();
+      if (this.error !== undefined) throw this.error;
+    }
+    this.writes += 1;
+    try {
+      return await operation();
+    } finally {
+      this.writes -= 1;
+      this.notify();
+    }
+  }
+
+  private changed(): Promise<void> {
+    return new Promise((resolve) => this.waiters.push(resolve));
+  }
+
+  private notify(): void {
+    const waiters = this.waiters;
+    this.waiters = [];
+    for (const resolve of waiters) resolve();
+  }
+}
+
+const writeFences = new AsyncLocalStorage<WriteFence>();
+const quietSections = new AsyncLocalStorage<ReadonlySet<WriteFence>>();
+
+/** Runs `operation` with its atomic writes, and those of everything it starts, subject to `fence`. */
+export function withWriteFence<T>(fence: WriteFence, operation: () => Promise<T>): Promise<T> {
+  return writeFences.run(fence, operation);
+}
+
 export async function atomicWriteBytes(
   path: string,
   bytes: Uint8Array,
   options: AtomicWriteOptions = {},
 ): Promise<void> {
+  const fence = writeFences.getStore();
+  if (fence !== undefined) return fence.write(() => writeBytes(path, bytes, options));
+  return writeBytes(path, bytes, options);
+}
+
+async function writeBytes(path: string, bytes: Uint8Array, options: AtomicWriteOptions): Promise<void> {
   const directory = dirname(path);
   await mkdir(directory, { recursive: true });
   const temporary = join(directory, `.${basename(path)}.${process.pid}.${crypto.randomUUID()}.tmp`);

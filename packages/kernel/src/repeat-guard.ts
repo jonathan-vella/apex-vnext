@@ -14,9 +14,9 @@ import { constants } from "node:fs";
 import { lstat, mkdir, open } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { sha256Json, sha256Text } from "./canonical.js";
-import { DirectoryLock } from "./directory-lock.js";
+import { DirectoryLock, DirectoryLockShareCloseError, type DirectoryLockHold } from "./directory-lock.js";
 import { EventJournal } from "./event-journal.js";
-import { atomicWriteJson } from "./files.js";
+import { atomicWriteJson, withWriteFence, WriteFence } from "./files.js";
 import {
   repeatFilesHeld,
   snapshotRepeatFiles,
@@ -37,6 +37,8 @@ export const REPEAT_EVENT_TYPE = "call.repeated";
 export const REPEAT_LOCK_FILE = ".repeat-guard.lock";
 export const DEFAULT_REPEAT_LOCK_WAIT_MS = 30_000;
 const REPEAT_LOCK_TTL_MS = 30_000;
+// Poll interval of a read waiting for the workspace lock or for a share window to open.
+const READ_LOCK_RETRY_MS = 20;
 export const DEFAULT_REPEAT_WINDOW_MS = 10 * 60 * 1000;
 export const MAX_REPEAT_RECORDS = 16;
 export const MAX_REPEAT_RESULT_BYTES = 64 * 1024;
@@ -145,6 +147,32 @@ export class RepeatGuardStaleError extends Error {
   }
 }
 
+/**
+ * A snapshot read reached a step that needs the workspace lock, such as finishing a pending recovery. Nothing was
+ * written; {@link withRepeatGuardReadLock} discards the attempt and waits for the lock instead.
+ */
+export class RepeatGuardSnapshotUnavailableError extends Error {
+  constructor() {
+    super("The read needs the workspace lock");
+    this.name = "RepeatGuardSnapshotUnavailableError";
+  }
+}
+
+/**
+ * A holder's share window could not be closed, so snapshot readers might still trust it. Every later atomic write and
+ * share in the holder's operation fails with this error, and so does the operation itself, even if it handled the
+ * error; releasing the lock then closes the window. The caller should run the operation again.
+ */
+export class RepeatGuardShareCloseError extends Error {
+  constructor(cause: unknown) {
+    super("The workspace lock could not be closed to readers; nothing more was written", { cause });
+    this.name = "RepeatGuardShareCloseError";
+  }
+}
+
+/** How {@link withRepeatGuardReadLock} runs a read: holding the workspace lock, or as a validated snapshot without it. */
+export type RepeatGuardReadMode = "locked" | "snapshot";
+
 /** The workspace lock as held by one {@link withRepeatGuardLock} operation. */
 export interface WorkspaceLockHold {
   /**
@@ -154,6 +182,15 @@ export interface WorkspaceLockHold {
    * workspace created during the wait is locked from then on. Not reentrant: one suspension at a time.
    */
   suspend<R>(wait: () => Promise<R>, state: () => Promise<string>): Promise<R>;
+  /**
+   * Keeps the workspace lock while `operation` runs, for example a long provider, Git or Azure CLI process, but lets
+   * {@link withRepeatGuardReadLock} readers in other processes read the workspace meanwhile. The holder must not write
+   * workspace state until `operation` settles. Writers still wait. While this hold has no lock to share, because the
+   * workspace has no state yet or the hold is suspended, it runs `operation` without a share window.
+   * When the window cannot be closed afterwards it throws {@link RepeatGuardShareCloseError}, which also fences every
+   * later write of the holding operation.
+   */
+  share<R>(operation: () => Promise<R>): Promise<R>;
 }
 
 export interface RepeatSafeOutcome<T> {
@@ -366,6 +403,7 @@ export async function withRepeatGuardLock<T>(
   if (cancelled()) throw new RepeatGuardCancelledError();
   let held = await acquireRepeatGuardLock(lockDirectory, lockWaitMs, signal);
   let suspended = false;
+  const fence = new WriteFence();
   const hold: WorkspaceLockHold = {
     suspend: async (wait, state) => {
       if (suspended) throw new Error("The workspace lock is already suspended");
@@ -389,14 +427,95 @@ export async function withRepeatGuardLock<T>(
         suspended = false;
       }
     },
+    share: async (operation) => {
+      if (fence.error !== undefined) throw fence.error;
+      const sharing = held;
+      if (sharing === undefined) return operation();
+      try {
+        // No write of this operation lands while the window is open, even from a flow other than `operation`.
+        return await fence.quiet(() => sharing.share(operation));
+      } catch (error) {
+        if (!(error instanceof DirectoryLockShareCloseError)) throw error;
+        // A reader may still trust the open window, so nothing in this operation may write again before release.
+        fence.error ??= new RepeatGuardShareCloseError(error);
+        throw fence.error;
+      }
+    },
   };
   try {
     // Cancellation while waiting for the lock is reported by the lock; once it is held, nothing has started yet.
     if (cancelled()) throw new RepeatGuardCancelledError();
-    return await operation(hold);
+    const value = await withWriteFence(fence, () => operation(hold));
+    if (fence.error !== undefined) throw fence.error;
+    return value;
+  } catch (error) {
+    // An operation that handled the share failure, or failed on a fenced write, still fails with it.
+    throw fence.error ?? error;
   } finally {
     await held?.release();
   }
+}
+
+/**
+ * Runs a read that may need the workspace lock, for example to finish a pending recovery. It takes the lock like
+ * {@link withRepeatGuardLock} when the lock is free. While another process holds the lock but shares it through
+ * {@link WorkspaceLockHold.share}, `operation` runs in `snapshot` mode without the lock instead, and its outcome counts
+ * only if the holder kept the same share window open throughout, so the holder wrote nothing meanwhile. In `snapshot`
+ * mode `operation` must not write workspace state; it throws {@link RepeatGuardSnapshotUnavailableError} instead, and
+ * the read waits for the lock. Fails with {@link RepeatGuardBusyError} after `lockWaitMs` without either.
+ */
+export async function withRepeatGuardReadLock<T>(
+  lockDirectory: string,
+  operation: (mode: RepeatGuardReadMode) => Promise<T>,
+  options: { lockWaitMs?: number; signal?: AbortSignal } = {},
+): Promise<T> {
+  const lockWaitMs = options.lockWaitMs ?? DEFAULT_REPEAT_LOCK_WAIT_MS;
+  if (!Number.isSafeInteger(lockWaitMs) || lockWaitMs < 0)
+    throw new RangeError("Repeat lock wait must not be negative");
+  const { signal } = options;
+  const cancelled = () => signal?.aborted === true;
+  const deadline = Date.now() + lockWaitMs;
+  // Only a lock holder can finish a pending recovery, so once a snapshot needed one the read just waits for the lock.
+  let snapshots = true;
+  for (;;) {
+    if (cancelled()) throw new RepeatGuardCancelledError();
+    let held: DirectoryLockHold | undefined;
+    try {
+      held = await acquireRepeatGuardLock(lockDirectory, 0, signal);
+    } catch (error) {
+      if (!(error instanceof RepeatGuardBusyError)) throw error;
+      const snapshot = !snapshots
+        ? undefined
+        : await repeatGuardLock(lockDirectory)
+            .readShared(() => operation("snapshot"))
+            .catch((readError: unknown) => {
+              if (!(readError instanceof RepeatGuardSnapshotUnavailableError)) throw readError;
+              snapshots = false;
+              return undefined;
+            });
+      if (snapshot !== undefined) return snapshot.value;
+      if (Date.now() >= deadline) throw error;
+      await new Promise((done) => setTimeout(done, READ_LOCK_RETRY_MS));
+      continue;
+    }
+    try {
+      if (cancelled()) throw new RepeatGuardCancelledError();
+      return await operation("locked");
+    } finally {
+      await held?.release();
+    }
+  }
+}
+
+function repeatGuardLock(lockDirectory: string): DirectoryLock {
+  return new DirectoryLock(join(lockDirectory, REPEAT_LOCK_FILE), {
+    label: "Repeat guard lock",
+    clock: () => new Date(),
+    idSource: () => crypto.randomUUID(),
+    ttlMs: REPEAT_LOCK_TTL_MS,
+    platform: process.platform,
+    busyError: () => new RepeatGuardBusyError(),
+  });
 }
 
 /** Acquires the workspace repeat lock, or returns undefined while the workspace has no state to serialize yet. */
@@ -404,7 +523,7 @@ async function acquireRepeatGuardLock(
   lockDirectory: string,
   lockWaitMs: number,
   signal: AbortSignal | undefined,
-): Promise<{ release(): Promise<void> } | undefined> {
+): Promise<DirectoryLockHold | undefined> {
   const cancelled = () => (signal?.aborted === true ? new RepeatGuardCancelledError() : undefined);
   try {
     await lstat(dirname(lockDirectory));
@@ -416,15 +535,7 @@ async function acquireRepeatGuardLock(
   const directory = await lstat(lockDirectory);
   if (!directory.isDirectory() || directory.isSymbolicLink())
     throw new Error("Repeat guard lock directory is not a regular directory");
-  const lock = new DirectoryLock(join(lockDirectory, REPEAT_LOCK_FILE), {
-    label: "Repeat guard lock",
-    clock: () => new Date(),
-    idSource: () => crypto.randomUUID(),
-    ttlMs: REPEAT_LOCK_TTL_MS,
-    platform: process.platform,
-    busyError: () => new RepeatGuardBusyError(),
-  });
-  return lock.acquire({ waitMs: lockWaitMs, onContention: async () => cancelled() });
+  return repeatGuardLock(lockDirectory).acquire({ waitMs: lockWaitMs, onContention: async () => cancelled() });
 }
 
 async function guardedCall<T extends object>(

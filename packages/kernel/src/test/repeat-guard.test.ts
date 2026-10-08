@@ -16,11 +16,15 @@ import {
   RepeatFileWrites,
   RepeatGuardBusyError,
   RepeatGuardCancelledError,
+  RepeatGuardShareCloseError,
+  RepeatGuardSnapshotUnavailableError,
   RepeatGuardStaleError,
   RunRepository,
   RunWriterConflictError,
+  atomicWriteJson,
   executeRepeatSafe,
   withRepeatGuardLock,
+  withRepeatGuardReadLock,
   sha256Json,
   readRepeatEvents,
   readRepeatRecords,
@@ -645,6 +649,270 @@ test("a workspace created while an unserialized holder waits is locked when the 
     );
   });
   assert.equal(await withRepeatGuardLock(lockDirectory, async () => "acquired", { lockWaitMs: 0 }), "acquired");
+});
+
+test("a holder sharing the lock serves snapshot reads while writers still wait", async () => {
+  const { lockDirectory } = await fixture();
+  const read = (lockWaitMs = 10_000) => withRepeatGuardReadLock(lockDirectory, async (mode) => mode, { lockWaitMs });
+  const lockFree = () => withRepeatGuardLock(lockDirectory, async () => "acquired", { lockWaitMs: 0 });
+
+  // A free lock is taken as before.
+  assert.equal(await read(), "locked");
+  await withRepeatGuardLock(lockDirectory, async (hold) => {
+    // Held but not shared: reads wait for the lock like writers.
+    await assert.rejects(read(50), RepeatGuardBusyError);
+    const value = await hold.share(async () => {
+      const started = Date.now();
+      assert.equal(await read(), "snapshot");
+      assert.ok(Date.now() - started < 5_000);
+      await assert.rejects(lockFree(), RepeatGuardBusyError);
+      // Nested shares keep one window open until the outermost settles.
+      await hold.share(async () => assert.equal(await read(), "snapshot"));
+      assert.equal(await read(), "snapshot");
+      return "provider result";
+    });
+    assert.equal(value, "provider result");
+    // The window closed before share returned, so the holder may write again.
+    await assert.rejects(read(50), RepeatGuardBusyError);
+  });
+  assert.equal(await lockFree(), "acquired");
+
+  // A failed operation closes the window too, and its error is the holder's.
+  await withRepeatGuardLock(lockDirectory, async (hold) => {
+    await assert.rejects(
+      hold.share(async () => {
+        throw new Error("provider failed");
+      }),
+      /provider failed/,
+    );
+    await assert.rejects(read(50), RepeatGuardBusyError);
+  });
+
+  // A workspace without state has no lock to share.
+  const empty = join(await mkdtemp(join(tmpdir(), "apex-repeat-guard-")), "missing", "local");
+  assert.equal(await withRepeatGuardLock(empty, async (hold) => hold.share(async () => "unlocked")), "unlocked");
+});
+
+test("concurrent shares run in one window and none returns before it closed", async () => {
+  const { lockDirectory } = await fixture();
+  const read = (lockWaitMs = 10_000) => withRepeatGuardReadLock(lockDirectory, async (mode) => mode, { lockWaitMs });
+  await withRepeatGuardLock(lockDirectory, async (hold) => {
+    const started: string[] = [];
+    const returned: string[] = [];
+    let finishSlow!: () => void;
+    const slowFinished = new Promise<void>((done) => (finishSlow = done));
+    const fast = hold
+      .share(async () => {
+        started.push("fast");
+        return "fast";
+      })
+      .then((value) => (returned.push(value), value));
+    const slow = hold
+      .share(async () => {
+        started.push("slow");
+        await slowFinished;
+        return "slow";
+      })
+      .then((value) => (returned.push(value), value));
+    await new Promise((done) => setTimeout(done, 50));
+    // Both operations run at once, but the settled one does not return into a holder that could write while the
+    // other keeps the window open.
+    assert.deepEqual(started.sort(), ["fast", "slow"]);
+    assert.deepEqual(returned, []);
+    assert.equal(await read(), "snapshot");
+    finishSlow();
+    assert.deepEqual(await Promise.all([fast, slow]), ["fast", "slow"]);
+    await assert.rejects(read(50), RepeatGuardBusyError);
+    // A share started after the window closed opens a new one.
+    assert.equal(await hold.share(async () => read()), "snapshot");
+    await assert.rejects(read(50), RepeatGuardBusyError);
+  });
+});
+
+test("a holder write from another flow waits while a share window is open", async () => {
+  const { lockDirectory } = await fixture();
+  const state = join(lockDirectory, "..", "state.json");
+  const providerRecord = join(lockDirectory, "..", "provider-record.json");
+  await atomicWriteJson(state, { value: "before" });
+  const readState = () =>
+    withRepeatGuardReadLock(
+      lockDirectory,
+      async (mode) => ({ mode, value: (JSON.parse(await readFile(state, "utf8")) as { value: string }).value }),
+      { lockWaitMs: 10_000 },
+    );
+  await withRepeatGuardLock(lockDirectory, async (hold) => {
+    let finish!: () => void;
+    const finished = new Promise<void>((done) => (finish = done));
+    let opened!: () => void;
+    const windowOpen = new Promise<void>((done) => (opened = done));
+    const sharing = hold.share(async () => {
+      // The shared operation's own records, such as a provider's, are not held back.
+      await atomicWriteJson(providerRecord, { private: true });
+      opened();
+      await finished;
+    });
+    await windowOpen;
+    // A flow other than the shared operation, such as one whose own share already returned, writes meanwhile.
+    let written = false;
+    const writing = atomicWriteJson(state, { value: "written" }).then(() => (written = true));
+    await new Promise((done) => setTimeout(done, 50));
+    assert.equal(written, false, "a holder write must not land while readers trust the window");
+    assert.deepEqual(await readState(), { mode: "snapshot", value: "before" });
+    finish();
+    await Promise.all([sharing, writing]);
+    assert.equal(written, true);
+    assert.deepEqual(JSON.parse(await readFile(providerRecord, "utf8")), { private: true });
+    // A share waits for a write in flight before it opens a window.
+    let wrote = false;
+    const write = atomicWriteJson(state, { value: "again" }).then(() => (wrote = true));
+    assert.equal(await hold.share(async () => wrote), true);
+    await write;
+  });
+  assert.deepEqual(await readState(), { mode: "locked", value: "again" });
+});
+
+test("a share marker that is not a small regular file is not trusted", async () => {
+  const { lockDirectory } = await fixture();
+  const marker = join(lockDirectory, REPEAT_LOCK_FILE, "shared.json");
+  const read = (lockWaitMs = 10_000) => withRepeatGuardReadLock(lockDirectory, async (mode) => mode, { lockWaitMs });
+  await withRepeatGuardLock(lockDirectory, async (hold) => {
+    await hold.share(async () => {
+      const valid = await readFile(marker);
+      const outside = join(lockDirectory, "..", "marker-copy.json");
+      await writeFile(outside, valid);
+      await rm(marker);
+      let linked = true;
+      try {
+        await symlink(outside, marker);
+      } catch {
+        // Windows without symlink privileges cannot create the link; the size check below still runs.
+        linked = false;
+      }
+      if (linked) {
+        await assert.rejects(read(50), RepeatGuardBusyError);
+        await rm(marker);
+      }
+      // Still parseable as the marker, but over the size bound.
+      await writeFile(marker, Buffer.concat([valid, Buffer.alloc(8 * 1024, " ")]));
+      await assert.rejects(read(50), RepeatGuardBusyError);
+      await rm(marker);
+      await writeFile(marker, valid);
+      assert.equal(await read(), "snapshot");
+    });
+  });
+});
+
+test("a snapshot read that overlaps the end of a share window is discarded and answered under the lock", async () => {
+  const { lockDirectory } = await fixture();
+  let state = "before";
+  let closeWindow: (() => void) | undefined;
+  let windowOpen!: () => void;
+  const opened = new Promise<void>((done) => (windowOpen = done));
+  const holder = withRepeatGuardLock(lockDirectory, async (hold) => {
+    await hold.share(
+      () =>
+        new Promise<void>((done) => {
+          closeWindow = done;
+          windowOpen();
+        }),
+    );
+    // The holder writes only after the window closed.
+    await new Promise((done) => setTimeout(done, 50));
+    state = "after";
+  });
+  await opened;
+  const modes: string[] = [];
+  const value = await withRepeatGuardReadLock(
+    lockDirectory,
+    async (mode) => {
+      modes.push(mode);
+      const seen = state;
+      if (modes.length === 1) {
+        closeWindow!();
+        // Keep reading until the holder has written: this snapshot is torn and must not be answered.
+        while (state === "before") await new Promise((done) => setTimeout(done, 5));
+      }
+      return seen;
+    },
+    { lockWaitMs: 10_000 },
+  );
+  await holder;
+  assert.equal(modes[0], "snapshot");
+  assert.equal(modes.at(-1), "locked");
+  assert.equal(value, "after");
+});
+
+test("a snapshot read that needs the lock waits for it; a snapshot failure is the read's own", async () => {
+  const { lockDirectory } = await fixture();
+  await withRepeatGuardLock(lockDirectory, async (hold) => {
+    await hold.share(async () => {
+      // A read that would have to recover state is not served from the snapshot.
+      const modes: string[] = [];
+      await assert.rejects(
+        withRepeatGuardReadLock(
+          lockDirectory,
+          async (mode) => {
+            modes.push(mode);
+            throw new RepeatGuardSnapshotUnavailableError();
+          },
+          { lockWaitMs: 100 },
+        ),
+        RepeatGuardBusyError,
+      );
+      // It is tried once; only the lock holder can finish the recovery, so the read then just waits for the lock.
+      assert.deepEqual(modes, ["snapshot"]);
+      // Any other failure in an unchanged window is the read's result.
+      await assert.rejects(
+        withRepeatGuardReadLock(lockDirectory, async () => {
+          throw new Error("not found");
+        }),
+        /not found/,
+      );
+      // Cancellation stops the wait.
+      await assert.rejects(
+        withRepeatGuardReadLock(lockDirectory, async () => "never", { signal: AbortSignal.abort() }),
+        RepeatGuardCancelledError,
+      );
+    });
+  });
+  // The window marker leaves no residue in the lock directory once the lock is released.
+  assert.deepEqual(
+    (await readdir(lockDirectory)).filter((name) => !name.startsWith(".repeat-guard.retired")),
+    [],
+  );
+});
+
+test("a share window that cannot be closed fences every later write of its holder until release", async () => {
+  const { lockDirectory } = await fixture();
+  const marker = join(lockDirectory, REPEAT_LOCK_FILE, "shared.json");
+  const state = join(lockDirectory, "..", "state.json");
+  const failures: unknown[] = [];
+  let snapshot: unknown;
+  await assert.rejects(
+    withRepeatGuardLock(lockDirectory, async (hold) => {
+      try {
+        await hold.share(async () => {
+          snapshot = await withRepeatGuardReadLock(lockDirectory, async (mode) => mode);
+          // Something the holder cannot remove now stands where the window marker was.
+          await rm(marker);
+          await mkdir(join(marker, "held"), { recursive: true });
+        });
+      } catch (error) {
+        // A holder that handles the failure as an ordinary process error still cannot write or share again.
+        failures.push(error);
+      }
+      failures.push(await atomicWriteJson(state, { written: true }).catch((error: unknown) => error));
+      failures.push(await hold.share(async () => "shared").catch((error: unknown) => error));
+      return "continued";
+    }),
+    RepeatGuardShareCloseError,
+  );
+  assert.equal(snapshot, "snapshot");
+  assert.equal(failures.length, 3);
+  for (const failure of failures) assert.ok(failure instanceof RepeatGuardShareCloseError);
+  await assert.rejects(readFile(state), { code: "ENOENT" });
+  // Releasing the lock took the window with it.
+  assert.equal(await withRepeatGuardReadLock(lockDirectory, async (mode) => mode, { lockWaitMs: 0 }), "locked");
 });
 
 test("a live repeat lock makes callers fail closed; an expired dead holder's lock is taken over", async () => {

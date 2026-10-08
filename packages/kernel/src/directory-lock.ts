@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { constants } from "node:fs";
 import { lstat, mkdir, mkdtemp, open, readdir, rm } from "node:fs/promises";
 import { hostname } from "node:os";
@@ -14,6 +15,12 @@ const TRANSIENT_LOCK_RENAME_CODES = new Set(["EPERM", "EACCES", "EBUSY"]);
 const RELEASED_LOCK_PREFIX = "released-";
 const RELEASED_LOCK_REMOVE_ATTEMPTS = 5;
 const TRANSIENT_LOCK_REMOVE_CODES = new Set(["EPERM", "EACCES", "EBUSY", "ENOTEMPTY"]);
+// Marker inside a held generation that opens it to snapshot readers; see `DirectoryLockHold.share`.
+const SHARE_MARKER_FILE = "shared.json";
+const MAX_SHARE_MARKER_BYTES = 4 * 1024;
+// Holds whose share window the current async context runs inside, so a nested share joins it instead of waiting for it.
+const enclosingShares = new AsyncLocalStorage<ReadonlySet<object>>();
+const SHARE_MARKER_REMOVE_ATTEMPTS = 8;
 
 interface LockMetadata {
   token: string;
@@ -21,6 +28,41 @@ interface LockMetadata {
   host: string;
   createdAt: string;
   expiresAt: string;
+}
+
+/**
+ * A share window could not be closed, so snapshot readers may still trust it. The hold refuses to share again; its
+ * holder must write nothing more before it releases the lock, which takes the window with it.
+ */
+export class DirectoryLockShareCloseError extends Error {
+  constructor(label: string, cause: unknown) {
+    super(`${label} share window could not be closed`, { cause });
+    this.name = "DirectoryLockShareCloseError";
+  }
+}
+
+interface ShareWindow {
+  members: number;
+  opened: Promise<void>;
+  closed: Promise<void>;
+  settle(error?: Error): void;
+}
+
+/** One acquisition of a {@link DirectoryLock}. */
+export interface DirectoryLockHold {
+  /** Gives the lock up. Idempotent. */
+  release(): Promise<void>;
+  /**
+   * Runs `operation` with this generation open to {@link DirectoryLock.readShared} snapshot readers, for example while
+   * the holder waits for an external process. The lock stays held, so other holders still wait. The holder must not
+   * write the state the lock protects until `operation` settles: the window closes before `share` returns, and closing
+   * it is what invalidates a snapshot read that overlapped it. Concurrent calls run their operations in one window,
+   * which closes when the last of them settles, and none returns before it closed. A call made inside a shared
+   * operation runs in the enclosing window and returns into that operation, which must still not write. When the
+   * window cannot be closed `share` throws {@link DirectoryLockShareCloseError},
+   * then and on every later call; the holder must then stop writing until it releases the lock.
+   */
+  share<T>(operation: () => Promise<T>): Promise<T>;
 }
 
 interface LockSnapshot {
@@ -113,7 +155,7 @@ export class DirectoryLock {
    */
   async acquire(
     options: { onContention?: () => Promise<Error | undefined>; waitMs?: number } = {},
-  ): Promise<{ release(): Promise<void> }> {
+  ): Promise<DirectoryLockHold> {
     await mkdir(dirname(this.lockPath), { recursive: true });
     const token = this.idSource();
     const createdAt = this.clock();
@@ -148,7 +190,65 @@ export class DirectoryLock {
       if (!(await this.retireStaleLock(existing))) throw this.busyError();
     }
     let released = false;
+    let unclosed: DirectoryLockShareCloseError | undefined;
+    const key = {};
+    // The open (or opening) window that concurrent calls join, and the close of the previous one, which a new window
+    // waits for so it never publishes its marker before the old one is removed.
+    let window: ShareWindow | undefined;
+    let closing: Promise<void> = Promise.resolve();
     return {
+      share: async <T>(operation: () => Promise<T>): Promise<T> => {
+        if (unclosed !== undefined) throw unclosed;
+        if (released) throw new Error(`${this.label} is no longer held`);
+        const enclosing = enclosingShares.getStore();
+        if (enclosing?.has(key) === true) return operation();
+        if (window === undefined) {
+          let resolveClosed!: () => void;
+          let rejectClosed!: (error: Error) => void;
+          const closed = new Promise<void>((resolve, reject) => {
+            resolveClosed = resolve;
+            rejectClosed = reject;
+          });
+          const previous = closing;
+          closing = closed.catch(() => undefined);
+          window = {
+            members: 0,
+            opened: previous.then(() => {
+              if (unclosed !== undefined) throw unclosed;
+              return this.openShare(token);
+            }),
+            closed,
+            settle: (error) => (error === undefined ? resolveClosed() : rejectClosed(error)),
+          };
+        }
+        const current = window;
+        current.members += 1;
+        let outcome: { value: T } | { error: unknown };
+        try {
+          await current.opened;
+          const members = new Set(enclosing ?? []).add(key);
+          outcome = { value: await enclosingShares.run(members, operation) };
+        } catch (error) {
+          outcome = { error };
+        }
+        current.members -= 1;
+        if (current.members === 0) {
+          if (window === current) window = undefined;
+          try {
+            // A released generation took its marker with it; the lock path may now hold another generation.
+            if (!released) await this.closeShare();
+            current.settle();
+          } catch (error) {
+            unclosed = new DirectoryLockShareCloseError(this.label, error);
+            current.settle(unclosed);
+          }
+        }
+        // No member returns while the window may still be open; a close failure replaces every member's outcome, so
+        // the holder never continues as if the window had closed.
+        await current.closed;
+        if ("error" in outcome) throw outcome.error;
+        return outcome.value;
+      },
       release: async () => {
         if (released) return;
         released = true;
@@ -161,6 +261,99 @@ export class DirectoryLock {
         await this.sweepReleasedLocks();
       },
     };
+  }
+
+  /**
+   * Runs `read` without the lock while a holder shares its generation (see {@link DirectoryLockHold.share}) and returns
+   * its outcome only when the same window was still open after `read` settled, so the holder wrote nothing meanwhile.
+   * Returns undefined, discarding the outcome, when no window was open or it closed during the read; the caller then
+   * retries or waits for the lock. `read` must not write the state the lock protects.
+   */
+  async readShared<T>(read: () => Promise<T>): Promise<{ value: T } | undefined> {
+    const before = await this.shareWindow();
+    if (before === undefined) return undefined;
+    let outcome: { value: T } | { error: unknown };
+    try {
+      outcome = { value: await read() };
+    } catch (error) {
+      outcome = { error };
+    }
+    if ((await this.shareWindow()) !== before) return undefined;
+    if ("error" in outcome) throw outcome.error;
+    return outcome;
+  }
+
+  private async openShare(token: string): Promise<void> {
+    const current = await this.readLock();
+    if (current?.metadata.token !== token) throw new Error(`${this.label} is no longer held`);
+    const staging = join(this.lockPath, `${SHARE_MARKER_FILE}.${crypto.randomUUID()}.pending`);
+    try {
+      const handle = await open(staging, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY, 0o600);
+      try {
+        await handle.writeFile(canonicalJsonBytes({ token, window: crypto.randomUUID() }));
+        await handle.sync();
+      } finally {
+        await handle.close();
+      }
+      // Published by rename, so a reader never parses a partial marker.
+      await renameWithRetry(staging, join(this.lockPath, SHARE_MARKER_FILE));
+    } finally {
+      await rm(staging, { force: true });
+    }
+  }
+
+  private async closeShare(): Promise<void> {
+    const attempts = this.platform === "win32" ? SHARE_MARKER_REMOVE_ATTEMPTS : 1;
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        await rm(join(this.lockPath, SHARE_MARKER_FILE), { force: true });
+        return;
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code ?? "";
+        if (attempt >= attempts || !TRANSIENT_LOCK_REMOVE_CODES.has(code)) throw error;
+        await sleep(10 * 2 ** (attempt - 1));
+      }
+    }
+  }
+
+  /**
+   * Identity of the open share window: the holding generation's token and the window id, or undefined when there is no
+   * readable window. Any failure to read it counts as no window, so a reader falls back to the lock.
+   */
+  private async shareWindow(): Promise<string | undefined> {
+    try {
+      const lock = await this.readLock();
+      if (lock === undefined) return undefined;
+      const markerPath = join(this.lockPath, SHARE_MARKER_FILE);
+      const marker = await lstat(markerPath);
+      if (!marker.isFile() || marker.size > MAX_SHARE_MARKER_BYTES) return undefined;
+      // Read through one handle that is still the file checked above, so a replacement cannot redirect or enlarge it.
+      const handle = await open(markerPath, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+      let bytes: Buffer;
+      try {
+        const opened = await handle.stat();
+        if (
+          !opened.isFile() ||
+          opened.dev !== marker.dev ||
+          opened.ino !== marker.ino ||
+          opened.size > MAX_SHARE_MARKER_BYTES
+        )
+          return undefined;
+        const buffer = Buffer.alloc(MAX_SHARE_MARKER_BYTES + 1);
+        const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
+        if (bytesRead > MAX_SHARE_MARKER_BYTES) return undefined;
+        bytes = buffer.subarray(0, bytesRead);
+      } finally {
+        await handle.close();
+      }
+      const value = JSON.parse(bytes.toString("utf8")) as { token?: unknown; window?: unknown } | null;
+      // The token binds the marker to the generation read above; a later generation carries a different token.
+      if (value?.token !== lock.metadata.token || typeof value.window !== "string" || value.window.length === 0)
+        return undefined;
+      return `${lock.metadata.token}\n${value.window}`;
+    } catch {
+      return undefined;
+    }
   }
 
   private async acquireLock(metadata: LockMetadata): Promise<boolean> {
