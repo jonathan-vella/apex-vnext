@@ -20,6 +20,8 @@ Use this skill to orient an interactive agent without reconstructing workflow st
 
 1. Call `apex/status` for the selected project.
    For a status-only request, report that result and stop without calling `apex/nextTask`.
+   If status returns `runtime_mismatch`, report both versions and its `nextAction`, then stop; every other APEX tool
+   fails with `APEX_RUNTIME_MISMATCH` until the user fixes the runtime or workspace version.
 2. If the selected project is wrong or absent, use the active client question mechanism to select a project, then repeat
    `apex/status`.
 3. If status identifies blockers, gates, or a terminal run, report that kernel state and do not infer a task.

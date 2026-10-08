@@ -27,7 +27,7 @@ timeouts or cancellations, route human decisions through `ask_user`, and explain
 
 | Tool                   | Purpose                                                                                       |
 | ---------------------- | --------------------------------------------------------------------------------------------- |
-| `status`               | Read selected project and run status.                                                         |
+| `status`               | Read selected project and run status, or report a runtime version mismatch.                   |
 | `releaseWriter`        | Release this workspace's writer lease for the selected run.                                   |
 | `nextTask`             | Get the next input, review decision, task, or terminal status.                                |
 | `taskContext`          | Read context for the exact task ID returned by `nextTask`.                                    |
@@ -147,6 +147,31 @@ oversized non-pageable result fails instead of being silently truncated. Every c
 | `improvementProposals`    | `proposals`    |
 | `render`                  | `markdown`     |
 | `doctorChecks`            | `checks`       |
+
+## Runtime Binding
+
+The server runs one exact `@apexops/cli` version: the version the plugin bundles, or the npm package that runs
+`apex mcp serve`. The plugin and `@apexops/cli` are published at the same version
+([REQ-DIST-001](../vnext/PRD.md#req-dist-001-distribution-and-installation)). `apex init`, `apex update` and
+`apex doctor --fix --yes` record the version that wrote the workspace as `cliVersion` in `.apex/apex.lock.json`. Every
+tool call reads that field after resolving `workspace` and before calling the service, so an `apex update` takes effect
+without restarting the server. The rule is the same for both channels: the runtime version must equal the workspace
+lock version exactly.
+
+| Workspace lock                                             | `status`                  | Every other tool                                                             |
+| ---------------------------------------------------------- | ------------------------- | ---------------------------------------------------------------------------- |
+| No `.apex/apex.lock.json` (APEX not initialized)           | Unchanged                 | Unchanged                                                                    |
+| `cliVersion` equals the runtime version                    | Unchanged                 | Unchanged                                                                    |
+| Older `cliVersion` (`RUNTIME_WORKSPACE_OLDER`)             | `runtime_mismatch` result | `APEX_RUNTIME_MISMATCH`; run `apex update` with the runtime's `@apexops/cli` |
+| Newer `cliVersion` (`RUNTIME_WORKSPACE_NEWER`)             | `runtime_mismatch` result | `APEX_RUNTIME_MISMATCH`; install the plugin or `@apexops/cli` the lock names |
+| Missing, non-SemVer or unreadable (`RUNTIME_LOCK_INVALID`) | `runtime_mismatch` result | `APEX_RUNTIME_MISMATCH`; inspect the lock, then `apex doctor --fix --yes`    |
+
+Versions compare by SemVer precedence; a lock that differs only in build metadata counts as newer, so the workspace
+keeps its version. On a mismatch, `status` stays read-only and does not read workspace state. It returns
+`{ "status": "runtime_mismatch", "reason", "runtimeVersion", "workspaceRuntimeVersion", "nextAction" }`, where
+`workspaceRuntimeVersion` is `null` for an invalid lock and `nextAction` is the remediation. Every other tool returns
+`APEX_RUNTIME_MISMATCH` without calling the service, and its message names both versions. CLI commands, including
+`apex update`, are not gated, so the fix path always runs. Do not downgrade a newer workspace with an older runtime.
 
 ## Inputs And Lifecycle
 

@@ -45,6 +45,7 @@ function contract(schema: TObject | TUnion<TObject[]>, options: { pageable?: boo
             "APEX_CONFLICT",
             "APEX_WRITER_CONFLICT",
             "APEX_WORKSPACE_UNSUPPORTED",
+            "APEX_RUNTIME_MISMATCH",
             "APEX_VALIDATION",
             "APEX_STALE",
             "APEX_AUTHORIZATION",
@@ -194,6 +195,17 @@ export const MCP_OUTPUT_SCHEMAS = {
         status: Type.Literal("needs_project"),
         workspaceReady: Type.Literal(true),
         projects: Type.Array(Type.String(), { maxItems: 0 }),
+        nextAction: NonEmptyStringSchema,
+      }),
+      object({
+        status: Type.Literal("runtime_mismatch"),
+        reason: Type.Union(
+          ["RUNTIME_WORKSPACE_OLDER", "RUNTIME_WORKSPACE_NEWER", "RUNTIME_LOCK_INVALID"].map((value) =>
+            Type.Literal(value),
+          ),
+        ),
+        runtimeVersion: NonEmptyStringSchema,
+        workspaceRuntimeVersion: Type.Union([NonEmptyStringSchema, Type.Null()]),
         nextAction: NonEmptyStringSchema,
       }),
     ]),

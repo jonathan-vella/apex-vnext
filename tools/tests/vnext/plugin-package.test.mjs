@@ -627,6 +627,31 @@ test("packaged MCP server starts offline and serves 2026-07-28 discovery, tools 
   assert.notEqual(called.result.isError, true, JSON.stringify(called.result));
   assert.deepEqual(called.result.structuredContent, cli(plugin.workspace, ["status"]).result);
 
+  // The bundled runtime refuses a workspace locked to another @apexops/cli version; status reports it read-only.
+  const { version } = await readJson(join(root, "packages/cli/package.json"));
+  const lockPath = join(plugin.workspace, ".apex", "apex.lock.json");
+  await writeFile(lockPath, JSON.stringify({ ...(await readJson(lockPath)), cliVersion: "99.0.0" }));
+  server.send({
+    id: 4,
+    method: "tools/call",
+    params: { name: "status", arguments: { workspace: plugin.workspace }, _meta: modernMeta },
+  });
+  const mismatch = await server.next();
+  assert.equal(mismatch.id, 4, JSON.stringify(mismatch));
+  assert.notEqual(mismatch.result.isError, true, JSON.stringify(mismatch.result));
+  assert.equal(mismatch.result.structuredContent.status, "runtime_mismatch");
+  assert.equal(mismatch.result.structuredContent.runtimeVersion, version);
+  assert.equal(mismatch.result.structuredContent.workspaceRuntimeVersion, "99.0.0");
+  server.send({
+    id: 5,
+    method: "tools/call",
+    params: { name: "projectList", arguments: { workspace: plugin.workspace }, _meta: modernMeta },
+  });
+  const refused = await server.next();
+  assert.equal(refused.id, 5, JSON.stringify(refused));
+  assert.equal(refused.result.isError, true, JSON.stringify(refused.result));
+  assert.equal(refused.result.structuredContent.error.code, "APEX_RUNTIME_MISMATCH");
+
   const exit = await server.close();
   assert.deepEqual({ code: exit.code, signal: exit.signal }, { code: 0, signal: null }, exit.stderr);
   assert.equal(exit.stderr, "");
@@ -654,6 +679,11 @@ test("packaged MCP server answers a Copilot discover then 2025-11-25 initialize 
   assert.equal(initialized.error, undefined, JSON.stringify(initialized));
   assert.equal(initialized.result.protocolVersion, "2025-11-25");
   assert.equal(initialized.result.serverInfo.name, "apex");
+  // The bundle serves the exact @apexops/cli version the plugin is published as.
+  assert.equal(
+    initialized.result.serverInfo.version,
+    (await readJson(join(root, "packages/cli/package.json"))).version,
+  );
   server.send({ method: "notifications/initialized" });
   server.send({ id: 3, method: "tools/list" });
   const listed = await server.next();

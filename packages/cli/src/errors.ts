@@ -1,5 +1,6 @@
 import { GovernanceBaselineError } from "@apexops/capabilities";
 import { RunWriterConflictError } from "@apexops/kernel";
+import { APEX_VERSION } from "./version.js";
 
 export const EXIT_CODES = {
   success: 0,
@@ -18,6 +19,7 @@ export type ApexErrorCode =
   | "APEX_CONFLICT"
   | "APEX_WRITER_CONFLICT"
   | "APEX_WORKSPACE_UNSUPPORTED"
+  | "APEX_RUNTIME_MISMATCH"
   | "APEX_VALIDATION"
   | "APEX_STALE"
   | "APEX_AUTHORIZATION"
@@ -47,6 +49,8 @@ const REMEDIATION_BY_CODE: Record<ApexErrorCode, string> = {
     "Continue from the owning worktree, release the writer lease there, or wait for the lease to expire before retrying.",
   APEX_WORKSPACE_UNSUPPORTED:
     "Use the absolute path of a supported APEX checkout or git worktree, or start a workspace-aware MCP server.",
+  APEX_RUNTIME_MISMATCH:
+    "Make this APEX runtime and the workspace runtime lock the same version: run `apex update` for an older workspace, or install the matching APEX plugin or @apexops/cli version for a newer one.",
   APEX_VALIDATION: "Correct the validation issues against the current tool contract, then call the tool again.",
   APEX_STALE: "Call status to refresh state and use the latest expected head, epoch, task, or cursor before retrying.",
   APEX_AUTHORIZATION: "Call status and obtain the required human approval or decision before retrying.",
@@ -58,8 +62,23 @@ const REMEDIATION_BY_CODE: Record<ApexErrorCode, string> = {
     "Report this with the server log; retry only after checking status because side effects may have completed.",
 };
 
-// Remediation is a fixed hint per stable code so error details, causes, and paths never reach MCP clients.
+export type RuntimeMismatchReason = "RUNTIME_WORKSPACE_OLDER" | "RUNTIME_WORKSPACE_NEWER" | "RUNTIME_LOCK_INVALID";
+
+const RUNTIME_MISMATCH_REMEDIATION: Record<RuntimeMismatchReason, string> = {
+  RUNTIME_WORKSPACE_OLDER: `Run \`apex update\` in the workspace with @apexops/cli@${APEX_VERSION}, the runtime this server runs, then call status again.`,
+  RUNTIME_WORKSPACE_NEWER:
+    "Install the APEX plugin or @apexops/cli version named by the workspace runtime lock and restart the MCP server; do not downgrade the workspace with an older runtime.",
+  RUNTIME_LOCK_INVALID: `Inspect .apex/apex.lock.json; if a newer APEX runtime did not write it, run \`apex doctor --fix --yes\` in the workspace with @apexops/cli@${APEX_VERSION} to rewrite it, then call status again.`,
+};
+
+// Remediation is a fixed hint per stable code (and, for a runtime mismatch, per fixed reason) so error details,
+// causes, and paths never reach MCP clients.
 export function remediationForApexError(error: ApexError): string {
+  if (error.code === "APEX_RUNTIME_MISMATCH") {
+    const reason = (error.details as { reason?: unknown } | undefined)?.reason;
+    if (typeof reason === "string" && Object.hasOwn(RUNTIME_MISMATCH_REMEDIATION, reason))
+      return RUNTIME_MISMATCH_REMEDIATION[reason as RuntimeMismatchReason];
+  }
   return REMEDIATION_BY_CODE[error.code];
 }
 
