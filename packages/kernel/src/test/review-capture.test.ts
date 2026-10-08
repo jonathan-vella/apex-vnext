@@ -117,7 +117,11 @@ test("findings derive only from exactly one apex-review block", () => {
       ],
     }),
     answer({ findings: [], criteria: [] }),
-    answer({ findings: Array.from({ length: 101 }, () => ({ severity: "low", title: "t", detail: "d" })) }),
+    answer({ findings: Array.from({ length: 51 }, () => ({ severity: "low", title: "t", detail: "d" })) }),
+    answer({
+      findings: Array.from({ length: 11 }, () => ({ severity: "low", title: "t", detail: "é".repeat(2_000) })),
+    }),
+    answer({ findings: [{ severity: "low", title: "t", detail: '"\\'.repeat(2_600) }] }),
   ])
     assert.throws(() => parseReviewAnswer(bad, { wellArchitected: false }), failure("unparseable"), bad.slice(0, 60));
 });

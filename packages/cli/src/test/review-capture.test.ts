@@ -8,11 +8,13 @@ import {
   reviewCaptureFileName,
   reviewHome,
   reviewPromptSha256,
+  REVIEW_MAX_FINDINGS,
   sha256Bytes,
   type ReviewCaptureRecordV1,
 } from "@apexops/kernel";
 import type { ReviewFindingsV1 } from "@apexops/contracts";
 import { ApexError } from "../errors.js";
+import { MCP_MAX_SERIALIZED_RESULT_BYTES } from "../mcp.js";
 import { ApexService } from "../service.js";
 import { captureReview, nextTaskAfterInput, requirements, reviewAnswer, tempRoot } from "./helpers.js";
 
@@ -395,4 +397,22 @@ test("an oversized capture is rejected and quarantined rather than deleted", asy
   assert.deepEqual(await captureFiles(nonce), []);
   const quarantine = await readdir(join(reviewHome(), "quarantine"));
   assert.ok(quarantine.some((name) => name.endsWith(`${nonce}-0000000000000000.json`)));
+});
+
+test("the largest accepted review still fits the bounded nextTask result", async () => {
+  const { service, taskId } = await setup();
+  // Worst case for escaping: quotes and backslashes fill the budget across the maximum number of findings.
+  const findings = Array.from({ length: REVIEW_MAX_FINDINGS }, (_, index) => ({
+    id: `FINDING-${String(index).padStart(3, "0")}`,
+    severity: "medium",
+    title: `Title ${index} "quoted"`,
+    detail: '"\\'.repeat(40),
+  }));
+  await captureReview(service, taskId, { findings });
+  await service.completeReview(taskId);
+  const next = await service.nextTask();
+  assert.equal(next.status, "needs_review");
+  const text = JSON.stringify(next);
+  const envelope = Buffer.byteLength(JSON.stringify({ content: [{ type: "text", text }], structuredContent: next }));
+  assert.ok(envelope <= MCP_MAX_SERIALIZED_RESULT_BYTES, `${envelope} bytes`);
 });

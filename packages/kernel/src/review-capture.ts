@@ -23,7 +23,13 @@ export const REVIEW_ANSWER_FENCE = "apex-review";
 export const REVIEW_AGENT = "rubber-duck";
 export const REVIEW_MAX_ATTEMPTS = 2;
 export const REVIEW_HOME_ENV = "APEX_REVIEW_HOME";
-export const REVIEW_MAX_FINDINGS = 100;
+export const REVIEW_MAX_FINDINGS = 50;
+/**
+ * Budget for all finding titles and details together, measured as doubly JSON-escaped UTF-8 because an MCP result
+ * carries its JSON once as structured content and once as escaped text. nextTask returns every open finding in one
+ * result capped at 64 KiB, so the findings must fit there with their IDs and actions.
+ */
+export const REVIEW_MAX_FINDINGS_BYTES = 20_480;
 
 const NONCE_PATTERN = /^[0-9a-f]{32}$/u;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
@@ -145,6 +151,8 @@ export function buildReviewPrompt(request: ReviewPromptRequest): string {
     `${REVIEW_ANSWER_FENCE} and whose content is one JSON object in this shape:`,
     shape,
     `severity is one of ${SEVERITIES.join(", ")}. Use "findings": [] when there are no problems.`,
+    `Report at most ${REVIEW_MAX_FINDINGS} findings and keep all titles and details together under ` +
+      `${Math.floor(REVIEW_MAX_FINDINGS_BYTES / 2048)} KB; merge related problems.`,
     ...(request.wellArchitected
       ? [
           `Give exactly one criteria entry for each pillar: ${PILLARS.join(", ")}.`,
@@ -262,6 +270,15 @@ export function parseReviewAnswer(response: string, options: { wellArchitected: 
       detail: boundedText(finding.detail, `finding ${id} detail`, 8_000),
     };
   });
+  const findingBytes = findings.reduce(
+    (total, { title, detail }) => total + Buffer.byteLength(JSON.stringify(JSON.stringify([title, detail]))),
+    0,
+  );
+  if (findingBytes > REVIEW_MAX_FINDINGS_BYTES)
+    throw new ReviewCaptureError(
+      "unparseable",
+      `Review findings use ${findingBytes} bytes of titles and details; the limit is ${REVIEW_MAX_FINDINGS_BYTES}`,
+    );
   const ids = findings.map(({ id }) => id);
   if (new Set(ids).size !== ids.length)
     throw new ReviewCaptureError("unparseable", "Review finding ids must be unique");
