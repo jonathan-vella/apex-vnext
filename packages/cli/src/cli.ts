@@ -555,7 +555,7 @@ async function dispatch(
           "The wizard requires per-plan interactive confirmation; omit --yes and --json",
           EXIT_CODES.usage,
         );
-      return interactiveBootstrap(root, service, interaction.bootstrap);
+      return interactiveBootstrap(root, service, { interaction: interaction.bootstrap });
     case "bootstrap governance-plan":
       return service.planGovernanceSetup((await inputJson(flags)) as GovernanceSetupConfigV1);
     case "bootstrap governance-provision-plan":
@@ -588,7 +588,8 @@ async function dispatch(
         true,
       );
     case "bootstrap": {
-      if (Object.keys(flags).length === 0) return interactiveBootstrap(root, service, interaction.bootstrap);
+      if (Object.keys(flags).length === 0)
+        return interactiveBootstrap(root, service, { interaction: interaction.bootstrap });
       confirmed(flags, "bootstrap");
       const config = await onboardingConfig(flags, root);
       return service.bootstrap({

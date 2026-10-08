@@ -112,8 +112,8 @@ one or more listed workload numbers, and review each copy and workspace installa
 Bootstrap does not ask for or invent a project ID, environment, workload target or IaC track. Each selected copy uses
 a separate workspace; the APEX agent gathers details and creates the first project later. Enter `cancel` to stop;
 completed copies and configured workspaces are retained. Declining a plan does not execute it. While the wizard waits
-for an answer, APEX MCP calls in the workspace keep working. If the workspace changes during the wait, the wizard stops
-with `APEX_STALE` instead of applying the answer; run it again to review current plans.
+for an answer, APEX MCP calls in the workspace and in copied workspaces keep working. If one of them changes during the
+wait, the wizard stops with `APEX_STALE` instead of applying the answer; run it again to review current plans.
 
 The wizard can collect consumer-governance identity inputs and display the evidence-bound OIDC plan, or record that a
 central reviewed baseline will be used. Target-bound baseline checks are deferred until a project and target exist;

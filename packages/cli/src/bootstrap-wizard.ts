@@ -38,10 +38,14 @@ class InterruptedWait extends Error {
   }
 }
 
+/** Runs one workspace's setup steps, for example while holding that workspace's lock. */
+export type BootstrapWorkspaceScope = <T>(directory: string, body: () => Promise<T>) => Promise<T>;
+
 export async function runBootstrapWizard(
   root: string,
   interaction: BootstrapInteraction,
   serviceAt: (directory: string) => SetupService = (directory) => new ApexService(directory),
+  scope: BootstrapWorkspaceScope = (_directory, body) => body(),
 ) {
   const progress: Array<{ directory: string; step: string; outcome: unknown }> = [];
   const ask = async (question: string) => {
@@ -116,138 +120,142 @@ export async function runBootstrapWizard(
       directories = selections.map(({ destination }) => join(root, destination));
     }
     for (const directory of directories) {
-      interaction.show({ workspace: directory });
-      const createRepository = await confirm("Initialize a local Git repository if none exists here?");
-      const config: OnboardingConfigV1 = {
-        schemaVersion: "1.0.0",
-        client: "github-copilot-cli",
-        createRepository,
-      };
-      const service = serviceAt(directory);
-      const plan = await service.planBootstrap(config);
-      interaction.show(plan);
-      if (plan.status === "blocked")
-        return {
-          status: "blocked",
-          progress,
-          nextAction: "Resolve the local bootstrap blockers; existing files were preserved.",
+      const stopped = await scope(directory, async () => {
+        interaction.show({ workspace: directory });
+        const createRepository = await confirm("Initialize a local Git repository if none exists here?");
+        const config: OnboardingConfigV1 = {
+          schemaVersion: "1.0.0",
+          client: "github-copilot-cli",
+          createRepository,
         };
-      if (
-        !(await confirm(
-          "Install the exact workspace runtime and configure or resume APEX here without creating a project?",
-        ))
-      )
-        return { status: "pending", progress, nextAction: "Workspace setup was not confirmed." };
-      if (!isDeepStrictEqual(await service.planBootstrap(config), plan))
-        throw new ApexError(
-          "APEX_STALE",
-          "The local bootstrap plan changed after it was shown; run the wizard again to review a fresh plan.",
-          EXIT_CODES.stale,
+        const service = serviceAt(directory);
+        const plan = await service.planBootstrap(config);
+        interaction.show(plan);
+        if (plan.status === "blocked")
+          return {
+            status: "blocked",
+            progress,
+            nextAction: "Resolve the local bootstrap blockers; existing files were preserved.",
+          };
+        if (
+          !(await confirm(
+            "Install the exact workspace runtime and configure or resume APEX here without creating a project?",
+          ))
+        )
+          return { status: "pending", progress, nextAction: "Workspace setup was not confirmed." };
+        if (!isDeepStrictEqual(await service.planBootstrap(config), plan))
+          throw new ApexError(
+            "APEX_STALE",
+            "The local bootstrap plan changed after it was shown; run the wizard again to review a fresh plan.",
+            EXIT_CODES.stale,
+          );
+        const initialized = await service.bootstrap({ createRepository, clientId: "github-copilot-cli" });
+        progress.push({ directory, step: "local-bootstrap", outcome: initialized });
+        if (await confirm("Create a GitHub repository and push this reviewed branch?")) {
+          const owner = await ask("Repository owner (user or organization login): ");
+          const name = await ask("Repository name: ");
+          const visibility = (await choose(
+            "Visibility [private/internal/public, default private]: ",
+            ["private", "internal", "public"],
+            "private",
+          )) as RepositoryPublishConfigV1["visibility"];
+          const branch = (await ask("Branch to publish [main]: ")) || "main";
+          const publishConfig: RepositoryPublishConfigV1 = {
+            schemaVersion: "1.0.0",
+            owner,
+            name,
+            visibility,
+            branch,
+            remote: "origin",
+          };
+          const publishPlan = await service.planRepositoryPublish(publishConfig);
+          interaction.show(publishPlan);
+          progress.push({ directory, step: "github-repository-plan", outcome: publishPlan });
+          if (publishPlan.status === "pending") {
+            if (
+              await confirm(
+                `Create ${publishPlan.repository.fullName} as ${publishPlan.repository.visibility} and push exactly commit ${publishPlan.push.commit} on ${publishPlan.push.branch} without force?`,
+              )
+            ) {
+              const published = await service.publishRepository(publishConfig, publishPlan.planHash, true);
+              interaction.show(published);
+              progress.push({ directory, step: "github-repository", outcome: published });
+            }
+          }
+        }
+        const governance = await choose(
+          "Governance source [consumer/central/later, default later]: ",
+          ["consumer", "central", "later"],
+          "later",
         );
-      const initialized = await service.bootstrap({ createRepository, clientId: "github-copilot-cli" });
-      progress.push({ directory, step: "local-bootstrap", outcome: initialized });
-      if (await confirm("Create a GitHub repository and push this reviewed branch?")) {
-        const owner = await ask("Repository owner (user or organization login): ");
-        const name = await ask("Repository name: ");
-        const visibility = (await choose(
-          "Visibility [private/internal/public, default private]: ",
-          ["private", "internal", "public"],
-          "private",
-        )) as RepositoryPublishConfigV1["visibility"];
-        const branch = (await ask("Branch to publish [main]: ")) || "main";
-        const publishConfig: RepositoryPublishConfigV1 = {
-          schemaVersion: "1.0.0",
-          owner,
-          name,
-          visibility,
-          branch,
-          remote: "origin",
-        };
-        const publishPlan = await service.planRepositoryPublish(publishConfig);
-        interaction.show(publishPlan);
-        progress.push({ directory, step: "github-repository-plan", outcome: publishPlan });
-        if (publishPlan.status === "pending") {
-          if (
-            await confirm(
-              `Create ${publishPlan.repository.fullName} as ${publishPlan.repository.visibility} and push exactly commit ${publishPlan.push.commit} on ${publishPlan.push.branch} without force?`,
-            )
-          ) {
-            const published = await service.publishRepository(publishConfig, publishPlan.planHash, true);
-            interaction.show(published);
-            progress.push({ directory, step: "github-repository", outcome: published });
+        if (governance === "consumer") {
+          const repository = await ask("Consumer GitHub repository (OWNER/REPOSITORY): ");
+          const tenantId = await ask("Azure tenant ID: ");
+          const subscriptionId = await ask("Login and standalone collection subscription ID: ");
+          const managementGroupId = await ask("Management-group collection ID, or blank for subscription: ");
+          const mode = await choose("Identity [reuse/create]: ", ["reuse", "create"]);
+          const identity: GovernanceSetupConfigV1["identity"] =
+            mode === "reuse"
+              ? {
+                  mode,
+                  clientId: await ask("Approved application client ID: "),
+                  principalId: await ask("Approved service-principal object ID: "),
+                }
+              : { mode: "create", displayName: await ask("Proposed dedicated application display name: ") };
+          const governanceConfig: GovernanceSetupConfigV1 = {
+            schemaVersion: "1.0.0",
+            repository,
+            tenantId,
+            subscriptionId,
+            identity,
+            ...(managementGroupId ? { managementGroupId } : {}),
+          };
+          const setup = await service.planGovernanceSetup(governanceConfig);
+          interaction.show(setup);
+          progress.push({ directory, step: "governance-plan", outcome: setup });
+          if (identity.mode === "reuse" && setup.status !== "blocked") {
+            const provisioning = await service.planGovernanceProvision(governanceConfig);
+            interaction.show(provisioning);
+            progress.push({ directory, step: "governance-provision-plan", outcome: provisioning });
+            if (
+              provisioning.status === "ready" &&
+              (await confirm(
+                "Create only the listed Azure federation and Reader assignment for this existing identity? GitHub configuration and collection stay unchanged.",
+              ))
+            ) {
+              const outcome = await service.provisionGovernance(governanceConfig, provisioning.planHash, true);
+              interaction.show(outcome);
+              progress.push({ directory, step: "governance-provision", outcome });
+            }
           }
+        } else if (governance === "central") {
+          progress.push({
+            directory,
+            step: "central-baseline-check",
+            outcome: {
+              status: "pending",
+              imported: false,
+              nextAction:
+                "APEX will check the reviewed central baseline once the first project and its target are known.",
+            },
+          });
+        } else {
+          progress.push({
+            directory,
+            step: "governance",
+            outcome: {
+              status: "pending",
+              source: governance,
+              nextAction:
+                governance === "central"
+                  ? "Select and import the current reviewed central baseline using the governance workflow."
+                  : "Configure governance before planning infrastructure.",
+            },
+          });
         }
-      }
-      const governance = await choose(
-        "Governance source [consumer/central/later, default later]: ",
-        ["consumer", "central", "later"],
-        "later",
-      );
-      if (governance === "consumer") {
-        const repository = await ask("Consumer GitHub repository (OWNER/REPOSITORY): ");
-        const tenantId = await ask("Azure tenant ID: ");
-        const subscriptionId = await ask("Login and standalone collection subscription ID: ");
-        const managementGroupId = await ask("Management-group collection ID, or blank for subscription: ");
-        const mode = await choose("Identity [reuse/create]: ", ["reuse", "create"]);
-        const identity: GovernanceSetupConfigV1["identity"] =
-          mode === "reuse"
-            ? {
-                mode,
-                clientId: await ask("Approved application client ID: "),
-                principalId: await ask("Approved service-principal object ID: "),
-              }
-            : { mode: "create", displayName: await ask("Proposed dedicated application display name: ") };
-        const governanceConfig: GovernanceSetupConfigV1 = {
-          schemaVersion: "1.0.0",
-          repository,
-          tenantId,
-          subscriptionId,
-          identity,
-          ...(managementGroupId ? { managementGroupId } : {}),
-        };
-        const setup = await service.planGovernanceSetup(governanceConfig);
-        interaction.show(setup);
-        progress.push({ directory, step: "governance-plan", outcome: setup });
-        if (identity.mode === "reuse" && setup.status !== "blocked") {
-          const provisioning = await service.planGovernanceProvision(governanceConfig);
-          interaction.show(provisioning);
-          progress.push({ directory, step: "governance-provision-plan", outcome: provisioning });
-          if (
-            provisioning.status === "ready" &&
-            (await confirm(
-              "Create only the listed Azure federation and Reader assignment for this existing identity? GitHub configuration and collection stay unchanged.",
-            ))
-          ) {
-            const outcome = await service.provisionGovernance(governanceConfig, provisioning.planHash, true);
-            interaction.show(outcome);
-            progress.push({ directory, step: "governance-provision", outcome });
-          }
-        }
-      } else if (governance === "central") {
-        progress.push({
-          directory,
-          step: "central-baseline-check",
-          outcome: {
-            status: "pending",
-            imported: false,
-            nextAction:
-              "APEX will check the reviewed central baseline once the first project and its target are known.",
-          },
-        });
-      } else {
-        progress.push({
-          directory,
-          step: "governance",
-          outcome: {
-            status: "pending",
-            source: governance,
-            nextAction:
-              governance === "central"
-                ? "Select and import the current reviewed central baseline using the governance workflow."
-                : "Configure governance before planning infrastructure.",
-          },
-        });
-      }
+        return undefined;
+      });
+      if (stopped !== undefined) return stopped;
     }
     const blocked = progress.some(
       ({ outcome }) =>
@@ -273,21 +281,56 @@ export async function runBootstrapWizard(
 }
 
 /**
- * Runs the wizard on the terminal, or on `interaction` when given. Each question is asked without the workspace lock, so
- * MCP calls are not blocked while the wizard waits; if the workspace changed during the wait, the wizard fails with
- * `APEX_STALE` instead of applying the answer.
+ * Runs the wizard on the terminal, or on `options.interaction` when given, while the command holds the workspace lock
+ * of `root` through `service`. Each copied workspace's steps also hold that workspace's own lock. Every question is
+ * asked without any of these locks, so MCP calls are not blocked while the wizard waits; if a workspace changed during
+ * the wait, the wizard fails with `APEX_STALE` instead of applying the answer.
  */
 export async function interactiveBootstrap(
   root: string,
   service: Pick<ApexService, "waitOutsideWorkspaceLock">,
-  interaction?: BootstrapInteraction,
+  options: { interaction?: BootstrapInteraction | undefined; serviceAt?: (directory: string) => ApexService } = {},
 ) {
+  const services = new Map<string, ApexService>();
+  const serviceAt = (directory: string) => {
+    let current = services.get(directory);
+    if (current === undefined) {
+      current = options.serviceAt?.(directory) ?? new ApexService(directory);
+      services.set(directory, current);
+    }
+    return current;
+  };
+  // Workspaces whose locks the wizard holds, outermost first; a question waits without all of them.
+  const holders: Array<Pick<ApexService, "waitOutsideWorkspaceLock">> = [service];
+  const scope: BootstrapWorkspaceScope = (directory, body) => {
+    if (directory === root) return body();
+    const workspace = serviceAt(directory);
+    return workspace.withWorkspaceWriteLock(
+      async () => {
+        holders.push(workspace);
+        try {
+          return await body();
+        } finally {
+          holders.pop();
+        }
+      },
+      undefined,
+      { suspendable: true },
+    );
+  };
+  const outsideLocks = <T>(wait: () => Promise<T>): Promise<T> =>
+    holders.reduce<() => Promise<T>>((inner, holder) => () => holder.waitOutsideWorkspaceLock(inner), wait)();
   const run = (terminal: BootstrapInteraction) =>
-    runBootstrapWizard(root, {
-      ask: (question) => service.waitOutsideWorkspaceLock(() => terminal.ask(question)),
-      show: (value) => terminal.show(value),
-    });
-  if (interaction !== undefined) return run(interaction);
+    runBootstrapWizard(
+      root,
+      {
+        ask: (question) => outsideLocks(() => terminal.ask(question)),
+        show: (value) => terminal.show(value),
+      },
+      serviceAt,
+      scope,
+    );
+  if (options.interaction !== undefined) return run(options.interaction);
   if (!stdin.isTTY || !stdout.isTTY)
     throw new ApexError(
       "APEX_USAGE",
