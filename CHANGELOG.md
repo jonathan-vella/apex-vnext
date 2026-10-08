@@ -48,6 +48,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   applied to state it was not given against. Other waits, such as provider and Azure CLI processes, still hold the
   lock.
 
+### Security
+
+- Raise the dependency overrides for `fast-uri` (4.2.1, used by the shipped contract validator), `ip-address`,
+  `basic-ftp`, `katex`, and markdownlint-cli2's `js-yaml` and `smol-toml` to patched releases. `braces` has no patched
+  release yet and stays a development-only advisory.
+
 ## [0.10.0-next.5] — Preview
 
 ### Changed
