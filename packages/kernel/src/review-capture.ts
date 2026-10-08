@@ -362,12 +362,15 @@ export const REVIEW_CAPTURE_RETENTION_MS = 48 * 60 * 60 * 1000;
 
 /**
  * Removes captures whose request can no longer be ingested, so abandoned reviews do not keep model output in the
- * shared review home forever. Captures for live requests are younger than the retention and stay. Returns the count.
+ * shared review home forever: captures older than the retention, and captures whose nonce the caller knows was used
+ * (completed, rejected or cancelled) but whose removal failed earlier. Captures for live requests stay. Returns the
+ * count removed.
  */
 export async function sweepReviewCaptures(
   home = reviewHome(),
   now = Date.now(),
   maxAgeMs = REVIEW_CAPTURE_RETENTION_MS,
+  consumedNonces: ReadonlySet<string> = new Set(),
 ): Promise<number> {
   const directory = join(home, "captures");
   if (!(await plainDirectory(home, false)) || !(await plainDirectory(directory, false))) return 0;
@@ -376,9 +379,9 @@ export async function sweepReviewCaptures(
     if (!name.endsWith(".json")) continue;
     const path = join(directory, name);
     const info = await lstat(path).catch(() => undefined);
-    if (info === undefined || !info.isFile() || now - info.mtimeMs <= maxAgeMs) continue;
-    await rm(path, { force: true });
-    removed += 1;
+    if (info === undefined || !info.isFile()) continue;
+    if (now - info.mtimeMs <= maxAgeMs && !consumedNonces.has(name.slice(0, 32))) continue;
+    if ((await removeReviewCaptures([{ path, value: undefined }])).length === 0) removed += 1;
   }
   return removed;
 }
@@ -569,8 +572,30 @@ export async function loadReviewCaptures(nonce: string, home = reviewHome()): Pr
   return files;
 }
 
-export async function removeReviewCaptures(files: readonly ReviewCaptureFile[]): Promise<void> {
-  for (const { path } of files) await rm(path, { force: true }).catch(() => undefined);
+const TRANSIENT_REMOVE_ERRORS = new Set(["EBUSY", "EPERM", "EACCES", "EMFILE", "ENFILE"]);
+
+/**
+ * Removes ingested, rejected or cancelled captures, retrying transient errors (a scanner or indexer holding the file on
+ * Windows). Returns the paths that still could not be removed; `sweepReviewCaptures` removes them on a later call.
+ */
+export async function removeReviewCaptures(files: readonly ReviewCaptureFile[]): Promise<string[]> {
+  const failed: string[] = [];
+  for (const { path } of files) {
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        await rm(path, { force: true });
+        break;
+      } catch (error) {
+        if (attempt < 5 && TRANSIENT_REMOVE_ERRORS.has((error as NodeJS.ErrnoException).code ?? "")) {
+          await new Promise((settle) => setTimeout(settle, 25 * attempt));
+          continue;
+        }
+        failed.push(path);
+        break;
+      }
+    }
+  }
+  return failed;
 }
 
 /**

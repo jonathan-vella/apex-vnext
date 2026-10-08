@@ -127,8 +127,9 @@ What this guarantees and what it does not:
 - On Linux and macOS the review home and its folders must belong to the user and must not be writable by group or
   others. Otherwise the hook stores no capture and denies APEX mutations while marks cannot be trusted, and
   `reviewComplete` fails with `REVIEW_HOME_INSECURE` until the folders are private (`chmod 700`).
-- Captures of a cancelled review move into the run's object store, and the cancellation event lists them. Captures
-  older than 48 hours belong to expired requests; the next review request sweeps them from the review home.
+- Captures of a cancelled review move into the run's object store, and the cancellation event lists them. Removal
+  retries transient errors. Each `nextTask` and each new review request also sweep the review home: they remove the
+  run's used captures that are still there, and captures older than 48 hours, which belong to expired requests.
 - Hooks only capture, mark and deny; the kernel decides. If hooks are disabled or time out, no capture exists and the
   review cannot complete, and rubber-duck calls are no longer denied by the hook. The kernel's pending-review guard
   still refuses every approve, delete and publish operation until the review completes or is cancelled; other

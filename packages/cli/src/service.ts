@@ -2750,6 +2750,7 @@ export class ApexService {
     const selection = await this.selection();
     const run = await this.run(selection);
     const events = await this.journal(run).replay();
+    await this.sweepCaptures(events);
     const requirements = this.artifactHash(events, "requirements");
     const governanceInput = await this.governanceInputState(run, events);
     if (governanceInput !== undefined && !governanceInput.fulfilled) {
@@ -5212,6 +5213,25 @@ export class ApexService {
     );
   }
 
+  /**
+   * Best effort: removes captures of this run's used review requests whose earlier removal failed, and captures of
+   * long-expired requests. File times are wall-clock, so the sweep uses the wall clock rather than the service clock.
+   */
+  private async sweepCaptures(events: Awaited<ReturnType<EventJournal["replay"]>>): Promise<void> {
+    const consumed = new Set<string>();
+    for (const { type, payload } of events) {
+      const value = payload as { nonce?: unknown; capture?: { nonce?: unknown } } | null;
+      const nonce =
+        type === "task.completed"
+          ? value?.capture?.nonce
+          : ["review.capture-rejected", "task.cancelled"].includes(type)
+            ? value?.nonce
+            : undefined;
+      if (typeof nonce === "string") consumed.add(nonce);
+    }
+    await sweepReviewCaptures(this.reviewHomeOverride ?? reviewHome(), Date.now(), undefined, consumed).catch(() => 0);
+  }
+
   private reviewNonceConsumed(events: Awaited<ReturnType<EventJournal["replay"]>>, nonce: string): boolean {
     return events.some((event) => {
       const payload = event.payload as { nonce?: unknown; capture?: { nonce?: unknown } } | null;
@@ -5328,9 +5348,8 @@ export class ApexService {
     inputRefs: readonly string[],
   ): Promise<{ requestHash: string; nonce: string; promptSha256: string; subjectHash: string; attempt: number }> {
     // Best effort: drop captures of long-expired requests from the shared review home; issuing never depends on it.
-    // File times are wall-clock, so the sweep uses the wall clock rather than the service clock.
-    await sweepReviewCaptures(this.reviewHomeOverride ?? reviewHome()).catch(() => 0);
     const events = await this.journal(run).replay();
+    await this.sweepCaptures(events);
     const subjectKind = this.reviewSubjectArtifactKind(descriptor)!;
     const subjectHash = this.artifactHash(events, subjectKind);
     if (subjectHash === undefined || !inputRefs.includes(subjectHash))

@@ -561,3 +561,17 @@ test(
     );
   },
 );
+
+test("a capture whose removal failed after its nonce was used is swept by the next nextTask", async () => {
+  const { service, taskId } = await setup();
+  const { nonce } = (await service.taskContext(taskId)).reviewRequest!;
+  const path = await captureReview(service, taskId, { findings: [] });
+  const bytes = await readFile(path);
+  await service.completeReview(taskId);
+  // Simulate a removal that failed (for example a file held open on Windows): the used capture is still there.
+  await writeFile(path, bytes);
+  assert.equal((await captureFiles(nonce)).length, 1);
+  // Gate 1 now waits for approval, so nextTask refuses to route; the sweep has already run.
+  await assert.rejects(service.nextTask(), /Gate 1 approval is required/u);
+  assert.deepEqual(await captureFiles(nonce), [], "the used capture does not outlive the next workflow step");
+});
