@@ -782,9 +782,9 @@
       "resourceDispositions": [
         {
           "source": "references/arm-mcp-pricing-guidance.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
+          "disposition": "adapt",
+          "targets": ["references/retail-pricing.md"],
+          "reason": "Adapts the read-only retail price query, meter and monthly-calculation rules to the apex-azure-pricing server without the direct-API fallback.",
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",

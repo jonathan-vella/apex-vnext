@@ -1,3 +1,5 @@
+# Compliance Finding Criteria
+
 ## Finding Integrity
 
 A compliance finding needs a control basis, an affected target within scope,
@@ -5,14 +7,29 @@ an observed condition, evidence hash, observation time, and coverage status.
 Classify missing access, incomplete results, redacted fields, or stale evidence
 as an assessment limitation rather than an absent finding.
 
+## Recommendation Sources
+
+Record the source of every recommendation. Sources differ in focus, so a duplicate signal from two sources is one
+exposure with two pieces of evidence.
+
+| Source | Focus | Typical confidence |
+| --- | --- | --- |
+| Microsoft Defender for Cloud | Security posture and threat protection | High for security findings |
+| Azure Proactive Resiliency Library | Reliability and resiliency practice | High for reliability findings |
+| Azure Advisor | Cross-pillar recommendations, including cost | Medium; confirm resource context |
+| Azure Policy compliance state | Governance controls assigned to the scope | Depends on the assignment and its effect |
+| Orphaned-resource heuristics | Unused or disconnected resources | Low until dependencies are confirmed |
+
+## Categories
+
 Use categories to preserve meaning:
 
 | Category | Typical evidence-backed concern |
 | --- | --- |
-| Security | Public exposure, encryption, identity, protocol, or access posture |
-| Reliability | Redundancy, backup, recovery, or single-instance posture |
-| Operational | Diagnostics, monitoring, inventory, or tagging coverage |
-| Cost | Unused or oversized resource signal; route to cost assessment |
+| Security | Public endpoint, missing private endpoint, encryption, weak TLS, missing managed identity, or access posture |
+| Reliability | Missing zone redundancy, single instance, missing backup, or missing disaster recovery |
+| Operational | Missing diagnostic settings or alerts, missing tags, or an outdated SKU or version |
+| Cost | Unused or oversized resource, or a commitment opportunity; route to cost assessment |
 
 ## Severity
 
@@ -43,7 +60,21 @@ include values or material identifying sensitive content.
 - Disabled items can reduce immediate use risk but may retain governance,
   inventory, or recovery significance.
 - Ambiguous time zone, missing timestamp, or incomplete item coverage produces
-  `indeterminate` status and requires refreshed scoped evidence.
+  `indeterminate` status and requires refreshed scoped evidence. Item timestamps are UTC.
+
+Band findings against the task's approved warning threshold:
+
+| Condition | Severity | Handoff |
+| --- | --- | --- |
+| Expired and enabled | Critical | Urgent owner rotation review |
+| Expires within an imminent window the task defines, for example seven days | High | Priority rotation planning |
+| Expires within the approved warning threshold | Medium | Planned rotation |
+| No expiry set | Medium | Lifecycle policy gap |
+| Expires beyond the threshold | Low | Track on the regular cadence |
+
+Coverage must be stated, not assumed. Follow every result page, include version history only when the task asks for it,
+and read certificate expiry from certificate metadata: secret listings can omit the secrets that back certificates, and
+those secret values are never fetched. Production vaults take priority over non-production vaults.
 
 ## Safe Reporting
 

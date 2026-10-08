@@ -47,6 +47,10 @@
     {
       "fileMatch": ["agent-output/*/08-iteration-log.json", "agent-output/_bench/*/*/08-iteration-log.json"],
       "url": "./tools/schemas/iteration-log.schema.json"
+    },
+    {
+      "fileMatch": ["tools/registry/skill-upstream-pins.v1.json"],
+      "url": "./tools/registry/schemas/skill-upstream-pins.schema.json"
     }
   ],
   "editor.formatOnSave": true,

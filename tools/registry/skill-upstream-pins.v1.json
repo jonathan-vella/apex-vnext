@@ -1,0 +1,217 @@
+{
+  "$schema": "schemas/skill-upstream-pins.schema.json",
+  "schemaVersion": "1.0.0",
+  "policy": "One entry per shipped skill re-ported from an upstream repository. Each entry pins the exact upstream commit the skill content was read at and records what was adapted for, or dropped by, the vNext kernel boundaries. Update the entry, including the commit and date, whenever the skill is re-ported; never pin a branch name.",
+  "entries": [
+    {
+      "skill": "apex-azure-defaults",
+      "upstreamRepository": "jonathan-vella/apex",
+      "upstreamPath": ".github/skills/apex-azure-defaults/",
+      "upstreamCommit": "c209d8bb765681aa21dce5d3cd2a3b080dad8d5e",
+      "portedOn": "2026-10-08",
+      "tracking": ["#384", "#401"],
+      "adaptations": [
+        "WHEN/DO NOT USE FOR description with quoted triggers and (use ...) redirects to shipped skills; explicit user-invocable: false and disable-model-invocation: false",
+        "IaC invariants (governance wins, security floor, one stable uniqueness token, AVM-first exact pins, verified lifecycle, explicit network and cost decisions) restated as decision rules that reference runtime securityInvariants and azureDefaults instead of values",
+        "CAF abbreviation hints, greenfield tag checklist and tag purposes, tag-casing facts, per-effect CodeGen binding treatment, recurring AVM default and lifecycle pitfalls, AVM version evidence through the APEX agent's allowlisted registry lookups, VNet triggers and subnet sizing starting points with Learn links",
+        "New retail-pricing reference ported from pricing-guidance for apex-azure-pricing/get_retail_prices"
+      ],
+      "dropped": [
+        "Repository npm validators, bicep/terraform commands, apex-recall decisions, sku-manifest.json and 04-governance-constraints.json file contracts",
+        "Adversarial review protocols, workflow gates, artifact categories, cost-estimate subagent contract, service-class menu, identity resolution, Terraform conventions and Azure CLI auth checks",
+        "Dated deprecated-service table, constrained direct-API pricing fallback, cost-alert Bicep/Terraform snippets, WAF 1-10 scoring scale, company-size and industry service heuristics"
+      ]
+    },
+    {
+      "skill": "apex-azure-adr",
+      "upstreamRepository": "jonathan-vella/apex",
+      "upstreamPath": ".github/skills/apex-azure-adr/",
+      "upstreamCommit": "c209d8bb765681aa21dce5d3cd2a3b080dad8d5e",
+      "portedOn": "2026-10-08",
+      "tracking": ["#384", "#401"],
+      "adaptations": [
+        "WHEN/DO NOT USE FOR description with quoted triggers and (use ...) redirects to shipped skills; explicit user-invocable: false and disable-model-invocation: false",
+        "Rules: one decision per record, at least two viable alternatives, all five WAF pillars with an improves/degrades/neutral direction, traceability, honest consequences, five-minute readability, no placeholders",
+        "Common decision topics merged into decision examples"
+      ],
+      "dropped": [
+        "ADR file naming, numbering and agent-output paths (the kernel owns typed decision records)",
+        "Badge and navigation Markdown template; Step 3/Step 7 phase prefixes; user-invocable: true and argument-hint"
+      ]
+    },
+    {
+      "skill": "apex-azure-compute",
+      "upstreamRepository": "jonathan-vella/apex",
+      "upstreamPath": ".github/skills/apex-azure-compute/",
+      "upstreamCommit": "c209d8bb765681aa21dce5d3cd2a3b080dad8d5e",
+      "portedOn": "2026-10-08",
+      "tracking": ["#384", "#401"],
+      "adaptations": [
+        "WHEN/DO NOT USE FOR description with quoted triggers and (use ...) redirects to shipped skills; explicit user-invocable: false and disable-model-invocation: false",
+        "Rules: single VM unless a fleet is evidenced, Flexible orchestration, two or three candidates, documentation-verified specifications, VMSS price at minimum and maximum instances, commitments as review options",
+        "VM family map, decision tree, size-name decoding, trade-offs, orchestration comparison, autoscale patterns and load-balancer choice",
+        "Retail Prices API usage rewritten for apex-azure-pricing/get_retail_prices; quota and availability follow the Architecture assumption rule"
+      ],
+      "dropped": [
+        "curl and PowerShell Retail Prices API calls, web_fetch verification steps, apex-azure-prepare provisioning route",
+        "Specific series versions, discount percentages and scale-set instance limits stated from memory"
+      ]
+    },
+    {
+      "skill": "apex-azure-storage",
+      "upstreamRepository": "jonathan-vella/apex",
+      "upstreamPath": ".github/skills/apex-azure-storage/",
+      "upstreamCommit": "c209d8bb765681aa21dce5d3cd2a3b080dad8d5e",
+      "portedOn": "2026-10-08",
+      "tracking": ["#384", "#401"],
+      "adaptations": [
+        "WHEN/DO NOT USE FOR description with quoted triggers and (use ...) redirects to shipped skills; explicit user-invocable: false and disable-model-invocation: false",
+        "Rules: managed identity over keys, no public blob access, tier by observed access with minimum retention, redundancy by recovery objectives, lifecycle, Premium only on evidence, right service",
+        "Access-tier minimum retention and retrieval table, redundancy protection table, data-plane versus management-plane access, credential posture by environment, per-sub-resource private endpoints",
+        "Deduplicated the service-selection text previously repeated in two references"
+      ],
+      "dropped": [
+        "az storage CLI commands, SDK quick references and code samples",
+        "Durability figures and Azure MCP documentation calls"
+      ]
+    },
+    {
+      "skill": "apex-azure-rbac",
+      "upstreamRepository": "jonathan-vella/apex",
+      "upstreamPath": ".github/skills/apex-azure-rbac/",
+      "upstreamCommit": "c209d8bb765681aa21dce5d3cd2a3b080dad8d5e",
+      "portedOn": "2026-10-08",
+      "tracking": ["#384", "#401"],
+      "adaptations": [
+        "WHEN/DO NOT USE FOR description with quoted triggers and (use ...) redirects to shipped skills; explicit user-invocable: false and disable-model-invocation: false",
+        "Effective-permission evaluation rules (actions minus notActions, dataActions minus notDataActions, wildcard matching, per-block exclusions, conditions, deny assignments, eligible-assignment activation)",
+        "Common plane-split role examples, AVM role-assignment input preference, definition-ID references, principal type from evidence, User Access Administrator as least-privilege assigner, Azure RBAC versus Graph consent"
+      ],
+      "dropped": [
+        "az role CLI commands, custom-role JSON, raw Bicep and Terraform role-assignment snippets",
+        "Documentation MCP and live catalogue lookups from the skill"
+      ]
+    },
+    {
+      "skill": "apex-azure-quotas",
+      "upstreamRepository": "jonathan-vella/apex",
+      "upstreamPath": ".github/skills/apex-azure-quotas/",
+      "upstreamCommit": "c209d8bb765681aa21dce5d3cd2a3b080dad8d5e",
+      "portedOn": "2026-10-08",
+      "tracking": ["#384", "#401"],
+      "adaptations": [
+        "WHEN/DO NOT USE FOR description with quoted triggers and (use ...) redirects to shipped skills; explicit user-invocable: false and disable-model-invocation: false",
+        "Three independent checks (quota headroom, SKU availability, allocation capacity) and the Architecture assumption rule",
+        "New sku-availability reference: AVAILABLE/RESTRICTED/NOT_OFFERED/UNKNOWN status contract, per-service evidence sources, deployment-time allocation failures",
+        "ARM-type to quota-resource mapping hints and failure classification"
+      ],
+      "dropped": [
+        "az quota and az vm list-skus commands, the jq availability helper, CLI prerequisites and extension installs",
+        "Quota increase submission, provider registration and portal alert steps"
+      ]
+    },
+    {
+      "skill": "apex-azure-cost-optimization",
+      "upstreamRepository": "jonathan-vella/apex",
+      "upstreamPath": ".github/skills/apex-azure-cost-optimization/",
+      "upstreamCommit": "c209d8bb765681aa21dce5d3cd2a3b080dad8d5e",
+      "portedOn": "2026-10-08",
+      "tracking": ["#384", "#401"],
+      "adaptations": [
+        "WHEN/DO NOT USE FOR description with quoted triggers and (use ...) redirects to shipped skills; explicit user-invocable: false and disable-model-invocation: false",
+        "Routing to read-only apex-azure-pricing tools (query_costs, query_aks_costs, forecast_costs, get_retail_prices, benefit and reservation reads); whole-bill rule; Redis-only branching rule",
+        "New cost-tool-guardrails reference: scopes, query and forecast limits, evidence labels, error handling",
+        "Storage review signals with tier retention and early-deletion costs"
+      ],
+      "dropped": [
+        "azqr, Resource Graph, Azure Monitor and Advisor workflows (not shipped capabilities), REST and CLI fallbacks, Redis SDK and report templates",
+        "agent-output report and audit-trail files, dry-run and rollback commands, best-practices MCP calls"
+      ]
+    },
+    {
+      "skill": "apex-azure-governance",
+      "upstreamRepository": "jonathan-vella/apex",
+      "upstreamPath": ".github/skills/apex-azure-governance-discovery/",
+      "upstreamCommit": "c209d8bb765681aa21dce5d3cd2a3b080dad8d5e",
+      "portedOn": "2026-10-08",
+      "tracking": ["#384", "#401"],
+      "adaptations": [
+        "WHEN/DO NOT USE FOR description with quoted triggers and (use ...) redirects to shipped skills; explicit user-invocable: false and disable-model-invocation: false",
+        "Effective parameter resolution, allowed-location interpretation (empty list is not unrestricted), exemption validity as necessary-not-sufficient conditions",
+        "Contents line for the reference that now exceeds 100 lines; cleaned list formatting"
+      ],
+      "dropped": [
+        "discover.py and Python collector scripts, terminal commands, cache and L0 envelope internals, preview Markdown",
+        "Structured deny override object, reconciliation escalation through apex-recall and 04g agent handoffs, Defender auto-assignment filtering (the vNext collector retains them)"
+      ]
+    },
+    {
+      "skill": "apex-azure-compliance",
+      "upstreamRepository": "jonathan-vella/apex",
+      "upstreamPath": ".github/skills/apex-azure-compliance/",
+      "upstreamCommit": "c209d8bb765681aa21dce5d3cd2a3b080dad8d5e",
+      "portedOn": "2026-10-08",
+      "tracking": ["#384", "#401"],
+      "adaptations": [
+        "WHEN/DO NOT USE FOR description with quoted triggers and (use ...) redirects to shipped skills; explicit user-invocable: false and disable-model-invocation: false",
+        "Rules: report never remediate, metadata only, explicit coverage, provenance, reassessment cadence",
+        "Recommendation source table, category examples, Key Vault expiration severity bands relative to the approved threshold, certificate-backed secret coverage rule"
+      ],
+      "dropped": [
+        "azqr and Key Vault MCP tool tables, Azure CLI fallbacks, SDK quick references",
+        "azqr recommendation IDs and Excel report columns, rotation automation advice with fixed intervals"
+      ]
+    },
+    {
+      "skill": "apex-azure-resources",
+      "upstreamRepository": "jonathan-vella/apex",
+      "upstreamPath": ".github/skills/apex-azure-resources/",
+      "upstreamCommit": "c209d8bb765681aa21dce5d3cd2a3b080dad8d5e",
+      "portedOn": "2026-10-08",
+      "tracking": ["#384", "#401"],
+      "adaptations": [
+        "WHEN/DO NOT USE FOR description with quoted triggers and (use ...) redirects to shipped skills; explicit user-invocable: false and disable-model-invocation: false",
+        "apex/inventory as the reader of recorded inventory; scoped, indexed-not-live, candidate and no-secret rules; diagrams only of accepted inventory through apex-mermaid",
+        "Orphan candidate definitions and resource-ID retention rule"
+      ],
+      "dropped": [
+        "Resource Graph execution, dedicated MCP tool routing, extension_cli_generate and az graph commands",
+        "Visualize-mode file generation, diagram templates and example assets"
+      ]
+    },
+    {
+      "skill": "apex-entra-app-registration",
+      "upstreamRepository": "jonathan-vella/apex",
+      "upstreamPath": ".github/skills/apex-entra-app-registration/",
+      "upstreamCommit": "c209d8bb765681aa21dce5d3cd2a3b080dad8d5e",
+      "portedOn": "2026-10-08",
+      "tracking": ["#384", "#401"],
+      "adaptations": [
+        "WHEN/DO NOT USE FOR description with quoted triggers and (use ...) redirects to shipped skills; explicit user-invocable: false and disable-model-invocation: false",
+        "Rules: least privilege, credentials by environment, consent as a decision, additive rotation, exact HTTPS redirects, token validation, Graph versus Azure RBAC",
+        "Access-model contract, admin consent conditions, delegated-permission intersection, exposed API design, sign-in error code table corrected against the Microsoft Learn error reference"
+      ],
+      "dropped": [
+        "Portal, az ad and MSAL code examples, first-registration walkthrough, Bicep example, SDK quick references",
+        "Token decoding tools and credential handling steps"
+      ]
+    },
+    {
+      "skill": "apex-microsoft-docs",
+      "upstreamRepository": "jonathan-vella/apex",
+      "upstreamPath": ".github/skills/apex-microsoft-docs/",
+      "upstreamCommit": "c209d8bb765681aa21dce5d3cd2a3b080dad8d5e",
+      "portedOn": "2026-10-08",
+      "tracking": ["#384", "#401"],
+      "adaptations": [
+        "WHEN/DO NOT USE FOR description with quoted triggers and (use ...) redirects to shipped skills; explicit user-invocable: false and disable-model-invocation: false",
+        "Available-sources table: the APEX agent's allowlisted resource reference fetch, with general Learn search kept as an unavailable capability and blocker",
+        "Search-first, specificity, single-page and citation rules"
+      ],
+      "dropped": [
+        "Azure MCP documentation router, mslearn CLI fallback and its npx install",
+        ".vscode/mcp.json prerequisite"
+      ]
+    }
+  ]
+}

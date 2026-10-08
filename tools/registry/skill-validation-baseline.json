@@ -5,31 +5,7 @@
   "entries": [
     {
       "root": "shipped",
-      "skill": "apex-azure-compute",
-      "rule": "skill-user-invocable-explicit",
-      "violation": "SKILL.md frontmatter does not declare 'user-invocable' (true or false)",
-      "recorded": "2026-10-08",
-      "tracking": "#401"
-    },
-    {
-      "root": "shipped",
-      "skill": "apex-azure-storage",
-      "rule": "skill-user-invocable-explicit",
-      "violation": "SKILL.md frontmatter does not declare 'user-invocable' (true or false)",
-      "recorded": "2026-10-08",
-      "tracking": "#401"
-    },
-    {
-      "root": "shipped",
       "skill": "apex-bicep-patterns",
-      "rule": "skill-user-invocable-explicit",
-      "violation": "SKILL.md frontmatter does not declare 'user-invocable' (true or false)",
-      "recorded": "2026-10-08",
-      "tracking": "#401"
-    },
-    {
-      "root": "shipped",
-      "skill": "apex-microsoft-docs",
       "rule": "skill-user-invocable-explicit",
       "violation": "SKILL.md frontmatter does not declare 'user-invocable' (true or false)",
       "recorded": "2026-10-08",

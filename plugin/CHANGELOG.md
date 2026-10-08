@@ -30,6 +30,8 @@ First marketplace release of APEX as one Agent Plugins 1.0 plugin.
   with the Copilot CLI client mechanics the workspace copies carried before `apex init` stopped copying them (CP-11).
   The built-in `rubber-duck` agent runs the Requirements, Architecture and Plan reviews; the APEX Reviewer worker is
   retired.
+- Azure design skills re-ported from `jonathan-vella/apex` (CP-18): trigger-rich descriptions, retail pricing, SKU
+  availability and cost tool references, and guidance aligned to the read-only `apex-azure-pricing` tools.
 - The `apex` MCP server: the bundled `@apexops/cli` runtime as one esbuild bundle on the MCP TypeScript SDK v2, started
   with `node` from the plugin folder and needing no registry download.
 - The `apex-azure-pricing` MCP server: Azure Resource Manager MCP over streamable HTTP with the `CostManagement` and

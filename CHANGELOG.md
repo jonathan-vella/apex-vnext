@@ -55,6 +55,14 @@ the workspace runtime version. Plugin and CLI versions move in lockstep; see `pl
   closed with `APEX_RUNTIME_MISMATCH` and a remediation (`apex update` for an older workspace, the matching plugin or
   CLI version for a newer one); `status` returns a read-only `runtime_mismatch` result. Uninitialized workspaces are
   unchanged.
+- The shipped Azure design skills (`apex-azure-defaults`, `apex-azure-adr`, `apex-azure-compute`, `apex-azure-storage`,
+  `apex-azure-rbac`, `apex-azure-quotas`, `apex-azure-cost-optimization`, `apex-azure-governance`,
+  `apex-azure-compliance`, `apex-azure-resources`, `apex-entra-app-registration` and `apex-microsoft-docs`) are
+  re-ported from `jonathan-vella/apex` at a pinned commit and adapted to the kernel boundaries. Descriptions use quoted
+  `WHEN:` triggers and `DO NOT USE FOR:` redirects, every skill declares its invocation fields, pricing and cost
+  guidance uses the read-only `apex-azure-pricing` tools, and new references cover retail pricing, SKU availability
+  and cost tool limits. `tools/registry/skill-upstream-pins.v1.json` records the upstream commit and adaptations per
+  skill.
 - `npm run validate:skills` now validates the shipped skills in `customizations/.github/skills/` as well as the
   repository authoring skills, requires every shipped skill to declare `user-invocable`, keeps skills loaded by the
   APEX agent, its workers or `apex-next` routing model-loadable, and records pre-existing errors in a shrink-only

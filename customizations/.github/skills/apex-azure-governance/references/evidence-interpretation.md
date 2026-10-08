@@ -4,6 +4,10 @@ Use this reference after accepted governance evidence is available in the
 active task context. The evidence is a point-in-time attestation, not a
 standing authorization.
 
+Contents: [acceptance checks](#acceptance-checks), [classification rules](#classification-rules),
+[effective values](#effective-values), [exemption validity](#exemption-validity),
+[planning handoff](#planning-handoff), [resume and reconciliation](#resume-and-reconciliation).
+
 ## Acceptance Checks
 
 Treat the evidence as usable only when all of the following hold:
@@ -57,6 +61,30 @@ evidence and never downgrade a descendant-mode finding or authorize a waiver. Ta
 exemption scopes only. Legacy collection without `IncludeDescendants` keeps its earlier subscription-level behavior;
 it is not accepted as new target-bound coverage. Unsupported partial exclusions, selectors, versions, or unresolved
 management-group exemption ancestry still stop collection. Retained Audit evidence is not a compliance verdict.
+
+## Effective Values
+
+- Parameter values resolve from the assignment first, then the initiative, then the definition default. An initiative
+  member binding resolves against the effective initiative values. Plan against the effective value in the evidence,
+  never a definition default.
+- An effect expression the collector could not resolve stays unresolved; it is not `Deny`, `Audit`, or `Disabled` by
+  assumption.
+- Allowed locations come from the resolved policy condition, not a policy name or category. A subscription-wide list is
+  the intersection of compatible, enforced `Deny` allowlists, including inherited ones. A conditional or
+  resource-specific restriction applies only to its own resource types and scope.
+- An empty allowed-locations list is not evidence of unrestricted placement. It can mean no location policy, a
+  disjoint intersection, or restrictions that need scoped interpretation; inspect the retained findings.
+
+## Exemption Validity
+
+These are necessary conditions, never sufficient ones; the runtime decides whether an exemption is accepted.
+
+- Only the `Waiver` and `Mitigated` categories can exempt a finding.
+- An expiry must be absent or a timezone-aware instant strictly after the evaluation time. An expired, invalid, or
+  timezone-less expiry never suppresses a blocker.
+- An exemption covers only its own scope and, for an initiative, only the listed member references. A child
+  resource-group exemption does not establish subscription-wide coverage.
+- Each exemption is evaluated independently; one partial exemption cannot remove another member's finding.
 
 ## Planning Handoff
 
