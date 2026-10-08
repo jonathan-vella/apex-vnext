@@ -436,6 +436,10 @@ function rubberDuckTask(overrides = {}, args = {}) {
   };
 }
 
+// A damaged mark ages by its file mtime. NTFS stamps it with a finer clock than Date.now(), so the mtime can run a few
+// milliseconds ahead; checking one minute past the TTL keeps expiry tests independent of that skew.
+const PAST_TTL_MS = MARKER_TTL_MS + 60_000;
+
 const subagentStart = (agentName = "rubber-duck", overrides = {}) => ({
   sessionId: parentSession,
   timestamp: 1791388443826,
@@ -657,7 +661,7 @@ test("rubber-duck marks clear on task failure, expire, and fail closed when unre
   assert.equal(activeRubberDuckMarks().length, 1, "one failure clears one mark");
   assertAllowed(decide("postToolUseFailure", { ...failure, toolArgs: { ...failure.toolArgs, agent_type: "explore" } }));
   assert.equal(activeRubberDuckMarks().length, 1);
-  assert.equal(activeRubberDuckMarks({ now: Date.now() + MARKER_TTL_MS + 1 }).length, 0, "expired marks are removed");
+  assert.equal(activeRubberDuckMarks({ now: Date.now() + PAST_TTL_MS }).length, 0, "expired marks are removed");
   assert.deepEqual(await readdir(join(testReviewHome, "active")), []);
 
   // A damaged mark fails closed for every folder until it is older than the TTL; temporary files are ignored.
@@ -676,7 +680,7 @@ test("rubber-duck marks clear on task failure, expire, and fail closed when unre
     { decision: denyApexMutationDuringRubberDuck(readPayload(JSON.stringify(apexCall("gateDecide", { cwd: "/x" })))) },
     "gateDecide",
   );
-  assert.equal(activeRubberDuckMarks({ now: Date.now() + MARKER_TTL_MS + 1 }).length, 0, "old damaged marks expire");
+  assert.equal(activeRubberDuckMarks({ now: Date.now() + PAST_TTL_MS }).length, 0, "old damaged marks expire");
   assert.deepEqual(
     (await readdir(join(testReviewHome, "active"))).filter((name) => name.endsWith(".json")),
     [],
@@ -715,7 +719,7 @@ test("a denied duplicate rubber-duck call cannot clear the mark of the run that 
   assertAllowed(decide("postToolUseFailure", failed({ cwd: "/home/user/other" })));
   assertAllowed(decide("postToolUseFailure", failed({ sessionId: rubberDuckSession })));
   assert.equal(activeRubberDuckMarks().length, 1);
-  assert.equal(consumeRubberDuckDenial(rubberDuckTask(), { now: Date.now() + MARKER_TTL_MS + 1 }), false);
+  assert.equal(consumeRubberDuckDenial(rubberDuckTask(), { now: Date.now() + PAST_TTL_MS }), false);
   assert.deepEqual(await readdir(join(testReviewHome, "denied")), [], "expired denials are removed");
   assertAllowed(decide("postToolUseFailure", failed()));
   assert.equal(activeRubberDuckMarks().length, 0);
@@ -739,7 +743,7 @@ test("a denied duplicate rubber-duck call cannot clear the mark of the run that 
     activeRubberDuckMarks().every(({ parentSessionId }) => parentSessionId === parentSession),
     "a session that owns no mark gains none, so it never becomes an exempt parent",
   );
-  assert.equal(activeRubberDuckMarks({ now: Date.now() + MARKER_TTL_MS + 1 }).length, 0);
+  assert.equal(activeRubberDuckMarks({ now: Date.now() + PAST_TTL_MS }).length, 0);
   await rm(join(testReviewHome, "denied"));
 
   // A fail-safe denial of an unreadable rubber-duck call covers the next rubber-duck failure from any session.
