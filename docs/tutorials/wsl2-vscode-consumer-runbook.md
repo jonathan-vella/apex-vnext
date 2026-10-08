@@ -2,8 +2,9 @@
 
 > [Current Version](../../VERSION.md) | Install APEX in Ubuntu on WSL2 and start it in GitHub Copilot CLI.
 
-This runbook creates one APEX workspace in Ubuntu on WSL2 and runs APEX in GitHub Copilot CLI. The same steps apply on
-a Linux machine without WSL. It creates local project state only; it does not deploy Azure resources.
+This runbook creates one APEX workspace in Ubuntu on WSL2 and runs APEX in GitHub Copilot CLI. On an Ubuntu machine
+without WSL, skip the WSL installation step and run the same Ubuntu commands. It creates local project state only; it
+does not deploy Azure resources.
 
 In WSL2, Copilot CLI is the only supported APEX host. VS Code and the GitHub Copilot app run APEX on native Windows; see
 the [Windows 11 first run](windows-11-first-run.md). Use one host per workspace: a run does not move between a Windows
@@ -17,7 +18,8 @@ client and Copilot CLI in WSL2. Docker, a devcontainer and the APEX source repos
 
 ## Prepare Ubuntu
 
-Follow the WSL2 steps in [Prepare Windows 11](../how-to/prepare-windows-11.md#prepare-wsl2-for-copilot-cli):
+Follow the WSL2 steps in [Prepare Windows 11](../how-to/prepare-windows-11.md#prepare-wsl2-for-copilot-cli). On
+Ubuntu without WSL, start at [Install Node.js And npm](../how-to/prepare-windows-11.md#install-nodejs-and-npm):
 
 - Ubuntu on WSL2, with workspaces in the Linux filesystem, such as `~/src`, rather than under `/mnt/c`;
 - Node.js 24.21.0 (LTS) or later, installed in Ubuntu and separate from any Node.js installation on Windows;
@@ -50,6 +52,7 @@ cd ~/src/contoso-platform
 npx --yes @apexops/cli@PLUGIN_VERSION bootstrap \
   --project payments \
   --risk-owner partner \
+  --target local \
   --create-repo \
   --yes
 ```

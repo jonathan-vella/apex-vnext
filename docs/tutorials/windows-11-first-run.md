@@ -36,7 +36,7 @@ npm install --global @apexops/cli@PLUGIN_VERSION
 apex version --json
 New-Item -ItemType Directory -Force C:\src\contoso-platform | Out-Null
 Set-Location C:\src\contoso-platform
-apex bootstrap --project payments --risk-owner partner --create-repo --yes
+apex bootstrap --project payments --risk-owner partner --target local --create-repo --yes
 ```
 
 Bootstrap installs the same CLI version as a workspace dependency and writes the thin workspace projection:
