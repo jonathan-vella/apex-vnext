@@ -38,10 +38,18 @@ npm run test:plugin
 
 The build writes `dist/apex-plugin/` and its tree hash to `dist/apex-plugin.sha256`. The package holds `plugin.json`,
 `mcp.json`, `skills/`, the APEX agent and hidden workers under `com.github.copilot/agents/`, the managed hooks under
-`com.github.copilot/hooks/`, `assets/`, and `mcp/apex.mjs`: one esbuild bundle of the MCP server and its npm
-dependencies, about 3 MB. Clients start it with `node ${PLUGIN_ROOT}/mcp/apex.mjs`; it reads `assets/` next to
-`mcp/` and needs no `node_modules`, `npm` or network. PNG diagram rendering needs the native `@resvg/resvg-js`
-package, so the plugin writes SVG diagrams only.
+`com.github.copilot/hooks/`, `assets/`, `native/`, and `mcp/apex.mjs`: one esbuild bundle of the MCP server and its
+npm dependencies, about 3 MB. Clients start it with `node ${PLUGIN_ROOT}/mcp/apex.mjs`; it reads `assets/` next to
+`mcp/` and needs no `node_modules`, `npm` or network.
+
+`native/resvg-js/` holds the prebuilt `@resvg/resvg-js` binaries that render PNG diagrams, about 8.5 MB: `linux-x64`
+(glibc, for the Copilot CLI on Linux and WSL2) and `win32-x64` (VS Code and the Copilot app on Windows), with their
+MPL-2.0 `LICENSE` and a `manifest.json` naming each source tarball. The build takes them from the npm tarballs pinned
+in `package-lock.json` and checks each tarball's lockfile integrity. Under `npm run` it reads the npm cache first, then
+`node_modules/.cache/apex-plugin-native/`, and downloads from the lockfile URL only when neither has the tarball. The
+bundle carries each binary's SHA-256 and loads a binary only when its hash matches. On other platforms, on musl Linux,
+or when a binary is missing or altered, the plugin writes Python and SVG diagrams and the review `README.md` reports
+PNG as unavailable.
 
 ### Install Smoke
 

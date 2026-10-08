@@ -8,15 +8,34 @@
  * The MCP server ships as one esbuild bundle at mcp/apex.mjs with no node_modules. The CLI reads its bundled assets
  * from new URL("../assets/", import.meta.url), so assets/ sits beside mcp/ under the plugin root.
  *
+ * PNG diagrams need the native @resvg/resvg-js binding, which a single-file bundle cannot carry. The build ships the
+ * prebuilt platform binaries named in the manifest's native section under native/, taken from the npm tarballs pinned in
+ * package-lock.json and verified against their lockfile integrity, and inlines their SHA-256 table into the bundle so
+ * the runtime refuses a replaced binary. Tarballs come from the npm cache, node_modules/.cache/apex-plugin-native/ or
+ * the lockfile URL, in that order; the plugin itself never downloads anything.
+ *
  * Agents are rendered with the same Copilot CLI renderer the workspace projection used before CP-11, so the plugin
  * carries the client mechanics (ask_user, task delegation and Explore rules) the retired workspace copies carried.
  */
 import { createHash } from "node:crypto";
 import { constants } from "node:fs";
-import { chmod, lstat, mkdir, open, readFile, readdir, realpath, rm, utimes, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  lstat,
+  mkdir,
+  open,
+  readFile,
+  readdir,
+  realpath,
+  rename,
+  rm,
+  utimes,
+  writeFile,
+} from "node:fs/promises";
 import { builtinModules } from "node:module";
 import { basename, dirname, extname, isAbsolute, join, posix, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { gunzipSync } from "node:zlib";
 import { build as esbuild } from "esbuild";
 import { load as loadYaml } from "js-yaml";
 import {
@@ -50,7 +69,11 @@ const manifestShape = {
   skills: ["sourceRoot", "targetRoot"],
   hooks: ["sourceRoot", "targetRoot", "entries"],
   assets: ["sourceRoot", "targetRoot"],
+  native: ["package", "targetRoot", "source", "binaries"],
 };
+const nativeBinaryShape = ["package", "file", "libc"];
+const nativeCacheDirectory = join(repositoryRoot, "node_modules/.cache/apex-plugin-native");
+const nativeFetchTimeoutMs = 120_000;
 const builtins = new Set(builtinModules.flatMap((name) => [name, `node:${name}`]));
 // camelCase events from the Copilot hooks reference; PascalCase names select the VS Code payload format instead.
 const hookEvents = [
@@ -131,6 +154,39 @@ async function readJson(path) {
   return JSON.parse(await readFile(path, "utf8"));
 }
 
+function validateNativeSection(manifest) {
+  const native = manifest.native;
+  if (typeof native.package !== "string" || !/^@resvg\/resvg-js$/u.test(native.package))
+    throw new Error("Plugin native package must be @resvg/resvg-js");
+  if (typeof native.source !== "string" || !native.source.startsWith("https://"))
+    throw new Error("Plugin native source must be the https URL of the binaries' source code");
+  const topLevel = native.targetRoot.split("/", 1)[0];
+  const taken = [
+    manifest.plugin.target,
+    manifest.mcp.target,
+    manifest.server.target,
+    manifest.agents.targetRoot,
+    manifest.skills.targetRoot,
+    manifest.hooks.targetRoot,
+    manifest.assets.targetRoot,
+  ].map((target) => target.split("/", 1)[0]);
+  if (topLevel !== "native" || taken.includes(topLevel))
+    throw new Error("Plugin native targetRoot must sit under native/, apart from every other plugin component");
+  if (!isPlainObject(native.binaries) || Object.keys(native.binaries).length === 0)
+    throw new Error("Plugin native binaries must map at least one platform");
+  for (const [platform, binary] of Object.entries(native.binaries)) {
+    if (!/^(?:linux|win32)-(?:x64|arm64)$/u.test(platform))
+      throw new Error(`Plugin native platform ${platform} must be <linux|win32>-<x64|arm64>`);
+    assertKeys(`Plugin native binary ${platform}`, binary, nativeBinaryShape, ["package", "file"]);
+    if (binary.package !== `${native.package}-${platform}${platform.startsWith("win32-") ? "-msvc" : "-gnu"}`)
+      throw new Error(`Plugin native binary ${platform} must come from the ${platform} platform package`);
+    if (!safeRelativePath(binary.file) || binary.file.includes("/") || extname(binary.file) !== ".node")
+      throw new Error(`Plugin native binary ${platform} file must be a .node file name`);
+    if (platform.startsWith("linux-") !== (binary.libc === "glibc"))
+      throw new Error(`Plugin native binary ${platform} must set libc glibc exactly for Linux`);
+  }
+}
+
 function validatePackageManifest(manifest) {
   assertKeys("Plugin package manifest", manifest, ["schemaVersion", "outputDirectory", ...Object.keys(manifestShape)]);
   if (manifest.schemaVersion !== "1.0.0") throw new Error("Plugin package manifest schemaVersion must be 1.0.0");
@@ -148,6 +204,7 @@ function validatePackageManifest(manifest) {
     ["hooks.sourceRoot", manifest.hooks.sourceRoot],
     ["assets.sourceRoot", manifest.assets.sourceRoot],
     ["assets.targetRoot", manifest.assets.targetRoot],
+    ["native.targetRoot", manifest.native.targetRoot],
   ]) {
     if (!safeRelativePath(path)) throw new Error(`Plugin package manifest ${label} must be a safe relative path`);
   }
@@ -155,6 +212,7 @@ function validatePackageManifest(manifest) {
     const actual = manifest[section].target ?? manifest[section].targetRoot;
     if (actual !== target) throw new Error(`Plugin package manifest ${section} target must be ${target}`);
   }
+  validateNativeSection(manifest);
   if (!/^node\d+$/u.test(manifest.server.nodeTarget)) throw new Error("Plugin server nodeTarget must look like node24");
   const assetRoot = posix.normalize(posix.join(posix.dirname(manifest.server.target), "../assets"));
   if (manifest.assets.targetRoot !== assetRoot) {
@@ -589,11 +647,194 @@ async function validatePackagedHooks(outputRoot, manifest) {
   if (unused.length > 0) throw new Error(`Hook script is not referenced by hooks.json: ${unused[0]}`);
 }
 
+function lockedPackage(lock, name) {
+  const entry = lock.packages?.[`node_modules/${name}`];
+  if (
+    !isPlainObject(entry) ||
+    typeof entry.version !== "string" ||
+    typeof entry.resolved !== "string" ||
+    !entry.resolved.startsWith("https://registry.npmjs.org/") ||
+    typeof entry.integrity !== "string" ||
+    !/^sha512-[A-Za-z0-9+/]{86}==$/u.test(entry.integrity)
+  ) {
+    throw new Error(`package-lock.json must pin ${name} with an npmjs.org tarball and a sha512 integrity`);
+  }
+  return { name, version: entry.version, resolved: entry.resolved, integrity: entry.integrity, entry };
+}
+
+function matchesIntegrity(bytes, integrity) {
+  return `sha512-${createHash("sha512").update(bytes).digest("base64")}` === integrity;
+}
+
+async function readIfPresent(path) {
+  return readFile(path).catch((error) => {
+    if (error.code === "ENOENT" || error.code === "ENOTDIR") return undefined;
+    throw error;
+  });
+}
+
+/**
+ * Returns the lockfile tarball verified against its integrity. npm's content-addressed cache already holds the
+ * tarballs `npm ci` installed; other platforms' tarballs are downloaded once from the lockfile URL into a local cache.
+ */
+async function lockedTarball(locked) {
+  const digest = Buffer.from(locked.integrity.slice("sha512-".length), "base64").toString("hex");
+  const npmCache = process.env.npm_config_cache;
+  const ownCache = join(nativeCacheDirectory, `${digest}.tgz`);
+  const candidates = [
+    ...(npmCache
+      ? [join(npmCache, "_cacache/content-v2/sha512", digest.slice(0, 2), digest.slice(2, 4), digest.slice(4))]
+      : []),
+    ownCache,
+  ];
+  for (const candidate of candidates) {
+    const cached = await readIfPresent(candidate);
+    if (cached !== undefined && matchesIntegrity(cached, locked.integrity)) return cached;
+  }
+  if (process.env.npm_config_offline === "true" || process.env.NPM_CONFIG_OFFLINE === "true")
+    throw new Error(`${locked.name}@${locked.version} is not cached and npm offline mode is set; build online once`);
+  let response;
+  try {
+    response = await fetch(locked.resolved, { signal: AbortSignal.timeout(nativeFetchTimeoutMs) });
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(`Could not download ${locked.resolved}: ${reason}`, { cause: error });
+  }
+  if (!response.ok) throw new Error(`Could not download ${locked.resolved}: HTTP ${response.status}`);
+  const bytes = Buffer.from(await response.arrayBuffer());
+  if (!matchesIntegrity(bytes, locked.integrity))
+    throw new Error(`${locked.resolved} does not match its package-lock.json integrity`);
+  await mkdir(nativeCacheDirectory, { recursive: true });
+  const partial = `${ownCache}.${process.pid}.partial`;
+  await writeFile(partial, bytes);
+  await rename(partial, ownCache);
+  return bytes;
+}
+
+function tarField(header, start, length) {
+  const field = header.subarray(start, start + length);
+  const end = field.indexOf(0);
+  return field.subarray(0, end === -1 ? length : end).toString("utf8");
+}
+
+function tarNumber(header, start, length, label) {
+  if ((header[start] & 0x80) !== 0) throw new Error(`Unsupported base-256 tar ${label}`);
+  const text = tarField(header, start, length).trim();
+  if (!/^[0-7]*$/u.test(text)) throw new Error(`Invalid tar ${label}`);
+  return text === "" ? 0 : Number.parseInt(text, 8);
+}
+
+/** Reads the regular files of an npm package tarball (gzip ustar with optional pax headers) with Node builtins. */
+function extractTarball(tgz, label) {
+  const tar = gunzipSync(tgz);
+  const files = new Map();
+  let paxPath;
+  for (let offset = 0; offset + 512 <= tar.length;) {
+    const header = tar.subarray(offset, offset + 512);
+    if (header.every((byte) => byte === 0)) break;
+    let checksum = 0;
+    for (let index = 0; index < 512; index += 1) checksum += index >= 148 && index < 156 ? 32 : header[index];
+    if (checksum !== tarNumber(header, 148, 8, "checksum")) throw new Error(`${label} has a corrupt tar header`);
+    const size = tarNumber(header, 124, 12, "size");
+    const bodyStart = offset + 512;
+    if (bodyStart + size > tar.length) throw new Error(`${label} is truncated`);
+    const body = tar.subarray(bodyStart, bodyStart + size);
+    const type = header[156] === 0 ? "0" : String.fromCharCode(header[156]);
+    const prefix = tarField(header, 257, 6).startsWith("ustar") ? tarField(header, 345, 155) : "";
+    const name = tarField(header, 0, 100);
+    if (type === "x") {
+      const path = /(?:^|\n)\d+ path=([^\n]*)\n/u.exec(body.toString("utf8"));
+      paxPath = path?.[1];
+    } else {
+      const path = paxPath ?? (prefix === "" ? name : `${prefix}/${name}`);
+      paxPath = undefined;
+      if (type === "0") {
+        if (files.has(path)) throw new Error(`${label} repeats ${path}`);
+        files.set(path, Buffer.from(body));
+      }
+    }
+    offset = bodyStart + Math.ceil(size / 512) * 512;
+  }
+  return files;
+}
+
+function tarballFile(files, path, label) {
+  const content = files.get(`package/${path}`);
+  if (content === undefined) throw new Error(`${label} has no ${path}`);
+  return content;
+}
+
+/**
+ * Writes the native rasterizer binaries, their license and a provenance manifest, and returns the table the bundle
+ * inlines as __APEX_PLUGIN_NATIVE__. The manifest pins the same hashes the bundle checks before loading a binary.
+ */
+async function packageNativeBinaries(manifest, outputRoot) {
+  const native = manifest.native;
+  const lock = await readJson(join(repositoryRoot, "package-lock.json"));
+  const main = lockedPackage(lock, native.package);
+  const mainLabel = `${main.name}@${main.version}`;
+  const mainFiles = extractTarball(await lockedTarball(main), mainLabel);
+  const mainPackage = JSON.parse(tarballFile(mainFiles, "package.json", mainLabel).toString("utf8"));
+  if (mainPackage.name !== main.name || mainPackage.version !== main.version || mainPackage.license !== "MPL-2.0")
+    throw new Error(`${mainLabel} tarball metadata does not match package-lock.json and MPL-2.0`);
+  const license = tarballFile(mainFiles, "LICENSE", mainLabel);
+  if (!license.toString("utf8").startsWith("Mozilla Public License Version 2.0"))
+    throw new Error(`${mainLabel} LICENSE is not the MPL-2.0 text`);
+
+  const runtimeBinaries = {};
+  const provenance = {};
+  for (const platform of Object.keys(native.binaries).sort(bytewise)) {
+    const binary = native.binaries[platform];
+    const locked = lockedPackage(lock, binary.package);
+    const label = `${locked.name}@${locked.version}`;
+    if (locked.version !== main.version || main.entry.optionalDependencies?.[locked.name] !== main.version)
+      throw new Error(`${label} must be the ${mainLabel} optional dependency for ${platform}`);
+    const [os, cpu] = platform.split("-");
+    if (
+      locked.entry.os?.join() !== os ||
+      locked.entry.cpu?.join() !== cpu ||
+      (binary.libc === undefined ? locked.entry.libc !== undefined : locked.entry.libc?.join() !== binary.libc)
+    )
+      throw new Error(`${label} is not the ${platform}${binary.libc ? ` ${binary.libc}` : ""} package`);
+    const files = extractTarball(await lockedTarball(locked), label);
+    const packageJson = JSON.parse(tarballFile(files, "package.json", label).toString("utf8"));
+    if (packageJson.name !== locked.name || packageJson.version !== locked.version || packageJson.main !== binary.file)
+      throw new Error(`${label} tarball metadata does not match package-lock.json and ${binary.file}`);
+    const content = tarballFile(files, binary.file, label);
+    const file = `${platform}/${binary.file}`;
+    const sha256 = createHash("sha256").update(content).digest("hex");
+    await writeOutputFile(outputRoot, `${native.targetRoot}/${file}`, content);
+    runtimeBinaries[platform] = { file, sha256, ...(binary.libc === undefined ? {} : { libc: binary.libc }) };
+    provenance[platform] = {
+      file,
+      bytes: content.length,
+      sha256,
+      ...(binary.libc === undefined ? {} : { libc: binary.libc }),
+      package: locked.name,
+      version: locked.version,
+      tarball: locked.resolved,
+      integrity: locked.integrity,
+    };
+  }
+  await writeOutputFile(outputRoot, `${native.targetRoot}/LICENSE`, license);
+  await writeJsonOutput(outputRoot, `${native.targetRoot}/manifest.json`, {
+    package: main.name,
+    version: main.version,
+    license: "MPL-2.0",
+    licenseFile: "LICENSE",
+    source: `${native.source}/tree/v${main.version}`,
+    note: "Unmodified binaries from the npm platform packages; other platforms write SVG diagrams only.",
+    binaries: provenance,
+  });
+  const root = `${posix.relative(posix.dirname(manifest.server.target), native.targetRoot)}/`;
+  return { package: main.name, version: main.version, root, binaries: runtimeBinaries };
+}
+
 /**
  * Bundles the MCP entry and its @apexops/* and npm dependencies into one ESM file. Paths in esbuild comments are
  * relative to the repository root, so the output does not depend on the checkout location.
  */
-async function bundleServer(manifest, outputRoot) {
+async function bundleServer(manifest, outputRoot, nativeTable) {
   const result = await esbuild({
     absWorkingDir: repositoryRoot,
     entryPoints: [join(repositoryRoot, manifest.server.entry)],
@@ -603,7 +844,8 @@ async function bundleServer(manifest, outputRoot) {
     format: "esm",
     target: manifest.server.nodeTarget,
     // Disables the CLI's "run main when executed directly" guard, which would match the shared bundle URL.
-    define: { __APEX_PLUGIN_BUNDLE__: "true" },
+    // __APEX_PLUGIN_NATIVE__, a JSON string, switches the rasterizer to the hashed binaries under native/.
+    define: { __APEX_PLUGIN_BUNDLE__: "true", __APEX_PLUGIN_NATIVE__: JSON.stringify(JSON.stringify(nativeTable)) },
     // CommonJS dependencies such as ajv call require(); ESM output needs a real one.
     banner: {
       js: [
@@ -718,7 +960,8 @@ async function build(
   validateMcpJson(mcp, manifest);
   await writeJsonOutput(outputDirectory, manifest.mcp.target, mcp);
 
-  const bundle = await bundleServer(manifest, outputDirectory);
+  const nativeTable = await packageNativeBinaries(manifest, outputDirectory);
+  const bundle = await bundleServer(manifest, outputDirectory, nativeTable);
   for (const [name, content] of await renderPluginAgents(manifest.agents.sourceRoot)) {
     await writeOutputFile(outputDirectory, `${manifest.agents.targetRoot}/${name}`, Buffer.from(content, "utf8"));
   }
@@ -742,7 +985,7 @@ async function build(
   await setDirectoryTimes(outputDirectory);
   const tree = await hashTree(outputDirectory);
   await writeFile(`${outputDirectory}.sha256`, `${tree.sha256}  ${basename(outputDirectory)}\n`);
-  return { outputDirectory, bundle, ...tree };
+  return { outputDirectory, bundle, native: nativeTable, ...tree };
 }
 
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { cp, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { builtinModules } from "node:module";
 import { tmpdir } from "node:os";
@@ -59,6 +60,7 @@ test("plugin build is byte reproducible with fixed mtimes", async (context) => {
   assert.equal(first.sha256, second.sha256);
   assert.deepEqual(first.files, second.files);
   assert.deepEqual(first.bundle, second.bundle);
+  assert.deepEqual(first.native, second.native);
   assert.deepEqual(await hashTree(first.outputDirectory), await hashTree(second.outputDirectory));
   for (const path of ["plugin.json", "mcp", "mcp/apex.mjs", "assets/manifest.json"]) {
     assert.equal((await stat(join(first.outputDirectory, path))).mtimeMs, fixedTime, path);
@@ -87,7 +89,7 @@ test("plugin layout, manifests, agents, skills and bundle are valid", async (con
   const { outputDirectory, files, bundle } = await buildInto(context, "layout");
   const manifest = await readManifest();
   const topLevel = [...new Set(files.map((path) => path.split("/", 1)[0]))].sort();
-  assert.deepEqual(topLevel, ["assets", "com.github.copilot", "mcp", "mcp.json", "plugin.json", "skills"]);
+  assert.deepEqual(topLevel, ["assets", "com.github.copilot", "mcp", "mcp.json", "native", "plugin.json", "skills"]);
   assert.ok(files.every((path) => !path.split("/").includes("node_modules")));
 
   const plugin = await readJson(join(outputDirectory, "plugin.json"));
@@ -529,8 +531,8 @@ function cli(cwd, args) {
   return JSON.parse(result.stdout);
 }
 
-async function offlinePlugin(context) {
-  const { outputDirectory } = await buildInto(context, "offline-build");
+async function offlinePlugin(context, outputDirectory, projectId = "plugin-test") {
+  outputDirectory ??= (await buildInto(context, "offline-build")).outputDirectory;
   const sandbox = await temporaryDirectory(context, "offline");
   const pluginRoot = join(sandbox, "installed", "apex");
   const pluginData = join(sandbox, "data", "apex");
@@ -540,14 +542,14 @@ async function offlinePlugin(context) {
   await mkdir(workspace, { recursive: true });
   const git = spawnSync("git", ["init", "--quiet", workspace], { encoding: "utf8" });
   assert.equal(git.status, 0, git.stderr);
-  const init = cli(workspace, ["init", "--project", "plugin-test", "--risk-owner", "partner", "--target", "local"]);
+  const init = cli(workspace, ["init", "--project", projectId, "--risk-owner", "partner", "--target", "local"]);
   assert.equal(init.ok, true);
   const guard = join(sandbox, "guard.mjs");
   await writeFile(guard, guardHook);
-  return { pluginRoot, pluginData, workspace, guard };
+  return { pluginRoot, pluginData, workspace, guard, sandbox, projectId, runId: init.result.runId };
 }
 
-function startServer({ pluginRoot, pluginData, guard }) {
+function startServer({ pluginRoot, pluginData, guard, preload = [] }) {
   const env = {
     PATH: dirname(process.execPath),
     PLUGIN_ROOT: pluginRoot,
@@ -557,7 +559,8 @@ function startServer({ pluginRoot, pluginData, guard }) {
     ...(process.platform === "win32" ? { SystemRoot: process.env.SystemRoot } : {}),
   };
   assert.equal(env.PATH.split(delimiter).length, 1);
-  const child = spawn(process.execPath, ["--import", pathToFileURL(guard).href, join(pluginRoot, "mcp/apex.mjs")], {
+  const imports = [guard, ...preload].flatMap((path) => ["--import", pathToFileURL(path).href]);
+  const child = spawn(process.execPath, [...imports, join(pluginRoot, "mcp/apex.mjs")], {
     cwd: pluginRoot,
     env,
     shell: false,
@@ -658,4 +661,205 @@ test("packaged MCP server answers a Copilot discover then 2025-11-25 initialize 
   assert.ok(listed.result.tools.some((tool) => tool.name === "status"));
   const exit = await server.close();
   assert.deepEqual({ code: exit.code, signal: exit.signal }, { code: 0, signal: null }, exit.stderr);
+});
+
+const pngSignature = [137, 80, 78, 71, 13, 10, 26, 10];
+const diagramNames = ["02-waf-assessment", "03-des-cost-breakdown", "03-des-cost-uncertainty", "03-des-diagram"];
+
+/**
+ * Drives a workspace to the Architecture task with the npm CLI service and its test fixtures, so the packaged server
+ * renders the Gate 2 diagrams when it completes that task. The fixtures use the project id "demo".
+ */
+async function architectureTask(plugin) {
+  const { ApexService } = await import(pathToFileURL(join(root, "packages/cli/dist/service.js")).href);
+  const fixtures = await import(pathToFileURL(join(root, "packages/cli/dist/test/helpers.js")).href);
+  const { projectId } = plugin;
+  const service = new ApexService(plugin.workspace);
+  const complete = async (taskType, outputs) => {
+    const next = await fixtures.nextTaskAfterInput(service);
+    assert.equal(next.status, "task", JSON.stringify(next));
+    assert.equal(next.task.taskType, taskType);
+    return service.completeTaskOutputs(next.task.taskId, outputs);
+  };
+  const requirements = await complete("requirements", [
+    { kind: "requirements", value: fixtures.requirements(projectId) },
+  ]);
+  await complete("requirements-review", [
+    {
+      kind: "review-findings",
+      value: fixtures.review(plugin.runId, "requirements", requirements.outputHashes.requirements),
+    },
+  ]);
+  await service.decideGateNumber(1, "approved", "tester");
+  await fixtures.acceptAvailabilityEvidence(service, plugin.runId, projectId);
+  const governanceHash = await fixtures.importReferenceGovernance(service);
+  const next = await fixtures.nextTaskAfterInput(service);
+  assert.equal(next.task?.taskType, "architecture", JSON.stringify(next));
+  const findings = await fixtures.governanceFindings(service, next.task.taskId, ["Microsoft.Web/sites"]);
+  const architecture = fixtures.architecture(plugin.runId);
+  const cost = fixtures.costEstimate(plugin.runId);
+  const { sha256Json } = await import(pathToFileURL(join(root, "packages/kernel/dist/index.js")).href);
+  return {
+    taskId: next.task.taskId,
+    outputs: [
+      { kind: "architecture", value: architecture },
+      { kind: "cost-estimate", value: cost },
+      {
+        kind: "workload-decision-manifest",
+        value: fixtures.workloadDecisionManifest({
+          runId: plugin.runId,
+          requirementsHash: requirements.outputHashes.requirements,
+          architectureHash: sha256Json(architecture),
+          costEstimateHash: sha256Json(cost),
+        }),
+      },
+      { kind: "policy-property-map", value: fixtures.policyMap(plugin.runId, governanceHash, findings) },
+    ],
+    directory: join(plugin.workspace, "agent-output", projectId, plugin.runId, "architecture"),
+  };
+}
+
+/** Completes the Architecture task through the packaged server and returns the review README diagram status. */
+async function renderThroughPackagedServer(plugin, preload = []) {
+  const task = await architectureTask(plugin);
+  const server = startServer({ ...plugin, preload });
+  try {
+    server.send({
+      id: 1,
+      method: "tools/call",
+      params: {
+        name: "completeTask",
+        arguments: { workspace: plugin.workspace, taskId: task.taskId, outputs: task.outputs },
+        _meta: modernMeta,
+      },
+    });
+    const completed = await server.next();
+    assert.equal(completed.error, undefined, JSON.stringify(completed));
+    assert.notEqual(completed.result.isError, true, JSON.stringify(completed.result));
+  } finally {
+    const exit = await server.close();
+    assert.deepEqual({ code: exit.code, signal: exit.signal }, { code: 0, signal: null }, exit.stderr);
+  }
+  for (const name of diagramNames) {
+    for (const extension of ["py", "svg"]) {
+      assert.ok((await readFile(join(task.directory, `${name}.${extension}`))).byteLength > 0, `${name}.${extension}`);
+    }
+  }
+  return { directory: task.directory, readme: await readFile(join(task.directory, "README.md"), "utf8") };
+}
+
+const hostPlatform = `${process.platform}-${process.arch}`;
+const nativePlatforms = ["linux-x64", "win32-x64"];
+// The shipped Linux binary needs glibc; a musl host falls back to SVG before any hash check.
+const hostLoadsShippedBinary =
+  nativePlatforms.includes(hostPlatform) &&
+  (process.platform !== "linux" || process.report.getReport().header.glibcVersionRuntime !== undefined);
+
+test("plugin ships the pinned resvg binaries, license and provenance under native/", async (context) => {
+  const { outputDirectory, files, native } = await buildInto(context, "native");
+  const manifest = await readManifest();
+  const lock = await readJson(join(root, "package-lock.json"));
+  const provenance = await readJson(join(outputDirectory, "native/resvg-js/manifest.json"));
+  assert.deepEqual(
+    files.filter((path) => path.startsWith("native/")),
+    [
+      "native/resvg-js/LICENSE",
+      "native/resvg-js/linux-x64/resvgjs.linux-x64-gnu.node",
+      "native/resvg-js/manifest.json",
+      "native/resvg-js/win32-x64/resvgjs.win32-x64-msvc.node",
+    ],
+  );
+  assert.match(
+    await readFile(join(outputDirectory, "native/resvg-js/LICENSE"), "utf8"),
+    /^Mozilla Public License Version 2\.0/u,
+  );
+  assert.equal(provenance.license, "MPL-2.0");
+  assert.equal(provenance.version, lock.packages["node_modules/@resvg/resvg-js"].version);
+  assert.equal(provenance.source, `https://github.com/yisibl/resvg-js/tree/v${provenance.version}`);
+  assert.deepEqual(Object.keys(provenance.binaries), nativePlatforms);
+  assert.deepEqual(Object.keys(native.binaries), nativePlatforms);
+  assert.equal(native.root, "../native/resvg-js/");
+  for (const platform of nativePlatforms) {
+    const binary = provenance.binaries[platform];
+    const locked = lock.packages[`node_modules/${manifest.native.binaries[platform].package}`];
+    assert.equal(binary.package, manifest.native.binaries[platform].package);
+    assert.deepEqual([binary.tarball, binary.integrity], [locked.resolved, locked.integrity]);
+    const bytes = await readFile(join(outputDirectory, "native/resvg-js", binary.file));
+    assert.equal(bytes.length, binary.bytes);
+    assert.equal(createHash("sha256").update(bytes).digest("hex"), binary.sha256, `${platform} binary hash`);
+    assert.deepEqual(native.binaries[platform], {
+      file: binary.file,
+      sha256: binary.sha256,
+      ...(platform.startsWith("linux-") ? { libc: "glibc" } : {}),
+    });
+  }
+  const signature = (bytes) => [...bytes.subarray(0, 4)];
+  const linux = await readFile(join(outputDirectory, "native/resvg-js", provenance.binaries["linux-x64"].file));
+  const windows = await readFile(join(outputDirectory, "native/resvg-js", provenance.binaries["win32-x64"].file));
+  assert.deepEqual(signature(linux), [0x7f, 0x45, 0x4c, 0x46], "linux-x64 binary is ELF");
+  assert.deepEqual(signature(windows).slice(0, 2), [0x4d, 0x5a], "win32-x64 binary is PE");
+  const bundle = await readFile(join(outputDirectory, "mcp/apex.mjs"), "utf8");
+  for (const platform of nativePlatforms) assert.ok(bundle.includes(provenance.binaries[platform].sha256));
+});
+
+test("plugin native manifest rejects drift from the shipped platform packages", async () => {
+  const manifest = await readManifest();
+  const variant = (change) => {
+    const copy = structuredClone(manifest);
+    change(copy.native);
+    return copy;
+  };
+  for (const [change, pattern] of [
+    [(native) => (native.package = "left-pad"), /native package must be @resvg\/resvg-js/u],
+    [(native) => (native.targetRoot = "assets/native"), /under native\//u],
+    [(native) => (native.source = "http://example.com"), /native source/u],
+    [(native) => (native.binaries = {}), /at least one platform/u],
+    [(native) => (native.binaries["darwin-arm64"] = native.binaries["linux-x64"]), /darwin-arm64 must be/u],
+    [(native) => (native.binaries["linux-x64"].package = "@resvg/resvg-js-linux-x64-musl"), /platform package/u],
+    [(native) => (native.binaries["linux-x64"].file = "../escape.node"), /\.node file name/u],
+    [(native) => delete native.binaries["linux-x64"].libc, /libc glibc exactly for Linux/u],
+    [(native) => (native.binaries["win32-x64"].libc = "glibc"), /libc glibc exactly for Linux/u],
+    [(native) => (native.binaries["win32-x64"].extra = true), /unsupported fields: extra/u],
+  ]) {
+    assert.throws(() => validatePackageManifest(variant(change)), pattern);
+  }
+});
+
+test("packaged MCP server renders Gate 2 diagrams to PNG with the shipped binary", async (context) => {
+  if (!hostLoadsShippedBinary) {
+    context.skip(`no loadable shipped binary for ${hostPlatform}`);
+    return;
+  }
+  const { directory, readme } = await renderThroughPackagedServer(await offlinePlugin(context, undefined, "demo"));
+  for (const name of diagramNames) {
+    const png = await readFile(join(directory, `${name}.png`));
+    assert.deepEqual([...png.subarray(0, 8)], pngSignature, `${name}.png`);
+    assert.match(readme, new RegExp(`- ${name}: generated as Python, SVG, and PNG`, "u"));
+  }
+});
+
+test("packaged MCP server writes SVG only on an unsupported platform or a tampered binary", async (context) => {
+  const { outputDirectory } = await buildInto(context, "fallback-build");
+  const unsupported = await offlinePlugin(context, outputDirectory, "demo");
+  const arch = join(unsupported.sandbox, "unsupported-arch.mjs");
+  await writeFile(arch, 'Object.defineProperty(process, "arch", { value: "riscv64" });\n');
+  const tampered = await offlinePlugin(context, outputDirectory, "demo");
+  const provenance = await readJson(join(tampered.pluginRoot, "native/resvg-js/manifest.json"));
+  const hostBinary = provenance.binaries[hostPlatform]?.file ?? provenance.binaries["linux-x64"].file;
+  await writeFile(join(tampered.pluginRoot, "native/resvg-js", hostBinary), "replaced");
+  for (const [plugin, preload, reason] of [
+    [unsupported, [arch], `is not bundled for ${process.platform}-riscv64`],
+    ...(hostLoadsShippedBinary ? [[tampered, [], `binary for ${hostPlatform} failed its integrity check`]] : []),
+  ]) {
+    const { directory, readme } = await renderThroughPackagedServer(plugin, preload);
+    for (const name of diagramNames) {
+      await assert.rejects(stat(join(directory, `${name}.png`)), { code: "ENOENT" });
+      assert.ok(
+        readme.includes(
+          `- ${name}: generated as Python and SVG; PNG unavailable (PNG rasterizer @resvg/resvg-js ${reason}; SVG output is available)`,
+        ),
+        readme,
+      );
+    }
+  }
 });

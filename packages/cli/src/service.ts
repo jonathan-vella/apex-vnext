@@ -5271,7 +5271,7 @@ export class ApexService {
       | { name: string; source: DiagramSource; png: Uint8Array }
       | { name: string; source: DiagramSource; pngError: string };
     const message = (error: unknown, fallback: string) => (error instanceof Error ? error.message : fallback);
-    // PNG output is optional: the plugin bundle has no native rasterizer but still writes Python and SVG sources.
+    // PNG output is optional: a host without a usable native rasterizer still gets the Python and SVG sources.
     const renderDiagram = (name: string, render: () => DiagramSource): RenderedDiagram => {
       let source: DiagramSource;
       try {
