@@ -92,7 +92,8 @@ parent session and folder; `subagentStop` or a failed `task` call clears the mar
 While a mark is active, the `preToolUse` hook denies every APEX tool that is not read-only (only `status`,
 `projectList` and `doctorChecks` are) to each session in that folder that owns no active mark. Only one rubber-duck
 run per folder may be active, so a reviewer cannot make itself a parent and one run's stop event cannot clear another
-run's mark.
+run's mark. A denied second rubber-duck call leaves a short-lived denial record under `denied/`; the failure event for
+that call consumes it, so the denial cannot clear the mark of the run that is still going.
 Subagent calls carry the subagent's own session ID, so this covers rubber-duck and any agent it starts. A concurrent
 worker waits until the mark clears. The read-only list ships as `apex-mcp-tools.json`, generated from the MCP
 adapter at plugin build time; without it every APEX tool is denied during a run.

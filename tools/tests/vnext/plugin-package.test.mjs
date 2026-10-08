@@ -190,8 +190,8 @@ test("plugin layout, manifests, agents, skills and bundle are valid", async (con
   assert.deepEqual(
     Object.fromEntries(Object.entries(hooks.hooks).map(([event, entries]) => [event, entries.map((e) => e.matcher)])),
     {
-      preToolUse: ["task|.*apex[-_]azure[-_]pricing.*", "apex-.*|apex/.*|mcp__apex__.*"],
-      postToolUse: ["task"],
+      preToolUse: ["task|Task|Agent|.*apex[-_]azure[-_]pricing.*", "apex-.*|apex/.*|mcp__apex__.*"],
+      postToolUse: ["task|Task|Agent"],
       postToolUseFailure: [undefined],
       subagentStart: ["rubber-duck"],
       subagentStop: [undefined],
@@ -204,11 +204,20 @@ test("plugin layout, manifests, agents, skills and bundle are valid", async (con
     }
   const [hook] = hooks.hooks.preToolUse;
   assert.equal(hook.type, "command");
-  assert.equal(hook.matcher, "task|.*apex[-_]azure[-_]pricing.*");
+  assert.equal(hook.matcher, "task|Task|Agent|.*apex[-_]azure[-_]pricing.*");
   const matcher = new RegExp(`^(?:${hook.matcher})$`, "u");
-  for (const name of ["task", "apex-azure-pricing-create_budget", "mcp__apex_azure_pricing__get_budget"])
+  for (const name of [
+    "task",
+    "Task",
+    "Agent",
+    "apex-azure-pricing-create_budget",
+    "mcp__apex_azure_pricing__get_budget",
+  ])
     assert.ok(matcher.test(name), name);
-  for (const name of ["bash", "view", "apex-status", "tasks"]) assert.ok(!matcher.test(name), name);
+  for (const name of ["bash", "view", "apex-status", "tasks", "agent"]) assert.ok(!matcher.test(name), name);
+  // Every subagent tool name the hook script handles reaches it through the postToolUse capture entry too.
+  const capture = new RegExp(`^(?:${hooks.hooks.postToolUse[0].matcher})$`, "u");
+  for (const name of ["task", "Task", "Agent"]) assert.ok(capture.test(name), name);
   const registry = await readJson(join(root, "tools/registry/arm-mcp-cost-pricing.v1.json"));
   const packagedHook = await readFile(join(outputDirectory, "com.github.copilot/hooks/apex-hook.mjs"), "utf8");
   const generated =
@@ -573,17 +582,21 @@ test("packaged rubber-duck hooks capture reviews and deny reviewer mutations thr
   const child = "b98af3d1-4763-4c97-a520-e4c5ac7f5fd5";
   const cwd = join(sandbox, "workspace");
   const nonce = "0123456789abcdef0123456789abcdef";
-  const prompt = buildReviewPrompt({
-    nonce,
-    gate: 1,
-    subjectKind: "requirements",
-    wellArchitected: false,
-    files: [{ label: "subject", kind: "requirements", path: join(cwd, "subject.json"), sha256: "b".repeat(64) }],
-  });
+  const promptFor = (requestNonce) =>
+    buildReviewPrompt({
+      nonce: requestNonce,
+      gate: 1,
+      subjectKind: "requirements",
+      wellArchitected: false,
+      files: [{ label: "subject", kind: "requirements", path: join(cwd, "subject.json"), sha256: "b".repeat(64) }],
+    });
+  const prompt = promptFor(nonce);
+  const vscodeNonce = "fedcba9876543210fedcba9876543210";
+  const vscodePrompt = promptFor(vscodeNonce);
   for (const shell of hookShells()) {
     const home = join(sandbox, `review-home-${shell.name}`);
-    const invoke = (event, payload, index = 0) => {
-      const result = spawnSync(shell.name, shell.args(hooks[event][index][shell.field]), {
+    const invoke = (entry, event, payload) => {
+      const result = spawnSync(shell.name, shell.args(entry[shell.field]), {
         cwd: pluginRoot,
         env: {
           ...process.env,
@@ -598,6 +611,18 @@ test("packaged rubber-duck hooks capture reviews and deny reviewer mutations thr
       assert.equal(result.status, 0, `${shell.name} ${event}: ${result.stderr}`);
       return result.stdout.trim() === "" ? null : JSON.parse(result.stdout);
     };
+    // Dispatch like the client: every entry for the event whose matcher fully matches the tool (or agent) name runs,
+    // and the first decision wins.
+    const dispatch = (event, payload) => {
+      const name = String(payload.toolName ?? payload.tool_name ?? payload.agentName ?? "");
+      let decision = null;
+      for (const entry of hooks[event])
+        if (entry.matcher === undefined || new RegExp(`^(?:${entry.matcher})$`, "u").test(name)) {
+          const result = invoke(entry, event, payload);
+          decision ??= result;
+        }
+      return decision;
+    };
     const apexCall = (tool, sessionId = child) => ({
       sessionId,
       timestamp: 1,
@@ -605,16 +630,25 @@ test("packaged rubber-duck hooks capture reviews and deny reviewer mutations thr
       toolName: `apex-${tool}`,
       toolArgs: {},
     });
-    assert.equal(invoke("preToolUse", apexCall("gateDecide"), 1), null, `${shell.name}: no rubber-duck run`);
-    assert.equal(invoke("subagentStart", { sessionId: parent, timestamp: 1, cwd, agentName: "rubber-duck" }), null);
+    assert.equal(dispatch("preToolUse", apexCall("gateDecide")), null, `${shell.name}: no rubber-duck run`);
+    assert.equal(dispatch("subagentStart", { sessionId: parent, timestamp: 1, cwd, agentName: "rubber-duck" }), null);
     for (const tool of ["reviewComplete", "gateDecide", "reviewDecide", "completeTask", "nextTask"])
-      assert.equal(invoke("preToolUse", apexCall(tool), 1)?.permissionDecision, "deny", `${shell.name}: ${tool}`);
-    assert.equal(invoke("preToolUse", apexCall("status"), 1), null, `${shell.name}: read-only tools stay allowed`);
-    assert.equal(invoke("preToolUse", apexCall("reviewComplete", parent), 1), null, `${shell.name}: parent`);
+      assert.equal(dispatch("preToolUse", apexCall(tool))?.permissionDecision, "deny", `${shell.name}: ${tool}`);
+    assert.equal(dispatch("preToolUse", apexCall("status")), null, `${shell.name}: read-only tools stay allowed`);
+    assert.equal(dispatch("preToolUse", apexCall("reviewComplete", parent)), null, `${shell.name}: parent`);
     const response = '```apex-review\n{"findings":[]}\n```';
     const task = { description: "review", agent_type: "rubber-duck", mode: "sync", name: "review", prompt };
+    // A denied duplicate call fails, and its failure event leaves the running run's mark in place.
+    const duplicate = { sessionId: parent, timestamp: 2, cwd, toolName: "task", toolArgs: task };
+    assert.equal(dispatch("preToolUse", duplicate)?.permissionDecision, "deny", `${shell.name}: duplicate`);
+    assert.equal(dispatch("postToolUseFailure", { ...duplicate, error: "Denied by preToolUse hook" }), null);
     assert.equal(
-      invoke("subagentStop", {
+      dispatch("preToolUse", apexCall("gateDecide"))?.permissionDecision,
+      "deny",
+      `${shell.name}: still marked after the denied duplicate fails`,
+    );
+    assert.equal(
+      dispatch("subagentStop", {
         sessionId: parent,
         timestamp: 2,
         cwd,
@@ -626,9 +660,9 @@ test("packaged rubber-duck hooks capture reviews and deny reviewer mutations thr
       }),
       null,
     );
-    assert.equal(invoke("preToolUse", apexCall("gateDecide"), 1), null, `${shell.name}: mark cleared`);
+    assert.equal(dispatch("preToolUse", apexCall("gateDecide")), null, `${shell.name}: mark cleared`);
     assert.equal(
-      invoke("postToolUse", {
+      dispatch("postToolUse", {
         sessionId: parent,
         timestamp: 3,
         cwd,
@@ -645,6 +679,24 @@ test("packaged rubber-duck hooks capture reviews and deny reviewer mutations thr
       await reviewCaptureKey(home),
     );
     assert.equal(record.response, response, `${shell.name}: exact output captured`);
+    // The VS Code payload names the subagent tool `Agent`; the packaged matcher still reaches the capture handler.
+    assert.equal(
+      dispatch("postToolUse", {
+        hook_event_name: "PostToolUse",
+        session_id: parent,
+        cwd,
+        tool_name: "Agent",
+        tool_input: { agent_type: "rubber-duck", prompt: vscodePrompt, mode: "sync" },
+        tool_result: { result_type: "success", text_result_for_llm: response },
+      }),
+      null,
+    );
+    const vscode = verifyIssuedReviewCapture(
+      { nonce: vscodeNonce, promptSha256: reviewPromptSha256(vscodePrompt) },
+      await loadReviewCaptures(vscodeNonce, home),
+      await reviewCaptureKey(home),
+    );
+    assert.equal(vscode.toolName, "Agent", `${shell.name}: VS Code capture`);
   }
 });
 

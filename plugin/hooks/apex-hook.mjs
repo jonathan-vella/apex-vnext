@@ -25,7 +25,8 @@
  *   kernel verifies (packages/kernel/src/review-capture.ts holds the same format; a test keeps them aligned). Records
  *   live in the review home (`$APEX_REVIEW_HOME`, else `~/.apex/reviews`), outside every workspace.
  * - subagentStart marks a rubber-duck run as active for its parent session and folder; subagentStop and
- *   postToolUseFailure clear one mark; marks expire after MARKER_TTL_MS.
+ *   postToolUseFailure clear one mark; marks expire after MARKER_TTL_MS. A rubber-duck call that preToolUse denied
+ *   leaves a denial record, which its postToolUseFailure event consumes instead of clearing the running run's mark.
  * - preToolUse denies APEX state-changing MCP tools to every session in that folder that owns no active mark: a
  *   subagent's tool calls carry the subagent's own sessionId, while subagentStart carries the parent's. Only one
  *   rubber-duck run per folder may be active, so a reviewer cannot make itself a parent.
@@ -339,11 +340,67 @@ export function markRubberDuckStart({ payload }, { env = process.env, now = new 
   return null;
 }
 
-/** subagentStop and postToolUseFailure: clear the oldest mark of this parent session and folder. */
+function denialDirectory(env) {
+  return join(reviewHome(env), "denied");
+}
+
+/**
+ * Records that preToolUse denied a rubber-duck `task` call, so the postToolUseFailure event the client then sends for
+ * that call does not clear the mark of the run that is still going. A null session or folder matches any (fail-safe
+ * denials of unreadable input). Recording never blocks the denial.
+ */
+function recordRubberDuckDenial(sessionId, cwd, { env = process.env, now = new Date() } = {}) {
+  try {
+    const directory = denialDirectory(env);
+    plainDirectory(directory, true);
+    const denial = { sessionId, cwd, deniedAt: now.toISOString() };
+    writeNewFile(join(directory, `${now.getTime()}-${randomBytes(6).toString("hex")}.json`), JSON.stringify(denial));
+  } catch {
+    // The call is still denied; at worst its failure event clears a mark early, as without this record.
+  }
+}
+
+/**
+ * Consumes the oldest unexpired denial record for this session and folder. Expired and unreadable records are removed.
+ * Returns true when the failure belongs to a denied call rather than to a rubber-duck run.
+ */
+export function consumeRubberDuckDenial(payload, { env = process.env, now = Date.now() } = {}) {
+  const directory = denialDirectory(env);
+  if (!plainDirectory(directory, false)) return false;
+  for (const name of readdirSync(directory).sort()) {
+    if (!name.endsWith(".json")) continue;
+    const path = join(directory, name);
+    let denial;
+    try {
+      denial = JSON.parse(readFileSync(path, "utf8"));
+    } catch {
+      denial = undefined;
+    }
+    const deniedAt = isObject(denial) ? Date.parse(denial.deniedAt) : Number.NaN;
+    if (!Number.isFinite(deniedAt) || now - deniedAt > MARKER_TTL_MS) {
+      rmSync(path, { force: true });
+      continue;
+    }
+    if (
+      (denial.sessionId === null || denial.sessionId === sessionOf(payload)) &&
+      (denial.cwd === null || denial.cwd === folderOf(payload))
+    ) {
+      rmSync(path, { force: true });
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * subagentStop and postToolUseFailure: clear the oldest mark of this parent session and folder. A failure event for a
+ * rubber-duck call that preToolUse denied consumes that denial instead, so a denied duplicate cannot clear the mark.
+ */
 export function clearRubberDuckMark({ payload, toolName, args }, { env = process.env } = {}) {
   const agent = toolName === "" ? (payload.agentName ?? payload.agentType ?? payload.agent_name) : taskAgentType(args);
   if (toolName !== "" && !TASK_TOOLS.has(toolName)) return null;
   if (!isRubberDuck(agent)) return null;
+  if (toolName !== "" && consumeRubberDuckDenial(payload, { env })) return null;
   const mark = activeRubberDuckMarks({ env }).find(
     (candidate) => candidate.parentSessionId === sessionOf(payload) && candidate.cwd === folderOf(payload),
   );
@@ -418,6 +475,7 @@ export function denyNestedRubberDuck({ payload, toolName, args }, { env = proces
     return deny(`cannot read rubber-duck run marks (${error.message}), so the rubber-duck call is blocked.`);
   }
   if (!marks.some((mark) => mark.cwd === null || mark.cwd === folderOf(payload))) return null;
+  recordRubberDuckDenial(sessionOf(payload), folderOf(payload), { env });
   return deny("a rubber-duck review is already running in this folder; wait for it to finish before starting another.");
 }
 
@@ -460,6 +518,7 @@ function failSafe(event, text) {
   } catch {
     // An unreadable mark store cannot prove that no rubber-duck run is active.
   }
+  if (rubberDuck) recordRubberDuckDenial(null, null);
   return deny(
     tool === undefined
       ? "unreadable rubber-duck task call is blocked while a rubber-duck review may be running."

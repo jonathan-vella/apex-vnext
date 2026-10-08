@@ -11,6 +11,7 @@ import {
   MARKER_TTL_MS,
   activeRubberDuckMarks,
   apexToolName,
+  consumeRubberDuckDenial,
   denyApexMutationDuringRubberDuck,
   deny,
   handlers,
@@ -687,6 +688,47 @@ test("rubber-duck marks clear on task failure, expire, and fail closed when unre
   assert.equal(unreadable?.permissionDecision, "deny");
   assert.match(unreadable.permissionDecisionReason, /cannot read rubber-duck run marks .* "gateDecide" is blocked/u);
   await rm(join(testReviewHome, "active"));
+});
+
+test("a denied duplicate rubber-duck call cannot clear the mark of the run that is still going", async () => {
+  await resetReviewHome();
+  const failed = (overrides = {}) => {
+    const failure = { ...rubberDuckTask(overrides), error: "Denied by preToolUse hook" };
+    delete failure.toolResult;
+    return failure;
+  };
+  assertAllowed(decide("subagentStart", subagentStart()));
+  const duplicate = decide("preToolUse", rubberDuckTask());
+  assert.equal(duplicate.decision?.permissionDecision, "deny");
+  assertAllowed(decide("postToolUseFailure", failed()));
+  assert.equal(activeRubberDuckMarks().length, 1, "the denied duplicate's failure consumes its denial, not the mark");
+  assertMutationDenied(decide("preToolUse", apexCall("gateDecide")), "gateDecide");
+  assert.deepEqual(await readdir(join(testReviewHome, "denied")), []);
+  // The running call's own failure still clears its mark.
+  assertAllowed(decide("postToolUseFailure", failed()));
+  assert.equal(activeRubberDuckMarks().length, 0);
+  assertAllowed(decide("preToolUse", apexCall("gateDecide")));
+
+  // A denial only covers failures from the same session and folder, and expires with the mark TTL.
+  assertAllowed(decide("subagentStart", subagentStart()));
+  assert.equal(decide("preToolUse", rubberDuckTask()).decision?.permissionDecision, "deny");
+  assertAllowed(decide("postToolUseFailure", failed({ cwd: "/home/user/other" })));
+  assertAllowed(decide("postToolUseFailure", failed({ sessionId: rubberDuckSession })));
+  assert.equal(activeRubberDuckMarks().length, 1);
+  assert.equal(consumeRubberDuckDenial(rubberDuckTask(), { now: Date.now() + MARKER_TTL_MS + 1 }), false);
+  assert.deepEqual(await readdir(join(testReviewHome, "denied")), [], "expired denials are removed");
+  assertAllowed(decide("postToolUseFailure", failed()));
+  assert.equal(activeRubberDuckMarks().length, 0);
+
+  // A fail-safe denial of an unreadable rubber-duck call covers the next rubber-duck failure from any session.
+  assertAllowed(decide("subagentStart", subagentStart()));
+  const unreadable = decide("preToolUse", JSON.stringify(rubberDuckTask()).slice(0, -10));
+  assert.equal(unreadable.decision?.permissionDecision, "deny");
+  assertAllowed(decide("postToolUseFailure", failed({ sessionId: rubberDuckSession })));
+  assert.equal(activeRubberDuckMarks().length, 1);
+  assertAllowed(decide("subagentStop", subagentStop()));
+  assert.equal(activeRubberDuckMarks().length, 0);
+  await resetReviewHome();
 });
 
 test("unreadable APEX tool payloads are denied only while a rubber-duck run is marked", async () => {
