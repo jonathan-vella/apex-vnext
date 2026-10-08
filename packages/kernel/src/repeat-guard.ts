@@ -64,6 +64,11 @@ export interface RepeatScope {
   runId: RunId;
   ownerEpoch: number;
   state: string;
+  /**
+   * Latest change time, in milliseconds since the epoch, of the mutable files the state token covers. A change after
+   * the operation returned was not made by the operation, so its result is not stored against that state.
+   */
+  changedAtMs?: number;
 }
 
 export interface RepeatSafeHooks<T> {
@@ -367,10 +372,13 @@ async function guardedCall<T extends object>(
     );
     const original = record === undefined ? undefined : replayable(record);
     // A bound file that changed since the call identity was taken makes the stored result stale; execute instead.
+    // The state is read again so that an edit that bypasses the workspace lock while the record was checked cannot be
+    // answered from the stored result; the replay is then current as of that second read.
     if (
       record !== undefined &&
       original !== undefined &&
-      (hooks.identityStable === undefined || (await hooks.identityStable()))
+      (hooks.identityStable === undefined || (await hooks.identityStable())) &&
+      (await hooks.scope().catch(() => undefined))?.state === before.state
     ) {
       await hooks.assertReplayAllowed(before);
       await appendRepeatEvent(before, record, call, fingerprint, now, idSource);
@@ -378,11 +386,16 @@ async function guardedCall<T extends object>(
     }
   }
   const value = await hooks.execute();
+  const finishedAt = Date.now();
   try {
     if (hooks.identityStable !== undefined && !(await hooks.identityStable()))
       return { value, repeated: false, fingerprint };
     const after = await hooks.scope();
     if (after === undefined) return { value, repeated: false, fingerprint };
+    // A file changed after the operation returned, for example by an editor that bypasses the workspace lock, would
+    // bind this result to content the operation never saw.
+    if (after.changedAtMs !== undefined && after.changedAtMs > finishedAt)
+      return { value, repeated: false, fingerprint };
     const now = clock();
     const result = JSON.stringify(value);
     const limit = hooks.validUntil?.(value);

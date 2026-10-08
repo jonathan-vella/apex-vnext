@@ -2549,7 +2549,7 @@ export class ApexService {
       throw error;
     }
     const state = await this.runRepository(selection).repeatState();
-    const files = await this.repeatFilesSignature(selection);
+    const { signature: files, changedAtMs } = await this.repeatFilesSignature(selection);
     let projects: string[];
     try {
       projects = await readdir(join(this.root, ".apex", "projects"));
@@ -2563,14 +2563,16 @@ export class ApexService {
       runId: selection.runId,
       ownerEpoch: state.ownerEpoch,
       state: repeatStateToken({ selection, projects, ...state, files }),
+      changedAtMs,
     };
   }
 
   /**
    * Stat signature of the files guarded operations read outside the run journal: the run's staged work tree and the
    * latest generated source tree. Any edit changes a file's ctime, so an external edit makes an identical call new.
+   * Also returns the latest change time across the trees and their roots.
    */
-  private async repeatFilesSignature(selection: Selection): Promise<string> {
+  private async repeatFilesSignature(selection: Selection): Promise<{ signature: string; changedAtMs: number }> {
     const events = await this.journal(selection as RunConfigV1).replay();
     const generated = events.findLast(
       (event) =>
@@ -2584,6 +2586,10 @@ export class ApexService {
     if (handoffHash !== undefined)
       roots.push(resolve(this.root, (await this.objects.getJson<IacHandoffV1>(handoffHash)).rootPath));
     const entries: string[] = [];
+    let changedAtNs = 0n;
+    const changed = (entry: { mtimeNs: bigint; ctimeNs: bigint }) => {
+      for (const time of [entry.mtimeNs, entry.ctimeNs]) if (time > changedAtNs) changedAtNs = time;
+    };
     const walk = async (root: string, directory: string): Promise<void> => {
       let names: string[];
       try {
@@ -2599,14 +2605,20 @@ export class ApexService {
         entries.push(
           [relative(root, path), entry.mode, entry.ino, entry.size, entry.mtimeNs, entry.ctimeNs].join("\u0000"),
         );
+        changed(entry);
         if (entry.isDirectory()) await walk(root, path);
       }
     };
     for (const root of roots) {
       entries.push(`root\u0000${root}`);
+      const rootEntry = await lstat(root, { bigint: true }).catch((error: unknown) => {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+        throw error;
+      });
+      if (rootEntry !== undefined) changed(rootEntry);
       await walk(root, root);
     }
-    return sha256Json(entries);
+    return { signature: sha256Json(entries), changedAtMs: Number(changedAtNs / 1_000_000n) };
   }
 
   /** Content hash plus the inode, size and change times that any later modification of the file would alter. */

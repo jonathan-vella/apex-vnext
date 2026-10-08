@@ -602,6 +602,50 @@ test("a call whose identity changed is never replayed, and is returned but not s
   assert.equal(executions, 3);
 });
 
+test("a file changed by a writer that bypasses the lock is never bound to a stored result", async () => {
+  const { runDirectory, lockDirectory, worktree, scope } = await fixture();
+  let editedAtMs: number | undefined;
+  let reads = 0;
+  let editOnRead: number | undefined;
+  const current = async (): Promise<RepeatScope> => {
+    reads += 1;
+    if (reads === editOnRead) editedAtMs = Date.now() + 1_000;
+    const base = await scope();
+    return {
+      ...base,
+      ...(editedAtMs === undefined
+        ? {}
+        : { state: sha256Json({ base: base.state, editedAtMs }), changedAtMs: editedAtMs }),
+    };
+  };
+  let executions = 0;
+  const run = () =>
+    executeRepeatSafe(
+      { operation: "stageFile", workspace: worktree, arguments: { path: "main.bicep" } },
+      {
+        lockDirectory,
+        scope: current,
+        assertReplayAllowed: async () => undefined,
+        execute: async () => ({ executions: ++executions }),
+      },
+    );
+  // An edit after the operation returned and before the post-call read: the result is returned but not stored.
+  editOnRead = 2;
+  assert.equal((await run()).repeated, false);
+  assert.deepEqual(await readRepeatRecords(runDirectory), []);
+  // The next call is stored normally because its files have not changed since it returned.
+  editOnRead = undefined;
+  editedAtMs = Date.now() - 1_000;
+  assert.equal((await run()).repeated, false);
+  assert.equal((await readRepeatRecords(runDirectory)).length, 1);
+  // An edit while the stored record is checked: the second state read differs, so the call executes instead.
+  reads = 0;
+  editOnRead = 2;
+  const raced = await run();
+  assert.equal(raced.repeated, false);
+  assert.equal(executions, 3);
+});
+
 test("repeat records survive a restart because they are stored with the run", async () => {
   const { call, runDirectory, worktree, lockDirectory } = await fixture();
   const first = await call();

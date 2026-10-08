@@ -210,8 +210,10 @@ case-folded on Windows) and the validated arguments as canonical JSON with sorte
 a result is not stored when that file changed while the call ran.
 The run state is a hash of the selection, the project set, the selected run document, its journal head, the writer
 lease holder (lease renewals do not change it) and a stat signature of the run's staged work tree and latest generated
-source tree, so an external edit to staged or generated files also makes an identical call new. The recorded fingerprint
-binds the call to the state it applied to. Every guarded call in a workspace holds a workspace-scoped lock,
+source tree, so an external edit to staged or generated files also makes an identical call new. Editors do not take
+the workspace lock, so the guard reads the state again before answering a repeat and executes instead if it changed. It
+also does not store a result when a staged or generated file changed after the operation returned. The recorded
+fingerprint binds the call to the state it applied to. Every guarded call in a workspace holds a workspace-scoped lock,
 `.apex/local/.repeat-guard.lock`, from record lookup through record publication, so concurrent identical calls from
 separate processes execute once, including calls such as `projectCreate` and `projectUse` that create or change the
 selected run. A call made before any run exists is recorded against the run it creates, so a repeated first
