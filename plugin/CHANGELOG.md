@@ -31,3 +31,5 @@ First marketplace release of APEX as one Agent Plugins 1.0 plugin.
 - The `apex` MCP server refuses a workspace whose `.apex/apex.lock.json` names another `@apexops/cli` version with
   `APEX_RUNTIME_MISMATCH`; `status` reports the mismatch read-only. Run `apex update` for an older workspace, or
   install the plugin version that matches a newer one (CP-25).
+- The manual-only `apex-unslop` skill (`/apex-unslop`): polishes prose you ask it to without changing facts,
+  identifiers or APEX file contracts, and never edits kernel-managed artifacts.
