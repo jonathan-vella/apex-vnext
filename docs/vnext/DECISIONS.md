@@ -314,3 +314,30 @@ apex-jon server moved to the v2 SDK on 2026-10-04 and its `apex-plugin` build se
 v2 `Server` over stdio, falling back to `2025-11-25` because it does not use `serveStdio`. A local probe on 2026-10-07
 confirmed that only `serveStdio` answers `server/discover` and returns `2026-07-28` results. Live client evidence is
 recorded in CP-20.
+
+## DECISION-035: Deploy With azd For Labs And GitHub Actions Pipelines For Production
+
+Maintainer direction on 2026-10-08. Production deployments run through GitHub Actions pipelines; labs deploy from a
+local device with azd. Both keep the kernel's deployment authority, `REQ-APPROVAL-001` and
+[ADR-0002](adrs/03-des-adr-0002-use-local-gate-4-before-ci-handoff.md): local Gate 4 is the only deployment approval.
+
+- **Labs.** `apex deploy` gains an `azd` track alongside the Bicep and Terraform tracks. The provisioning preview is
+  `azd provision --preview`; Gate 4 approves it, and `azd provision` then runs bound to that exact preview under the
+  same commit, dependency revision, hash, recipient and expiry rules as the other tracks. Service deployment from
+  `azure.yaml` is a separate operation: its own Gate 4 decision binds the service list and the package digests, and
+  `azd deploy` runs only those packages. APEX does not run `azd up`, because no single preview covers both steps.
+- **Production.** APEX generates `azure.yaml` and the GitHub Actions workflow as static, reviewable files that pass
+  the normal gates, with OIDC federated credentials and no secrets in files. `azd pipeline config` creates Entra
+  identities, federated credentials, role assignments and GitHub variables, so it is a separate state-changing
+  operation: it runs only after its own preview and Gate 4 decision, through `apex deploy`. The workflow follows
+  ADR-0002: local Gate 4 approves the exact preview and binds the CI recipient, CI accepts the one-hop transfer and
+  executes only that imported preview, and the run evidence returns through `submitEvidence`. CI cannot create,
+  replace or refresh Gate 4 approval. Production CI apply stays blocked until recipient-bound encrypted transport is
+  qualified (`REQ-TERRAFORM-001`).
+- **Agent commands.** The APEX agent never runs a command that changes Azure, Entra or GitHub settings. Read and
+  diagnostic `az` and `azd` commands may run directly. Skills keep their azd and CLI guidance (CP-18), with mutations
+  routed through `apex deploy` or the approved pipeline.
+
+Today's tracks: Bicep previews with `az deployment group|sub what-if` and deploys with `az deployment group|sub create`;
+Terraform previews with `terraform plan -out` and applies that saved plan. CP-26 owns delivery; CLIENT-039 and
+CLIENT-040 qualify it.
