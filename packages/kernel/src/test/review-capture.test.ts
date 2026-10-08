@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
-import { chmod, mkdtemp, readFile, readdir, rm, stat, symlink, writeFile, mkdir } from "node:fs/promises";
+import { chmod, mkdtemp, readFile, readdir, rm, stat, symlink, utimes, writeFile, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import {
+  REVIEW_CAPTURE_RETENTION_MS,
   REVIEW_CAPTURE_SCHEMA,
   ReviewCaptureError,
+  ReviewHomeError,
+  sweepReviewCaptures,
   buildReviewInstructions,
   buildReviewPrompt,
   createReviewNonce,
@@ -229,7 +232,7 @@ test("the review home holds a private key and nonce-named capture files", async 
   if (process.platform !== "win32") assert.equal((await stat(join(home, "capture.key"))).mode & 0o077, 0);
   assert.match(await readFile(join(home, "capture.key"), "utf8"), /^[0-9a-f]{64}\n$/u);
   assert.deepEqual(await loadReviewCaptures(nonce, home), []);
-  await mkdir(join(home, "captures"));
+  await mkdir(join(home, "captures"), { mode: 0o700 });
   const record = signReviewCapture({ prompt: prompt(), response: "x", capturedAt: "2026-10-07T00:00:00.000Z" }, first);
   await writeFile(join(home, "captures", reviewCaptureFileName(record)), JSON.stringify(record));
   await writeFile(join(home, "captures", `${"f".repeat(32)}-0000000000000000.json`), "{}");
@@ -284,7 +287,7 @@ test("the capture key is published whole, and unarchivable captures are quaranti
     [],
     "no temporary key files remain",
   );
-  await mkdir(join(home, "captures"));
+  await mkdir(join(home, "captures"), { mode: 0o700 });
   const oversized = join(home, "captures", `${nonce}-0000000000000000.json`);
   await writeFile(oversized, "x".repeat(1024 * 1024 + 1));
   const [file] = await loadReviewCaptures(nonce, home);
@@ -303,4 +306,41 @@ test("the capture key is published whole, and unarchivable captures are quaranti
     home,
   );
   assert.deepEqual(missing, { quarantined: [], failed: ["gone.json"] }, "a failed move is reported, not claimed");
+});
+
+test("a review home other users can write is refused", { skip: process.platform === "win32" }, async (context) => {
+  const root = await mkdtemp(join(tmpdir(), "apex-review-home-"));
+  context.after(() => rm(root, { recursive: true, force: true }));
+  const home = join(root, "reviews");
+  await reviewCaptureKey(home);
+  await mkdir(join(home, "captures"), { mode: 0o700 });
+  for (const folder of [home, join(home, "captures")]) {
+    await chmod(folder, 0o777);
+    await assert.rejects(loadReviewCaptures(nonce, home), (error: unknown) => {
+      assert.ok(error instanceof ReviewHomeError);
+      assert.match(error.message, /writable by other users/u);
+      return true;
+    });
+    await chmod(folder, 0o700);
+  }
+  await chmod(home, 0o770);
+  await assert.rejects(reviewCaptureKey(home), ReviewHomeError);
+  await chmod(home, 0o700);
+  assert.deepEqual(await loadReviewCaptures(nonce, home), []);
+});
+
+test("captures of long-expired requests are swept; younger ones stay", async (context) => {
+  const root = await mkdtemp(join(tmpdir(), "apex-review-home-"));
+  context.after(() => rm(root, { recursive: true, force: true }));
+  const home = join(root, "reviews");
+  assert.equal(await sweepReviewCaptures(home), 0, "a missing review home has nothing to sweep");
+  await mkdir(join(home, "captures"), { recursive: true, mode: 0o700 });
+  const old = join(home, "captures", `${nonce}-0000000000000000.json`);
+  const young = join(home, "captures", `${"f".repeat(32)}-0000000000000000.json`);
+  await writeFile(old, "{}");
+  await writeFile(young, "{}");
+  const past = new Date(Date.now() - REVIEW_CAPTURE_RETENTION_MS - 60_000);
+  await utimes(old, past, past);
+  assert.equal(await sweepReviewCaptures(home), 1);
+  assert.deepEqual(await readdir(join(home, "captures")), [`${"f".repeat(32)}-0000000000000000.json`]);
 });

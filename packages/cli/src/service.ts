@@ -172,6 +172,8 @@ import {
   REVIEW_AGENT,
   REVIEW_MAX_ATTEMPTS,
   ReviewCaptureError,
+  ReviewHomeError,
+  sweepReviewCaptures,
   assertSingleReviewCapture,
   quarantineReviewCaptures,
   buildReviewInstructions,
@@ -745,6 +747,18 @@ const ARCHITECTURE_DECISIONS: readonly ArchitectureDecision[] = [
     ],
   },
 ];
+
+/** A review home another OS user can write cannot be trusted; the user fixes it, then the review completes as usual. */
+function reviewHomeFailure(error: unknown): unknown {
+  if (!(error instanceof ReviewHomeError)) return error;
+  return new ApexError(
+    "APEX_VALIDATION",
+    `${error.message}. Captures in it cannot be trusted; make the review home (APEX_REVIEW_HOME or ~/.apex/reviews) ` +
+      "and its folders private to you, then call reviewComplete again",
+    EXIT_CODES.validation,
+    { reason: "REVIEW_HOME_INSECURE" },
+  );
+}
 
 function capturedReviewOnlyError(): ApexError {
   return new ApexError(
@@ -5031,7 +5045,9 @@ export class ApexService {
     if (this.reviewNonceConsumed(events, request.nonce))
       throw new ApexError("APEX_CONFLICT", "This review request was already used", EXIT_CODES.conflict);
     const home = this.reviewHomeOverride ?? reviewHome();
-    const files = await loadReviewCaptures(request.nonce, home);
+    const files = await loadReviewCaptures(request.nonce, home).catch((error: unknown) => {
+      throw reviewHomeFailure(error);
+    });
     let completion: { outputHashes: Partial<Record<ArtifactKind, string>>; summary: string };
     try {
       await verifyReviewFiles(request.files);
@@ -5066,6 +5082,7 @@ export class ApexService {
         requestHash,
       });
     } catch (error) {
+      if (error instanceof ReviewHomeError) throw reviewHomeFailure(error);
       const failure =
         error instanceof ReviewCaptureError
           ? { reason: error.reason, message: error.message }
@@ -5234,19 +5251,7 @@ export class ApexService {
     files: Awaited<ReturnType<typeof loadReviewCaptures>>,
     validatedHead: string,
   ): Promise<void> {
-    await this.acquireRunWriterLease(run);
-    // Rejected captures move into the run's object store as typed JSON audit evidence, so the shared review home stays
-    // bounded and state transfer can still carry (and secret-check) every journal-referenced object.
-    const captureHashes: string[] = [];
-    const unarchivable: typeof files = [];
-    for (const file of files) {
-      const evidence = file.bytes === undefined ? undefined : rejectedReviewCapture(file.bytes);
-      if (evidence === undefined) unarchivable.push(file);
-      else captureHashes.push(await this.objects.putJson(evidence));
-    }
-    // Move captures that cannot be archived before the event, so it records only moves that happened; the quarantine
-    // keeps them even if the event then loses the race to another writer.
-    const quarantine = await quarantineReviewCaptures(unarchivable, this.reviewHomeOverride ?? reviewHome());
+    const { captureHashes, quarantined, notQuarantined, archived } = await this.archiveReviewCaptures(run, files);
     try {
       // Compare-and-swap on the head completeReview validated: a concurrent rejection or completion consumes the
       // nonce first, so this one fails stale instead of counting the same attempt twice.
@@ -5262,8 +5267,8 @@ export class ApexService {
           reason,
           captures: files.length,
           captureHashes,
-          quarantined: quarantine.quarantined.map(({ name }) => name),
-          ...(quarantine.failed.length === 0 ? {} : { notQuarantined: quarantine.failed }),
+          quarantined,
+          ...(notQuarantined.length === 0 ? {} : { notQuarantined }),
         },
         validatedHead,
       );
@@ -5276,7 +5281,40 @@ export class ApexService {
         );
       throw error;
     }
-    await removeReviewCaptures(files.filter((file) => !unarchivable.includes(file)));
+    await removeReviewCaptures(archived);
+  }
+
+  /**
+   * Moves captures that will never be ingested into the run's object store as typed JSON audit evidence, so the shared
+   * review home stays bounded and state transfer can still carry (and secret-check) every journal-referenced object.
+   * Captures that cannot be archived move to the review home's quarantine first, so the caller's event records only
+   * moves that happened; the quarantine keeps them even if that event then loses the race to another writer. The
+   * caller removes `archived` once its event is committed.
+   */
+  private async archiveReviewCaptures(
+    run: RunConfigV1,
+    files: Awaited<ReturnType<typeof loadReviewCaptures>>,
+  ): Promise<{
+    captureHashes: string[];
+    quarantined: string[];
+    notQuarantined: Awaited<ReturnType<typeof quarantineReviewCaptures>>["failed"];
+    archived: Awaited<ReturnType<typeof loadReviewCaptures>>;
+  }> {
+    await this.acquireRunWriterLease(run);
+    const captureHashes: string[] = [];
+    const unarchivable: typeof files = [];
+    for (const file of files) {
+      const evidence = file.bytes === undefined ? undefined : rejectedReviewCapture(file.bytes);
+      if (evidence === undefined) unarchivable.push(file);
+      else captureHashes.push(await this.objects.putJson(evidence));
+    }
+    const quarantine = await quarantineReviewCaptures(unarchivable, this.reviewHomeOverride ?? reviewHome());
+    return {
+      captureHashes,
+      quarantined: quarantine.quarantined.map(({ name }) => name),
+      notQuarantined: quarantine.failed,
+      archived: files.filter((file) => !unarchivable.includes(file)),
+    };
   }
 
   /**
@@ -5289,6 +5327,9 @@ export class ApexService {
     taskId: string,
     inputRefs: readonly string[],
   ): Promise<{ requestHash: string; nonce: string; promptSha256: string; subjectHash: string; attempt: number }> {
+    // Best effort: drop captures of long-expired requests from the shared review home; issuing never depends on it.
+    // File times are wall-clock, so the sweep uses the wall clock rather than the service clock.
+    await sweepReviewCaptures(this.reviewHomeOverride ?? reviewHome()).catch(() => 0);
     const events = await this.journal(run).replay();
     const subjectKind = this.reviewSubjectArtifactKind(descriptor)!;
     const subjectHash = this.artifactHash(events, subjectKind);
@@ -6204,7 +6245,32 @@ export class ApexService {
   async cancelTask(taskId: string): Promise<void> {
     const run = await this.currentRun();
     await this.readTask(run, taskId);
-    await this.append(run, "task.cancelled", { taskId });
+    const events = await this.journal(run).replay();
+    const binding = (
+      events.findLast(
+        ({ type, payload }) => type === "task.issued" && (payload as { taskId?: unknown }).taskId === taskId,
+      )?.payload as { review?: { nonce?: unknown } } | undefined
+    )?.review;
+    if (typeof binding?.nonce !== "string" || this.reviewNonceConsumed(events, binding.nonce)) {
+      await this.append(run, "task.cancelled", { taskId });
+      return;
+    }
+    // A cancelled review's captures can never be ingested: archive them as audit evidence and clear the review home.
+    const files = await loadReviewCaptures(binding.nonce, this.reviewHomeOverride ?? reviewHome()).catch(
+      (error: unknown) => {
+        throw reviewHomeFailure(error);
+      },
+    );
+    const archive = await this.archiveReviewCaptures(run, files);
+    await this.append(run, "task.cancelled", {
+      taskId,
+      nonce: binding.nonce,
+      captures: files.length,
+      captureHashes: archive.captureHashes,
+      quarantined: archive.quarantined,
+      ...(archive.notQuarantined.length === 0 ? {} : { notQuarantined: archive.notQuarantined }),
+    });
+    await removeReviewCaptures(archive.archived);
   }
 
   async resolveReview(resolution: ReviewResolution): Promise<void> {

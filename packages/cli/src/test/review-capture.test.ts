@@ -523,3 +523,41 @@ test("a review task issued without a rubber-duck request is replaced by a fresh 
   await captureReview(service, fresh, { findings: [] });
   assert.ok((await service.completeReview(fresh)).outputHashes["review-findings"]);
 });
+
+test("cancelling a review archives its captures and clears them from the review home", async () => {
+  const { root, service, journal, taskId } = await setup();
+  const { nonce } = (await service.taskContext(taskId)).reviewRequest!;
+  await captureReview(service, taskId, { findings: [] });
+  await service.cancelTask(taskId);
+  const cancelled = (await journal.replay()).findLast(({ type }) => type === "task.cancelled")!.payload as {
+    taskId: string;
+    nonce: string;
+    captures: number;
+    captureHashes: string[];
+  };
+  assert.equal(cancelled.taskId, taskId);
+  assert.equal(cancelled.nonce, nonce);
+  assert.equal(cancelled.captures, 1);
+  const archived = (await new ObjectStore(root).getJson(cancelled.captureHashes[0]!)) as RejectedReviewCaptureV1;
+  assert.equal((JSON.parse(archived.content) as ReviewCaptureRecordV1).nonce, nonce);
+  assert.deepEqual(await captureFiles(nonce), [], "the cancelled review leaves no capture behind");
+});
+
+test(
+  "an insecure review home fails with a fix-it validation error",
+  { skip: process.platform === "win32" },
+  async () => {
+    const { service, taskId } = await setup();
+    await captureReview(service, taskId, { findings: [] });
+    await chmod(join(reviewHome(), "captures"), 0o777);
+    try {
+      await rejectsWith(() => service.completeReview(taskId), "REVIEW_HOME_INSECURE");
+    } finally {
+      await chmod(join(reviewHome(), "captures"), 0o700);
+    }
+    assert.ok(
+      (await service.completeReview(taskId)).outputHashes["review-findings"],
+      "the review completes once fixed",
+    );
+  },
+);

@@ -198,6 +198,11 @@ function plainDirectory(path, create) {
   }
   if (stat === undefined) return false;
   if (stat.isSymbolicLink() || !stat.isDirectory()) throw new Error(`not a plain directory: ${path}`);
+  // Same rule as the kernel: another OS user who can write here could replace the key, captures or run marks.
+  if (process.platform !== "win32" && typeof process.getuid === "function") {
+    if (stat.uid !== process.getuid()) throw new Error(`review folder is owned by another user: ${path}`);
+    if ((stat.mode & 0o022) !== 0) throw new Error(`review folder is writable by other users: ${path}`);
+  }
   return true;
 }
 
@@ -305,7 +310,8 @@ function markerDirectory(env) {
  */
 export function activeRubberDuckMarks({ env = process.env, now = Date.now() } = {}) {
   const directory = markerDirectory(env);
-  if (!plainDirectory(directory, false)) return [];
+  // The home is checked too: whoever can write it could rename the whole folder away.
+  if (!plainDirectory(reviewHome(env), false) || !plainDirectory(directory, false)) return [];
   const marks = [];
   for (const name of readdirSync(directory).sort()) {
     if (!name.endsWith(".json")) continue;
@@ -335,6 +341,7 @@ export function activeRubberDuckMarks({ env = process.env, now = Date.now() } = 
 export function markRubberDuckStart({ payload }, { env = process.env, now = new Date() } = {}) {
   if (!isRubberDuck(payload.agentName ?? payload.agent_name)) return null;
   const directory = markerDirectory(env);
+  plainDirectory(reviewHome(env), true);
   plainDirectory(directory, true);
   const mark = { parentSessionId: sessionOf(payload), cwd: folderOf(payload), startedAt: now.toISOString() };
   writeNewFile(join(directory, `${now.getTime()}-${randomBytes(6).toString("hex")}.json`), JSON.stringify(mark));
@@ -353,6 +360,7 @@ function denialDirectory(env) {
 function recordRubberDuckDenial(sessionId, cwd, { env = process.env, now = new Date() } = {}) {
   try {
     const directory = denialDirectory(env);
+    plainDirectory(reviewHome(env), true);
     plainDirectory(directory, true);
     const denial = { sessionId, cwd, deniedAt: now.toISOString() };
     writeNewFile(join(directory, `${now.getTime()}-${randomBytes(6).toString("hex")}.json`), JSON.stringify(denial));
@@ -383,7 +391,7 @@ function recordRubberDuckDenial(sessionId, cwd, { env = process.env, now = new D
  */
 export function consumeRubberDuckDenial(payload, { env = process.env, now = Date.now() } = {}) {
   const directory = denialDirectory(env);
-  if (!plainDirectory(directory, false)) return false;
+  if (!plainDirectory(reviewHome(env), false) || !plainDirectory(directory, false)) return false;
   for (const name of readdirSync(directory).sort()) {
     if (!name.endsWith(".json")) continue;
     const path = join(directory, name);

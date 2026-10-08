@@ -68,6 +68,17 @@ export class ReviewCaptureError extends Error {
   }
 }
 
+/**
+ * The review home (or a folder in it) is not private to this OS user: another user could replace the capture key or
+ * inject captures, so nothing in it can be trusted until its owner and mode are fixed.
+ */
+export class ReviewHomeError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ReviewHomeError";
+  }
+}
+
 export type ReviewSeverity = (typeof SEVERITIES)[number];
 export type ReviewPillar = (typeof PILLARS)[number];
 
@@ -337,7 +348,39 @@ async function plainDirectory(path: string, create: boolean): Promise<boolean> {
     return plainDirectory(path, false);
   }
   if (stat.isSymbolicLink() || !stat.isDirectory()) throw new Error(`Review folder is not a plain directory: ${path}`);
+  if (process.platform !== "win32" && typeof process.getuid === "function") {
+    if (stat.uid !== process.getuid())
+      throw new ReviewHomeError(`Review folder is owned by another user: ${path}; it must belong to you`);
+    if ((stat.mode & 0o022) !== 0)
+      throw new ReviewHomeError(`Review folder is writable by other users: ${path}; run chmod 700 on it`);
+  }
   return true;
+}
+
+/** Captures older than this belong to requests that expired (tasks live 24 hours) and can never be ingested. */
+export const REVIEW_CAPTURE_RETENTION_MS = 48 * 60 * 60 * 1000;
+
+/**
+ * Removes captures whose request can no longer be ingested, so abandoned reviews do not keep model output in the
+ * shared review home forever. Captures for live requests are younger than the retention and stay. Returns the count.
+ */
+export async function sweepReviewCaptures(
+  home = reviewHome(),
+  now = Date.now(),
+  maxAgeMs = REVIEW_CAPTURE_RETENTION_MS,
+): Promise<number> {
+  const directory = join(home, "captures");
+  if (!(await plainDirectory(home, false)) || !(await plainDirectory(directory, false))) return 0;
+  let removed = 0;
+  for (const name of await readdir(directory)) {
+    if (!name.endsWith(".json")) continue;
+    const path = join(directory, name);
+    const info = await lstat(path).catch(() => undefined);
+    if (info === undefined || !info.isFile() || now - info.mtimeMs <= maxAgeMs) continue;
+    await rm(path, { force: true });
+    removed += 1;
+  }
+  return removed;
 }
 
 async function readRegularFile(path: string, maxBytes: number): Promise<Buffer> {

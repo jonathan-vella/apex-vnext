@@ -264,7 +264,7 @@ export async function captureReview(
     await reviewCaptureKey(home),
   );
   const path = join(home, "captures", reviewCaptureFileName(record));
-  await mkdir(join(home, "captures"), { recursive: true });
+  await mkdir(join(home, "captures"), { recursive: true, mode: 0o700 });
   await writeFile(path, JSON.stringify(record));
   return path;
 }

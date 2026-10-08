@@ -466,7 +466,7 @@ const apexCall = (tool, overrides = {}) => ({
 
 async function resetReviewHome() {
   await rm(testReviewHome, { recursive: true, force: true });
-  await mkdir(testReviewHome, { recursive: true });
+  await mkdir(testReviewHome, { recursive: true, mode: 0o700 });
 }
 
 function assertMutationDenied(result, tool) {
@@ -558,7 +558,7 @@ test("postToolUse never blocks when the capture cannot be written", async () => 
   assertAllowed(result);
   assert.match(result.warnings.join(""), /APEX hook: postToolUse handler failed/u);
   await rm(testReviewHome, { force: true });
-  await mkdir(testReviewHome);
+  await mkdir(testReviewHome, { mode: 0o700 });
 });
 
 test("a reviewer mutation is denied while rubber-duck runs, and allowed again after it stops", async () => {
@@ -773,6 +773,31 @@ test(
     }
     assertAllowed(decide("subagentStop", subagentStop()));
     assert.equal(activeRubberDuckMarks().length, 0);
+    await resetReviewHome();
+  },
+);
+
+test(
+  "a review home other users can write is not trusted: no capture, and APEX mutations are denied",
+  { skip: process.platform === "win32" },
+  async () => {
+    await resetReviewHome();
+    assertAllowed(decide("subagentStart", subagentStart()));
+    await chmod(testReviewHome, 0o777);
+    try {
+      const captured = decide("postToolUse", rubberDuckTask());
+      assertAllowed(captured);
+      assert.match(captured.warnings.join(""), /writable by other users/u);
+      const denied = decide("preToolUse", apexCall("gateDecide"));
+      assert.equal(denied.decision?.permissionDecision, "deny");
+      assert.match(
+        denied.decision.permissionDecisionReason,
+        /cannot read rubber-duck run marks .*writable by other users/u,
+      );
+    } finally {
+      await chmod(testReviewHome, 0o700);
+    }
+    assert.deepEqual(await loadReviewCaptures(reviewRequestNonce, testReviewHome), []);
     await resetReviewHome();
   },
 );
