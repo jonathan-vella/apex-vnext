@@ -3,21 +3,22 @@
 > [Current Version](../VERSION.md) | Pre-release documentation for the governed APEX runtime and clients.
 
 APEX vNext targets COE workload reuse and conversational adaptation with rich design and operational output. Both
-ALZ-backed workloads and standalone labs/demos are initial scope, using Copilot CLI, standalone or through the VS Code
-Copilot harness, on Windows via WSL2 without a devcontainer. The kernel owns state, gates and evidence; clients guide
-people through it.
+ALZ-backed workloads and standalone labs/demos are initial scope. APEX runs in VS Code with the Copilot harness or the
+GitHub Copilot app on native Windows 11, or in GitHub Copilot CLI on Linux or WSL2, without a devcontainer. The kernel
+owns state, gates and evidence; clients guide people through it.
 
 The [PRD](vnext/PRD.md) defines the target contract. Guides describe implemented commands and mark planned extensions
-explicitly; the [checkpoint](vnext/PROJECT.md) identifies remaining work. Distribution and APEX MCP packaging are the
-last feature-delivery phase, not prerequisites for completing governance and workload reuse.
+explicitly; the [checkpoint](vnext/PROJECT.md) identifies remaining work. APEX ships as the `apex` Agent Plugin plus
+`apex init` onboarding; no plugin release is published yet.
 
 ## Start By Goal
 
 | Goal                                     | Start here                                                                           |
 | ---------------------------------------- | ------------------------------------------------------------------------------------ |
-| Start on Windows 11 with WSL2            | [WSL2 consumer runbook](tutorials/wsl2-vscode-consumer-runbook.md)                   |
+| Install, update or reset APEX            | [Manage installation](how-to/manage-installation.md)                                 |
+| Start in VS Code or the app on Windows   | [Windows 11 first run](tutorials/windows-11-first-run.md)                            |
+| Start in Copilot CLI on Linux or WSL2    | [Copilot CLI on WSL2 runbook](tutorials/wsl2-vscode-consumer-runbook.md)             |
 | Evaluate APEX locally                    | [Complete the first local run](tutorials/first-run.md)                               |
-| Install or update APEX                   | [Manage installation](how-to/manage-installation.md)                                 |
 | Run a governed workflow                  | [Run the workflow](how-to/run-workflow.md)                                           |
 | Understand planned COE reuse and changes | [Project adaptation](explanation/workflow-and-gates.md#planned-coe-reuse-and-change) |
 | Review output quality expectations       | [Quality reference](vnext/PRD.md#output-quality-reference)                           |
@@ -30,8 +31,10 @@ last feature-delivery phase, not prerequisites for completing governance and wor
 
 - [Complete the first local run](tutorials/first-run.md) introduces initialization, readiness, and deterministic local
   state without making cloud changes.
-- [WSL2 and VS Code consumer runbook](tutorials/wsl2-vscode-consumer-runbook.md) installs the published preview and
-  creates an APEX workspace for Copilot CLI in Ubuntu on WSL2.
+- [Windows 11 first run](tutorials/windows-11-first-run.md) creates an APEX workspace on native Windows and starts APEX
+  in VS Code or the GitHub Copilot app.
+- [Copilot CLI on WSL2 runbook](tutorials/wsl2-vscode-consumer-runbook.md) creates an APEX workspace in Ubuntu on WSL2
+  and starts APEX in Copilot CLI.
 
 ## How-To Guides
 

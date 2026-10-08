@@ -1,21 +1,88 @@
 # Prepare Windows 11
 
-> [Current Version](../../VERSION.md) | Prepare Windows 11, WSL2, Azure, and GitHub Copilot for APEX onboarding.
+> [Current Version](../../VERSION.md) | Prepare native Windows for VS Code or the Copilot app, or WSL2 for Copilot CLI.
 
-This guide assumes Windows 11, WSL2 with Ubuntu, an existing Azure subscription, and a GitHub account with an active
-Copilot entitlement. Run Linux commands from an Ubuntu WSL terminal unless a step explicitly says PowerShell.
+This guide assumes Windows 11 25H2 or 24H2, an existing Azure subscription, and a GitHub account with an active Copilot
+entitlement. Choose your host first: VS Code with the Copilot harness or the GitHub Copilot app on native Windows, or
+GitHub Copilot CLI in WSL2. [Manage installation](manage-installation.md#choose-one-host-per-workspace) compares them.
+Use one host per workspace.
 
-This is the current Windows host path. Under DECISION-033, VS Code and the GitHub Copilot app will run on native Windows
-without WSL once the [client pivot](../vnext/ROADMAP.md#client-pivot) ships; this guide changes then. Docker, a
-devcontainer and a clone of the APEX development repository are not consumer prerequisites. Install tools for the
-selected client and requested stage; cloud credentials are not needed merely to inspect local project state. Both
-workload profiles follow the [PRD boundary](../vnext/PRD.md#workload-boundary).
+Docker, a devcontainer and a clone of the APEX development repository are not consumer prerequisites. Install tools for
+the selected host and requested stage; cloud credentials are not needed merely to inspect local project state. Both
+workload profiles follow the [PRD boundary](../vnext/PRD.md#workload-boundary). Check the
+[release status](manage-installation.md) before you install: the APEX plugin has no published release yet.
+
+## Prepare Native Windows For VS Code Or The App
+
+Run these commands in PowerShell. App Installer (`winget`) must be available.
+
+### Update Windows
+
+Install current Windows updates from **Settings** > **Windows Update**. Client local sandboxing needs the September
+2026 Windows security update or later; the GitHub Copilot app documents Windows 11 25H2 with KB5124010 or later.
+
+### Install The Client
+
+For VS Code, install it and check that the version is 1.140 or later:
+
+```powershell
+winget install Microsoft.VisualStudioCode
+code --version
+```
+
+Open VS Code and sign in through **Accounts** with your Copilot-enabled GitHub account. APEX runs in the Copilot
+harness: set the chat session target to **Copilot**. The **Local** harness is not supported.
+
+For the GitHub Copilot app, install it and sign in with the same account. Add the workspace folder as a local project.
+
+Then turn on local sandboxing for your client as described in
+[Manage installation](manage-installation.md#turn-on-local-sandboxing).
+
+### Install Git, Node.js And Copilot CLI
+
+Install Git and Node.js 24.21.0 (LTS) or later, then verify them:
+
+```powershell
+winget install Git.Git
+winget install OpenJS.NodeJS.LTS
+git --version
+node --version
+npm --version
+```
+
+Install GitHub Copilot CLI, which needs PowerShell 6 or later on Windows. On Windows it only manages the plugin store
+that VS Code and the app read; do not run APEX sessions in it.
+
+```powershell
+winget install Microsoft.PowerShell
+winget install GitHub.Copilot
+copilot --version
+```
+
+Then [install the plugin](manage-installation.md#windows-vs-code-or-the-app).
+
+### Install Azure Tooling On Windows
+
+Install Azure CLI and the IaC tool for each project, Bicep or Terraform:
+
+```powershell
+winget install Microsoft.AzureCLI
+winget install Microsoft.Bicep
+winget install Hashicorp.Terraform
+```
+
+Open a new PowerShell window so the updated PATH applies, then continue with
+[Sign In To Azure](#sign-in-to-azure).
+
+## Prepare WSL2 For Copilot CLI
+
+Run Linux commands from an Ubuntu WSL terminal unless a step says PowerShell.
 
 > [!IMPORTANT]
 > Use a Linux workspace under your WSL home directory, such as `~/src`. Do not create the APEX workspace under
 > `/mnt/c`; WSL filesystem performance and file permission behavior are more reliable inside the Linux filesystem.
 
-## Install WSL2 And Ubuntu
+### Install WSL2 And Ubuntu
 
 For APEX repository development, use the [automated setup](#automated-repository-setup) below instead of repeating the
 manual installation sections. The manual path remains available for consumers who need fewer tools.
@@ -34,33 +101,15 @@ sudo apt upgrade -y
 sudo apt install -y ca-certificates curl git
 ```
 
-Verify the environment:
+Verify the environment. The distribution must run as WSL version 2:
 
 ```bash
 wsl.exe --status
+wsl.exe --list --verbose
 git --version
 ```
 
-## Install VS Code And Copilot
-
-Install VS Code from PowerShell:
-
-```powershell
-winget install Microsoft.VisualStudioCode
-```
-
-From the Ubuntu terminal, install the WSL and GitHub Copilot extensions into the VS Code host:
-
-```bash
-code --install-extension ms-vscode-remote.remote-wsl
-code --install-extension GitHub.copilot
-code --install-extension GitHub.copilot-chat
-```
-
-Open VS Code, sign in to GitHub, and confirm that GitHub Copilot Chat is available. APEX requires a Copilot-enabled
-GitHub account for agent-led onboarding.
-
-## Install Node.js And npm
+### Install Node.js And npm
 
 Install Node.js 24.21.0 (LTS) or later. The Node Version Manager keeps the Linux runtime independent of Windows:
 
@@ -73,11 +122,21 @@ node --version
 npm --version
 ```
 
-> [!NOTE]
-> APEX currently uses npm. Use the npm that ships with the selected Node release. Final distribution, including
-> Agent Plugins and APEX MCP packaging, is a later roadmap decision rather than an onboarding requirement today.
+### Install Copilot CLI And Sandbox Tools
 
-## Install Azure Tooling
+Install GitHub Copilot CLI and the tools its local sandbox needs, then sign in:
+
+```bash
+npm install -g @github/copilot
+sudo apt install -y bubblewrap slirp4netns
+copilot --version
+copilot login
+```
+
+Turn on local sandboxing as described in [Manage installation](manage-installation.md#turn-on-local-sandboxing), then
+[install the plugin](manage-installation.md#linux-or-wsl2-copilot-cli).
+
+### Install Azure Tooling On Ubuntu
 
 Install Azure CLI in Ubuntu:
 
@@ -86,38 +145,7 @@ curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
 az version
 ```
 
-Sign in to the existing subscription and select it:
-
-```bash
-az login
-az account list --output table
-az account set --subscription "SUBSCRIPTION_NAME_OR_ID"
-az account show --output table
-```
-
-Use the least-privilege access granted for the intended workload operations. ALZ consumers must not require blanket
-subscription Owner access just to start APEX; supplied identity/networking/monitoring references may have separate read
-and use permissions. Labs may need additional rights to create workload-owned support resources, but do not assume or
-grant those rights automatically. Inspect the signed-in user's direct assignments as one input:
-
-```bash
-az role assignment list \
-  --assignee "$(az ad signed-in-user show --query id --output tsv)" \
-  --scope "/subscriptions/$(az account show --query id --output tsv)" \
-  --query "[].roleDefinitionName" \
-  --output tsv
-```
-
-> [!CAUTION]
-> This listing is not a complete effective-permission proof: group membership, inheritance, deny assignments and
-> conditions can affect access. Ask the platform owner to resolve missing permissions; do not elevate access or
-> replace shared resources to bypass a boundary. Service-principal identities need their own permission assessment.
-
-## Choose An IaC Tool
-
 APEX supports Bicep and Terraform. Choose one for each APEX project.
-
-### Bicep
 
 Install the Bicep CLI through Azure CLI:
 
@@ -126,9 +154,7 @@ az bicep install
 az bicep version
 ```
 
-### Terraform
-
-Install HashiCorp Terraform for Ubuntu:
+Or install HashiCorp Terraform for Ubuntu:
 
 ```bash
 sudo apt-get update
@@ -144,6 +170,44 @@ sudo apt-get update
 sudo apt-get install -y terraform
 terraform version
 ```
+
+## Sign In To Azure
+
+Sign in to the existing subscription and select it. These commands are the same in PowerShell and Ubuntu:
+
+```bash
+az login
+az account list --output table
+az account set --subscription "SUBSCRIPTION_NAME_OR_ID"
+az account show --output table
+```
+
+Use the least-privilege access granted for the intended workload operations. ALZ consumers must not require blanket
+subscription Owner access just to start APEX; supplied identity/networking/monitoring references may have separate read
+and use permissions. Labs may need additional rights to create workload-owned support resources, but do not assume or
+grant those rights automatically. Inspect the signed-in user's direct assignments as one input. In Ubuntu:
+
+```bash
+az role assignment list \
+  --assignee "$(az ad signed-in-user show --query id --output tsv)" \
+  --scope "/subscriptions/$(az account show --query id --output tsv)" \
+  --query "[].roleDefinitionName" \
+  --output tsv
+```
+
+In PowerShell:
+
+```powershell
+$userId = az ad signed-in-user show --query id --output tsv
+$subscriptionId = az account show --query id --output tsv
+az role assignment list --assignee $userId --scope "/subscriptions/$subscriptionId" `
+  --query "[].roleDefinitionName" --output tsv
+```
+
+> [!CAUTION]
+> This listing is not a complete effective-permission proof: group membership, inheritance, deny assignments and
+> conditions can affect access. Ask the platform owner to resolve missing permissions; do not elevate access or
+> replace shared resources to bypass a boundary. Service-principal identities need their own permission assessment.
 
 ## Configure A Private npm Registry
 
@@ -161,23 +225,24 @@ credential helper.
 
 ## Verify Readiness
 
-Run these checks before starting a workspace:
+Run these checks before starting a workspace, in PowerShell for VS Code or the app and in Ubuntu for Copilot CLI:
 
 ```bash
 node --version
 npm --version
 git --version
+copilot --version
 az account show --output table
-code --version
 ```
 
-Install and authenticate GitHub Copilot CLI according to the GitHub Copilot CLI documentation, then verify its version
-and sign-in status. APEX agents run in Copilot CLI, standalone or through the VS Code Copilot harness.
+For VS Code, `code --version` must report 1.140 or later. Confirm that local sandboxing is on for your client and that
+`copilot plugin list` shows one `apex` plugin once a release is published.
 
 ## Automated Repository Setup
 
-This automation prepares the development checkout, not an Azure deployment. Use the scripts from the reviewed checkout;
-they do not clone repositories, remove a devcontainer, copy credentials, grant Azure roles or change subscriptions.
+This automation prepares an APEX development checkout in WSL2 for repository contributors. It does not prepare a
+consumer host or an Azure deployment. Use the scripts from the reviewed checkout; they do not clone repositories, remove
+a devcontainer, copy credentials, grant Azure roles or change subscriptions.
 
 | Install location         | Contents                                                                                   |
 | ------------------------ | ------------------------------------------------------------------------------------------ |
@@ -267,6 +332,7 @@ and WSL2 installation still needs a real host trial; those tests do not establis
 
 ## Related
 
-- [Windows 11 first run](../tutorials/windows-11-first-run.md) - create and bootstrap an APEX workspace.
-- [Manage installation](manage-installation.md) - update, roll back, or remove APEX-managed files.
-- [Client support](../reference/client-support.md) - understand VS Code and Copilot CLI capability boundaries.
+- [Windows 11 first run](../tutorials/windows-11-first-run.md) - start APEX in VS Code or the app on native Windows.
+- [Copilot CLI on WSL2 runbook](../tutorials/wsl2-vscode-consumer-runbook.md) - start APEX in Copilot CLI.
+- [Manage installation](manage-installation.md) - install, update and reset the plugin and workspace files.
+- [Client support](../reference/client-support.md) - understand client support and qualification boundaries.

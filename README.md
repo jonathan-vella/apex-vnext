@@ -9,11 +9,11 @@ archetypes, and consumers reuse independent copies and adapt them through APEX.
 Preserve rich output while minimizing repeated input and keeping one owner per
 fact. Both ALZ-backed workloads and standalone labs/demos are initial scope.
 
-The target user experience is VS Code and the GitHub Copilot app on native
-Windows, and GitHub Copilot CLI on Linux or WSL2, without a devcontainer. APEX
-is moving to an Agent Plugin plus `apex init` onboarding
-([DECISION-033](docs/vnext/DECISIONS.md)); npm and WSL2 remain the current
-implementation until that ships.
+The supported hosts are VS Code with the Copilot harness and the GitHub Copilot
+app on native Windows 11, and GitHub Copilot CLI on Linux or WSL2, without a
+devcontainer ([DECISION-033](docs/vnext/DECISIONS.md)). APEX ships as the
+`apex` Agent Plugin plus `apex init` onboarding; no plugin release is published
+yet.
 See the [PRD](docs/vnext/PRD.md) and [roadmap](docs/vnext/ROADMAP.md) for planned
 scope, and the [checkpoint](docs/vnext/PROJECT.md) for implementation status.
 
@@ -32,8 +32,9 @@ npm ci
 npm run qualify:vnext
 ```
 
-Consumer onboarding starts with the [WSL2 runbook](docs/tutorials/wsl2-vscode-consumer-runbook.md),
-not a clone of this development repository. No token-baseline project is required now.
+Consumer onboarding starts with [Manage installation](docs/how-to/manage-installation.md),
+not a clone of this development repository. It covers install, update and reset
+for each host. No token-baseline project is required now.
 
 Use focused commands while developing:
 
@@ -48,6 +49,7 @@ npm run test:vnext-pack
 ## Documentation
 
 - [Documentation index](docs/README.md)
+- [Install, update and reset APEX](docs/how-to/manage-installation.md)
 - [First local run](docs/tutorials/first-run.md)
 - [Workflow](docs/how-to/run-workflow.md)
 - [CLI reference](docs/reference/cli.md)

@@ -1,100 +1,64 @@
-# WSL2 And VS Code Consumer Runbook
+# Copilot CLI On WSL2 Runbook
 
-> [Current Version](../../VERSION.md) | Install the published APEX preview in Ubuntu on WSL2
-> and start APEX in Copilot CLI or VS Code.
+> [Current Version](../../VERSION.md) | Install APEX in Ubuntu on WSL2 and start it in GitHub Copilot CLI.
 
-This runbook installs the published preview from npm and creates one APEX workspace with the Copilot CLI projection,
-which standalone Copilot CLI and the VS Code Copilot harness both run. It creates local project state only; it does not
-deploy Azure resources.
+This runbook creates one APEX workspace in Ubuntu on WSL2 and runs APEX in GitHub Copilot CLI. On an Ubuntu machine
+without WSL, skip the WSL installation step and run the same Ubuntu commands. It creates local project state only; it
+does not deploy Azure resources.
 
-Docker, a devcontainer and the APEX source repository are not required. npm is the current route; plugin and APEX MCP
-redistribution work comes at the end of the [roadmap](../vnext/ROADMAP.md#phase-6-distribution-last).
+In WSL2, Copilot CLI is the only supported APEX host. VS Code and the GitHub Copilot app run APEX on native Windows; see
+the [Windows 11 first run](windows-11-first-run.md). Use one host per workspace: a run does not move between a Windows
+client and Copilot CLI in WSL2. Docker, a devcontainer and the APEX source repository are not required.
 
-## Prepare Windows And Ubuntu
+> [!IMPORTANT]
+> The APEX plugin has no published release yet, and the published `@apexops/cli@next` preview predates the plugin.
+> These steps describe the released flow. Until then, use a
+> [local candidate](../how-to/manage-installation.md#install-a-local-candidate) and check the
+> [release status](../how-to/manage-installation.md).
 
-Open PowerShell as an administrator and install Ubuntu on WSL2 when it is not already installed:
+## Prepare Ubuntu
 
-```powershell
-wsl --install -d Ubuntu
-```
+Follow the WSL2 steps in [Prepare Windows 11](../how-to/prepare-windows-11.md#prepare-wsl2-for-copilot-cli). On
+Ubuntu without WSL, start at [Install Node.js And npm](../how-to/prepare-windows-11.md#install-nodejs-and-npm):
 
-Restart Windows when prompted. Open **Ubuntu**, create your Linux user, then install the base tools:
+- Ubuntu on WSL2, with workspaces in the Linux filesystem, such as `~/src`, rather than under `/mnt/c`;
+- Node.js 24.21.0 (LTS) or later, installed in Ubuntu and separate from any Node.js installation on Windows;
+- GitHub Copilot CLI, signed in, with Bubblewrap and `slirp4netns` for its local sandbox.
 
-```bash
-sudo apt update
-sudo apt upgrade -y
-sudo apt install -y ca-certificates curl git
-```
+Then turn on the Copilot CLI sandbox with `/sandbox enable` in a session. APEX assumes it is on and does not check it.
 
-Keep APEX workspaces in the Linux filesystem, such as `~/src`, rather than under `/mnt/c`.
+## Install The Plugin
 
-## Install VS Code And Copilot
-
-Install VS Code on Windows:
-
-```powershell
-winget install Microsoft.VisualStudioCode
-```
-
-In VS Code, install **WSL**, **GitHub Copilot**, and **GitHub Copilot Chat**. Sign in to the GitHub account that has a
-Copilot entitlement.
-
-From Ubuntu, verify that the VS Code command opens a WSL window:
+Install the plugin once in this Ubuntu environment:
 
 ```bash
-code --version
+copilot plugin marketplace add jonathan-vella/apex-plugins
+copilot plugin install apex@apex-plugins
+copilot plugin list
 ```
 
-If the command is unavailable, open VS Code on Windows, install the WSL extension, then run **WSL: Connect to WSL**
-from the Command Palette before retrying.
-
-Install and authenticate GitHub Copilot CLI in Ubuntu as described in
-[Prepare Windows 11](../how-to/prepare-windows-11.md#verify-readiness). APEX agents run in Copilot CLI.
-
-## Install Node.js
-
-Install Node.js 24.21.0 (LTS) or later in Ubuntu. The Linux runtime is separate from any Node.js installation on Windows:
-
-```bash
-NVM_VERSION=v0.40.1
-NVM_INSTALL_SHA256=abdb525ee9f5b48b34d8ed9fc67c6013fb0f659712e401ecd88ab989b3af8f53
-curl --fail --silent --show-error --location \
-  "https://raw.githubusercontent.com/nvm-sh/nvm/${NVM_VERSION}/install.sh" \
-  --output /tmp/nvm-install.sh
-printf '%s  %s\n' "$NVM_INSTALL_SHA256" /tmp/nvm-install.sh | sha256sum --check --status
-bash /tmp/nvm-install.sh
-rm /tmp/nvm-install.sh
-source ~/.bashrc
-nvm install 24
-nvm use 24
-node --version
-npm --version
-```
+A workspace that `apex init` set up also asks Copilot CLI to install the plugin, through its
+`.github/copilot/settings.json`, so you can skip this step and trust the workspace folder when Copilot asks.
 
 ## Create The Workspace
 
-Create one consumer repository in Ubuntu and open it in the WSL-connected VS Code window. This repository can hold
-multiple APEX workloads; choose a name for the consumer or business entity, not the first workload:
+Create one consumer repository in Ubuntu. This repository can hold multiple APEX workloads; choose a name for the
+consumer or business entity, not the first workload. Bootstrap the APEX CLI at the plugin's version and create a Git
+repository boundary:
 
 ```bash
 mkdir -p ~/src/contoso-platform
 cd ~/src/contoso-platform
-code .
-```
-
-Trust the folder when VS Code asks. In its integrated WSL terminal, bootstrap the published preview and create a Git
-repository boundary:
-
-```bash
-npx --yes @apexops/cli@next bootstrap \
+npx --yes @apexops/cli@PLUGIN_VERSION bootstrap \
   --project payments \
   --risk-owner partner \
+  --target local \
   --create-repo \
   --yes
 ```
 
 The command installs the exact APEX CLI as a workspace dependency, creates `.apex` state, and writes the thin
-workspace projection with `.github/copilot/settings.json`, which installs the `apex` plugin. Do not edit `.apex`
+workspace projection with `.github/copilot/settings.json`, which enables the `apex` plugin. Do not edit `.apex`
 directly.
 
 ## Add Workloads To The Consumer
@@ -152,12 +116,9 @@ stage review packages are described in [Run the workflow](../how-to/run-workflow
 execution-state contract.
 
 In the workspace terminal, run `copilot --agent apex` and provide the initial workload requirements. Ask APEX what is
-next at any point; it names the owning agent and prints `/agent <name>` with a scope prompt to paste after you switch.
+next at any point; it reads kernel state, continues in the same APEX agent and delegates only to its hidden workers.
 The agents read the kernel-owned workspace state; they do not grant deployment approval or configure cloud resources on
 their own.
-
-In VS Code, start a chat with the session target set to Copilot and pick **APEX** in the Agent picker. Over WSL, VS Code
-`1.139.0` with Copilot Chat `0.67.0` does not apply a picked agent yet, so use Copilot CLI there.
 
 Verify the workspace before continuing:
 
@@ -172,7 +133,8 @@ npx apex task next --json
 ## Add Azure Tooling When Needed
 
 The initial local workflow does not require Azure credentials. Before an Azure-ready workflow, follow
-[Prepare Windows 11](../how-to/prepare-windows-11.md) to install Azure CLI and select either Bicep or Terraform.
+[Prepare Windows 11](../how-to/prepare-windows-11.md#install-azure-tooling-on-ubuntu) to install Azure CLI and select
+either Bicep or Terraform.
 Authenticate only to the intended subscription and confirm the required role before requesting a real deployment
 preview.
 
@@ -181,13 +143,16 @@ server.
 
 ## Update Or Remove APEX
 
-From the workspace terminal, inspect the installed preview and managed files:
+Update the plugin, then the workspace CLI and files, so both stay at the same version:
 
 ```bash
-npx apex version --json
+copilot plugin update apex@apex-plugins
+npm install --save-dev --save-exact @apexops/cli@PLUGIN_VERSION
 npx apex update --json
 npx apex doctor --json
 ```
+
+Start a new Copilot CLI session after a plugin update.
 
 To remove managed client files while retaining project history and local state, run:
 
@@ -195,9 +160,11 @@ To remove managed client files while retaining project history and local state, 
 npx apex customizations uninstall --json
 ```
 
+[Manage installation](../how-to/manage-installation.md) covers rollback, reinstall and removing the plugin.
+
 ## Related
 
 - [Prepare Windows 11](../how-to/prepare-windows-11.md) - install Azure and IaC prerequisites for Azure-ready work.
-- [Manage installation](../how-to/manage-installation.md) - update, roll back, reinstall, or remove managed files.
+- [Manage installation](../how-to/manage-installation.md) - update, roll back, reinstall, or remove APEX.
 - [Run the workflow](../how-to/run-workflow.md) - continue the kernel-governed project workflow.
 - [Client support](../reference/client-support.md) - understand supported client boundaries.
