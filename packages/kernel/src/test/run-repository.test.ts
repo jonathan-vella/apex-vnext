@@ -544,7 +544,8 @@ async function withReleasedLockRemovalFailure<T>(
 
 test("repeated run mutations leave a bounded number of lock entries", async () => {
   const now = { value: new Date("2026-01-01T00:00:00.000Z") };
-  const { directory, repository } = await writerLeaseFixture(now);
+  const { directory } = await writerLeaseFixture(now);
+  const repository = new RunRepository(directory, { clock: () => now.value, platform: "linux" });
   const windows = new RunRepository(directory, { clock: () => now.value, platform: "win32" });
   for (let index = 0; index < 25; index += 1) {
     await mutateOnce(index % 2 === 0 ? repository : windows, `event-${index}`);
@@ -582,7 +583,8 @@ test("two repositories contending on one run keep CAS semantics and leave no rel
 
 test("a failed released-lock cleanup never fails the mutation and is swept by the next one", async () => {
   const now = { value: new Date("2026-01-01T00:00:00.000Z") };
-  const { directory, repository: linux } = await writerLeaseFixture(now);
+  const { directory } = await writerLeaseFixture(now);
+  const linux = new RunRepository(directory, { clock: () => now.value, platform: "linux" });
   const windows = new RunRepository(directory, { clock: () => now.value, platform: "win32" });
   let sequence = 0;
   const expectLeftover = async (repository: RunRepository, code: string, failures: number, injected: number) => {
