@@ -9,6 +9,7 @@ import type { Client } from "@modelcontextprotocol/client";
 import {
   EventJournal,
   REPEAT_EVENT_TYPE,
+  REPEAT_GUARD_FILE,
   RunRepository,
   readRepeatEvents,
   readRepeatRecords,
@@ -525,6 +526,25 @@ test("state-changing CLI commands share the workspace lock that guarded calls ho
   await Promise.all(commands);
   assert.deepEqual([...settled].sort(), ["project history", "project use --project demo"]);
   assert.equal((status as { run: { projectId: string } }).run.projectId, "demo");
+});
+
+test("repeat records stay out of Git through the managed .apex boundary", async (context) => {
+  const { service, runDirectory } = await initializedWorkspace();
+  await execFileAsync("git", ["init", service.root]);
+  const { client } = await connect(context, service, "repeat-git-boundary");
+  assertSuccess(await client.callTool({ name: "nextTask", arguments: { workspace: service.root } }), "nextTask");
+  const records = join(runDirectory, REPEAT_GUARD_FILE);
+  assert.equal((await readRepeatRecords(runDirectory)).length, 1);
+  await execFileAsync("git", ["-C", service.root, "check-ignore", "--quiet", relative(service.root, records)]);
+  await assert.rejects(
+    execFileAsync("git", [
+      "-C",
+      service.root,
+      "check-ignore",
+      "--quiet",
+      relative(service.root, join(runDirectory, "run.json")),
+    ]),
+  );
 });
 
 test("a repeat survives an MCP server restart within the run", async (context) => {

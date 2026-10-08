@@ -164,7 +164,7 @@ test("init writes only the thin projection with plugin settings and no plugin-ow
   );
   assert.equal(
     await readFile(join(root, ".apex", ".gitignore"), "utf8"),
-    "/cache/\n/local/\n/work/\n/runtime/capability-packs/\n",
+    "/cache/\n/local/\n/work/\n/runtime/capability-packs/\n.repeat-guard.json\n",
   );
   assert.match(await readFile(join(root, ".apex", "runtime", "workflow.v1.json"), "utf8"), /apex-workflow-v1/);
   const registry = JSON.parse(
@@ -538,7 +538,7 @@ test("update rejects and doctor repairs a modified local Git boundary", async ()
   assert.match(boundaryCheck?.value ?? "", /^[0-9a-f]{64}$/);
   assert.notEqual(boundaryCheck?.value, "/local/\n");
   await service.doctor(true, true);
-  assert.equal(await readFile(boundary, "utf8"), "/cache/\n/local/\n/work/\n/runtime/capability-packs/\n");
+  assert.equal(await readFile(boundary, "utf8"), "/cache/\n/local/\n/work/\n/runtime/capability-packs/\n.repeat-guard.json\n");
 });
 
 test("init writes a real runtime lock and doctor detects managed tampering", async () => {

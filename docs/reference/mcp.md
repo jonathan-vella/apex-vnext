@@ -245,8 +245,9 @@ separate `repeats/` journal. Records live in the run's `.repeat-guard.json`, wri
 state differs from the current state are dropped on every write because they can never match again. The file is the
 strict, versioned `repeat-guard-records-v1` contract
 ([schema](../../packages/contracts/schemas/repeat-guard-records-v1.schema.json)), validated on every read and write; a
-file that fails it disables replay instead of returning a forged result. State transfer excludes the record file and
-carries the audit journal.
+file that fails it disables replay instead of returning a forged result. The record file is machine-local: the managed
+`.apex/.gitignore` keeps it out of Git (`doctor --fix --yes` updates an older boundary), and state transfer excludes it
+but carries the audit journal.
 
 ## Authority
 

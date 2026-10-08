@@ -149,6 +149,7 @@ import {
   WorkflowEngine,
   assertTaskCurrent,
   executeRepeatSafe,
+  REPEAT_GUARD_FILE,
   RepeatGuardBusyError,
   RepeatGuardCancelledError,
   withRepeatGuardLock,
@@ -219,7 +220,8 @@ import {
 const ZERO_HASH = "0".repeat(64);
 const TASK_TTL_MS = 24 * 60 * 60 * 1000;
 const PREVIEW_TTL_MS = 24 * 60 * 60 * 1000;
-const APEX_GITIGNORE = "/cache/\n/local/\n/work/\n/runtime/capability-packs/\n";
+// Repeat records hold serialized tool results for this machine only; they stay out of Git like other local state.
+const APEX_GITIGNORE = `/cache/\n/local/\n/work/\n/runtime/capability-packs/\n${REPEAT_GUARD_FILE}\n`;
 
 function repeatGuardError(error: unknown): unknown {
   if (error instanceof RepeatGuardBusyError)
