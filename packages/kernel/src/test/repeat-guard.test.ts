@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
-import { lstat, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, readdir, readFile, rm, stat, symlink, utimes, writeFile } from "node:fs/promises";
 import { hostname, tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import test from "node:test";
 import {
   DEFAULT_REPEAT_WINDOW_MS,
@@ -12,6 +12,8 @@ import {
   REPEAT_EVENT_TYPE,
   REPEAT_GUARD_FILE,
   REPEAT_LOCK_FILE,
+  RepeatFileSnapshotError,
+  RepeatFileWrites,
   RepeatGuardBusyError,
   RepeatGuardCancelledError,
   RepeatGuardStaleError,
@@ -25,6 +27,11 @@ import {
   repeatCallHash,
   repeatFingerprint,
   repeatStateToken,
+  repeatFilesDigest,
+  repeatFilesHeld,
+  sha256Bytes,
+  sha256Text,
+  snapshotRepeatFiles,
   type RepeatCall,
   type RepeatSafeOutcome,
   type RepeatScope,
@@ -766,48 +773,226 @@ test("a call whose identity changed is never replayed, and is returned but not s
   assert.equal(executions, 3);
 });
 
-test("a file changed by a writer that bypasses the lock is never bound to a stored result", async () => {
-  const { runDirectory, lockDirectory, worktree, scope } = await fixture();
-  let editedAtMs: number | undefined;
-  let reads = 0;
-  let editOnRead: number | undefined;
-  const current = async (): Promise<RepeatScope> => {
-    reads += 1;
-    if (reads === editOnRead) editedAtMs = Date.now() + 1_000;
-    const base = await scope();
+const PINNED_SECONDS = 1_700_000_000;
+
+/** Writes `content` with whole-second access and modification times, so a later edit can restore them exactly. */
+async function writePinned(path: string, content: string): Promise<void> {
+  await writeFile(path, content);
+  await utimes(path, PINNED_SECONDS, PINNED_SECONDS);
+}
+
+/** Rewrites a pinned file with same-length content and restores its size and modification time exactly. */
+async function sameStatEdit(path: string, content: string): Promise<void> {
+  const before = await stat(path, { bigint: true });
+  assert.equal(BigInt(Buffer.byteLength(content)), before.size);
+  await writePinned(path, content);
+  const after = await stat(path, { bigint: true });
+  assert.equal(after.size, before.size);
+  assert.equal(after.mtimeNs, before.mtimeNs);
+}
+
+test("bound files hold only through the operation's own writes, and a size- and mtime-preserving edit is detected", async () => {
+  const root = await mkdtemp(join(tmpdir(), "apex-repeat-files-"));
+  const work = join(root, "work");
+  const staged = join(work, "task-1", "code", "main.bicep");
+  await mkdir(dirname(staged), { recursive: true });
+  await writePinned(staged, "param a string\n");
+  const start = await snapshotRepeatFiles([work, join(work, "task-1", "code")]);
+  assert.deepEqual(start.roots, [work, join(work, "task-1", "code")].sort());
+  assert.equal(start.entries[staged]?.type, "file");
+  assert.equal(repeatFilesHeld(start, await snapshotRepeatFiles(start.roots)), true);
+
+  // A write the operation reports, including the directories it creates, holds; an unreported one does not.
+  const written = join(work, "task-2", "requirements.json");
+  await mkdir(dirname(written), { recursive: true });
+  await writeFile(written, "{}");
+  const writes = new RepeatFileWrites();
+  writes.file(written, sha256Text("{}"));
+  const end = await snapshotRepeatFiles(start.roots);
+  assert.equal(repeatFilesHeld(start, end, writes), true);
+  assert.equal(repeatFilesHeld(start, end), false);
+  const wrong = new RepeatFileWrites();
+  wrong.file(written, sha256Text("[]"));
+  assert.equal(repeatFilesHeld(start, end, wrong), false);
+
+  // A content change that keeps every stat field is still a change, because files are bound by content.
+  const forged = structuredClone(start);
+  forged.entries[staged] = { ...(forged.entries[staged] as { type: "file"; sha256: string; stat: string }) };
+  (forged.entries[staged] as { sha256: string }).sha256 = sha256Text("param b string\n");
+  assert.equal(repeatFilesHeld(start, forged), false);
+  assert.notEqual(repeatFilesDigest(forged), repeatFilesDigest(start));
+  await sameStatEdit(staged, "param b string\n");
+  const edited = await snapshotRepeatFiles(start.roots);
+  assert.notEqual(
+    (edited.entries[staged] as { sha256: string }).sha256,
+    (start.entries[staged] as { sha256: string }).sha256,
+  );
+  assert.equal(repeatFilesHeld(start, edited, writes), false);
+
+  // A removal the operation reports holds for the whole removed tree.
+  const removing = await snapshotRepeatFiles([work]);
+  await rm(join(work, "task-2"), { recursive: true });
+  const removal = new RepeatFileWrites();
+  removal.removed(join(work, "task-2"));
+  assert.equal(repeatFilesHeld(removing, await snapshotRepeatFiles([work]), removal), true);
+  assert.equal(repeatFilesHeld(removing, await snapshotRepeatFiles([work])), false);
+  // An end snapshot that does not cover every start root cannot show the start roots unchanged.
+  assert.equal(repeatFilesHeld(removing, await snapshotRepeatFiles([join(root, "other")])), false);
+});
+
+test("a repeat file snapshot streams large files, fails closed over budget, and refuses a linked root", async () => {
+  const root = await mkdtemp(join(tmpdir(), "apex-repeat-budget-"));
+  const large = join(root, "large.bin");
+  const bytes = Buffer.alloc(300 * 1024, 7);
+  await writeFile(large, bytes);
+  const snapshot = await snapshotRepeatFiles([root]);
+  assert.equal((snapshot.entries[large] as { sha256: string }).sha256, sha256Bytes(bytes));
+  await assert.rejects(snapshotRepeatFiles([root], { maxBytes: bytes.byteLength - 1 }), RepeatFileSnapshotError);
+  await assert.rejects(snapshotRepeatFiles([root], { maxEntries: 1 }), RepeatFileSnapshotError);
+  assert.deepEqual((await snapshotRepeatFiles([join(root, "missing")])).entries, {});
+  if (process.platform !== "win32") {
+    const linked = join(root, "linked");
+    await symlink(root, linked);
+    await assert.rejects(snapshotRepeatFiles([linked]), RepeatFileSnapshotError);
+    await assert.rejects(snapshotRepeatFiles([root, linked]), RepeatFileSnapshotError);
+  }
+  await assert.rejects(snapshotRepeatFiles([root], { attempts: 0 }), RangeError);
+});
+
+async function boundFixture() {
+  const base = await fixture();
+  const work = join(base.root, ".apex", "work", "run-1");
+  const staged = join(work, "task-1", "code", "main.bicep");
+  await mkdir(dirname(staged), { recursive: true });
+  await writePinned(staged, "param a string\n");
+  let roots = [work];
+  let failNextScope = false;
+  const scope = async (): Promise<RepeatScope> => {
+    if (failNextScope) {
+      failNextScope = false;
+      throw new Error("scope unavailable");
+    }
+    const state = await base.repository.repeatState();
+    const files = await snapshotRepeatFiles(roots);
     return {
-      ...base,
-      ...(editedAtMs === undefined
-        ? {}
-        : { state: sha256Json({ base: base.state, editedAtMs }), changedAtMs: editedAtMs }),
+      runDirectory: base.runDirectory,
+      projectId: "demo",
+      runId: "run-1",
+      ownerEpoch: state.ownerEpoch,
+      state: repeatStateToken({
+        selection: { projectId: "demo", runId: "run-1" },
+        projects: ["demo"],
+        ...state,
+        files: repeatFilesDigest(files),
+      }),
+      files,
     };
   };
   let executions = 0;
-  const run = () =>
-    executeRepeatSafe(
-      { operation: "stageFile", workspace: worktree, arguments: { path: "main.bicep" } },
+  const run = (effect: (writes: RepeatFileWrites) => Promise<void> = async () => undefined) => {
+    const writes = new RepeatFileWrites();
+    return executeRepeatSafe(
+      { operation: "validateTask", workspace: base.worktree, arguments: { taskId: "task-1" } },
       {
-        lockDirectory,
-        scope: current,
+        lockDirectory: base.lockDirectory,
+        scope,
         assertReplayAllowed: async () => undefined,
-        execute: async () => ({ executions: ++executions }),
+        execute: async () => {
+          executions += 1;
+          await effect(writes);
+          return { executions };
+        },
+        writes,
       },
     );
-  // An edit after the operation returned and before the post-call read: the result is returned but not stored.
-  editOnRead = 2;
-  assert.equal((await run()).repeated, false);
-  assert.deepEqual(await readRepeatRecords(runDirectory), []);
-  // The next call is stored normally because its files have not changed since it returned.
-  editOnRead = undefined;
-  editedAtMs = Date.now() - 1_000;
-  assert.equal((await run()).repeated, false);
-  assert.equal((await readRepeatRecords(runDirectory)).length, 1);
-  // An edit while the stored record is checked: the second state read differs, so the call executes instead.
-  reads = 0;
-  editOnRead = 2;
-  const raced = await run();
+  };
+  return {
+    ...base,
+    work,
+    staged,
+    run,
+    executions: () => executions,
+    setRoots(next: string[]) {
+      roots = next;
+    },
+    failNextScope() {
+      failNextScope = true;
+    },
+  };
+}
+
+test("a bound file edited while the operation runs never binds the result, and the repeat is a new request", async () => {
+  const { runDirectory, staged, run, executions } = await boundFixture();
+  // The operation read the staged file at its start; an editor changes it before the operation returns.
+  const raced = await run(async () => writePinned(staged, "param b string\n"));
   assert.equal(raced.repeated, false);
-  assert.equal(executions, 3);
+  assert.deepEqual(await readRepeatRecords(runDirectory), []);
+  assert.equal((await run()).repeated, false);
+  assert.equal(executions(), 2);
+  assert.equal((await readRepeatRecords(runDirectory)).length, 1);
+  assert.equal((await run()).repeated, true);
+  assert.equal(executions(), 2);
+
+  // The same holds for an edit that keeps the file's size and modification time.
+  const sameStat = await run(async () => undefined);
+  assert.equal(sameStat.repeated, true);
+  const stored = await readRepeatRecords(runDirectory);
+  await sameStatEdit(staged, "param c string\n");
+  // The stored record no longer matches the edited content, so the identical call executes.
+  const executed = await run(async () => sameStatEdit(staged, "param d string\n"));
+  assert.equal(executed.repeated, false);
+  assert.equal(executions(), 3);
+  assert.deepEqual(await readRepeatRecords(runDirectory), stored);
+});
+
+test("an operation's own writes to bound files are stored, an edit after them is not", async () => {
+  const { runDirectory, work, run, executions } = await boundFixture();
+  const output = join(work, "task-2", "requirements.json");
+  const write = async (writes: RepeatFileWrites) => {
+    await mkdir(dirname(output), { recursive: true });
+    await writeFile(output, "{}");
+    writes.file(output, sha256Text("{}"));
+  };
+  assert.equal((await run(write)).repeated, false);
+  assert.equal((await readRepeatRecords(runDirectory)).length, 1);
+  assert.equal((await run(write)).repeated, true);
+  assert.equal(executions(), 1);
+
+  // An editor that rewrites the operation's output before the call returns keeps the result from being stored.
+  await rm(join(work, "task-2"), { recursive: true });
+  const stored = await readRepeatRecords(runDirectory);
+  const edited = await run(async (writes) => {
+    await write(writes);
+    await writeFile(output, "[]");
+  });
+  assert.equal(edited.repeated, false);
+  assert.deepEqual(await readRepeatRecords(runDirectory), stored);
+  assert.equal((await run()).repeated, false);
+  assert.equal(executions(), 3);
+});
+
+test("bound roots a call leaves are rechecked, and an unreadable start state never stores a result", async () => {
+  const { runDirectory, root, work, staged, run, executions, setRoots, failNextScope } = await boundFixture();
+  const next = join(root, ".apex", "work", "run-2");
+  // A call that changes the bound roots, such as one that selects another run, is still checked against the roots it
+  // started with.
+  const switching = (edit: boolean) =>
+    run(async () => {
+      setRoots([next]);
+      if (edit) await writeFile(staged, "param b string\n");
+    });
+  assert.equal((await switching(true)).repeated, false);
+  assert.deepEqual(await readRepeatRecords(runDirectory), []);
+  setRoots([work]);
+  assert.equal((await switching(false)).repeated, false);
+  const stored = await readRepeatRecords(runDirectory);
+  assert.equal(stored.length, 1);
+
+  setRoots([work]);
+  failNextScope();
+  assert.equal((await run()).repeated, false);
+  assert.deepEqual(await readRepeatRecords(runDirectory), stored);
+  assert.equal(executions(), 3);
 });
 
 test("repeat records survive a restart because they are stored with the run", async () => {

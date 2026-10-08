@@ -47,6 +47,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   before it continues and fails with `APEX_STALE` if the workspace changed during the wait, so an answer is never
   applied to state it was not given against. Other waits, such as provider and Azure CLI processes, still hold the
   lock.
+- The MCP repeat guard binds staged and generated files by content instead of by stat signature. A result is stored
+  only if those files still hold their content from the start of the call, changed only by the call's own writes, so an
+  edit while a call runs, or one that keeps a file's size and modification time, is never answered from a result
+  computed on other content.
 
 ### Security
 

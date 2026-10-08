@@ -17,6 +17,12 @@ import { sha256Json, sha256Text } from "./canonical.js";
 import { DirectoryLock } from "./directory-lock.js";
 import { EventJournal } from "./event-journal.js";
 import { atomicWriteJson } from "./files.js";
+import {
+  repeatFilesHeld,
+  snapshotRepeatFiles,
+  type RepeatFileSnapshot,
+  type RepeatFileWrites,
+} from "./repeat-files.js";
 import { canonicalWorktreePath } from "./run-repository.js";
 
 /** Run-scoped file holding the bounded set of calls that may still be answered from their original result. */
@@ -53,7 +59,10 @@ export interface RepeatStateInput {
   runHash: string;
   journalHead: string | null;
   writer: string | null;
-  /** Signature of mutable files the run's operations read, such as staged work and generated source trees. */
+  /**
+   * Content digest of the mutable files the run's operations read, such as staged work and generated source trees, from
+   * {@link repeatFilesDigest}.
+   */
   files?: string | null;
 }
 
@@ -65,10 +74,11 @@ export interface RepeatScope {
   ownerEpoch: number;
   state: string;
   /**
-   * Latest change time, in milliseconds since the epoch, of the mutable files the state token covers. A change after
-   * the operation returned was not made by the operation, so its result is not stored against that state.
+   * Content of the mutable files the state token covers, read with it. The snapshot taken before a call executes binds
+   * its record: the result is stored only if those trees still hold that content afterwards, changed only by the
+   * call's own {@link RepeatSafeHooks.writes}.
    */
-  changedAtMs?: number;
+  files?: RepeatFileSnapshot;
 }
 
 export interface RepeatSafeHooks<T> {
@@ -90,6 +100,11 @@ export interface RepeatSafeHooks<T> {
    * result without storing it.
    */
   identityStable?(): Promise<boolean>;
+  /**
+   * Writes the operation makes to files the scope binds, filled while `execute` runs. Any other change to a bound file
+   * between the scope read before execution and the one after it returns the result without storing it.
+   */
+  writes?: RepeatFileWrites;
 }
 
 export interface RepeatSafeOptions {
@@ -175,12 +190,12 @@ export function repeatFingerprint(callHash: string, state: string | null): strin
 
 /**
  * State token for the repeat window. It changes whenever the selection, the project set, the selected run document,
- * its journal head, its writer lease holder or the signature of its mutable files changes; lease expiry renewals do
- * not change it.
+ * its journal head, its writer lease holder or the content of its mutable files changes; lease expiry renewals do not
+ * change it.
  */
 export function repeatStateToken(input: RepeatStateInput): string {
   return sha256Json({
-    version: 1,
+    version: 2,
     selection: { projectId: input.selection.projectId, runId: input.selection.runId },
     projects: [...input.projects].sort(),
     runHash: input.runHash,
@@ -304,7 +319,9 @@ async function storeRepeatRecord(
  * Executes a state-changing call at most once per run state. An identical call (same operation, worktree and
  * arguments) made while the selected run is unchanged since the original succeeded, and within the window, returns the
  * original serialized result and appends a `call.repeated` audit event instead of executing again. Any intervening
- * state change, an expired window, a failed original call or a missing record makes the call a new request. Guarded
+ * state change, an expired window, a failed original call or a missing record makes the call a new request. A result
+ * is stored only if the files the scope binds kept their content from the start of the call, changed only by the
+ * call's own writes, so a later repeat is never answered from a result computed on other content. Guarded
  * calls in one workspace are serialized across processes from record lookup through record publication, including
  * calls that create or change the selected run.
  */
@@ -419,7 +436,12 @@ async function guardedCall<T extends object>(
   windowMs: number,
   maxRecords: number,
 ): Promise<RepeatSafeOutcome<T>> {
-  const before = await hooks.scope().catch(() => undefined);
+  // A start state that could not be read cannot bind a result, so such a call is never stored.
+  let startRead = true;
+  const before = await hooks.scope().catch(() => {
+    startRead = false;
+    return undefined;
+  });
   const fingerprint = repeatFingerprint(callHash, before?.state ?? null);
   if (before !== undefined) {
     const now = clock();
@@ -446,16 +468,22 @@ async function guardedCall<T extends object>(
     }
   }
   const value = await hooks.execute();
-  const finishedAt = Date.now();
   try {
+    if (!startRead) return { value, repeated: false, fingerprint };
     if (hooks.identityStable !== undefined && !(await hooks.identityStable()))
       return { value, repeated: false, fingerprint };
     const after = await hooks.scope();
     if (after === undefined) return { value, repeated: false, fingerprint };
-    // A file changed after the operation returned, for example by an editor that bypasses the workspace lock, would
-    // bind this result to content the operation never saw.
-    if (after.changedAtMs !== undefined && after.changedAtMs > finishedAt)
-      return { value, repeated: false, fingerprint };
+    // A bound file changed by anything but the operation itself while it ran, for example by an editor that bypasses
+    // the workspace lock, would bind this result to content the operation may not have seen.
+    if (before?.files !== undefined) {
+      const start = before.files;
+      const end =
+        after.files !== undefined && start.roots.every((root) => after.files!.roots.includes(root))
+          ? after.files
+          : await snapshotRepeatFiles(start.roots);
+      if (!repeatFilesHeld(start, end, hooks.writes)) return { value, repeated: false, fingerprint };
+    }
     const now = clock();
     const result = JSON.stringify(value);
     const limit = hooks.validUntil?.(value);

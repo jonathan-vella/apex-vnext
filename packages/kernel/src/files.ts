@@ -22,14 +22,36 @@ export async function renameWithRetry(from: string, to: string, options: RenameR
     (!Number.isSafeInteger(options.attempts) || options.attempts < 1 || options.attempts > 10)
   )
     throw new RangeError("Rename attempts must be an integer from 1 to 10");
-  const attempts = (options.platform ?? process.platform) === "win32" ? (options.attempts ?? 10) : 1;
   const move = options.rename ?? rename;
+  await retrySharingViolations(() => move(from, to), options);
+}
+
+export interface SharingRetryOptions {
+  readonly platform?: NodeJS.Platform;
+  readonly attempts?: number;
+  readonly sleep?: (milliseconds: number) => Promise<void>;
+}
+
+/**
+ * Runs a file operation with the bounded backoff of `renameWithRetry`, retrying the Windows sharing violations (EPERM,
+ * EACCES, EBUSY) that a concurrent writer, antivirus or indexer causes. Other platforms and other errors fail on the
+ * first attempt.
+ */
+export async function retrySharingViolations<T>(
+  operation: () => Promise<T>,
+  options: SharingRetryOptions = {},
+): Promise<T> {
+  if (
+    options.attempts !== undefined &&
+    (!Number.isSafeInteger(options.attempts) || options.attempts < 1 || options.attempts > 10)
+  )
+    throw new RangeError("Retry attempts must be an integer from 1 to 10");
+  const attempts = (options.platform ?? process.platform) === "win32" ? (options.attempts ?? 10) : 1;
   const sleep =
     options.sleep ?? (async (milliseconds: number) => await new Promise((done) => setTimeout(done, milliseconds)));
   for (let attempt = 1; ; attempt += 1) {
     try {
-      await move(from, to);
-      return;
+      return await operation();
     } catch (error) {
       if (attempt >= attempts || !TRANSIENT_RENAME_CODES.has((error as NodeJS.ErrnoException).code ?? "")) throw error;
       await sleep(Math.min(10 * 2 ** (attempt - 1), 500));
