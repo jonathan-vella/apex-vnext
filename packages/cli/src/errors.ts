@@ -60,7 +60,7 @@ const REMEDIATION_BY_CODE: Record<ApexErrorCode, string> = {
   APEX_RESULT_TOO_LARGE:
     "Request a smaller bounded result, use a paging-capable read tool, or narrow the requested document or collection.",
   APEX_REVIEW_PENDING:
-    "Finish the pending rubber-duck review with reviewComplete, or have the user cancel it from a terminal with apex task cancel; then retry.",
+    "Finish the pending rubber-duck review with reviewComplete, or have the user stop any running rubber-duck and then cancel the review from a terminal with apex task cancel; then retry.",
   APEX_INTERNAL:
     "Report this with the server log; retry only after checking status because side effects may have completed.",
 };

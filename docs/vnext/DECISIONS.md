@@ -236,7 +236,8 @@ motivates kernel capture.
 Amendment 2026-10-08 (coordinator decision on PR #421, maintainer unavailable): hooks fail open when missing or timed
 out, so the kernel also refuses every operation that approves, deletes or publishes (one classification in
 `packages/cli/src/review-guard.ts`) with `APEX_REVIEW_PENDING` while any review waits for its capture. Completing the
-review, or cancelling its task from the CLI, lifts the guard; hooks still only capture and deny.
+review, or cancelling its task from the CLI after the user stops rubber-duck, lifts the guard; hooks still only
+capture and deny.
 
 ## DECISION-032: Use One Interactive APEX Agent
 

@@ -108,8 +108,9 @@ with `APEX_REVIEW_PENDING` (exit code 4), whether it comes from MCP or the CLI. 
 `reviewDecide`, `projectDelete`, `promote` and `submitEvidence`, and also the CLI-only review resolution, deployment,
 repository publication, governance provisioning, writer transfer, improvement decision and deletion, and telemetry
 deletion. Reads, staging, `nextTask`, `taskContext` and `reviewComplete` stay available. To continue, finish the review
-with `reviewComplete`, or cancel it from a terminal with `apex project use --project <id> --run <run>` and
-`apex task cancel --task <taskId>`; the CLI error names the project, run and task.
+with `reviewComplete`, or stop any running rubber-duck and then cancel the review from a terminal with
+`apex project use --project <id> --run <run>` and `apex task cancel --task <taskId>`; the CLI error names the project,
+run and task. The kernel cannot see whether rubber-duck is still running, so cancelling is a user action.
 
 What this guarantees and what it does not:
 

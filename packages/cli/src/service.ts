@@ -5173,7 +5173,8 @@ export class ApexService {
       "APEX_REVIEW_PENDING",
       `${operation} (${REVIEW_GUARDED_OPERATIONS[operation]}) is blocked while a rubber-duck review waits for its ` +
         `capture in project ${pending.projectId}, run ${pending.runId} (task ${pending.taskId}). Finish the review ` +
-        `with reviewComplete, or cancel it from a terminal: apex project use --project ${pending.projectId} --run ` +
+        `with reviewComplete, or stop any running rubber-duck and cancel it from a terminal: apex project use ` +
+        `--project ${pending.projectId} --run ` +
         `${pending.runId}, then apex task cancel --task ${pending.taskId}.`,
       EXIT_CODES.conflict,
       { reason: "REVIEW_PENDING", operation, ...pending },
