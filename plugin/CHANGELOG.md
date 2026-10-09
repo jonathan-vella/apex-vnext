@@ -10,6 +10,11 @@ When you prepare a release, rename `## [Unreleased]` to the new version.
 
 ## [Unreleased]
 
+- Azure design skills re-ported from `jonathan-vella/apex` (CP-18): trigger-rich descriptions, retail pricing, SKU
+  availability and cost tool references, guidance aligned to the read-only `apex-azure-pricing` tools, and the upstream
+  Azure CLI and azd commands. Read commands run directly; commands that change Azure route through `apex deploy` and
+  Gate 4 or the approved GitHub Actions pipeline. APEX never runs `azd up`.
+
 ## [0.11.0-next.2] - 2026-10-09
 
 Fixes a Copilot review finding on the second marketplace release pull request (closed without merging): the

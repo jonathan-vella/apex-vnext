@@ -490,41 +490,38 @@
         },
         {
           "source": "references/azqr-remediation-patterns.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
+          "disposition": "adapt",
+          "targets": ["references/remediation-patterns.md"],
+          "reason": "Restores the upstream Azure CLI guidance under DECISION-035: read commands run directly; commands that change Azure route through apex deploy (Gate 4) or the approved pipeline.",
+          "replacementProof": "Shipped reference classifies every command as read/diagnostic or routed, and marks each command that changes Azure.",
+          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the approved pipeline.",
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/azure-keyvault-expiration-audit.md",
           "disposition": "adapt",
-          "targets": ["references/compliance-finding-criteria.md"],
-          "reason": "Preserves redacted expiration interpretation without Key Vault enumeration or content access.",
-          "replacementProof": "Managed finding criteria retains expiry, coverage, and indeterminate semantics.",
-          "rollbackGate": "Restore planned status if sensitive values or direct vault access are introduced.",
+          "targets": ["references/compliance-finding-criteria.md", "references/keyvault-expiration-audit.md"],
+          "reason": "Preserves redacted expiration interpretation and restores the metadata-only Key Vault list and show commands under DECISION-035; no command returns a secret value.",
+          "replacementProof": "Managed finding criteria retains expiry, coverage, and indeterminate semantics; the audit reference lists metadata-only commands and forbids value retrieval.",
+          "rollbackGate": "Restore the previous disposition if sensitive values or a value-returning command are introduced.",
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/azure-quick-review.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
+          "disposition": "adapt",
+          "targets": ["references/azure-quick-review.md"],
+          "reason": "Restores the upstream Azure CLI guidance under DECISION-035: read commands run directly; commands that change Azure route through apex deploy (Gate 4) or the approved pipeline.",
+          "replacementProof": "Shipped reference classifies every command as read/diagnostic or routed, and marks each command that changes Azure.",
+          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the approved pipeline.",
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/azure-resource-graph.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
+          "disposition": "adapt",
+          "targets": ["references/azure-resource-graph.md"],
+          "reason": "Restores the upstream Azure CLI guidance under DECISION-035: read commands run directly; commands that change Azure route through apex deploy (Gate 4) or the approved pipeline.",
+          "replacementProof": "Shipped reference classifies every command as read/diagnostic or routed, and marks each command that changes Azure.",
+          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the approved pipeline.",
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
@@ -638,9 +635,9 @@
         {
           "source": "references/retail-prices-api.md",
           "disposition": "adapt",
-          "targets": ["references/recommendation-and-scale-rules.md"],
-          "reason": "The managed reference retains pricing comparison inputs, VMSS range accounting, and stale-evidence handling without API calls or query syntax.",
-          "replacementProof": "The managed reference identifies retail price lookup as capability evidence and records the required comparison fields.",
+          "targets": ["references/recommendation-and-scale-rules.md", "references/retail-prices-api.md"],
+          "reason": "The managed references retain pricing comparison inputs and VMSS range accounting, and restore the unauthenticated read-only Retail Prices API queries under DECISION-035 as a fallback to the apex-azure-pricing tool.",
+          "replacementProof": "The pricing evidence reference keeps the tool as the evidence source; the API reference labels direct results.",
           "rollbackGate": "Remove only after a source comparison confirms price-evidence intent remains covered by a managed target.",
           "scenarioIds": ["compute-guidance-parity"]
         },
@@ -683,52 +680,47 @@
         },
         {
           "source": "references/azure-quick-review.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
+          "disposition": "adapt",
+          "targets": ["references/cost-cli-workflow.md"],
+          "reason": "Restores the upstream Azure CLI guidance under DECISION-035: read commands run directly; commands that change Azure route through apex deploy (Gate 4) or the approved pipeline.",
+          "replacementProof": "Shipped reference classifies every command as read/diagnostic or routed, and marks each command that changes Azure.",
+          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the approved pipeline.",
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/azure-redis.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
+          "disposition": "adapt",
+          "targets": ["references/cost-cli-workflow.md"],
+          "reason": "Restores the upstream Azure CLI guidance under DECISION-035: read commands run directly; commands that change Azure route through apex deploy (Gate 4) or the approved pipeline.",
+          "replacementProof": "Shipped reference classifies every command as read/diagnostic or routed, and marks each command that changes Azure.",
+          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the approved pipeline.",
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/azure-resource-graph.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
+          "disposition": "adapt",
+          "targets": ["references/azure-resource-graph.md"],
+          "reason": "Restores the upstream Azure CLI guidance under DECISION-035: read commands run directly; commands that change Azure route through apex deploy (Gate 4) or the approved pipeline.",
+          "replacementProof": "Shipped reference classifies every command as read/diagnostic or routed, and marks each command that changes Azure.",
+          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the approved pipeline.",
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/best-practices-notes.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
+          "disposition": "adapt",
+          "targets": ["references/cost-cli-workflow.md"],
+          "reason": "Restores the upstream Azure CLI guidance under DECISION-035: read commands run directly; commands that change Azure route through apex deploy (Gate 4) or the approved pipeline.",
+          "replacementProof": "Shipped reference classifies every command as read/diagnostic or routed, and marks each command that changes Azure.",
+          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the approved pipeline.",
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/detailed-workflow-steps.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
+          "disposition": "adapt",
+          "targets": ["references/cost-cli-workflow.md"],
+          "reason": "Restores the upstream Azure CLI guidance under DECISION-035: read commands run directly; commands that change Azure route through apex deploy (Gate 4) or the approved pipeline.",
+          "replacementProof": "Shipped reference classifies every command as read/diagnostic or routed, and marks each command that changes Azure.",
+          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the approved pipeline.",
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
@@ -743,12 +735,11 @@
         },
         {
           "source": "references/workflow-steps.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
+          "disposition": "adapt",
+          "targets": ["references/cost-cli-workflow.md"],
+          "reason": "Restores the upstream Azure CLI guidance under DECISION-035: read commands run directly; commands that change Azure route through apex deploy (Gate 4) or the approved pipeline.",
+          "replacementProof": "Shipped reference classifies every command as read/diagnostic or routed, and marks each command that changes Azure.",
+          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the approved pipeline.",
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
@@ -782,9 +773,9 @@
       "resourceDispositions": [
         {
           "source": "references/arm-mcp-pricing-guidance.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
+          "disposition": "adapt",
+          "targets": ["references/retail-pricing.md"],
+          "reason": "Adapts the read-only retail price query, meter and monthly-calculation rules to the apex-azure-pricing server without the direct-API fallback.",
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
@@ -792,12 +783,11 @@
         },
         {
           "source": "references/azure-cli-auth-validation.md",
-          "disposition": "exclude-unsafe",
-          "targets": [],
-          "reason": "Excludes direct Azure CLI authentication and environment-inspection commands.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
+          "disposition": "adapt",
+          "targets": ["references/azure-cli-and-azd.md"],
+          "reason": "Restores the upstream Azure CLI guidance under DECISION-035: read commands run directly; commands that change Azure route through apex deploy (Gate 4) or the approved pipeline.",
+          "replacementProof": "Shipped reference classifies every command as read/diagnostic or routed, and marks each command that changes Azure.",
+          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the approved pipeline.",
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
@@ -2314,32 +2304,29 @@
       "resourceDispositions": [
         {
           "source": "references/advanced-commands.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
+          "disposition": "adapt",
+          "targets": ["references/quota-cli-commands.md"],
+          "reason": "Restores the upstream Azure CLI guidance under DECISION-035: read commands run directly; commands that change Azure route through apex deploy (Gate 4) or the approved pipeline.",
+          "replacementProof": "Shipped reference classifies every command as read/diagnostic or routed, and marks each command that changes Azure.",
+          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the approved pipeline.",
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/commands.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
+          "disposition": "adapt",
+          "targets": ["references/quota-cli-commands.md"],
+          "reason": "Restores the upstream Azure CLI guidance under DECISION-035: read commands run directly; commands that change Azure route through apex deploy (Gate 4) or the approved pipeline.",
+          "replacementProof": "Shipped reference classifies every command as read/diagnostic or routed, and marks each command that changes Azure.",
+          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the approved pipeline.",
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/core-workflows.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
+          "disposition": "adapt",
+          "targets": ["references/quota-workflows.md"],
+          "reason": "Restores the upstream Azure CLI guidance under DECISION-035: read commands run directly; commands that change Azure route through apex deploy (Gate 4) or the approved pipeline.",
+          "replacementProof": "Shipped reference classifies every command as read/diagnostic or routed, and marks each command that changes Azure.",
+          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the approved pipeline.",
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
@@ -2354,10 +2341,10 @@
         {
           "source": "references/troubleshooting.md",
           "disposition": "adapt",
-          "targets": ["references/capacity-decision-rules.md"],
-          "reason": "Preserves unsupported-provider, invalid-scope, and hard-limit blocker semantics.",
-          "replacementProof": "Managed capacity guidance routes operational failures to deferred provider capabilities.",
-          "rollbackGate": "Restore planned status if troubleshooting becomes executable command guidance.",
+          "targets": ["references/capacity-decision-rules.md", "references/quota-cli-commands.md"],
+          "reason": "Preserves unsupported-provider, invalid-scope, and hard-limit blocker semantics and restores the error table with read-only fixes under DECISION-035.",
+          "replacementProof": "Managed capacity guidance classifies failures; registration and increases are routed changes.",
+          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the approved pipeline.",
           "scenarioIds": ["guidance-migration-ledger"]
         }
       ]
@@ -2400,19 +2387,19 @@
         {
           "source": "references/azure-resource-graph.md",
           "disposition": "adapt",
-          "targets": ["references/inventory-query-patterns.md"],
-          "reason": "Preserves bounded Resource Graph scope, type, tag, and orphan-candidate query patterns.",
-          "replacementProof": "Managed inventory guidance captures query boundaries and defers ARG execution.",
-          "rollbackGate": "Restore planned status if the reference allows direct query execution.",
+          "targets": ["references/inventory-query-patterns.md", "references/azure-resource-graph.md"],
+          "reason": "Preserves bounded Resource Graph scope, type, tag, and orphan-candidate query patterns and restores read-only az graph query execution under DECISION-035.",
+          "replacementProof": "Managed inventory guidance keeps query boundaries; direct results are observations until accepted as inventory evidence.",
+          "rollbackGate": "Restore the previous disposition if the reference allows a query result to stand in for accepted inventory evidence or a command that changes Azure.",
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/lookup-workflow.md",
           "disposition": "adapt",
-          "targets": ["references/inventory-query-patterns.md"],
-          "reason": "Preserves lookup pattern selection, pagination, freshness, and result-shaping limits.",
+          "targets": ["references/inventory-query-patterns.md", "references/azure-resource-graph.md"],
+          "reason": "Preserves lookup pattern selection, pagination, freshness, and result-shaping limits, with the read-only lookup commands restored under DECISION-035.",
           "replacementProof": "Managed inventory guidance distinguishes complete evidence from partial pages.",
-          "rollbackGate": "Restore planned status if lookup results can be represented as complete without coverage.",
+          "rollbackGate": "Restore the previous disposition if lookup results can be represented as complete without coverage.",
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
@@ -2718,20 +2705,20 @@
       "resourceDispositions": [
         {
           "source": "references/BICEP-EXAMPLE.bicep",
-          "disposition": "exclude-unsafe",
-          "targets": [],
-          "reason": "Bicep registration configuration is state-changing IaC outside advisory identity design guidance.",
-          "replacementProof": "The consumer skill prohibits IaC and hands approved intent to an authorized implementation capability.",
-          "rollbackGate": "Restore only with a kernel-authorized implementation path and configuration validation.",
-          "scenarioIds": ["entra-guidance-parity"]
+          "disposition": "adapt",
+          "targets": ["references/graph-bicep-example.md"],
+          "reason": "Restores the Microsoft Graph Bicep registration as the routed IaC form of the az ad commands under DECISION-035.",
+          "replacementProof": "Shipped reference classifies every command as read/diagnostic or routed, and marks each command that changes Azure.",
+          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the approved pipeline.",
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/api-permissions.md",
           "disposition": "adapt",
-          "targets": ["references/design-and-diagnostics.md"],
-          "reason": "The managed reference retains delegated versus application selection, least-privilege mapping, and consent blockers without granting permissions.",
-          "replacementProof": "The managed reference records operation-to-permission intent, consent ownership, and evidence constraints.",
-          "rollbackGate": "Remove only after a source comparison confirms permission intent is managed elsewhere.",
+          "targets": ["references/design-and-diagnostics.md", "references/cli-commands.md"],
+          "reason": "The managed references retain delegated versus application selection, least-privilege mapping, and consent blockers, and restore the permission lookup and admin-consent commands under DECISION-035 with consent routed to an authorized owner.",
+          "replacementProof": "The managed references record operation-to-permission intent and consent ownership; the CLI reference marks permission and consent changes as routed.",
+          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the approved pipeline.",
           "scenarioIds": ["entra-guidance-parity"]
         },
         {
@@ -2745,12 +2732,12 @@
         },
         {
           "source": "references/cli-commands.md",
-          "disposition": "exclude-unsafe",
-          "targets": [],
-          "reason": "Entra CLI commands inspect or mutate registrations, permissions, credentials, and consent outside the consumer boundary.",
-          "replacementProof": "The consumer skill prohibits CLI actions and returns authorized capability handoffs instead.",
-          "rollbackGate": "Restore only with a kernel-authorized operation capability and reviewed scope controls.",
-          "scenarioIds": ["entra-guidance-parity"]
+          "disposition": "adapt",
+          "targets": ["references/cli-commands.md"],
+          "reason": "Restores the upstream Azure CLI guidance under DECISION-035: read commands run directly; commands that change Azure route through apex deploy (Gate 4) or the approved pipeline.",
+          "replacementProof": "Shipped reference classifies every command as read/diagnostic or routed, and marks each command that changes Azure.",
+          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the approved pipeline.",
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/common-patterns.md",
@@ -2872,10 +2859,10 @@
         {
           "source": "references/troubleshooting.md",
           "disposition": "adapt",
-          "targets": ["references/design-and-diagnostics.md"],
-          "reason": "The managed reference retains redirect, consent, permission, credential, tenant, and application-boundary failure classification without remediation commands.",
-          "replacementProof": "The managed reference returns only evidence gaps, owners, and authorized next tasks.",
-          "rollbackGate": "Remove only after a source comparison confirms diagnostic classification is managed elsewhere.",
+          "targets": ["references/design-and-diagnostics.md", "references/cli-commands.md"],
+          "reason": "The managed references retain failure classification and restore the read-only troubleshooting checks under DECISION-035; fixes are routed changes.",
+          "replacementProof": "Diagnostic rules return evidence gaps and owners; the CLI reference pairs each read-only check with its routed fix.",
+          "rollbackGate": "Restore the previous disposition if the restored command reference runs a command that changes Azure outside apex deploy or the approved pipeline.",
           "scenarioIds": ["entra-guidance-parity"]
         }
       ]
