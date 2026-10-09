@@ -178,6 +178,10 @@ export function validateQualificationSecurityException(governanceFile, now = new
   return qualificationSecurityExceptionIssues(governance, now);
 }
 
+export function qualificationGovernanceSubscription(governanceFile) {
+  return readGovernance(governanceFile).subscription_id;
+}
+
 function main() {
   const args = process.argv.slice(2);
   const exceptionOnly = args[0] === "--security-exception-only";

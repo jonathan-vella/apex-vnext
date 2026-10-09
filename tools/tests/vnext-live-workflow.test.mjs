@@ -43,6 +43,16 @@ const closedBackendState = JSON.stringify({
   defaultToOAuthAuthentication: true,
 });
 
+const activeSubscription = "11111111-1111-4111-8111-111111111111";
+
+function endpointRun(commands, active = activeSubscription) {
+  return async (file, args) => {
+    commands.push([file, ...args]);
+    if (args[0] === "account" && args[1] === "show") return `${active}\n`;
+    return args.includes("show") ? closedBackendState : "";
+  };
+}
+
 function rejectsMutation(name, mutate, expected) {
   test(name, () => {
     const errors = validateWorkflowText(mutate(baseline));
@@ -584,6 +594,49 @@ test("launcher rejects an invalid exception before endpoint mutation", async () 
   assert.deepEqual(commands, []);
 });
 
+test("launcher binds the governance subscription to the active account before any endpoint mutation", async () => {
+  const args = {
+    governance_file: "/tmp/qualification-context.json",
+    resource_group: "control-rg",
+    storage_account: "storage",
+    container: "handoff",
+  };
+  for (const active of ["22222222-2222-4222-8222-222222222222", ""]) {
+    const commands = [];
+    let operationRan = false;
+    await assert.rejects(
+      withFirewall(
+        args,
+        async () => {
+          operationRan = true;
+        },
+        {
+          validateException: () => [],
+          governanceSubscription: () => activeSubscription,
+          run: endpointRun(commands, active),
+        },
+      ),
+      /does not match the active Azure account/,
+    );
+    assert.equal(operationRan, false);
+    assert.deepEqual(commands, [["az", "account", "show", "--query", "id", "--output", "tsv"]]);
+  }
+  const matching = [];
+  await withFirewall(args, async () => undefined, {
+    validateException: () => [],
+    governanceSubscription: () => activeSubscription.toUpperCase(),
+    run: endpointRun(matching),
+  });
+  assert.ok(matching.some((command) => command.join(" ").includes("--default-action Allow")));
+});
+
+test("launcher passes the explicit governance file to every context validation", () => {
+  const invocations =
+    launcher.match(/run\("node", \["tools\/scripts\/validate-vnext-qualification-context\.mjs"[^\]]*\]/gu) ?? [];
+  assert.ok(invocations.length >= 1);
+  for (const invocation of invocations) assert.match(invocation, /args\.governance_file/u);
+});
+
 test("launcher restores and verifies Deny and Disabled after a local endpoint session", async () => {
   const commands = [];
   const result = await withFirewall(
@@ -599,10 +652,8 @@ test("launcher restores and verifies Deny and Disabled after a local endpoint se
         assert.equal(governanceFile, "/tmp/qualification-context.json");
         return [];
       },
-      run: async (file, args) => {
-        commands.push([file, ...args]);
-        return args.includes("show") ? closedBackendState : "";
-      },
+      governanceSubscription: () => activeSubscription,
+      run: endpointRun(commands),
     },
   );
   assert.equal(result, "complete");
@@ -632,10 +683,8 @@ test("launcher cleans up before propagating a protected operation failure", asyn
       },
       {
         validateException: () => [],
-        run: async (file, args) => {
-          commands.push([file, ...args]);
-          return args.includes("show") ? closedBackendState : "";
-        },
+        governanceSubscription: () => activeSubscription,
+        run: endpointRun(commands),
       },
     ),
     /protected operation failed/,

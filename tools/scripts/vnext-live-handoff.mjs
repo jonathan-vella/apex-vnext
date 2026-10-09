@@ -10,7 +10,11 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { WriterTransferStore } from "../../packages/kernel/dist/index.js";
 import { VNEXT_QUALIFICATION_REPOSITORY } from "./_lib/vnext-qualification.mjs";
-import { EXPECTED_TAGS, validateQualificationSecurityException } from "./validate-vnext-qualification-context.mjs";
+import {
+  EXPECTED_TAGS,
+  qualificationGovernanceSubscription,
+  validateQualificationSecurityException,
+} from "./validate-vnext-qualification-context.mjs";
 
 const execFile = promisify(execFileCallback);
 const BRANCH = "main";
@@ -303,6 +307,11 @@ export async function withFirewall(args, action, dependencies = {}) {
     }
   };
   assertException();
+  const governanceSubscription = dependencies.governanceSubscription ?? qualificationGovernanceSubscription;
+  const activeSubscription = (await runCommand("az", ["account", "show", "--query", "id", "--output", "tsv"])).trim();
+  if (activeSubscription.toLowerCase() !== governanceSubscription(args.governance_file).toLowerCase()) {
+    throw safeError("Qualification governance subscription does not match the active Azure account");
+  }
   const atRestState = JSON.parse(
     await runCommand("az", [
       "storage",
@@ -540,7 +549,7 @@ async function localProviderConfig(args, temporary, account) {
     APEX_LOG_ANALYTICS_WORKSPACE_RESOURCE_ID: workspace,
     APEX_QUALIFICATION_TAGS_JSON: JSON.stringify(EXPECTED_TAGS),
   };
-  await run("node", ["tools/scripts/validate-vnext-qualification-context.mjs"], {
+  await run("node", ["tools/scripts/validate-vnext-qualification-context.mjs", args.governance_file], {
     cwd: SCRIPT_ROOT,
     env: environment,
   });
