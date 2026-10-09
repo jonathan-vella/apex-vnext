@@ -318,7 +318,7 @@ test("managed role projections retain required tools and exclude unrelated grant
       "inventory",
       "diagnose",
     ],
-    "code-generation": ["taskContext", "stageFile", "generateIac", "completeTask"],
+    "code-generation": ["taskContext", "stageFile", "generateIac"],
     validation: ["taskContext", "validateTask", "completeTask"],
   };
   const requiredArm = {

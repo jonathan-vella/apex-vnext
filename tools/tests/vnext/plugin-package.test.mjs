@@ -565,9 +565,9 @@ test("packaged hook commands run end to end through bash and PowerShell", async 
       assert.equal(allowed.stdout.trim(), "", `${shell.name} allows ${input}`);
     }
     const missing = invoke(hookPayload("apex:apex"), { PLUGIN_ROOT: join(pluginRoot, "missing") });
-    assert.equal(missing.status, 0, `${shell.name}: ${missing.stderr}`);
-    assert.equal(missing.stdout.trim(), "", `${shell.name} fails open without the script`);
-    assert.match(missing.stderr, /APEX hook: .* is missing; reinstall the APEX plugin\. Call allowed\./u);
+    assert.equal(missing.status, 1, `${shell.name}: fails closed without the script`);
+    assert.equal(missing.stdout.trim(), "", `${shell.name} denies without the script`);
+    assert.match(missing.stderr, /APEX hook: .* is missing; reinstall the APEX plugin\. Call denied\./u);
   }
 });
 

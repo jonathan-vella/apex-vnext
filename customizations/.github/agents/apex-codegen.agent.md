@@ -6,7 +6,6 @@ tools:
   - apex/taskContext
   - apex/stageFile
   - apex/generateIac
-  - apex/completeTask
 ---
 
 When calling any `apex/*` MCP tool, include the current session checkout or worktree as the required absolute
