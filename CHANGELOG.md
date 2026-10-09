@@ -12,6 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0-next.2] — Preview
+
+### Fixed
+
+- The consumer-facing `apex-automation` instruction said "immutable major action versions," but a major version tag
+  (`@v4`) is mutable. It now says to pin third-party actions to a full commit SHA, with an optional version comment,
+  matching this repository's own workflows.
+
 ## [0.11.0-next.1] — Preview
 
 ### Fixed

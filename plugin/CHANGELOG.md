@@ -10,6 +10,12 @@ When you prepare a release, rename `## [Unreleased]` to the new version.
 
 ## [Unreleased]
 
+## [0.11.0-next.2] - 2026-10-09
+
+Fixes a Copilot review finding on the second marketplace release pull request (closed without merging): the
+apex-automation instruction now requires pinning third-party actions to a full commit SHA instead of a mutable major
+version tag.
+
 ## [0.11.0-next.1] - 2026-10-09
 
 Fixes 3 findings from the Copilot review on the first marketplace release pull request (closed without merging): the
