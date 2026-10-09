@@ -1,4 +1,4 @@
-export const APEX_VERSION = "0.11.0-next.0" as const;
+export const APEX_VERSION = "0.11.0-next.1" as const;
 export const MINIMUM_NODE_VERSION = "24.21.0" as const;
 
 export function meetsMinimumVersion(current: string, minimum: string): boolean {
