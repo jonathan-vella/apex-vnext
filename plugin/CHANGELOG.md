@@ -12,9 +12,9 @@ When you prepare a release, rename `## [Unreleased]` to the new version.
 
 ## [0.11.0-next.1] - 2026-10-09
 
-Fixes 3 findings from the first marketplace release's Copilot review: the preToolUse hook now fails closed on a missing
-script, the APEX CodeGen agent no longer carries an unused `apex/completeTask` grant, and `apex-azure-quotas` no longer
-blocks an exact-fit quota request.
+Fixes 3 findings from the Copilot review on the first marketplace release pull request (closed without merging): the
+preToolUse hook now fails closed on a missing script, the APEX CodeGen agent no longer carries an unused
+`apex/completeTask` grant, and `apex-azure-quotas` no longer blocks an exact-fit quota request.
 
 ## [0.11.0-next.0] - 2026-10-08
 
