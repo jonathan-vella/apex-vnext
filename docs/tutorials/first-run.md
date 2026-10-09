@@ -7,8 +7,10 @@ release authority.
 
 This source-build tutorial is for local candidate evaluation. Normal consumers install released packages without a
 devcontainer or source clone: the [Windows 11 first run](windows-11-first-run.md) for VS Code or the GitHub Copilot app,
-and the [Copilot CLI on WSL2 runbook](wsl2-vscode-consumer-runbook.md) for Copilot CLI. No plugin release is published
-yet, so this tutorial installs the plugin you build.
+and the [Copilot CLI on WSL2 runbook](wsl2-vscode-consumer-runbook.md) for Copilot CLI. Preview `0.11.0-next.2` is
+published; this tutorial instead installs a source-built plugin. Use the
+[human-run qualification kit](../how-to/qualify-live-clients.md) to distinguish candidate bytes from a published release
+with the same version number.
 The fake provider is not evidence of either an ALZ-backed or standalone Azure deployment.
 
 ## Prerequisites

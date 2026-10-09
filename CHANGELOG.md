@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Add a human-run CP-20 client qualification kit using existing candidate/preparation/journal tools, with exact source
+  versus published-release pins, plugin tree verification, host/client sandbox observations and unrun evidence
+  worksheets. Correct the installation guides' preview status; azd/CI CLIENT-039/040 remain blocked pending CP-26,
+  clean-host proof remains pending, and app typed-outcome export remains an explicit gap.
 - The shipped Azure design skills (`apex-azure-defaults`, `apex-azure-adr`, `apex-azure-compute`, `apex-azure-storage`,
   `apex-azure-rbac`, `apex-azure-quotas`, `apex-azure-cost-optimization`, `apex-azure-governance`,
   `apex-azure-compliance`, `apex-azure-resources`, `apex-entra-app-registration` and `apex-microsoft-docs`) are

@@ -11,12 +11,12 @@ Each plugin release bundles the `@apexops/cli` version published to npm with the
 workspace CLI at the version of the installed plugin.
 
 > [!IMPORTANT]
-> **Release status.** No `apex` plugin release has been published yet. The
-> [apex-plugins](https://github.com/jonathan-vella/apex-plugins) marketplace lists no plugins, so the plugin install
-> commands on this page, and the install that a workspace's `.github/copilot/settings.json` requests, find nothing to
-> install until the first release. The published `@apexops/cli@next` preview predates the plugin and still copies agents,
-> skills and MCP configuration into the workspace. Until both are released, evaluate the current behavior with a
-> [local candidate](#install-a-local-candidate). Live qualification of the three clients is still pending.
+> **Release status.** The [apex-plugins](https://github.com/jonathan-vella/apex-plugins) marketplace and
+> `@apexops/cli` ship preview `0.11.0-next.2`. Live qualification of the three clients remains pending.
+> That published release predates #431's Azure skill changes; the source tree still reports the same version.
+> To evaluate those changes, install matching CLI tarballs and plugin from one
+> [local candidate](#install-a-local-candidate), not a mixture of local and registry packages. The
+> [human-run qualification kit](qualify-live-clients.md) pins source/release provenance separately.
 
 ## Choose One Host Per Workspace
 
@@ -238,6 +238,9 @@ the first trusted session, so a missing plugin is only a warning there.
 
 Clean-host qualification belongs to [CP-20](https://github.com/jonathan-vella/apex-vnext/issues/386) (`CLIENT-012`).
 Start from a host without APEX, follow [Prepare Windows 11](prepare-windows-11.md) for that host, and record each result.
+Closing implementation issue #378 did not provide live clean-host evidence. Record actual sandbox availability on the
+host/client: vendor app documentation lists 25H2/26H1, while the recorded APEX decision is 25H2/24H2. The
+[qualification worksheet](qualify-live-clients.md#5-copy-this-run-worksheet) retains that distinction for human evaluation.
 
 ### Windows 11 With VS Code Or The App
 
@@ -379,7 +382,7 @@ Removing the plugin does not delete `.apex/` project state or history.
 | APEX agent or its MCP tools missing in VS Code after a plugin change      | Run **Developer: Restart Local Agent Host** and start a new chat; then [reinstall](#reinstall-the-plugin) |
 | Two `apex` entries under `@agentPlugins`                                  | Uninstall the copy that did not come from the Copilot CLI store                                           |
 | **MCP: List Servers** shows the APEX server failing with `${PLUGIN_ROOT}` | That list does not run Copilot harness sessions; check `agenthost.log` under `%APPDATA%\Code\logs`        |
-| `copilot plugin install apex@apex-plugins` finds no plugin                | No release is published yet; see the release status above                                                 |
+| `copilot plugin install apex@apex-plugins` finds no plugin                | Check the marketplace entry and refresh it; use the release status above to distinguish local candidates  |
 | `doctor` reports `plugin-owned:<path>`                                    | Run `apex update`, then move or delete edited copies it lists                                             |
 | `doctor` reports `copilot-plugin` with another version                    | Run `copilot plugin update apex@apex-plugins`, or install the CLI at the plugin's version                 |
 | The client reports the sandbox as unavailable                             | Install the Windows update it names, or Bubblewrap and `slirp4netns` on Linux and WSL2                    |
@@ -388,6 +391,8 @@ Removing the plugin does not delete `.apex/` project state or history.
 
 This maintainer path builds the CLI packages and the plugin from a source checkout. Consumers install released packages
 and do not need a source checkout.
+For exact-candidate human testing, use the [qualification kit](qualify-live-clients.md), including installed tree-hash
+verification and direct-install/marketplace identity gaps. A same-version local build is not proof of the published bytes.
 
 Build and install every tarball from the same release manifest:
 

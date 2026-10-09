@@ -39,16 +39,21 @@ For each selected client, use a clean consumer workspace and the exact candidate
 client versions, executable hashes, managed projection hashes, MCP inventory, discovery, routing, input handling,
 restart/resume, lifecycle behavior, and normalized outcomes.
 
-Standalone Copilot CLI and VS Code Copilot harness outcomes are compared on the same CLI projection, recorded under the
-`github-copilot-cli` and `github-copilot-vscode` evidence identities.
+Follow the [human-run live client kit](qualify-live-clients.md) for source/release pins, install/doctor, sandbox
+observations, protocol metadata, review/tamper/repeat/worktree checks and a blank evidence worksheet. Native Windows
+VS Code Copilot harness and the Copilot app are separate cases; Copilot CLI runs separately on Linux and WSL2.
+Do not run Windows GUI qualification through WSL, a devcontainer or the VS Code Local harness. The typed outcome
+tools accept `github-copilot-cli` and `github-copilot-vscode`; the app's typed identity is still a gap, not a CLI alias.
 
-Use Windows via WSL2 without a devcontainer and cover both ALZ-backed and standalone lab/demo profiles. COE import,
+Cover both ALZ-backed and standalone lab/demo profiles. COE import,
 relevant change questions, conflict handling and selective regeneration are required target outcomes; missing
 implementation must be recorded as a gap. Worker asymmetry cannot excuse missing generation, review or validation.
 Review output using the [PRD checklist](../vnext/PRD.md#output-quality-reference), not a new token benchmark.
 
-Run basic interaction checks alongside features when executable controls permit. Final distribution and APEX MCP
-redistribution are evaluated last; repeat affected package and client qualification after that decision is implemented.
+Run basic interaction checks alongside features when executable controls permit. No automated preparation grants live
+client or Azure authority. CLIENT-039 to CLIENT-042 stay PLANNED and blocked until CP-26 to CP-30 deliver the
+purpose-bound lab, azd/Bicep, CI-owned production and production-setup paths; #378's
+closed implementation does not supply CLIENT-012 clean-host evidence. Repeat affected checks on each exact candidate.
 
 ## Prepare Live Azure Qualification
 

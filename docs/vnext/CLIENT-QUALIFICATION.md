@@ -5,10 +5,12 @@ This control defines release-blocking evidence for the three supported clients u
 Code Copilot harness and the GitHub Copilot app on native Windows, and GitHub Copilot CLI on Linux and WSL2.
 Generated projection and plugin tests are necessary but do not replace live client interaction.
 
-The release target is the [client pivot scenarios](#client-pivot-scenarios) plus the shared matrix below. Until the
-plugin ships, today's package installs the single CLI projection from
-[DECISION-029](DECISIONS.md#decision-029-ship-one-copilot-cli-projection), and the slice results below are
-exploratory history for that projection, not release evidence.
+The release target is the [client pivot scenarios](#client-pivot-scenarios) plus the shared matrix below. The plugin
+and thin workspace projection are shipped in the `0.11.0-next.2` preview; live qualification remains pending.
+The slice results below are exploratory history, not current release evidence. Use the
+[human-run qualification kit](../how-to/qualify-live-clients.md) to freeze a candidate, prepare each host and record
+scenario applicability and bounded evidence. Published `0.11.0-next.2` does not include #431; a source build at
+`7fbb02e1593a26ee710e6735df1ac21641efcee4` must not be identified by that version alone.
 
 Each client runs on its supported host with client local sandboxing on, without Docker or a devcontainer. Required
 outcomes follow the [PRD](PRD.md), including both environment profiles, COE reuse and conversational changes. Basic
@@ -24,6 +26,8 @@ that client result.
 The GitHub Copilot app is a supported client again. Its historical desktop receipts are provenance only and do not
 count as current evidence. The app needs its own evidence identity alongside `github-copilot-cli` and
 `github-copilot-vscode`. Also record the Windows build, whether local sandboxing is on, and the session model.
+The current typed client-outcome contract accepts only those CLI/VS Code identities; app typed export/closure remains
+a tooling gap. Keep an app-specific human worksheet; never relabel its evidence as another client.
 
 ## Scenario Matrix
 
@@ -119,6 +123,27 @@ CLIENT-039 through CLIENT-042 are DECISION-036 target acceptance, not implemente
 CP-26/CP-27 own the non-production path; CP-28/CP-29 own production execution/setup; CP-30 owns deployment qualification.
 CP-20 may qualify current client mechanics independently. Deferred production outcomes are not passing evidence and
 are not required to claim the initial non-production milestone complete.
+
+`CLIENT-039` through `CLIENT-042` are **planned and not runnable**: CP-26 to CP-30 have not delivered the azd/Bicep,
+purpose-bound, CI-owned production or setup paths. Do not run these scenarios through direct azd commands or claim
+readiness from the shipped skill guidance. `CLIENT-012` still needs live clean-host evidence even though implementation
+issue #378 is closed. The qualification kit records actual Windows host/client sandbox observations without changing
+DECISION-033's recorded 25H2/24H2 support assumption based on vendor-documentation differences alone.
+
+### CLIENT-038 Offline Transport Evidence
+
+On 2026-10-09, offline installed-plugin probes passed for source
+`7fbb02e1593a26ee710e6735df1ac21641efcee4` and published `0.11.0-next.2`. The published install preserved tree SHA-256
+`93407061c09f00cc1251a582a16840547a6c7bbe256c468aba0c4d2c4f15df22`, advertised
+`supportedVersions: ["2026-07-28"]`, listed 37 tools, and returned initialized status equal to the CLI. The source
+installed-plugin smoke and two focused modern lifecycle tests also passed. Private evidence locators are
+`client038-marketplace-evidence.json`, `client038-smoke.log`, `client038-lifecycle-tests.log` and probe source
+`client038-marketplace-probe.mjs` in the CP-20 session evidence.
+
+The earlier manual probe omitted modern `params._meta` and was interpreted as legacy. The existing smoke helper
+sends protocol version, clientInfo and clientCapabilities metadata correctly; no product regression or decision
+change is indicated. These are offline transport/package results only. No live harness, app or CLI agent run
+occurred, so CLIENT-038 remains **not run per client** until the human records actual session negotiation.
 
 ## CLI-Only Projection Probes
 
