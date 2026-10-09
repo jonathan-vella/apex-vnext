@@ -10,6 +10,11 @@ When you prepare a release, rename `## [Unreleased]` to the new version.
 
 ## [Unreleased]
 
+- Azure design skills re-ported from `jonathan-vella/apex` (CP-18): trigger-rich descriptions, retail pricing, SKU
+  availability and cost tool references, guidance aligned to the read-only `apex-azure-pricing` tools, and the upstream
+  Azure CLI and azd commands. Read commands run directly; commands that change Azure route through `apex deploy` and
+  Gate 4 or the approved GitHub Actions pipeline. APEX never runs `azd up`.
+
 ## [0.11.0-next.2] - 2026-10-09
 
 Fixes a Copilot review finding on the second marketplace release pull request (closed without merging): the
@@ -30,10 +35,6 @@ First marketplace release of APEX as one Agent Plugins 1.0 plugin.
   with the Copilot CLI client mechanics the workspace copies carried before `apex init` stopped copying them (CP-11).
   The built-in `rubber-duck` agent runs the Requirements, Architecture and Plan reviews; the APEX Reviewer worker is
   retired.
-- Azure design skills re-ported from `jonathan-vella/apex` (CP-18): trigger-rich descriptions, retail pricing, SKU
-  availability and cost tool references, guidance aligned to the read-only `apex-azure-pricing` tools, and the upstream
-  Azure CLI and azd commands. Read commands run directly; commands that change Azure route through `apex deploy` and
-  Gate 4 or the approved GitHub Actions pipeline. APEX never runs `azd up`.
 - The `apex` MCP server: the bundled `@apexops/cli` runtime as one esbuild bundle on the MCP TypeScript SDK v2, started
   with `node` from the plugin folder and needing no registry download.
 - The `apex-azure-pricing` MCP server: Azure Resource Manager MCP over streamable HTTP with the `CostManagement` and
