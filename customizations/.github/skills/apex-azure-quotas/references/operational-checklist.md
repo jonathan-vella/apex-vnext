@@ -13,8 +13,9 @@
 
 - Compute remaining capacity from the observed limit, usage, and requested
   demand, then retain each source value in the decision record.
-- Treat nonpositive remaining capacity as a blocker. Treat an unsupported or
-  unavailable quota surface as indeterminate, not unlimited capacity.
+- Treat negative remaining capacity as a blocker; a remainder of zero is an
+  exact fit and still sufficient. Treat an unsupported or unavailable quota
+  surface as indeterminate, not unlimited capacity.
 - Do not compare region alternatives whose evidence freshness or scope differs.
 
 ## Handoff

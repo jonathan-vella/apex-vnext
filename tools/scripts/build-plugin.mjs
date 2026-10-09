@@ -552,10 +552,16 @@ async function validatePackagedSkills(outputRoot, targetRoot) {
 /**
  * The only accepted hook commands: run one shipped script from the plugin root with the event name as its argument.
  * bash quotes "${PLUGIN_ROOT}/..."; PowerShell (5.1 and 7) builds the same path and lets node inherit stdin, so the
- * payload is not re-encoded. A missing script drains stdin, warns and allows; the script itself always exits 0.
+ * payload is not re-encoded. The script itself always exits 0. A missing script drains stdin and warns; for
+ * `preToolUse`, the only event whose hook denies a call, it then exits non-zero so the client denies the call closed
+ * instead of falling through to its default permission flow; every other event still exits 0 and allows, because its
+ * hook only does bookkeeping (capture, marking) that a denied call cannot restore anyway.
  */
 function hookCommands(script, event) {
-  const missing = "is missing; reinstall the APEX plugin. Call allowed.";
+  const failClosed = event === "preToolUse";
+  const missing = failClosed
+    ? "is missing; reinstall the APEX plugin. Call denied."
+    : "is missing; reinstall the APEX plugin. Call allowed.";
   const segments = script
     .split("/")
     .map((segment) => `'${segment}'`)
@@ -566,13 +572,14 @@ function hookCommands(script, event) {
       `if [ -f "$f" ]; then exec node "$f" ${event}; fi`,
       "cat > /dev/null",
       `echo "APEX hook: $f ${missing}" >&2`,
+      ...(failClosed ? ["exit 1"] : []),
     ].join("; "),
     powershell: [
       `$f = [System.IO.Path]::Combine([string]$env:PLUGIN_ROOT, ${segments})`,
       `if ([System.IO.File]::Exists($f)) { try { & node $f ${event} } catch { exit 1 }; exit $LASTEXITCODE }`,
       "[void][Console]::In.ReadToEnd()",
       `[Console]::Error.WriteLine("APEX hook: $f ${missing}")`,
-      "exit 0",
+      `exit ${failClosed ? 1 : 0}`,
     ].join("; "),
   };
 }

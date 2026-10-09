@@ -24,9 +24,10 @@ For each required quota, calculate:
 
 `remaining capacity = limit - (current usage + requested demand)`
 
-Capacity is sufficient only when every required quota has positive remaining
-capacity after the requested demand. Preserve the inputs and result in the
-typed planning decision so later validation can repeat the interpretation.
+Capacity is sufficient only when every required quota has nonnegative
+remaining capacity after the requested demand; an exact fit (remaining
+capacity of zero) still passes. Preserve the inputs and result in the typed
+planning decision so later validation can repeat the interpretation.
 
 ## Decision Outcomes
 
