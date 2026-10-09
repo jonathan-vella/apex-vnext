@@ -6,9 +6,7 @@
       "id": "build",
       "category": "build",
       "owner": "Package build engineering",
-      "inputs": [
-        "TypeScript projects and workspace manifests"
-      ],
+      "inputs": ["TypeScript projects and workspace manifests"],
       "ciSafety": "safe",
       "parallelSafety": "safe"
     },
@@ -16,9 +14,7 @@
       "id": "node-lint",
       "category": "lint",
       "owner": "Repository validation engineering",
-      "inputs": [
-        "Repository source and configuration"
-      ],
+      "inputs": ["Repository source and configuration"],
       "ciSafety": "safe",
       "parallelSafety": "safe"
     },
@@ -26,9 +22,7 @@
       "id": "node-validation",
       "category": "validation",
       "owner": "Repository validation engineering",
-      "inputs": [
-        "Repository contracts, configuration, and generated metadata"
-      ],
+      "inputs": ["Repository contracts, configuration, and generated metadata"],
       "ciSafety": "safe",
       "parallelSafety": "safe"
     },
@@ -36,9 +30,7 @@
       "id": "node-test",
       "category": "test",
       "owner": "Repository validation engineering",
-      "inputs": [
-        "Repository test fixtures and source"
-      ],
+      "inputs": ["Repository test fixtures and source"],
       "ciSafety": "safe",
       "parallelSafety": "safe"
     },
@@ -46,9 +38,7 @@
       "id": "external-lint",
       "category": "lint",
       "owner": "Language and infrastructure validation",
-      "inputs": [
-        "Language-native source trees and toolchains"
-      ],
+      "inputs": ["Language-native source trees and toolchains"],
       "ciSafety": "conditional",
       "parallelSafety": "safe"
     },
@@ -56,9 +46,7 @@
       "id": "external-validation",
       "category": "validation",
       "owner": "Language and infrastructure validation",
-      "inputs": [
-        "Infrastructure projects and external toolchains"
-      ],
+      "inputs": ["Infrastructure projects and external toolchains"],
       "ciSafety": "conditional",
       "parallelSafety": "safe"
     },
@@ -66,9 +54,7 @@
       "id": "external-test",
       "category": "test",
       "owner": "Component test engineering",
-      "inputs": [
-        "Component source, fixtures, and isolated runtimes"
-      ],
+      "inputs": ["Component source, fixtures, and isolated runtimes"],
       "ciSafety": "conditional",
       "parallelSafety": "safe"
     },
@@ -76,9 +62,7 @@
       "id": "network-lint",
       "category": "lint",
       "owner": "Documentation validation",
-      "inputs": [
-        "Versioned documentation links"
-      ],
+      "inputs": ["Versioned documentation links"],
       "ciSafety": "conditional",
       "parallelSafety": "safe"
     },
@@ -899,9 +883,7 @@
     {
       "id": "validate-node-core",
       "script": "validate:_node-core",
-      "prerequisites": [
-        "build:vnext"
-      ],
+      "prerequisites": ["build:vnext"],
       "members": [
         "validate:artifacts",
         "validate:agents",
@@ -981,13 +963,8 @@
     {
       "id": "validate-node-ci",
       "script": "validate:_node-ci",
-      "prerequisites": [
-        "build:vnext"
-      ],
-      "members": [
-        "validate:_node-core",
-        "lint:js:ci"
-      ],
+      "prerequisites": ["build:vnext"],
+      "members": ["validate:_node-core", "lint:js:ci"],
       "continueOnError": false,
       "epilogue": null
     },
@@ -1010,10 +987,7 @@
       "id": "validate-all",
       "script": "validate:all",
       "prerequisites": [],
-      "members": [
-        "validate:_node",
-        "validate:_external"
-      ],
+      "members": ["validate:_node", "validate:_external"],
       "continueOnError": true,
       "epilogue": "echo '✅ All validations passed'"
     },
@@ -1021,12 +995,7 @@
       "id": "validate-docs",
       "script": "validate:docs",
       "prerequisites": [],
-      "members": [
-        "lint:md",
-        "lint:links",
-        "lint:docs-freshness",
-        "validate:docs-reference"
-      ],
+      "members": ["lint:md", "lint:links", "lint:docs-freshness", "validate:docs-reference"],
       "continueOnError": false,
       "epilogue": null
     },
@@ -1034,11 +1003,7 @@
       "id": "audit-quarterly",
       "script": "audit:quarterly",
       "prerequisites": [],
-      "members": [
-        "lint:glob-audit",
-        "lint:orphaned-content",
-        "lint:docs-freshness"
-      ],
+      "members": ["lint:glob-audit", "lint:orphaned-content", "lint:docs-freshness"],
       "continueOnError": false,
       "epilogue": null
     }

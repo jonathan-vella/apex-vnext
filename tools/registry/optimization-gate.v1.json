@@ -13,10 +13,7 @@
     {
       "id": "repository-root",
       "owner": "Repository maintainers",
-      "consumers": [
-        "contributors",
-        "release controls"
-      ],
+      "consumers": ["contributors", "release controls"],
       "paths": [
         ".gitattributes",
         ".gitignore",
@@ -46,155 +43,79 @@
         "VERSION.md"
       ],
       "prefixes": [],
-      "proofCommands": [
-        "npm run validate:all"
-      ]
+      "proofCommands": ["npm run validate:all"]
     },
     {
       "id": "repository-controls",
       "owner": "Repository validation engineering",
-      "consumers": [
-        "CI",
-        "contributors"
-      ],
+      "consumers": ["CI", "contributors"],
       "paths": [],
-      "prefixes": [
-        ".github/",
-        ".devcontainer/",
-        ".vscode/"
-      ],
-      "proofCommands": [
-        "npm run validate:github-workflows"
-      ]
+      "prefixes": [".github/", ".devcontainer/", ".vscode/"],
+      "proofCommands": ["npm run validate:github-workflows"]
     },
     {
       "id": "runtime-packages",
       "owner": "Package build engineering",
-      "consumers": [
-        "APEX runtime",
-        "CLI consumers"
-      ],
+      "consumers": ["APEX runtime", "CLI consumers"],
       "paths": [],
-      "prefixes": [
-        "packages/"
-      ],
-      "proofCommands": [
-        "npm run build:vnext"
-      ]
+      "prefixes": ["packages/"],
+      "proofCommands": ["npm run build:vnext"]
     },
     {
       "id": "plugin-package",
       "owner": "Package build engineering",
-      "consumers": [
-        "Copilot CLI",
-        "VS Code Copilot harness",
-        "GitHub Copilot app"
-      ],
+      "consumers": ["Copilot CLI", "VS Code Copilot harness", "GitHub Copilot app"],
       "paths": [],
-      "prefixes": [
-        "plugin/"
-      ],
-      "proofCommands": [
-        "npm run test:plugin",
-        "npm run test:publish-plugin"
-      ]
+      "prefixes": ["plugin/"],
+      "proofCommands": ["npm run test:plugin", "npm run test:publish-plugin"]
     },
     {
       "id": "runtime-configuration",
       "owner": "Kernel configuration maintainers",
-      "consumers": [
-        "kernel",
-        "CLI",
-        "managed projections"
-      ],
+      "consumers": ["kernel", "CLI", "managed projections"],
       "paths": [],
-      "prefixes": [
-        "config/"
-      ],
-      "proofCommands": [
-        "npm run validate:vnext"
-      ]
+      "prefixes": ["config/"],
+      "proofCommands": ["npm run validate:vnext"]
     },
     {
       "id": "managed-customizations",
       "owner": "Managed customization maintainers",
-      "consumers": [
-        "VS Code",
-        "Copilot CLI"
-      ],
+      "consumers": ["VS Code", "Copilot CLI"],
       "paths": [],
-      "prefixes": [
-        "customizations/"
-      ],
-      "proofCommands": [
-        "npm run validate:agents"
-      ]
+      "prefixes": ["customizations/"],
+      "proofCommands": ["npm run validate:agents"]
     },
     {
       "id": "validation-tooling",
       "owner": "Repository validation engineering",
-      "consumers": [
-        "CI",
-        "release qualification"
-      ],
+      "consumers": ["CI", "release qualification"],
       "paths": [],
-      "prefixes": [
-        "tools/",
-        "tests/"
-      ],
-      "proofCommands": [
-        "npm run validate:all"
-      ]
+      "prefixes": ["tools/", "tests/"],
+      "proofCommands": ["npm run validate:all"]
     },
     {
       "id": "product-documentation",
       "owner": "Documentation maintainers",
-      "consumers": [
-        "users",
-        "contributors",
-        "release reviewers"
-      ],
+      "consumers": ["users", "contributors", "release reviewers"],
       "paths": [],
-      "prefixes": [
-        "docs/"
-      ],
-      "proofCommands": [
-        "npm run validate:docs"
-      ]
+      "prefixes": ["docs/"],
+      "proofCommands": ["npm run validate:docs"]
     },
     {
       "id": "infrastructure",
       "owner": "Infrastructure maintainers",
-      "consumers": [
-        "Bicep",
-        "Terraform",
-        "release qualification"
-      ],
+      "consumers": ["Bicep", "Terraform", "release qualification"],
       "paths": [],
-      "prefixes": [
-        "infra/"
-      ],
-      "proofCommands": [
-        "npm run validate:terraform"
-      ]
+      "prefixes": ["infra/"],
+      "proofCommands": ["npm run validate:terraform"]
     },
     {
       "id": "generated-and-historical",
       "owner": "Repository maintainers",
-      "consumers": [
-        "provenance validators",
-        "release reviewers"
-      ],
+      "consumers": ["provenance validators", "release reviewers"],
       "paths": [],
-      "prefixes": [
-        "agent-output/",
-        ".apex/",
-        ".archive/",
-        ".vale/"
-      ],
-      "proofCommands": [
-        "npm run test:retired-automation"
-      ]
+      "prefixes": ["agent-output/", ".apex/", ".archive/", ".vale/"],
+      "proofCommands": ["npm run test:retired-automation"]
     }
   ],
   "baselines": [
