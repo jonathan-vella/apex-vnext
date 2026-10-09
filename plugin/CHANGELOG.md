@@ -10,6 +10,12 @@ When you prepare a release, rename `## [Unreleased]` to the new version.
 
 ## [Unreleased]
 
+## [0.11.0-next.1] - 2026-10-09
+
+Fixes 3 findings from the first marketplace release's Copilot review: the preToolUse hook now fails closed on a missing
+script, the APEX CodeGen agent no longer carries an unused `apex/completeTask` grant, and `apex-azure-quotas` no longer
+blocks an exact-fit quota request.
+
 ## [0.11.0-next.0] - 2026-10-08
 
 First marketplace release of APEX as one Agent Plugins 1.0 plugin.

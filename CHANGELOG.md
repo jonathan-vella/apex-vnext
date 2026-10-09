@@ -12,6 +12,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0-next.1] — Preview
+
+### Fixed
+
+- A missing `preToolUse` hook script, such as a damaged plugin install, now denies the call instead of allowing it.
+  Only `preToolUse` enforces the task-target restriction and the `apex-azure-pricing` write-tool denylist; other hook
+  events are bookkeeping and still fail open.
+- The APEX CodeGen agent no longer carries an unused `apex/completeTask` grant: `generateIac` already completes the
+  task, and CodeGen's own instructions forbid calling `completeTask` afterward.
+- `apex-azure-quotas` treated a remaining capacity of exactly zero as a blocker. Azure only blocks when usage plus
+  demand exceeds the limit, so an exact fit is sufficient; only a negative remainder blocks.
+
 ## [0.11.0-next.0] — Preview
 
 First preview of the client pivot (DECISION-031 to DECISION-035). APEX now ships as one Agent Plugins 1.0 plugin,
