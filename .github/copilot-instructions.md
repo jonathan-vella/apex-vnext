@@ -7,9 +7,9 @@
 
 This section is the canonical declaration of Azure infrastructure defaults.
 Every Azure infrastructure skill, agent, and prompt must reference this section — never restate
-the values inline. The IaC-flavoured mirror with CAF naming, AVM modules,
-and reference index lives in
-[`.github/skills/azure-defaults/SKILL.md`](skills/azure-defaults/SKILL.md).
+the values inline. Active-task CAF naming, AVM modules and defaults guidance lives in
+[the managed defaults skill](../customizations/.github/skills/apex-azure-defaults/SKILL.md).
+It applies runtime-projected values and accepted governance, not a repository-maintenance workflow.
 
 ## Repository Maintenance Mode
 

@@ -52,7 +52,6 @@ VERSION.md
 
 # Generated caches / rendered summaries — owned by their generators.
 tools/scripts/_data/
-tools/scripts/_lib/artifact-headings-summary.json
 packages/contracts/schemas/
 
 # Managed VS Code customizations are validated by validate:vnext and

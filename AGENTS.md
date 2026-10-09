@@ -37,9 +37,9 @@ terraform fmt -check -recursive infra/terraform/ && npm run validate:terraform
 
 Code style (CAF naming, required tags, default region, AVM-first, unique
 suffix pattern) is documented in
-[.github/skills/azure-defaults/SKILL.md](.github/skills/azure-defaults/SKILL.md).
-Agents read that file as part of their mandatory skill load; this file
-no longer duplicates the tables.
+[managed Azure defaults](customizations/.github/skills/apex-azure-defaults/SKILL.md).
+This is active-task guidance, not a repository-maintenance workflow. Runtime configuration
+and accepted governance own the projected values; this file does not duplicate the tables.
 
 ## Security Baseline
 
@@ -92,7 +92,7 @@ For deeper guidance, agents read these on demand:
 - Consumer azd co-location guidance: `customizations/.github/instructions/apex-azure-yaml.instructions.md`
 - Terminal hygiene: avoid interactive `mv`/`rm`/`read` prompts and keep command output bounded; `lint:safe-shell`
   enforces committed consumer guidance.
-- Azure defaults: `.github/skills/azure-defaults/SKILL.md`
+- Azure defaults for active tasks: `customizations/.github/skills/apex-azure-defaults/SKILL.md`
 - vNext product contracts: `packages/contracts/schemas/`
 - Managed customization manifest: `customizations/manifest.json`
 - Full validation reference: <https://apexops.pro/reference/validation-reference/>

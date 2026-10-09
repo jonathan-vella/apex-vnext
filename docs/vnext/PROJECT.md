@@ -17,7 +17,8 @@ on Linux and WSL2, delivered as an Agent Plugin; the current package still uses 
 The standalone vNext repository owns a deterministic TypeScript runtime, versioned contracts, bounded capabilities,
 renderers, CLI/MCP lifecycle, one managed Copilot CLI projection, and deterministic qualification.
 [DECISION-029](DECISIONS.md#decision-029-ship-one-copilot-cli-projection) replaced the VS Code Local projection, now
-archived under `.archive/vscode-projection/`; the VS Code Copilot harness runs the CLI projection.
+archived under [archive catalog](../../.archive/CATALOG.json) (entry `.archive/vscode-projection/ROLLBACK.md`);
+the VS Code Copilot harness runs the CLI projection.
 
 Repository modernization has retired original automation, prompts, compatibility utilities, duplicate workflows and npm
 scripts, stale root configuration, and unneeded development-container tooling. The active documentation has been rebuilt
@@ -33,7 +34,8 @@ stopped at Gate 2; its fixes merged in #356 to #366
 
 On 2026-09-23 the maintainer selected a single Copilot CLI projection. Supported clients become standalone Copilot CLI
 and the VS Code Copilot harness, which runs CLI-format agents. The VS Code Local projection retires through
-DECISION-015 gates with an archive under `.archive/vscode-projection/`. An `apex-next` skill replaces handoffs, advisory
+DECISION-015 gates with an archive under [archive catalog](../../.archive/CATALOG.json)
+(entry `.archive/vscode-projection/ROLLBACK.md`). An `apex-next` skill replaces handoffs, advisory
 built-in helpers join the workflow, and the context sidekick is deferred. Work proceeds on `feat/cli-projection`
 (PR #350) per the [CLI-only projection plan](ROADMAP.md#cli-only-projection); slices 1 to 10 and 12 are done, so
 `apex init` installs only the CLI projection, managed agent sources use CLI frontmatter, APEX routes through
@@ -365,93 +367,17 @@ Only exact-candidate evidence satisfies current gates.
 
 ## Active Delivery Authorization
 
-On 2026-09-16 the maintainer authorized autonomous roadmap delivery, takeover of issue #344, commits, PRs, protected
-merges and publication after release acceptance. No protections, approval contracts or credential permissions may be
-bypassed. Manual VS Code and Copilot CLI/app tests remain maintainer actions. Live qualification is limited to isolated
-run-owned resources in the authenticated non-production `apex-shared` subscription; pre-existing resources are protected.
+The prior spending window ended on September 30, 2026. The original autonomous delivery delegation,
+historical costs and implementation receipts are preserved in the [archive catalog](../../.archive/CATALOG.json)
+(entry `docs/vnext/PROJECT.md`).
+Archived delegation is not current authority: it does not authorize commits, merges, publication, cloud work
+or renewed spending. Live qualification and release actions require separate explicit human authorization
+and current actual/projected cost evidence; historical estimates do not establish deployment headroom.
 
-The authorized spending window is 2026-09-16 00:00 UTC through 2026-09-30 00:00 UTC, with a USD 2,000 total-subscription
-ceiling and USD 400 reserve. Stop new provisioning at USD 1,600 estimated accrued spend or earlier projected overrun.
-Both requested email recipients are configured on the qualification budget, with actual thresholds 50/75/80/90/100%
-and forecast thresholds 80/100%. Email receipt is unverified. Azure requires a month-start budget; its September scope
-is more conservative than the authorized window. Budget alerts are not hard spending caps.
-
-No billable qualification resources have been provisioned. The initial existing-budget read reported USD 1,000.60
-September accrued and USD 1,539.88 monthly forecast; exact-window cost queries were rate-limited. These figures are
-historical observations, not current deployment headroom. Refresh actual and projected costs before provisioning.
-
-The active worktree adds current-dependency task inputs, UTF-8 input/output budgets, selective authorized reads,
-review pagination/expiry checks, narrow role grants, and governance import/collector safeguards. An experimental local
-archetype copy capability was removed after adversarial review found filesystem-race and secret-detection defects.
-COE import remains unimplemented; no release candidate has been selected.
-
-Draft [PR #345](https://github.com/jonathan-vella/apex-vnext/pull/345) contains the implementation checkpoint and prior
-cleanup/dependency work. The native-policy follow-up adds a typed digest-only receipt, bounded property comparison,
-exact generated-source verification, persisted preview binding and rejection of missing or altered evidence before
-Gate 4. Unsupported expressions, missing values and unverified exemptions fail closed. This is concrete-property
-preflight, not an Azure Policy interpreter or proof that supplied platform resources cannot be changed.
-
-PR feedback identified path containment, a weekly baseline TTL mismatch and management-group ID validation; these have
-focused fixes. Reported literal authorization placeholders were review redaction artifacts, verified against local and
-GitHub source; tests now assert Bearer-header construction. Catalog generation excludes Python caches to match clean CI.
-
-A read-only repository collector check against the authorized subscription succeeded on 2026-09-16: nine assignments,
-six retained, three Defender-filtered, and 48 actionable findings (13 blockers and 35 auto-remediation findings).
-Schema validation and selected-subscription import passed. Temporary baseline data was deleted; no Azure resources or
-policies were changed. Audit-only classifications remain visible summary evidence, not fabricated property mappings.
-
-The maintainer clarified that all generated code must comply with target Azure Policy. Unknown checks are deployment
-blockers to resolve, not accepted compliance exceptions. Native Terraform previews now compare material changes with
-exact emitted managed addresses. Native Bicep previews resolve literal top-level IDs from accepted bindings and reject
-foreign mutations and existing-resource updates/deletes. Unresolved AVM child ownership remains blocked.
-
-The September 19 ownership follow-up carries Bicep resolver failures into preview coverage and explicitly blocks
-unresolved Terraform module descendants or missing managed execution addresses. Empty and no-op previews cannot hide
-those failures; workflow regressions retain the journal head and closed Gate 4. Terraform coverage also rejects
-foreign material changes labelled no-op. These are safety fixes, not completed AVM support. Current Bicep evidence
-binds source and physical what-if IDs but does not attribute each ID to an accepted logical module. Terraform plan
-module metadata likewise needs a source-bound ownership contract before descendant operations can be authorized.
-
-A subsequent Bicep slice adds exact intended `physicalResources` to the accepted IaC binding. Plan validation rejects
-scope/type mismatches and physical collisions; the Gate 3 document displays the scope. Native request, what-if and
-observed inventory checks enforce that exact managed-ID set, including ancillary resources, while protecting existing
-IDs. This is authorization scope, not observed module attribution. Full AVM policy-property evaluation and Terraform
-module ownership remain open. See [the track contract](../reference/iac-tracks.md#exact-bicep-module-scope).
-
-Validation follow-up adds the accepted policy-property map to both validation nodes' declared inputs and makes
-generated-tree validation reject unsuccessful, interrupted or truncated command results. A subsequent receipt slice
-connects configured native providers to validation-task completion: fixed local commands run against isolated source
-copies, and runtime-owned digest receipts bind the accepted handoff, tree, intent and policy map. Native preview checks
-the recorded receipts; label-only adapters require explicit simulation mode. `validateTask` remains artifact staging.
-Reports label unexecuted checks simulated. Bicep receipts now require format/build/lint, with scratch-only formatting
-and byte comparison to reject drift; Terraform receipts prove init/format/validate. Real local Bicep tests cover nested
-files, formatting drift and error-level lint findings without changing accepted source. Historical build-only receipts
-must be regenerated. Earlier security/policy evaluation remains open, not inferred from receipt input hashes.
-The validation-input/verdict checkpoint passed `qualify:vnext` with 233 capability and 235 CLI tests, plus the remaining
-contract, kernel, renderer, testkit, validator and packaging suites. A subsequent focused ownership regression also
-blocks delete/replace of managed ancestors containing protected existing children, including extension resources.
-
-The September 18 follow-up blocks explicitly incomplete Terraform plans and malformed change arrays, actions and
-status fields. Native-provider tests confirm incomplete saved plans cannot apply with or without policy mappings.
-Absent optional fields remain compatible with older Terraform JSON. Plan acceptance on both tracks now rejects
-policy mappings to absent resources and unresolved blocked controls before recording completion or opening Gate 3.
-These checks do not implement AVM child ownership or full effective-policy evaluation during code validation.
-The integration checkpoint passed `qualify:vnext`: 232 capability, 217 CLI, 20 contract, 45 kernel, 13 renderer,
-20 testkit, 144 validator and 29 packaging tests. A subsequent optional-field compatibility assertion passed its
-focused test; no production behavior changed after the checkpoint.
-
-Reviewer context includes locked stage criteria and current matching dispositions, with selective bounded retrieval
-for oversized metadata. The ownership/reviewer batch passed a dedicated final `qualify:vnext` run. An earlier run was
-interrupted and is not used as passing evidence. External checks passed with the existing Python virtual environment.
-
-The latest cost refresh still returned HTTP 429 for exact-window actuals. A partial September 17-29 forecast of
-USD 503.08 excludes September 16, and the new budget's zero accrued value conflicts with the earlier budget read.
-Do not infer usable deployment headroom from these incomplete values; no billable resources have been provisioned.
-
-Final `npm run qualify:vnext` passed after repairing two stale guidance/tool inventory assertions, including
-143 validator tests and 29 packaging tests. Repository Node checks passed after regenerating public references.
-The external validation stage initially used system Python without pytest; rerunning with the existing virtual
-environment passed, including 16 Python tests and four optional skips. No live client or cloud proof is inferred.
+Protect all pre-existing resources. Local human Gate 4 and exact candidate, recipient, preview hash, ownership
+and expiry binding remain mandatory. Unsupported native checks, unresolved expressions and unverified module
+ownership remain blockers, not presumed compliance. Historical pass counts do not qualify this candidate.
+Use the [restore guide](../../.archive/RESTORE.md) for inspection only; it does not revive approvals.
 
 ## Planning Checkpoint
 
@@ -497,3 +423,6 @@ See [acceptance](PRD.md#req-dev-diagnostics-001-opt-in-development-evidence) and
 3. Select one bounded item with an owner and acceptance evidence.
 4. Keep live operations separate unless the item carries explicit authorization.
 5. Update this checkpoint only when the durable release boundary changes.
+
+Cleanup snapshot: originals are preserved against baseline
+`7fbb02e1593a26ee710e6735df1ac21641efcee4`; catalog lifecycle records archive verification separately.

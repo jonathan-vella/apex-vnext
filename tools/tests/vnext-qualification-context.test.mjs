@@ -1,10 +1,16 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import test from "node:test";
 import {
   EXPECTED_TAGS,
   FIREWALL_EXCEPTION_ID,
   qualificationContextIssues,
   qualificationSecurityExceptionIssues,
+  validateQualificationContext,
+  validateQualificationSecurityException,
 } from "../scripts/validate-vnext-qualification-context.mjs";
 
 const subscriptionId = "b47d2942-f5ad-4d3c-b28e-c23e4f83d97e";
@@ -61,6 +67,38 @@ const securityException = {
   compensating_controls: ["Default-deny firewall with unconditional cleanup."],
 };
 const governance = { subscription_id: subscriptionId, security_exceptions: [securityException] };
+
+test("qualification validators require explicit readable governance with subscription identity", (context) => {
+  const directory = mkdtempSync(path.join(tmpdir(), "apex-qualification-context-"));
+  context.after(() => rmSync(directory, { recursive: true }));
+  const filename = path.join(directory, "context.json");
+  assert.throws(() => validateQualificationContext(environment), /Explicit qualification governance file/u);
+  assert.throws(() => validateQualificationSecurityException(), /Explicit qualification governance file/u);
+  assert.throws(() => validateQualificationContext(environment, filename, now), /ENOENT/u);
+  writeFileSync(filename, "{invalid");
+  assert.throws(() => validateQualificationSecurityException(filename, now), SyntaxError);
+  writeFileSync(filename, JSON.stringify({ security_exceptions: [securityException] }));
+  assert.throws(() => validateQualificationContext(environment, filename, now), /subscription_id/u);
+  assert.throws(() => validateQualificationSecurityException(filename, now), /subscription_id/u);
+  writeFileSync(filename, JSON.stringify(governance));
+  assert.deepEqual(validateQualificationContext(environment, filename, now), []);
+  assert.deepEqual(validateQualificationSecurityException(filename, now), []);
+});
+
+test("qualification CLI rejects missing, extra and unsupported arguments explicitly", () => {
+  const script = path.resolve(import.meta.dirname, "../scripts/validate-vnext-qualification-context.mjs");
+  for (const args of [
+    [],
+    ["--security-exception-only"],
+    ["--unknown"],
+    ["a", "b"],
+    ["--security-exception-only", "a", "b"],
+  ]) {
+    const result = spawnSync(process.execPath, [script, ...args], { encoding: "utf8" });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /requires <file>/u);
+  }
+});
 
 test("qualification context matches the approved bootstrap and tag contract", () => {
   assert.deepEqual(qualificationContextIssues(environment, governance, now), []);

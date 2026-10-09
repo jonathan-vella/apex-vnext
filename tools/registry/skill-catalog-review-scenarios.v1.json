@@ -13,7 +13,7 @@
       "intent": "Find Azure naming, tag, and security guidance for a planned workload.",
       "expected": {
         "outcome": "discoverable guidance is routed to the defaults consumer skill",
-        "evidence": "managed skill and migration matrix entry",
+        "evidence": "managed skill and current delivery entry",
         "skill": "apex-azure-defaults"
       },
       "authority": {
@@ -43,7 +43,7 @@
       "intent": "Fetch current Microsoft documentation through a provider capability.",
       "expected": {
         "outcome": "provider-backed retrieval remains unavailable until lifecycle evidence exists",
-        "evidence": "matrix owner and deferred qualification statement",
+        "evidence": "current delivery owner and deferred qualification statement",
         "skill": "apex-microsoft-docs"
       },
       "authority": {
@@ -88,7 +88,7 @@
       "intent": "Read complete Bicep private endpoint and module interface guidance.",
       "expected": {
         "outcome": "source-reviewed references resolve to managed Bicep reference material",
-        "evidence": "matrix resource disposition targets",
+        "evidence": "current managed reference file ownership",
         "skill": "apex-bicep-patterns"
       },
       "authority": {

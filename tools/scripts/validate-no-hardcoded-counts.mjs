@@ -16,7 +16,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { globSync } from "node:fs";
 import { Reporter } from "./_lib/reporter.mjs";
-import { SKILLS_DIR, INSTRUCTIONS_DIR } from "./_lib/paths.mjs";
+import { SKILLS_DIR, SHIPPED_SKILLS_DIR, INSTRUCTIONS_DIR } from "./_lib/paths.mjs";
 import { parseJsonc } from "./_lib/parse-jsonc.mjs";
 import { getAgents } from "./_lib/workspace-index.mjs";
 
@@ -79,7 +79,8 @@ function computeActualCounts() {
   return {
     primary_agents: agents.filter((agent) => !agent.isSubagent).length,
     subagents: agents.filter((agent) => agent.isSubagent).length,
-    skills: countFiles(path.join(SKILLS_DIR, "*/SKILL.md")),
+    skills: countFiles(path.join(SHIPPED_SKILLS_DIR, "*/SKILL.md")),
+    authoring_skills: countFiles(path.join(SKILLS_DIR, "*/SKILL.md")),
     instructions: countFiles(path.join(INSTRUCTIONS_DIR, "*.instructions.md")),
     validators: validatorCount,
     vscode_extensions: extensionCount,

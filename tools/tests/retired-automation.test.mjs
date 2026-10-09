@@ -1,10 +1,24 @@
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { loadValidator } from "../scripts/_lib/ajv-validator.mjs";
 import test from "node:test";
 import { load } from "js-yaml";
 import { validateVscodeConfiguration } from "../scripts/validate-vscode-config.mjs";
 import { parseFrontmatter } from "../scripts/_lib/parse-frontmatter.mjs";
 import { validateReviewDependencies } from "../scripts/validate-challenger-presence.mjs";
+
+test("current region guidance uses the canonical runtime reference without a legacy mirror", () => {
+  const defaults = JSON.parse(readFileSync("config/defaults.v1.json", "utf8"));
+  assert.equal(defaults.azureDefaults.regionReference, ".github/copilot-instructions.md#default-regions");
+  const skill = readFileSync("customizations/.github/skills/apex-azure-defaults/SKILL.md", "utf8");
+  assert.match(skill, /runtime `securityInvariants` and `azureDefaults` configuration owns/u);
+  assert.match(skill, /`apex\/taskContext` projects/u);
+  assert.doesNotMatch(skill, /^###\s+Default Regions\s*$/mu);
+  const validator = readFileSync("tools/scripts/validate-region-canonical.mjs", "utf8");
+  assert.doesNotMatch(validator, /["']\.github\/skills\/azure-defaults\/SKILL\.md["']/u);
+  assert.match(validator, /config\/defaults\.v1\.json/u);
+});
 
 test("retired paths remain absent without requiring historical evidence", () => {
   const policy = JSON.parse(readFileSync("tools/registry/retired-paths.v1.json", "utf8"));
@@ -15,6 +29,35 @@ test("retired paths remain absent without requiring historical evidence", () => 
     assert.equal(path.startsWith("/"), false);
     assert.equal(path.split("/").includes(".."), false);
     assert.equal(existsSync(path), false, `${path} must stay retired`);
+  }
+});
+
+test("historical operational originals are absent from tracked development source, not forbidden in consumers", () => {
+  const tracked = execFileSync("git", ["ls-files", "-z"], { encoding: "utf8" }).split("\0").filter(Boolean);
+  const existing = tracked.filter((path) => existsSync(path));
+  assert.deepEqual(
+    existing.filter((path) => path.startsWith(".apex/") || path.startsWith("agent-output/")),
+    [],
+  );
+});
+
+test("obsolete snake_case sidecars cannot satisfy current typed contracts", () => {
+  for (const [name, payload] of [
+    ["implementation-intent", { schema_version: "1.0", modules: { bicep: [], terraform: [] }, resource_inventory: [] }],
+    ["iac-binding", { schema_version: "1.0", source_hash: "a".repeat(64), resources: [] }],
+    ["environment-inputs", { schema_version: "1.0", environment: "prod", parameters: {}, secrets: {} }],
+    ["policy-property-map", { schema_version: "1.0", policy_assignments: [], property_map: {} }],
+    ["iac-handoff", { schema_version: "1.0", validation_summary: {}, artifact_paths: [], tree_hash: "a".repeat(64) }],
+    ["policy-validation", { schema_version: "policy-precheck-v2", compliance_status: "passed", findings: [] }],
+    ["review-findings", { schema_version: "1.0", reviewer: "challenger", findings: [], decision: "approved" }],
+    [
+      "deployment-preview",
+      { schema_version: "1.0", preview_hash: "a".repeat(64), approved: true, expires_at: "2099-01-01T00:00:00Z" },
+    ],
+  ]) {
+    const schemaPath = `packages/contracts/schemas/${name}-v1.schema.json`;
+    assert.equal(existsSync(schemaPath), true, `Current schema required: ${name}`);
+    assert.equal(loadValidator(schemaPath)(payload), false, `Old ${name} shape must be rejected`);
   }
 });
 
@@ -32,6 +75,20 @@ test("all review requirements survive workflow cleanup", () => {
 test("retired automation commands remain unavailable", () => {
   const scripts = JSON.parse(readFileSync("package.json", "utf8")).scripts;
   for (const command of [
+    "fix:artifact-h2",
+    "check:h2-order",
+    "render:headings-summary",
+    "validate:headings-summary",
+    "validate:guidance-migration",
+    "test:guidance-migration",
+    "validate:challenger-findings",
+    "validate:iac-contract",
+    "validate:iac-contract-consistency",
+    "validate:policy-property-map",
+    "validate:environment-manifest",
+    "validate:iac-handoff",
+    "validate:plan-avm-pins",
+    "validate:policy-precheck",
     "validate:session-state",
     "validate:context-budget",
     "validate:governance-trace",
@@ -88,23 +145,20 @@ test("retired automation commands remain unavailable", () => {
     "tools/scripts/setup-wsl.sh",
     "tools/scripts/setup-windows.ps1",
     "config/workflow.v1.json",
-    "agent-output/vnext-qualification/04-governance-constraints.json",
     "packages/contracts/schemas/workload-decision-manifest-v1.schema.json",
   ])
     assert.equal(existsSync(path), true, `${path} replacement is required`);
+  const qualification = readFileSync("tools/scripts/validate-vnext-qualification-context.mjs", "utf8");
+  const launcher = readFileSync("tools/scripts/vnext-live-handoff.mjs", "utf8");
+  assert.doesNotMatch(qualification + launcher, /agent-output\/vnext-qualification\/04-governance-constraints\.json/u);
+  assert.match(qualification, /Explicit qualification governance file is required/u);
+  assert.match(launcher, /governance_file/u);
 });
 
 test("Functions guidance cannot route into retired materialization", () => {
   const paths = [
-    ".github/skills/azure-prepare/references/analyze.md",
-    ".github/skills/azure-prepare/references/research.md",
-    ".github/skills/azure-prepare/references/specialized-routing.md",
-    ".github/skills/azure-prepare/references/services/functions/README.md",
-    ".github/skills/azure-prepare/references/services/functions/bicep.md",
-    ".github/skills/azure-prepare/references/services/functions/terraform.md",
-    ".github/skills/azure-prepare/references/recipes/azcli/commands.md",
-    ".github/skills/azure-prepare/references/recipes/azd/azure-yaml.md",
-    ".github/skills/azure-prepare/references/recipes/azd/terraform.md",
+    "customizations/.github/skills/apex-azure-prepare/SKILL.md",
+    "customizations/.github/skills/apex-azure-prepare/references/preparation-lineage.md",
   ];
   const guidance = paths.map((path) => readFileSync(path, "utf8")).join("\n");
   assert.doesNotMatch(
@@ -131,15 +185,11 @@ test("consumer Node prerequisites match the canonical tool pin", () => {
   assert.doesNotMatch(service, /Node(?:\.js)? 24 or (?:later|newer)/u);
 });
 
-test("IaC handoff and validator use only canonical tool pins", () => {
+test("current toolchain and validator use only canonical tool pins", () => {
   const pins = JSON.parse(readFileSync("tools/registry/tool-version-pins.json", "utf8")).pins;
-  const handoff = JSON.parse(
-    readFileSync(".github/skills/azure-artifacts/templates/05-iac-handoff.template.json", "utf8"),
-  );
-  assert.deepEqual(handoff.validation_summary.tool_versions, {
-    bicep: pins.bicep.min,
-    az: pins.az.min,
-  });
+  assert.match(pins.bicep.min, /^\d+\.\d+\.\d+$/u);
+  assert.match(pins.az.min, /^\d+\.\d+\.\d+$/u);
+  assert.equal(existsSync("packages/contracts/schemas/iac-handoff-v1.schema.json"), true);
   const validator = readFileSync("tools/scripts/validate-tool-versions.mjs", "utf8");
   assert.doesNotMatch(validator, /DEFAULT_PINS|ensureDefaultPins|writeFileSync\(PINS_PATH/u);
   assert.match(validator, /tool-version-pins\.json is required/u);

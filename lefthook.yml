@@ -36,38 +36,36 @@ pre-commit:
         fi
 
     h2-sync:
-      glob: "{.github/skills/azure-artifacts/SKILL.md,.github/instructions/azure-artifacts*,tools/scripts/validate-artifacts*}"
+      glob: "{customizations/.github/skills/apex-artifacts/templates/requirements.md,customizations/manifest.json,packages/renderers/src/document-registry.ts,tools/scripts/validate-artifacts.mjs,tools/tests/validate-artifacts.test.mjs}"
       run: |
-        STAGED_SYNC=$(git diff --cached --name-only --diff-filter=ACM | grep -E '(SKILL\.md|azure-artifacts|validate-artifacts)' || true)
+        STAGED_SYNC=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^(customizations/(\.github/skills/apex-artifacts/templates/requirements\.md|manifest\.json)|packages/renderers/src/document-registry\.ts|tools/(scripts/validate-artifacts\.mjs|tests/validate-artifacts\.test\.mjs))$' || true)
         if [ -n "$STAGED_SYNC" ]; then
-          echo "🔄 Checking H2 heading sync across sources..."
+          echo "🔄 Checking current document sources..."
           npm run validate:artifacts
         else
-          echo "ℹ️  No H2-source files to sync-check"
+          echo "ℹ️  No current document-source files to check"
         fi
       fail_text: |
-        ❌ H2 heading sync failed!
+        ❌ Current document-source validation failed!
 
-        Sources must match: SKILL.md ↔ azure-artifacts ↔ validator
+        Sources must match the current renderer registry and managed requirements template.
         🔧 Run: npm run validate:artifacts
 
     artifact-validation:
-      glob: "{agent-output,.github/skills/azure-artifacts/templates}/**/*.md"
+      glob: "{agent-output/**/*.md,customizations/.github/skills/apex-artifacts/templates/requirements.md,customizations/manifest.json,packages/renderers/src/document-registry.ts,tools/scripts/validate-artifacts.mjs,tools/tests/validate-artifacts.test.mjs}"
       run: |
-        # Check if any agent-output artifacts are staged
-        STAGED_ARTIFACTS=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^agent-output/.*\.md$' || true)
+        STAGED_ARTIFACTS=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^agent-output/.*\.md$|^customizations/(\.github/skills/apex-artifacts/templates/requirements\.md|manifest\.json)$|^packages/renderers/src/document-registry\.ts$|^tools/(scripts/validate-artifacts\.mjs|tests/validate-artifacts\.test\.mjs)$' || true)
         if [ -n "$STAGED_ARTIFACTS" ]; then
           COUNT=$(echo "$STAGED_ARTIFACTS" | wc -l | tr -d ' ')
-          echo "📋 Validating $COUNT artifact(s) against templates..."
-          # Run full artifact validation - blocks on any H2 mismatch
+          echo "📋 Validating current artifact sources for $COUNT staged path(s)..."
           if ! npm run validate:artifacts; then
             echo ""
-            echo "❌ Artifact template validation failed!"
+            echo "❌ Current artifact source validation failed!"
             echo ""
             echo "🔧 To fix:"
             echo "   1. Check customizations/.github/instructions/apex-artifact-contracts.instructions.md"
-            echo "   2. Use EXACT H2 headings from that file"
-            echo "   3. Run: npm run fix:artifact-h2 -- <file> --apply"
+            echo "   2. Repair the registered template and source binding"
+            echo "   3. Run: npm run validate:artifacts"
             echo "   4. Re-stage and commit"
             echo ""
             exit 1
@@ -84,15 +82,15 @@ pre-commit:
             exit 1
           fi
         else
-          echo "ℹ️  No agent-output artifacts to validate"
+          echo "ℹ️  No artifact-source changes to validate"
         fi
       fail_text: |
-        ❌ Artifact H2 structure or challenger-review presence check failed!
+        ❌ Current artifact source or challenger-review presence check failed!
 
         📚 References:
         - customizations/.github/instructions/apex-artifact-contracts.instructions.md
-        - AGENTS.md "Agent Workflow" (mandatory challenger reviews)
-        🔧 Auto-fix H2: npm run fix:artifact-h2 -- <file> --apply
+        - config/workflow.v1.json (mandatory review dependencies)
+        🔧 Validate source: npm run validate:artifacts
         🔧 Review: run the kernel-issued rubber-duck review, then apex/reviewComplete
 
     agents:

@@ -29,6 +29,13 @@ changed the runtime. Chat, rendered views and historical evidence do not create 
 - **Qualification:** candidate-bound qualification scripts and project controls. Fixtures, logs, and historical dossiers
   are derived; authorize live and release evidence separately.
 
+## Guidance And Historical Originals
+
+The [guidance delivery registry](../../tools/registry/guidance-delivery.v1.json) owns current source membership and
+deferred obligations; generated catalogs are views. The [archive catalog](../../.archive/CATALOG.json) identifies
+historical originals by path/hash. The [restore guide](../../.archive/RESTORE.md) is for inspection, not executable
+fallback, qualification or renewed approval.
+
 ## Consumer Workspace Boundary
 
 Repository controls govern the APEX product, release, and distribution. They do not change a customer's project state.

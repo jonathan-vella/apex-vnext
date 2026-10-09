@@ -8,7 +8,7 @@ import Ajv2020 from "ajv/dist/2020.js";
 
 const REGISTRY_PATH = "tools/registry/diagram-semantics.v1.json";
 const SCHEMA_PATH = "tools/registry/schemas/diagram-semantics.schema.json";
-const EXPECTED_SHA256 = "5958fe843b420749affe76f497d3fab27bc075597a05f44b299024133e70a015";
+const EXPECTED_SHA256 = "433e1e9412b893ae5f087fc01930a1ce7c41173fd5a54c739434b844aeb6a039";
 const EXPECTED_IDS = [
   "g1-three-tier-web",
   "g2-hub-spoke-landing-zone",
@@ -20,12 +20,12 @@ const EXPECTED_IDS = [
 ];
 const EXPECTED_ROUTING = {
   inline: {
-    owner: "mermaid",
+    owner: "apex-mermaid",
     outputClasses: ["flow", "sequence", "state", "er", "compact-documentation"],
     formats: ["mmd", "markdown"],
   },
   standalone: {
-    owner: "python-diagrams",
+    owner: "packages/renderers",
     outputClasses: ["architecture", "network", "dependency", "runtime", "as-built", "waf", "cost", "compliance"],
     formats: ["py", "png", "svg"],
   },

@@ -36,11 +36,11 @@ scripts ("first create identity, then assign role...")?
 ## 4. Parse at Boundaries
 
 Validate inputs and outputs at module edges, not in the middle. Each workflow step
-validates its prerequisites exist and its outputs conform to templates. Internal logic is
-the agent's domain.
+is authorized by the kernel and validates typed inputs and outputs at its boundary.
+Registered renderers own document shape; agents do not create independent acceptance rules.
 
 **Test**: Does each agent check for required input artifacts before starting? Does each
-output pass artifact template validation?
+output pass typed contract validation and registered renderer checks?
 
 ## 5. AVM-First, Security Baseline Always
 
@@ -53,10 +53,10 @@ resource include the security baseline properties?
 
 ## 6. Golden Path Pattern
 
-Prefer shared utilities over hand-rolled helpers. Use the `azure-defaults` skill as the
-single source of truth for naming, regions, tags, and service matrices. Use
-`azure-artifacts` templates as the single source of truth for output structure. Don't
-reinvent.
+Prefer shared utilities over hand-rolled helpers. Runtime config and accepted governance own
+Azure defaults; managed `apex-azure-defaults` applies them only to active tasks.
+Typed contracts and `packages/renderers/src/document-registry.ts` own document structure.
+Managed `apex-artifacts` guides presentation without becoming an independent authority.
 
 **Test**: Are there duplicate conventions across agents? If yes, consolidate into the
 appropriate skill.
@@ -72,9 +72,9 @@ or validator) rather than just applied once?
 
 ## 8. Context Is Scarce
 
-Every token in the agent's context window must earn its keep. Load skills progressively:
-`golden-principles` → `azure-defaults` → task-specific skills. Don't load the full artifact
-template reference when you only need one template. Use pointers over inline content.
+Every token in the agent's context window must earn its keep. Load relevant maintainer guidance
+on demand. Active workload tasks use kernel-projected inputs and task-specific managed skills.
+Don't load a full reference when only one contract is needed. Use pointers over inline content.
 
 **Test**: Does each agent load ≤ 5 instruction files? Are skills loaded on-demand rather
 than all at once?
@@ -101,7 +101,7 @@ more reliable than a paragraph saying "use the correct H2 headings."
 
 ### For Agents
 
-1. Read this skill FIRST, before `azure-defaults`
+1. Use this reference when operating-principle guidance is relevant; no mandatory skill-loading chain
 2. Use the principles as a decision framework when uncertain
 3. When two approaches are equally valid, choose the one that better aligns with these principles
 

@@ -25,7 +25,7 @@ Every doc in `docs/` must start with:
 | Single H1 | Only the document title uses `#`                      |
 | ATX style | Always `##`, `###` — never underline style            |
 | No H4+    | Avoid `####` and deeper; restructure content instead  |
-| Numbering | Template artifacts use numbered H2s (`## 1. Section`) |
+| Output shape | Registered templates and renderer tests own accepted document structure |
 
 ## Line Length
 
@@ -101,9 +101,9 @@ These agents were removed and converted to skills. Never reference them:
 
 | Removed Agent      | Replacement Skill                   |
 | ------------------ | ----------------------------------- |
-| `diagram.agent.md` | `python-diagrams` or `mermaid` skill |
-| `adr.agent.md`     | `azure-adr` skill                   |
-| `docs.agent.md`    | `azure-artifacts` skill             |
+| `diagram.agent.md` | `packages/renderers/` for standalone output; `apex-mermaid` for supported inline guidance |
+| `adr.agent.md`     | Managed `apex-azure-adr` skill and accepted typed decisions |
+| `docs.agent.md`    | Managed `apex-artifacts` guidance, contracts and registered renderers |
 
 Also avoid references to removed paths:
 
@@ -129,14 +129,11 @@ npm run lint:md
 # Link validation
 npm run lint:links
 
-# Artifact H2 structure check
-npm run validate
+# Current registered artifact source check
+npm run validate:artifacts
 
 # Skill format validation
-npm run skill:validate
-
-# Auto-fix artifact H2 headings
-npm run fix:artifact-h2 <path> [--apply]
+npm run validate:skills
 ```
 
 ## Version Number Propagation

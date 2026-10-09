@@ -54,6 +54,9 @@ link-check cron (folded May 2026).
 | `docs-freshness`           | Runs `npm run audit:quarterly` (glob-audit + orphan-content + docs-freshness).                                                           | Opens or updates a GitHub issue on regression.                                                                                                                                                |
 | `link-check`               | Runs `lint:links` against root Markdown and `docs/**` as a scheduled safety net.                                                         | Fails the workflow run on broken links.                                                                                                                                                       |
 
+AVM version checks audit current Bicep/Terraform source only. Freeze mode remains fail closed on unavailable
+registry/cache evidence; neither this maintenance job nor its cache is deployment approval or Gate 4 evidence.
+
 ### Permissions model
 
 The workflow declares minimal top-level permissions

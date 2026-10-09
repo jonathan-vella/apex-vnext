@@ -19,6 +19,14 @@ explanations, and references start at the [documentation index](../README.md).
 Versioned runtime behavior is owned by `packages/`, `config/`, and `customizations/`. Project controls may add release
 requirements but may not create a competing runtime state machine.
 
+## Current Guidance And Cleanup Provenance
+
+Current managed membership and all deferred obligations are recorded in the
+[guidance delivery registry](../../tools/registry/guidance-delivery.v1.json).
+Historical desktop planning, modernization records and original cleanup inputs are indexed by entry path in the
+[archive catalog](../../.archive/CATALOG.json). See the [restore guide](../../.archive/RESTORE.md) for limitations.
+Neither historical receipts nor archived delegation qualifies this candidate or renews execution authority.
+
 ## Approved Product Direction
 
 Start with the [PRD goals](PRD.md#goals), [workload boundary](PRD.md#workload-boundary), and

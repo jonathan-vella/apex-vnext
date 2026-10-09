@@ -74,7 +74,7 @@ run_check "Safe shell (no interactive prompts)" "1" "npm run lint:safe-shell" "s
 run_check "Bicep lint" "$BICEP_COUNT" "shopt -s nullglob; for f in infra/bicep/*/main.bicep; do bicep build \"\$f\" && bicep lint \"\$f\"; done" "bicep" &
 run_check "Terraform fmt" "$TF_COUNT" "npm run lint:terraform-fmt" "tf-fmt" &
 run_check "Terraform validate" "$TF_COUNT" "npm run validate:terraform" "tf-validate" &
-run_check "Artifact templates" "$MD_ARTIFACT_COUNT" "npm run validate:artifacts" "artifacts" &
+run_check "Current artifact sources" "$MD_ARTIFACT_COUNT" "npm run validate:artifacts" "artifacts" &
 run_check "Agent validation" "$AGENT_COUNT" "npm run validate:agents" "agents" &
 run_check "Instruction checks" "$INSTRUCTION_COUNT" "npm run validate:instruction-checks" "instructions" &
 run_check "Skills validation" "$SKILL_COUNT" "npm run validate:skills" "skills" &

@@ -24,15 +24,15 @@ the read allowlist of `tools/registry/arm-mcp-cost-pricing.v1.json`, for every a
 Managed consumer skills retain Azure design, planning, validation, operations, identity, migration, Terraform, artifact,
 and inline-diagram guidance through progressive references. They use accepted task context and capability-produced
 evidence; direct cloud operations, repository mutation, approval, and deployment remain kernel- or CLI-owned. The
-versioned [guidance migration matrix](../../tools/registry/guidance-migration.v1.json) records the disposition of each
-root skill and instruction, including repository-only and deferred surfaces.
+versioned [guidance delivery registry](../../tools/registry/guidance-delivery.v1.json) records current managed ownership,
+retained maintainer entrypoints and all deferred obligations.
 
 ## One Projection, Two Hosts
 
 Managed agents use Copilot CLI frontmatter without model pins: no `model`, `model-policy` or `reasoning-effort`. Each
 session uses the model the user picks (DECISION-033). Standalone Copilot CLI and the VS Code Copilot harness run the same
 projection; `github-copilot-vscode` remains only the evidence identity for VS Code runs. The VS Code Local projection is
-retired and archived under `.archive/vscode-projection/`.
+retired and archived under [archive catalog](../../.archive/CATALOG.json) (entry `.archive/vscode-projection/ROLLBACK.md`).
 
 The `APEX` agent is the only foreground managed agent, because only foreground APEX may ask questions. CodeGen and
 Validator are hidden workers that run through `task` delegation with kernel task context, not repository instructions.
@@ -71,7 +71,8 @@ uninstall, and reinstall preserve unrelated files and report conflicts rather th
 `apex update` and `apex doctor --fix --yes` migrate a workspace from the earlier thick projection. They remove copied
 agents, skills and `.mcp.json` the user did not edit. Edited copies stay in place, are listed in `conflicts` and in the
 lock's `retained` entries, and `doctor` reports each one until you move or delete it, because a workspace copy would
-shadow the plugin's file. The [archive](../../.archive/thick-workspace-projection/ROLLBACK.md) records the retired
+shadow the plugin's file. The [archive](../../.archive/CATALOG.json)
+(entry `.archive/thick-workspace-projection/ROLLBACK.md`) records the retired
 surface and its rollback.
 
 `apex bootstrap` is the common onboarding path for global CLI, one-shot `npx`, and Copilot-agent entry points. It pins
@@ -87,3 +88,5 @@ client discovery, MCP startup, routing, interaction, restart/resume, and outcome
 - [Client support](../reference/client-support.md)
 - [Manage installation](../how-to/manage-installation.md)
 - [Runtime architecture](runtime-architecture.md)
+
+Historical restoration follows the [restore guide](../../.archive/RESTORE.md), never an archive-backed runtime path.

@@ -12,8 +12,9 @@ This directory supports development and maintenance of APEX vNext. Installed con
 
 ## Retained Owners
 
-The [guidance migration registry](../../tools/registry/guidance-migration.v1.json) records every root skill's disposition.
-Do not maintain a second model, skill-count or resource-migration inventory here.
+The [current guidance delivery registry](../../tools/registry/guidance-delivery.v1.json) records current source
+ownership and deferred obligations. Managed product skills live under `customizations/.github/skills/`;
+they are distinct from these repository-maintenance entry points.
 
 | Group                                                         | Why it remains                                                                                    |
 | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
@@ -22,12 +23,11 @@ Do not maintain a second model, skill-count or resource-migration inventory here
 | context-management, vendor-prompting                          | Current client diagnostics and managed-guidance validation.                                       |
 | golden-principles, wayfinder                                  | Repository operating rules and manually requested planning.                                       |
 | workflow-engine                                               | Current kernel routing, dependencies and approval boundaries.                                     |
-| Azure, IaC, Entra, Microsoft documentation and Mermaid skills | Source material with declared managed vNext consumers.                                            |
-| python-diagrams                                               | Required diagram quality and deferred capability source; not an obsolete dependency by age alone. |
 
-The source guidance is retained only while current code, validators or declared vNext requirements need it. Moving a
-source requires migration of those consumers and a focused replacement test. Directory size and old terminology alone
-are not proof that its behavior is unused. The old skill-audit automation is retired; it is not a maintenance prerequisite.
+Historical product-authoring copies are not current workload entry points. Their originals and deferred obligations
+are preserved through the approved cleanup catalog; current product behavior does not load archived source.
+Retirement requires replacement checks and archive verification. Directory size or old terminology alone is not
+proof that behavior is unused.
 
 ## Repository Instructions
 
@@ -41,7 +41,8 @@ need metadata/reference checks, and shared runtime or packaging changes need the
 ## Adding Or Retiring Guidance
 
 Update the existing owner, consumer mapping and relevant tests together. Validate invocation metadata and references with
-`npm run validate:skills` and `npm run validate:guidance-migration`. `validate:skills` checks the shipped
+`npm run validate:skills` and `npm run validate:guidance-delivery`. `validate:skills` checks the shipped
 `customizations/.github/skills/` and this directory with per-root rules; pre-existing errors live only in the shrink-only
-[skill validation baseline](../../tools/registry/skill-validation-baseline.json). Preserve licenses and attributions. Historical storage
+[skill validation baseline](../../tools/registry/skill-validation-baseline.json). Preserve licenses and attributions.
+Historical storage
 is optional; current source, documentation and required checks must remain usable without it.

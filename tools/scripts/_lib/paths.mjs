@@ -13,10 +13,6 @@ export const SKILLS_DIR = ".github/skills";
 export const SHIPPED_SKILLS_DIR = "customizations/.github/skills";
 export const INSTRUCTIONS_DIR = "customizations/.github/instructions";
 export const AGENT_OUTPUT_DIR = "agent-output";
-// NOTE: APEX prompt files live under `tools/apex-prompts/` (not `.github/prompts/`)
-// so they are never auto-loaded by VS Code Copilot's prompt-file discovery.
-// They remain invokable via `runSubagent`-style references and direct attach.
-export const PROMPTS_DIR = "tools/apex-prompts";
 
 /**
  * Prompt-source directories scanned by `getPromptFiles()`.
@@ -24,7 +20,7 @@ export const PROMPTS_DIR = "tools/apex-prompts";
  * holds E2E loop and benchmark prompts; all must satisfy the same
  * vendor-prompting rules (notably `model-pin-001`).
  */
-export const PROMPT_SOURCE_DIRS = ["tools/apex-prompts", ".github/prompts", "tools/tests/prompts"];
+export const PROMPT_SOURCE_DIRS = [".github/prompts", "tools/tests/prompts"];
 
 export const COUNT_MANIFEST_PATH = "tools/registry/count-manifest.json";
 export const COPILOT_INSTRUCTIONS = ".github/copilot-instructions.md";

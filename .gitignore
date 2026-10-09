@@ -98,6 +98,10 @@ freshness-report.json
 # that single committed deliverables can be re-included with `!`.
 agent-output/_baselines/*
 
+# Generated development-instance evidence is not product source.
+.apex/
+agent-output/
+
 
 # Terraform
 *.tfstate

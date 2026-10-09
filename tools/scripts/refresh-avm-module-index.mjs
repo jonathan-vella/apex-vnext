@@ -4,7 +4,7 @@
  *
  * Fetches the canonical Azure Verified Modules indexes published by the AVM
  * team and pre-warms the per-module version cache that backs
- * `validate:avm-versions:freeze`.
+ * fail-closed source audits through `validate:avm-versions:freeze`, not deployment approval.
  *
  * Inputs (upstream, network):
  *   - https://azure.github.io/Azure-Verified-Modules/module-indexes/BicepResourceModules.csv

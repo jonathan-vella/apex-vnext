@@ -64,7 +64,8 @@ jobs:
           title: "chore(data): Refresh AVM module index + version cache"
           body: |
             Automated refresh of the canonical AVM module index and the
-            per-module version cache that backs `validate:avm-versions:freeze`.
+            per-module version cache that backs fail-closed source audits through `validate:avm-versions:freeze`.
+            This maintenance audit is not deployment approval or Gate 4 evidence.
 
             Source CSVs:
             - https://azure.github.io/Azure-Verified-Modules/module-indexes/BicepResourceModules.csv

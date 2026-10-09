@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Generate a matrix-derived catalog review without inventing lifecycle or qualification evidence. */
+/** Generate a current-source catalog without inventing capability or qualification evidence. */
 
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
@@ -7,8 +7,8 @@ import process from "node:process";
 import { format } from "prettier";
 
 const root = resolve(process.cwd());
-const matrixPath = "tools/registry/guidance-migration.v1.json";
-const sourceSkillsDirectory = ".github/skills";
+const registryPath = "tools/registry/guidance-delivery.v1.json";
+const sourceSkillsDirectory = "customizations/.github/skills";
 const outputPath = "docs/vnext/SKILL-CATALOG-REVIEW.generated.md";
 const check = process.argv.includes("--check");
 
@@ -28,28 +28,26 @@ export function sourceResources(directory) {
     .sort();
 }
 
-function render(matrix) {
-  const entries = [...(matrix.skillDispositions ?? [])].sort((left, right) => left.source.localeCompare(right.source));
+function render(registry) {
+  const entries = [...registry.skills].sort((left, right) => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0));
   const resourceRows = entries.flatMap((entry) => {
-    if (!existsSync(join(root, sourceSkillsDirectory, entry.source))) return [];
-    const dispositions = new Map((entry.resourceDispositions ?? []).map((resource) => [resource.source, resource]));
-    return sourceResources(join(root, sourceSkillsDirectory, entry.source)).map((source) => {
-      const resource = dispositions.get(source);
+    return sourceResources(join(root, sourceSkillsDirectory, entry.id)).map((source) => {
+      const registered = entry.files.includes(`.github/skills/${entry.id}/${source}`);
       return {
-        source: entry.source,
+        source: entry.id,
         resource: source,
-        disposition: resource?.disposition ?? "ledger-pending",
-        target: resource?.targets?.join(", ") || "not-declared",
-        reason: resource?.reason ?? "No resource disposition exists in the current matrix.",
+        disposition: registered ? "current-source" : "unmapped-current-source",
+        target: entry.owner,
+        reason: registered
+          ? "Plugin-owned managed source; not capability qualification."
+          : "Current source requires an ownership entry.",
       };
     });
   });
   const mappingRows = entries.map((entry) => {
-    const lifecycle = entry.lifecycle ?? "not-declared";
-    const target = entry.consumerSkill ?? "not-declared";
     return (
-      `| ${escapeCell(entry.source)} | ${escapeCell(entry.disposition)} | ${escapeCell(target)} | ` +
-      `${escapeCell(entry.owner)} | ${escapeCell(lifecycle)} | not-proven | not-proven | not-run |`
+      `| ${escapeCell(entry.id)} | ${escapeCell(entry.entrypoint)} | ${escapeCell(entry.owner)} | ` +
+      `${escapeCell(entry.status)} | ${escapeCell(entry.capabilityQualification)} | not-run |`
     );
   });
   const resources = resourceRows.map(
@@ -58,31 +56,56 @@ function render(matrix) {
       `${escapeCell(resource.target)} | ${escapeCell(resource.reason)} |`,
   );
   return [
-    "## Skill Catalog Review",
+    "# Skill Catalog Review",
     "",
-    "Generated from the migration matrix and source skill tree. Do not edit manually.",
+    "> [Current Version](../../VERSION.md) | Generated current managed skill delivery and deferred obligations.",
+    "",
+    "Generated from [guidance-delivery.v1.json](../../tools/registry/guidance-delivery.v1.json). Do not edit manually.",
     "",
     "## Evidence Boundary",
     "",
-    "This review proves only current matrix declarations and source-tree inventory. It does not prove resource lifecycle,",
+    "This review proves only current delivery declarations and managed source inventory. It does not prove resource lifecycle,",
     "capability activation, renderer registration, packaged target presence, live provider behavior, or client behavior.",
     "Those facts require the lifecycle ledger and its qualification evidence before they can be marked complete.",
     "",
     "Live provider and paired-client qualification are not run by this artifact or its deterministic scenario fixture.",
     "",
-    "## Source Skill Dispositions",
+    "## Current Managed Skills",
     "",
-    "| Source skill | Matrix disposition | Consumer target | Canonical owner | Lifecycle | Capability | Renderer | Live qualification |",
-    "| --- | --- | --- | --- | --- | --- | --- | --- |",
+    "| Skill | Entrypoint | Owner | Availability | Capability evidence | Live qualification |",
+    "| --- | --- | --- | --- | --- | --- |",
     ...mappingRows,
     "",
     "## Source Resource Review",
     "",
-    "`ledger-pending` means the source resource exists but the current matrix does not yet declare its disposition.",
+    "`unmapped-current-source` means a managed source file lacks a current delivery entry and must fail validation.",
     "",
-    "| Source skill | Source resource | Matrix disposition | Target | Rationale or unresolved gap |",
+    "| Skill | Resource | Availability | Owner | Evidence boundary |",
     "| --- | --- | --- | --- | --- |",
     ...resources,
+    "",
+    "## Deferred Obligations",
+    "",
+    "Historical archive entries are identifiers only. This generator does not read retired source or archive payloads.",
+    "All obligations remain deferred until their recorded proof and rollback boundaries are satisfied.",
+    "",
+    "| ID | Owner | Managed skill | Status | Historical identifier | Source hash | Required proof | Rollback boundary |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- |",
+    ...registry.deferredCapabilities.map(
+      (entry) =>
+        `| ${[
+          entry.id,
+          entry.ownerPackage,
+          entry.managedSkill,
+          entry.status,
+          entry.archiveEntry,
+          entry.sourceSha256,
+          entry.replacementProof,
+          entry.rollbackGate,
+        ]
+          .map(escapeCell)
+          .join(" | ")} |`,
+    ),
     "",
     "## Deterministic Evaluation Scope",
     "",
@@ -94,8 +117,8 @@ function render(matrix) {
 }
 
 async function main() {
-  const matrix = JSON.parse(readFileSync(join(root, matrixPath), "utf8"));
-  const content = await format(render(matrix), { parser: "markdown" });
+  const registry = JSON.parse(readFileSync(join(root, registryPath), "utf8"));
+  const content = await format(render(registry), { parser: "markdown" });
   const destination = join(root, outputPath);
   if (check) {
     if (!existsSync(destination) || readFileSync(destination, "utf8") !== content) {

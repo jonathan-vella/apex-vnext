@@ -158,7 +158,7 @@ export function validateWorkflowText(text) {
     const firewallOpen = steps(job).find((step) => step.name === "Open temporary Entra-only endpoint session");
     const firewallOpenScript = firewallOpen?.run ?? "";
     fail(
-      firewallOpenScript.includes("--security-exception-only") &&
+      firewallOpenScript.includes('--security-exception-only "$APEX_QUALIFICATION_GOVERNANCE_PATH"') &&
         index(firewallOpenScript, "--security-exception-only") <
           index(firewallOpenScript, "--set tags.SecurityControl=Ignore") &&
         index(firewallOpenScript, "--set tags.SecurityControl=Ignore") <
@@ -197,7 +197,11 @@ export function validateWorkflowText(text) {
     fail(
       script
         .split(/\r?\n/)
-        .some((line) => line.trim() === "node tools/scripts/validate-vnext-qualification-context.mjs") &&
+        .some(
+          (line) =>
+            line.trim() ===
+            'node tools/scripts/validate-vnext-qualification-context.mjs "$APEX_QUALIFICATION_GOVERNANCE_PATH"',
+        ) &&
         script.includes("az account show --query id") &&
         script.includes('= "$AZURE_SUBSCRIPTION_ID"'),
       `${name} exact qualification context validation missing`,
@@ -206,12 +210,33 @@ export function validateWorkflowText(text) {
     const qualificationValidationIndex = jobSteps.findIndex((step) =>
       step.run
         ?.split(/\r?\n/)
-        .some((line) => line.trim() === "node tools/scripts/validate-vnext-qualification-context.mjs"),
+        .some(
+          (line) =>
+            line.trim() ===
+            'node tools/scripts/validate-vnext-qualification-context.mjs "$APEX_QUALIFICATION_GOVERNANCE_PATH"',
+        ),
     );
     const firewallAddIndex = jobSteps.findIndex((step) => step.name === "Open temporary Entra-only endpoint session");
     fail(
       qualificationValidationIndex >= 0 && firewallAddIndex > qualificationValidationIndex,
       `${name} security exception validation must precede endpoint opening`,
+    );
+    const contextPreparationIndex = jobSteps.findIndex(
+      (step) => step.name === "Prepare protected qualification governance context",
+    );
+    const contextPreparation = jobSteps[contextPreparationIndex]?.run ?? "";
+    fail(
+      job?.env?.APEX_QUALIFICATION_GOVERNANCE_JSON === "${{ vars.APEX_QUALIFICATION_GOVERNANCE_JSON }}" &&
+        contextPreparationIndex >= 0 &&
+        contextPreparationIndex < qualificationValidationIndex &&
+        contextPreparation.includes("if (!raw) throw new Error(") &&
+        contextPreparation.includes("JSON.parse(raw)") &&
+        contextPreparation.includes('join(process.env.RUNNER_TEMP, "apex-qualification-governance.json")') &&
+        contextPreparation.includes('mode: 0o600, flag: "wx"') &&
+        contextPreparation.includes("APEX_QUALIFICATION_GOVERNANCE_PATH=${filename}") &&
+        contextPreparation.includes("process.env.GITHUB_ENV") &&
+        !/\bconsole\.(log|error)\s*\(/u.test(contextPreparation),
+      `${name} protected qualification governance context preparation missing or unsafe`,
     );
     const protectedInputs = steps(job).find((step) => step.name === "Validate protected inputs");
     fail(

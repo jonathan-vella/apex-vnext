@@ -1,40 +1,22 @@
 {
   "$schema": "schemas/optimization-gate.schema.json",
   "schemaVersion": "1.0.0",
-  "state": "authorized",
+  "state": "draft",
   "candidate": {
-    "status": "bound",
-    "commit": "7214b0e2ea720d45cbf12db15b1b249f8af23f43",
-    "tree": "57f2ade95cb116ef96b1f8c6fd7fdce224f3aa7f"
+    "status": "pending"
   },
   "authorization": {
-    "status": "approved",
-    "approver": "jonathan-vella delegated autonomous read-only audit",
-    "expiresAt": "2026-08-23T23:59:59Z",
-    "allowedPaths": ["**"],
-    "allowedCommands": [
-      "npm run capture:optimization-audit",
-      "npm run capture:optimization-baseline",
-      "npm run preflight:optimization-client-measurement",
-      "npm run validate:all",
-      "npm run qualify:vnext"
-    ],
-    "stopConditions": [
-      "The candidate commit or tree changes.",
-      "Any command requires cloud, client, publication, release, or deployment authority.",
-      "A proposed action would modify a tracked file.",
-      "A critical or high security finding is detected."
-    ],
-    "budget": {
-      "maxTrackedMutations": 0,
-      "maxMinutes": 60
-    }
+    "status": "pending",
+    "pendingReason": "Historical authorization archived; no campaign authorized."
   },
   "surfaces": [
     {
       "id": "repository-root",
       "owner": "Repository maintainers",
-      "consumers": ["contributors", "release controls"],
+      "consumers": [
+        "contributors",
+        "release controls"
+      ],
       "paths": [
         ".gitattributes",
         ".gitignore",
@@ -64,79 +46,155 @@
         "VERSION.md"
       ],
       "prefixes": [],
-      "proofCommands": ["npm run validate:all"]
+      "proofCommands": [
+        "npm run validate:all"
+      ]
     },
     {
       "id": "repository-controls",
       "owner": "Repository validation engineering",
-      "consumers": ["CI", "contributors"],
+      "consumers": [
+        "CI",
+        "contributors"
+      ],
       "paths": [],
-      "prefixes": [".github/", ".devcontainer/", ".vscode/"],
-      "proofCommands": ["npm run validate:github-workflows"]
+      "prefixes": [
+        ".github/",
+        ".devcontainer/",
+        ".vscode/"
+      ],
+      "proofCommands": [
+        "npm run validate:github-workflows"
+      ]
     },
     {
       "id": "runtime-packages",
       "owner": "Package build engineering",
-      "consumers": ["APEX runtime", "CLI consumers"],
+      "consumers": [
+        "APEX runtime",
+        "CLI consumers"
+      ],
       "paths": [],
-      "prefixes": ["packages/"],
-      "proofCommands": ["npm run build:vnext"]
+      "prefixes": [
+        "packages/"
+      ],
+      "proofCommands": [
+        "npm run build:vnext"
+      ]
     },
     {
       "id": "plugin-package",
       "owner": "Package build engineering",
-      "consumers": ["Copilot CLI", "VS Code Copilot harness", "GitHub Copilot app"],
+      "consumers": [
+        "Copilot CLI",
+        "VS Code Copilot harness",
+        "GitHub Copilot app"
+      ],
       "paths": [],
-      "prefixes": ["plugin/"],
-      "proofCommands": ["npm run test:plugin", "npm run test:publish-plugin"]
+      "prefixes": [
+        "plugin/"
+      ],
+      "proofCommands": [
+        "npm run test:plugin",
+        "npm run test:publish-plugin"
+      ]
     },
     {
       "id": "runtime-configuration",
       "owner": "Kernel configuration maintainers",
-      "consumers": ["kernel", "CLI", "managed projections"],
+      "consumers": [
+        "kernel",
+        "CLI",
+        "managed projections"
+      ],
       "paths": [],
-      "prefixes": ["config/"],
-      "proofCommands": ["npm run validate:vnext"]
+      "prefixes": [
+        "config/"
+      ],
+      "proofCommands": [
+        "npm run validate:vnext"
+      ]
     },
     {
       "id": "managed-customizations",
       "owner": "Managed customization maintainers",
-      "consumers": ["VS Code", "Copilot CLI"],
+      "consumers": [
+        "VS Code",
+        "Copilot CLI"
+      ],
       "paths": [],
-      "prefixes": ["customizations/"],
-      "proofCommands": ["npm run validate:agents"]
+      "prefixes": [
+        "customizations/"
+      ],
+      "proofCommands": [
+        "npm run validate:agents"
+      ]
     },
     {
       "id": "validation-tooling",
       "owner": "Repository validation engineering",
-      "consumers": ["CI", "release qualification"],
+      "consumers": [
+        "CI",
+        "release qualification"
+      ],
       "paths": [],
-      "prefixes": ["tools/", "tests/"],
-      "proofCommands": ["npm run validate:all"]
+      "prefixes": [
+        "tools/",
+        "tests/"
+      ],
+      "proofCommands": [
+        "npm run validate:all"
+      ]
     },
     {
       "id": "product-documentation",
       "owner": "Documentation maintainers",
-      "consumers": ["users", "contributors", "release reviewers"],
+      "consumers": [
+        "users",
+        "contributors",
+        "release reviewers"
+      ],
       "paths": [],
-      "prefixes": ["docs/"],
-      "proofCommands": ["npm run validate:docs"]
+      "prefixes": [
+        "docs/"
+      ],
+      "proofCommands": [
+        "npm run validate:docs"
+      ]
     },
     {
       "id": "infrastructure",
       "owner": "Infrastructure maintainers",
-      "consumers": ["Bicep", "Terraform", "release qualification"],
+      "consumers": [
+        "Bicep",
+        "Terraform",
+        "release qualification"
+      ],
       "paths": [],
-      "prefixes": ["infra/"],
-      "proofCommands": ["npm run validate:terraform"]
+      "prefixes": [
+        "infra/"
+      ],
+      "proofCommands": [
+        "npm run validate:terraform"
+      ]
     },
     {
       "id": "generated-and-historical",
       "owner": "Repository maintainers",
-      "consumers": ["provenance validators", "release reviewers"],
+      "consumers": [
+        "provenance validators",
+        "release reviewers"
+      ],
       "paths": [],
-      "prefixes": ["agent-output/", ".apex/", ".archive/", ".vale/"],
-      "proofCommands": ["npm run test:retired-automation"]
+      "prefixes": [
+        "agent-output/",
+        ".apex/",
+        ".archive/",
+        ".vale/"
+      ],
+      "proofCommands": [
+        "npm run test:retired-automation"
+      ]
     }
   ],
   "baselines": [
@@ -176,7 +234,7 @@
       "id": "OPT-002",
       "status": "deferred",
       "owner": "Governance discovery maintainers",
-      "rationale": "The governance policy baseline is a large active input with workflow, instruction, and discovery consumers; size alone is not removal evidence.",
+      "rationale": "Reviewed governance is an explicit current consumer input; collector fixtures and typed contracts own current validation. Historical subscription snapshots are archived provenance, not active inputs or authority.",
       "expiry": "2026-12-31T23:59:59Z",
       "releaseImpact": "accepted"
     },

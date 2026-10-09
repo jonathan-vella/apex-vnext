@@ -84,6 +84,7 @@ jobs:
       APEX_LOCATION: ${{ vars.APEX_LOCATION }}
       APEX_PROJECT_NAME: ${{ vars.APEX_PROJECT_NAME }}
       APEX_QUALIFICATION_TAGS_JSON: ${{ vars.APEX_QUALIFICATION_TAGS_JSON }}
+      APEX_QUALIFICATION_GOVERNANCE_JSON: ${{ vars.APEX_QUALIFICATION_GOVERNANCE_JSON }}
       APEX_RUNTIME_ROOT: ${{ github.workspace }}/apex-live/runtime
     steps:
       - name: Checkout exact candidate
@@ -116,13 +117,34 @@ jobs:
             const token = await core.getIDToken("api://AzureADTokenExchange");
             core.setSecret(token);
             return token;
+      - name: Prepare protected qualification governance context
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { writeFileSync, appendFileSync } from "node:fs";
+          import { join } from "node:path";
+          const raw = process.env.APEX_QUALIFICATION_GOVERNANCE_JSON;
+          if (!raw) throw new Error("Protected qualification governance context is required");
+          let governance;
+          try {
+            governance = JSON.parse(raw);
+          } catch {
+            throw new Error("Protected qualification governance context is invalid JSON");
+          }
+          if (governance === null || typeof governance !== "object" || Array.isArray(governance)) {
+            throw new Error("Protected qualification governance context must be a JSON object");
+          }
+          const filename = join(process.env.RUNNER_TEMP, "apex-qualification-governance.json");
+          writeFileSync(filename, JSON.stringify(governance), { mode: 0o600, flag: "wx" });
+          appendFileSync(process.env.GITHUB_ENV, `APEX_QUALIFICATION_GOVERNANCE_PATH=${filename}\n`);
+          NODE
       - name: Validate protected inputs
         env:
           AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         run: |
           set -euo pipefail
           for name in APEX_CONTROL_RESOURCE_GROUP APEX_BACKEND_STORAGE_ACCOUNT APEX_BICEP_RESOURCE_GROUP APEX_TERRAFORM_RESOURCE_GROUP APEX_LOG_ANALYTICS_WORKSPACE_RESOURCE_ID APEX_LOCATION APEX_PROJECT_NAME APEX_QUALIFICATION_TAGS_JSON; do test -n "${!name:-}"; done
-          node tools/scripts/validate-vnext-qualification-context.mjs
+          node tools/scripts/validate-vnext-qualification-context.mjs "$APEX_QUALIFICATION_GOVERNANCE_PATH"
           test "$(az account show --query id --output tsv)" = "$AZURE_SUBSCRIPTION_ID"
           test "$GITHUB_SHA" = "$(git rev-parse HEAD)"
       - name: Define stable authority recipient
@@ -141,7 +163,7 @@ jobs:
       - name: Open temporary Entra-only endpoint session
         run: |
           set -euo pipefail
-          node tools/scripts/validate-vnext-qualification-context.mjs --security-exception-only
+          node tools/scripts/validate-vnext-qualification-context.mjs --security-exception-only "$APEX_QUALIFICATION_GOVERNANCE_PATH"
           az storage account update --resource-group "$APEX_CONTROL_RESOURCE_GROUP" --name "$APEX_BACKEND_STORAGE_ACCOUNT" --set tags.SecurityControl=Ignore --only-show-errors --output none
           az storage account update --resource-group "$APEX_CONTROL_RESOURCE_GROUP" --name "$APEX_BACKEND_STORAGE_ACCOUNT" --public-network-access Enabled --only-show-errors --output none
           az storage account update --resource-group "$APEX_CONTROL_RESOURCE_GROUP" --name "$APEX_BACKEND_STORAGE_ACCOUNT" --default-action Allow --only-show-errors --output none

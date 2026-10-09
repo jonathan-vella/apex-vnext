@@ -33,6 +33,12 @@ renderers, or scripts.
 Edit canonical package source, `config/*.v1.json`, and `customizations`. Regenerate derived schemas, assets, projections,
 and package output through owning commands. Never patch generated output as an independent source of truth.
 
+## Current Guidance Ownership
+
+The [guidance delivery registry](../../tools/registry/guidance-delivery.v1.json) records managed source and retained
+maintainer entrypoints. Historical originals belong to the [archive catalog](../../.archive/CATALOG.json), not
+active discovery or qualification. Follow the [restore guide](../../.archive/RESTORE.md) for inspection only.
+
 ## Develop One Slice
 
 1. Identify the controlling code path and one cheap falsifying check.

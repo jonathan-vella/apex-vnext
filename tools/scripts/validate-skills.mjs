@@ -95,7 +95,7 @@ export const NON_SKILL_REDIRECTS = { shipped: [], authoring: [] };
 export const RETIRED_SKILLS = [
   {
     old: "azure-troubleshooting",
-    replacements: ["apex-azure-diagnostics", "azure-diagnostics"],
+    replacements: ["apex-azure-diagnostics"],
     since: "Issue #240 — Azure Skills Plugin integration",
   },
 ];

@@ -164,9 +164,8 @@ the agent body — listed here for awareness.
   (`thinking: { type: "enabled", budget_tokens: N }`) is removed and
   returns a 400 error — use the `effort` parameter instead.
 - **`effort` still defaults to `high`**, same as 4.6. Raise to `xhigh`
-  only for the hardest coding/agentic tasks; this repo's CodeGen agents
-  (06b/06t) keep `high` — AVM generation is structured execution, not
-  deep reasoning, so `xhigh` buys no measurable lift.
+  only for the hardest coding/agentic tasks. The current session and client runtime select
+  model and effort; managed vNext guidance does not pin them.
 - **New tokenizer produces ~30% more tokens** for the same text vs.
   4.6. Re-check `max_tokens` headroom and any per-turn context budgets
   tuned against 4.6 (see

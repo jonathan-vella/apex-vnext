@@ -18,20 +18,13 @@ import { COPILOT_INSTRUCTIONS } from "./_lib/paths.mjs";
 // Skills intentionally kept without direct agent references.
 // These are invoked dynamically by VS Code Copilot via skill descriptions
 // or used as general-purpose skills available to any conversation.
-const KNOWN_UNLINKED_SKILLS = new Set([
-  "azure-cloud-migrate",
-  "azure-compliance",
-  "azure-compute",
-  "azure-cost-optimization",
-  "azure-kusto",
-  "azure-quotas",
-  "azure-rbac",
-  "azure-resources",
-  "azure-storage",
-  "entra-app-registration",
-  "mermaid",
-  "python-diagrams",
-]);
+const maintainerReadme = fs.readFileSync(".github/skills/README.md", "utf8");
+const managedManifest = JSON.parse(fs.readFileSync("customizations/manifest.json", "utf8"));
+const ownedSkills = new Set(
+  managedManifest.plugin.files
+    .filter((name) => /^\.github\/skills\/[^/]+\/SKILL\.md$/u.test(name))
+    .map((name) => name.split("/")[2]),
+);
 
 const r = new Reporter("Orphaned Content Validator");
 r.header();
@@ -49,7 +42,7 @@ function gatherReferenceContent() {
   }
 
   // Top-level config files
-  for (const f of [COPILOT_INSTRUCTIONS, "AGENTS.md", "tools/apex-prompts/plan-agenticWorkflowOverhaul.prompt.md"]) {
+  for (const f of [COPILOT_INSTRUCTIONS, "AGENTS.md"]) {
     if (fs.existsSync(f)) corpus.push(fs.readFileSync(f, "utf-8"));
   }
 
@@ -105,8 +98,8 @@ for (const [skill] of skills) {
     searchContent.includes(`\`${skill}\``);
 
   if (!isReferenced) {
-    if (KNOWN_UNLINKED_SKILLS.has(skill)) {
-      // Intentionally unlinked — skip warning
+    if (ownedSkills.has(skill) || maintainerReadme.includes(skill)) {
+      // Current managed ownership or documented maintainer entry point.
     } else {
       r.warn(`${skill}/`, "not referenced by any agent or instruction");
     }

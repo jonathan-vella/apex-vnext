@@ -139,7 +139,7 @@
       "triggerDigest": "e3ded6e02ec4d49557432b3b0d6fba9b1e37aa8136ebb240386c6d72546b4ec9",
       "permissionsDigest": "d8d6aceb1abc41990618a503082c3badcca8897feee0976f222af5b74e30bec2",
       "concurrencyDigest": "ac5c13ccbc116722f751295746c3c0d50eb7a8c994519ad66f4c2ed00f8ecc81",
-      "jobsDigest": "5b543210f68ce988daca8137a34742bab58e251a388d87c6d9b95858f5476833",
+      "jobsDigest": "79ab9cfd4ba74ab7ee0a3210b2637399eb142f8173901a2d9be7a758bc4a15b3",
       "jobs": {
         "validate_dispatch": "Validate exact dispatch",
         "apply": "Import local Gate 4 approval and deploy exact preview"
@@ -152,7 +152,7 @@
       "triggerDigest": "41f525188d27cb3a1fea9eff84337b73795b50d52df7d806b8d4d6a899e7d39a",
       "permissionsDigest": "0686420875052835389cb6e71bf20b413979858f142d3c2eb5c3efd881b5b4c9",
       "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
-      "jobsDigest": "6c913f8ed668d9bca32d90130f52e8512f7f34e9b2dae5c608b9d2e766e697a8",
+      "jobsDigest": "08dbccf87311a6eb6894bcab7f0f4fa544a813ab86e814f7f74036641e6292f4",
       "jobs": {
         "refresh-avm-module-index": "Refresh AVM Module Index",
         "track-deprecations": "Track Azure Deprecations",

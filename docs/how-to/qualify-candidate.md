@@ -59,6 +59,13 @@ resources, and bind evidence to the candidate. Follow [the live procedure](../vn
 
 ## Interpret Results
 
+Qualification launchers require `--governance-file <absolute-file>` for `preview`, `dispatch` and `retrieve`.
+Supply fresh, reviewed context for the exact candidate and target; do not use historical installed evidence or archives.
+The protected hosted environment separately requires nonsecret `APEX_QUALIFICATION_GOVERNANCE_JSON`.
+A maintainer must explicitly authorize setting that variable; this cleanup does not configure it or run live work.
+The hosted job creates a restrictive temporary context file and validates it again before opening the endpoint.
+Context is not approval: human local Gate 4 and exact recipient/preview binding remain required.
+
 - Deterministic pass means source behavior is internally qualified.
 - Package pass means the runtime packs and installs reproducibly.
 - Client pass means one exact client candidate satisfies its matrix.

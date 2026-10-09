@@ -13,7 +13,7 @@ const schema = JSON.parse(readFileSync("tools/registry/schemas/skill-catalog-rev
 test("catalog inventory and generated output ignore runtime caches without hiding authored resources", (context) => {
   const root = mkdtempSync(join(tmpdir(), "apex-skill-catalog-"));
   context.after(() => rmSync(root, { recursive: true, force: true }));
-  const directory = join(root, ".github/skills/fixture");
+  const directory = join(root, "customizations/.github/skills/apex-fixture");
   mkdirSync(join(directory, "scripts"), { recursive: true });
   mkdirSync(join(directory, "references"));
   for (const resource of ["SKILL.md", "LICENSE.txt", "scripts/diagram_io.py", "references/new-draft.md"]) {
@@ -26,8 +26,22 @@ test("catalog inventory and generated output ignore runtime caches without hidin
   mkdirSync(join(root, "tools/registry"), { recursive: true });
   mkdirSync(join(root, "docs/vnext"), { recursive: true });
   writeFileSync(
-    join(root, "tools/registry/guidance-migration.v1.json"),
-    JSON.stringify({ skillDispositions: [{ source: "fixture", disposition: "retain", owner: "fixture" }] }),
+    join(root, "tools/registry/guidance-delivery.v1.json"),
+    JSON.stringify({
+      skills: [
+        {
+          id: "apex-fixture",
+          entrypoint: ".github/skills/apex-fixture/SKILL.md",
+          owner: "fixture",
+          status: "current-source",
+          capabilityQualification: "not-established-by-this-registry",
+          files: ["SKILL.md", "LICENSE.txt", "scripts/diagram_io.py", "references/new-draft.md", "scripts/loop"]
+            .map((name) => `.github/skills/apex-fixture/${name}`)
+            .sort(),
+        },
+      ],
+      deferredCapabilities: [],
+    }),
   );
   const generator = resolve("tools/scripts/generate-skill-catalog-review.mjs");
   const generate = (...args) => {
@@ -38,6 +52,9 @@ test("catalog inventory and generated output ignore runtime caches without hidin
   generate();
   generate("--check");
   const withoutCache = readFileSync(destination, "utf8");
+  assert.match(withoutCache, /not-established-by-this-registry/u);
+  assert.match(withoutCache, /not-run/u);
+  assert.doesNotMatch(withoutCache, /guidance-migration\.v1\.json/u);
 
   mkdirSync(join(directory, "scripts/__pycache__/nested"), { recursive: true });
   mkdirSync(join(directory, "__pycache__"));

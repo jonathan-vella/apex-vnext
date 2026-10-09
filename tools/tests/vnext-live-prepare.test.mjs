@@ -16,9 +16,7 @@ const ROOT = resolve(import.meta.dirname, "../..");
 const CANDIDATE_SHA = "a".repeat(40);
 const SUBSCRIPTION = "b47d2942-f5ad-4d3c-b28e-c23e4f83d97e";
 const TOOL_PINS = JSON.parse(readFileSync(join(ROOT, "tools/registry/tool-version-pins.json"), "utf8")).pins;
-const GOVERNANCE_DISCOVERED_AT = JSON.parse(
-  readFileSync(join(ROOT, "agent-output/vnext-qualification/04-governance-constraints.json"), "utf8"),
-).discovered_at;
+const GOVERNANCE_DISCOVERED_AT = "2026-07-21T00:00:00Z";
 
 function minutesAfterGovernance(minutes) {
   return new Date(Date.parse(GOVERNANCE_DISCOVERED_AT) + minutes * 60 * 1000).toISOString();

@@ -1,8 +1,8 @@
 {
   "schemaVersion": "documentation-inventory-v1",
   "inventoryBinding": {
-    "commit": "da708ef5e0ff63a9ff1bf1a43112c6670e3bfc0a",
-    "capturedAt": "2026-08-01",
+    "commit": "7fbb02e1593a26ee710e6735df1ac21641efcee4",
+    "capturedAt": "2026-10-09",
     "scope": "Current vNext repository documentation"
   },
   "authorities": {
@@ -14,86 +14,165 @@
     "errors": "packages/cli/src/errors.ts",
     "mcp": "packages/cli/src/mcp.ts",
     "projectControls": "docs/vnext/README.md",
-    "qualification": "tools/scripts/validate-vnext.mjs"
+    "qualification": "tools/scripts/validate-vnext.mjs",
+    "guidanceDelivery": "tools/registry/guidance-delivery.v1.json",
+    "archiveCatalog": ".archive/CATALOG.json"
   },
   "records": [
     {
       "id": "root-readme",
       "currentPath": "README.md",
       "contentClass": "user-doc",
-      "audiences": ["platform-engineer", "repository-contributor"],
+      "audiences": [
+        "platform-engineer",
+        "repository-contributor"
+      ],
       "lifecycle": "active",
       "classification": "rewrite",
       "targetFamily": "navigation",
-      "targetPaths": ["README.md"],
-      "authorityBindings": ["productStatus", "clients"]
+      "targetPaths": [
+        "README.md"
+      ],
+      "authorityBindings": [
+        "productStatus",
+        "clients"
+      ]
     },
     {
       "id": "contributing",
       "currentPath": "CONTRIBUTING.md",
       "contentClass": "contributor-doc",
-      "audiences": ["repository-contributor"],
+      "audiences": [
+        "repository-contributor"
+      ],
       "lifecycle": "active",
       "classification": "split",
       "targetFamily": "how-to",
-      "targetPaths": ["CONTRIBUTING.md", "docs/how-to/contribute.md"],
-      "authorityBindings": ["projectControls", "qualification"]
+      "targetPaths": [
+        "CONTRIBUTING.md",
+        "docs/how-to/contribute.md"
+      ],
+      "authorityBindings": [
+        "projectControls",
+        "qualification"
+      ]
     },
     {
       "id": "documentation-index",
       "currentPath": "docs/README.md",
       "contentClass": "user-doc",
-      "audiences": ["platform-engineer", "repository-contributor"],
+      "audiences": [
+        "platform-engineer",
+        "repository-contributor"
+      ],
       "lifecycle": "active",
       "classification": "rewrite",
       "targetFamily": "navigation",
-      "targetPaths": ["docs/README.md"],
-      "authorityBindings": ["productStatus", "projectControls"]
+      "targetPaths": [
+        "docs/README.md"
+      ],
+      "authorityBindings": [
+        "productStatus",
+        "projectControls"
+      ]
     },
     {
       "id": "project-controls",
       "currentPath": "docs/vnext/{README,PRD,ROADMAP,REGISTER,DECISIONS,CLIENT-QUALIFICATION,LIVE-QUALIFICATION}.md",
       "contentClass": "project-control",
-      "audiences": ["repository-contributor", "maintainer", "release-reviewer"],
+      "audiences": [
+        "repository-contributor",
+        "maintainer",
+        "release-reviewer"
+      ],
       "lifecycle": "active",
       "classification": "keep",
       "targetFamily": "project-control",
-      "targetPaths": ["docs/vnext/**"],
-      "authorityBindings": ["projectControls", "qualification"]
+      "targetPaths": [
+        "docs/vnext/**"
+      ],
+      "authorityBindings": [
+        "projectControls",
+        "qualification"
+      ]
     },
     {
       "id": "copilot-desktop-parked-plan",
       "currentPath": "docs/vnext/COPILOT-DESKTOP-PLAN.md",
       "contentClass": "contributor-doc",
-      "audiences": ["repository-contributor", "maintainer"],
-      "lifecycle": "deferred",
-      "classification": "keep",
+      "audiences": [
+        "repository-contributor",
+        "maintainer"
+      ],
+      "lifecycle": "historical-archived",
+      "classification": "archive",
       "targetFamily": "project-control",
-      "targetPaths": ["docs/vnext/COPILOT-DESKTOP-PLAN.md"],
-      "authorityBindings": ["projectControls"],
-      "owner": "client-experience-maintainers"
+      "targetPaths": [
+        ".archive/CATALOG.json",
+        ".archive/RESTORE.md"
+      ],
+      "authorityBindings": [
+        "projectControls",
+        "archiveCatalog"
+      ],
+      "owner": "client-experience-maintainers",
+      "archiveEntry": "docs/vnext/COPILOT-DESKTOP-PLAN.md"
     },
     {
       "id": "terraform-reference",
       "currentPath": "docs/reference/iac-tracks.md",
       "contentClass": "user-doc",
-      "audiences": ["platform-engineer", "repository-contributor"],
+      "audiences": [
+        "platform-engineer",
+        "repository-contributor"
+      ],
       "lifecycle": "active",
       "classification": "keep",
       "targetFamily": "reference",
-      "targetPaths": ["docs/reference/iac-tracks.md"],
-      "authorityBindings": ["workflow"]
+      "targetPaths": [
+        "docs/reference/iac-tracks.md"
+      ],
+      "authorityBindings": [
+        "workflow"
+      ]
     },
     {
       "id": "adrs",
       "currentPath": "docs/vnext/adrs/**",
       "contentClass": "binding-contract",
-      "audiences": ["repository-contributor", "maintainer"],
+      "audiences": [
+        "repository-contributor",
+        "maintainer"
+      ],
       "lifecycle": "active",
       "classification": "keep",
       "targetFamily": "project-control",
-      "targetPaths": ["docs/vnext/adrs/**"],
-      "authorityBindings": ["projectControls"]
+      "targetPaths": [
+        "docs/vnext/adrs/**"
+      ],
+      "authorityBindings": [
+        "projectControls"
+      ]
+    },
+    {
+      "id": "current-guidance-delivery",
+      "currentPath": "tools/registry/guidance-delivery.v1.json",
+      "contentClass": "contributor-doc",
+      "audiences": [
+        "repository-contributor",
+        "maintainer"
+      ],
+      "lifecycle": "active",
+      "classification": "keep",
+      "targetFamily": "reference",
+      "targetPaths": [
+        "docs/vnext/SKILL-CATALOG-REVIEW.generated.md",
+        "docs/vnext/INSTRUCTION-CATALOG-REVIEW.generated.md"
+      ],
+      "authorityBindings": [
+        "guidanceDelivery"
+      ],
+      "owner": "managed-customization-maintainers"
     }
   ]
 }

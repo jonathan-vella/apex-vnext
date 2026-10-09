@@ -148,7 +148,8 @@ and the repository archives.
   gates. Retired client values fail validation with reason `CLIENT_PROJECTION_RETIRED`; there is no automatic
   migration, and only an explicit `apex init --client github-copilot-cli` swaps the managed files. Replace
   handoffs with `apex-next`, multi-select with native checkboxes or kernel-validated numbered selection, and allowlists
-  with kernel task ownership and scoped tools. The archive under `.archive/vscode-projection/` records rollback notes,
+  with kernel task ownership and scoped tools. The archive under [archive catalog](../../.archive/CATALOG.json)
+  (entry `.archive/vscode-projection/ROLLBACK.md`) records rollback notes,
   stays out of packaging, and `retired-paths.v1.json` keeps the former live paths absent.
 - **State:** Open; standalone CLI partially qualified in slice 11; VS Code harness blocked on WSL
 - **Closure proof:** Rejection and reintroduction tests pass, archive provenance and rollback notes are recorded, and
@@ -209,3 +210,6 @@ unchanged scoped permissions. Generic delegation and visibility-only probes are 
 
 No open risk is silently waived. A release-blocking item must be closed by evidence or accepted through an explicit,
 auditable maintainer decision that names scope, rationale, owner, expiry, and rollback.
+
+Historical archive entries are indexed in the [catalog](../../.archive/CATALOG.json);
+the [restore guide](../../.archive/RESTORE.md) grants no runtime, release or deployment authority.
