@@ -45,8 +45,8 @@ shipped reference governance baseline), or a full Azure scope such as
 
 Each project can have multiple environment-scoped runs. Use `apex project promote` after Gate 1 is approved and
 Gates 2 and 3 are approved or, for a lab run, recorded as kernel readiness checkpoints to create a linked run for the
-next environment. It inherits only still-valid upstream proof (never readiness, which the new run records itself) and
-always requires a new preview and Gate 4 approval.
+next environment. It inherits only still-valid upstream proof (Gate 1 only when the target is unchanged, and never
+readiness, which the new run records itself) and always requires a new preview and Gate 4 approval.
 
 ## Archetype Source Reuse
 

@@ -20,9 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Gate 1 stays the single human intent confirmation (it now binds `run-config.purpose` and `run-config.targetScope`)
   and Gate 4 the final human preview approval, which now shows the purpose, target, architecture, cost estimate and
   accepted risks. `gateDecide` on lab Gate 2 or 3 is refused, `ready` cannot satisfy Gate 1, Gate 4, deploy or destroy,
-  changed requirements invalidate it, and promotion recomputes it instead of inheriting it. `apex render status` lists
-  the purpose and readiness time. CLI/MCP prompts, managed guidance and qualification scenarios still describe three
-  human gate decisions until part 3.
+  changed requirements invalidate it, and promotion recomputes it instead of inheriting it. Because Gate 1 binds the
+  target, promotion to a different target no longer inherits Gate 1 and reopens it for a fresh human confirmation.
+  `apex render status` lists the purpose and readiness time. CLI/MCP prompts, managed guidance and qualification
+  scenarios still describe three human gate decisions until part 3.
 
 - Bind a typed deployment `purpose` (`lab` or `production`) to every run (CP-27, part 1). `apex init`, `bootstrap` and
   `project create` accept `--purpose` (MCP `projectCreate` and `promote` accept `purpose`) and default to `lab`;

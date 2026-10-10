@@ -31,20 +31,11 @@ export function parseRunConfig(raw: string): RunConfigV1 {
   throw new RunConfigInvalidError(issues);
 }
 
-/** A `ready` gate is a lab-only kernel checkpoint for Gates 2 and 3; it carries no human decision fields. */
+/** The schema fixes the shape of a ready gate; its lab-only restriction depends on the run purpose. */
 function readinessGateIssues(run: RunConfigV1): string[] {
-  return run.gates.flatMap((gate, index) => {
-    const path = `/gates/${index}`;
-    if (gate.state !== "ready") {
-      return gate.readyAt === undefined ? [] : [`${path}/readyAt: only allowed on a ready gate`];
-    }
-    if (!isReadinessGate(run.purpose, gate.gate)) {
-      return [`${path}/state: ready is only valid for lab Gates 2 and 3`];
-    }
-    if (gate.readyAt === undefined) return [`${path}/readyAt: required for a ready gate`];
-    if (gate.decidedAt !== undefined || gate.inheritedFromRunId !== undefined) {
-      return [`${path}: a ready gate cannot carry decision or inheritance fields`];
-    }
-    return [];
-  });
+  return run.gates.flatMap((gate, index) =>
+    gate.state === "ready" && !isReadinessGate(run.purpose, gate.gate)
+      ? [`/gates/${index}/state: ready is only valid for lab Gates 2 and 3`]
+      : [],
+  );
 }

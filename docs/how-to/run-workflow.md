@@ -34,8 +34,8 @@ Project creation selects the new project's first run. Use `apex project use` to 
 
 ## Promote A Project Environment
 
-Each workload has one run per environment. After Gate 1 is approved and Gates 2 and 3 are approved or, for a lab run, recorded
-as readiness checkpoints for the selected run, create the next environment run:
+Each workload has one run per environment. After Gate 1 is approved and Gates 2 and 3 are approved or, for a lab run,
+recorded as readiness checkpoints for the selected run, create the next environment run:
 
 ```bash
 apex project promote \
@@ -45,7 +45,8 @@ apex project promote \
 ```
 
 The promoted run remains in the same project and is selected automatically. It inherits only applicable upstream
-evidence; it always needs its own code generation, validation, preview, and Gate 4 approval. Repeat for production
+evidence; it always needs its own code generation, validation, preview, and Gate 4 approval. A different target also
+reopens Gate 1 for a fresh confirmation, and a lab run records its own Gate 2 and 3 readiness. Repeat for production
 with its production target. Return to a prior environment with `apex project use --project payments --run RUN_ID`.
 
 Use the `APEX` agent in Copilot CLI (`copilot --agent apex`) as the normal interactive entry point; the VS Code

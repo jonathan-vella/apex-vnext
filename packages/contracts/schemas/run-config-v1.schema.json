@@ -13,72 +13,97 @@
     },
     "gates": {
       "items": {
-        "additionalProperties": false,
-        "properties": {
-          "decidedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "dependencyHash": {
-            "pattern": "^[0-9a-f]{64}$",
-            "type": "string"
-          },
-          "gate": {
-            "maximum": 4,
-            "minimum": 1,
-            "type": "integer"
-          },
-          "inheritedFromRunId": {
-            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$",
-            "type": "string"
-          },
-          "readyAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "reason": {
-            "minLength": 1,
-            "type": "string"
-          },
-          "state": {
-            "anyOf": [
-              {
-                "const": "closed",
+        "anyOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "decidedAt": {
+                "format": "date-time",
                 "type": "string"
               },
-              {
-                "const": "open",
+              "dependencyHash": {
+                "pattern": "^[0-9a-f]{64}$",
                 "type": "string"
               },
-              {
+              "gate": {
+                "maximum": 4,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "inheritedFromRunId": {
+                "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$",
+                "type": "string"
+              },
+              "reason": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "state": {
+                "anyOf": [
+                  {
+                    "const": "closed",
+                    "type": "string"
+                  },
+                  {
+                    "const": "open",
+                    "type": "string"
+                  },
+                  {
+                    "const": "approved",
+                    "type": "string"
+                  },
+                  {
+                    "const": "inherited",
+                    "type": "string"
+                  },
+                  {
+                    "const": "rejected",
+                    "type": "string"
+                  },
+                  {
+                    "const": "invalidated",
+                    "type": "string"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "gate",
+              "state",
+              "dependencyHash"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "dependencyHash": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "gate": {
+                "maximum": 3,
+                "minimum": 2,
+                "type": "integer"
+              },
+              "readyAt": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "state": {
                 "const": "ready",
                 "type": "string"
-              },
-              {
-                "const": "approved",
-                "type": "string"
-              },
-              {
-                "const": "inherited",
-                "type": "string"
-              },
-              {
-                "const": "rejected",
-                "type": "string"
-              },
-              {
-                "const": "invalidated",
-                "type": "string"
               }
-            ]
+            },
+            "required": [
+              "gate",
+              "state",
+              "dependencyHash",
+              "readyAt"
+            ],
+            "type": "object"
           }
-        },
-        "required": [
-          "gate",
-          "state",
-          "dependencyHash"
-        ],
-        "type": "object"
+        ]
       },
       "maxItems": 4,
       "minItems": 4,

@@ -1928,6 +1928,14 @@ describe("target family contracts", () => {
     const gate = { gate: 2, state: "ready", dependencyHash: hash, readyAt: timestamp };
     assert.equal(Value.Check(GateRecordV1Schema, gate), true);
     assert.equal(Value.Check(GateRecordV1Schema, { ...gate, state: "readiness" }), false);
+    const { readyAt: _readyAt, ...withoutReadyAt } = gate;
+    assert.equal(Value.Check(GateRecordV1Schema, withoutReadyAt), false);
+    assert.equal(Value.Check(GateRecordV1Schema, { ...gate, gate: 1 }), false);
+    assert.equal(Value.Check(GateRecordV1Schema, { ...gate, gate: 4 }), false);
+    assert.equal(Value.Check(GateRecordV1Schema, { ...gate, decidedAt: timestamp }), false);
+    assert.equal(Value.Check(GateRecordV1Schema, { ...gate, inheritedFromRunId: "run-0" }), false);
+    assert.equal(Value.Check(GateRecordV1Schema, { ...gate, state: "approved" }), false);
+    assert.equal(Value.Check(GateRecordV1Schema, { gate: 2, state: "approved", dependencyHash: hash }), true);
   });
 
   it("permits only local and inherited approval mechanisms", () => {

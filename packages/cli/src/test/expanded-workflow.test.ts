@@ -3197,8 +3197,8 @@ test("promotion inherits neutral progression and restarts at the first environme
     sameScope.gates.map(({ state }) => state),
     ["inherited", "ready", "ready", "closed"],
   );
-  assert.equal(sameScope.gates[1]?.inheritedFromRunId, undefined);
-  assert.equal(sameScope.gates[2]?.inheritedFromRunId, undefined);
+  assert.equal((sameScope.gates[1] as { inheritedFromRunId?: string }).inheritedFromRunId, undefined);
+  assert.equal((sameScope.gates[2] as { inheritedFromRunId?: string }).inheritedFromRunId, undefined);
   assert.equal((await service.nextTask()).status, "task");
   assert.equal((await service.status()).task, "codegen-bicep");
 
@@ -3207,8 +3207,11 @@ test("promotion inherits neutral progression and restarts at the first environme
   assert.equal(changedScope.purpose, "lab");
   assert.deepEqual(
     changedScope.gates.map(({ state }) => state),
-    ["inherited", "closed", "closed", "closed"],
+    ["open", "closed", "closed", "closed"],
   );
+  // Gate 1 binds the target, so the changed target needs its own human confirmation.
+  await assert.rejects(service.nextTask(), /Gate 1 approval is required/);
+  await service.decideGateNumber(1, "approved", "tester");
   const next = await service.nextTask();
   assert.equal(next.status, "task");
   if (next.status === "task") assert.equal(next.task.taskType, "governance-discovery");

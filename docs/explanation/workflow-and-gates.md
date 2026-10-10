@@ -46,9 +46,11 @@ the gate unrecorded, and `nextTask` reports it like any other unmet gate. Decidi
 refused because no human decision exists.
 
 Changed requirements, and therefore changed intent, invalidate Gate 1 and the downstream readiness checkpoints, which
-are recomputed after the new confirmation. Promotion inherits the Gate 1 confirmation but never inherits readiness; the
-promoted run records its own. A new human confirmation is needed only for changed requirements, purpose or target, each
-new risk acceptance, and each apply and destroy, which keep their own current preview and Gate 4 approval.
+are recomputed after the new confirmation. Promotion inherits the Gate 1 confirmation only for the same target, because
+Gate 1 binds it; a changed target reopens Gate 1 in the new run for a fresh human confirmation. Promotion never inherits
+readiness; the promoted run records its own. A new human confirmation is needed only for changed requirements, purpose
+or target, each new risk acceptance, and each apply and destroy, which keep their own current preview and Gate 4
+approval.
 
 Still planned: the CLI and MCP prompts and `nextTask` wording, managed agent and skill guidance, and the client
 qualification scenarios still describe three human gate decisions and are updated separately (CP-27 PR 3).

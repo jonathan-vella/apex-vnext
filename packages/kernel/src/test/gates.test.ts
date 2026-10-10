@@ -33,7 +33,11 @@ test("markGateReady records a checkpoint with no decision fields and only from o
   assert.throws(() => markGateReady(open(4), "lab", readyAt), /cannot be recorded as ready/u);
   assert.throws(() => markGateReady(open(2), "production", readyAt), /cannot be recorded as ready/u);
   for (const state of ["closed", "approved", "inherited", "rejected", "invalidated", "ready"] as const) {
-    assert.throws(() => markGateReady({ gate: 3, state, dependencyHash: hash }, "lab", readyAt), /is not open/u, state);
+    assert.throws(
+      () => markGateReady({ gate: 3, state, dependencyHash: hash } as GateRecordV1, "lab", readyAt),
+      /is not open/u,
+      state,
+    );
   }
 });
 
@@ -46,7 +50,7 @@ test("a ready gate is invalidated like an approved gate, cannot be decided or in
     dependencyHash: later,
     reason: "requirements changed",
   });
-  assert.equal(invalidated.readyAt, undefined);
+  assert.equal(Object.hasOwn(invalidated, "readyAt"), false);
   assert.throws(() => decideGate(ready, "approved", readyAt), /is not open/u);
   assert.throws(() => inheritGate(ready, "run-1" as never, hash, readyAt), /recomputed in the new run/u);
   assert.equal(openGate(invalidated, later).state, "open");

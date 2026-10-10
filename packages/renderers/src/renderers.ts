@@ -205,15 +205,18 @@ export function renderDeploymentGuide(input: {
 export function renderRunStatus(run: RunConfigV1): string {
   const gates = [...run.gates]
     .sort((left, right) => left.gate - right.gate)
-    .map((gate) => [
-      gate.gate,
-      gate.state,
-      gate.state === "inherited" ? optional(gate.inheritedFromRunId) : "-",
-      optional(gate.decidedAt),
-      optional(gate.readyAt),
-      optional(gate.reason),
-      gate.dependencyHash,
-    ]);
+    .map((gate) => {
+      const fields = gate as Partial<Record<"decidedAt" | "readyAt" | "reason" | "inheritedFromRunId", string>>;
+      return [
+        gate.gate,
+        gate.state,
+        gate.state === "inherited" ? optional(fields.inheritedFromRunId) : "-",
+        optional(fields.decidedAt),
+        optional(fields.readyAt),
+        optional(fields.reason),
+        gate.dependencyHash,
+      ];
+    });
   return [
     "# Run Status",
     "",

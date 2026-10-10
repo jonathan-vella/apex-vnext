@@ -25,6 +25,10 @@ import {
 } from "./helpers.js";
 import { sha256Json } from "@apexops/kernel";
 
+function field(gate: RunConfigV1["gates"][number], key: "readyAt" | "decidedAt" | "inheritedFromRunId") {
+  return (gate as Partial<Record<typeof key, string>>)[key];
+}
+
 async function events(root: string, runId: string) {
   return new EventJournal(join(root, ".apex", "projects", "demo", "runs", runId, "journal")).replay();
 }
@@ -89,9 +93,9 @@ test("lab Gates 2 and 3 are recorded as readiness checkpoints without approval e
     ["approved", "ready", "ready", "closed"],
   );
   for (const gate of [states[1]!, states[2]!]) {
-    assert.match(gate.readyAt!, /^\d{4}-\d{2}-\d{2}T/u);
-    assert.equal(gate.decidedAt, undefined);
-    assert.equal(gate.inheritedFromRunId, undefined);
+    assert.match(field(gate, "readyAt")!, /^\d{4}-\d{2}-\d{2}T/u);
+    assert.equal(field(gate, "decidedAt"), undefined);
+    assert.equal(field(gate, "inheritedFromRunId"), undefined);
   }
 
   const journal = await events(root, runId);
@@ -154,6 +158,11 @@ test("lab readiness never unlocks Gate 4 or deployment; the final preview still 
   assert.match(material, /## Cost Estimate[\s\S]*Estimated monthly total: 1 USD/u);
   assert.match(material, /## Accepted Risks\n\n- None\./u);
 
+  // The approver relies on this material, so a hand edit blocks the decision until it is restored.
+  const materialPath = join(root, "agent-output", "demo", runId, "operations", "deployment-preview.md");
+  await writeFile(materialPath, material.replace("- Purpose: lab", "- Purpose: edited"));
+  await assert.rejects(service.decideGateNumber(4, "approved", "tester"), /manual edits/u);
+  await writeFile(materialPath, material);
   const approval = await service.decideGateNumber(4, "approved", "tester");
   assert.equal(approval.gate, 4);
   assert.equal(approval.mechanism, "tty");
@@ -276,7 +285,7 @@ test("readiness is not recorded while a required review is missing or a blocking
   ]);
   const gate2 = (await gates(service))[1]!;
   assert.equal(gate2.state, "ready");
-  assert.equal(gate2.decidedAt, undefined);
+  assert.equal(field(gate2, "decidedAt"), undefined);
   assert.deepEqual(
     (await events(root, runId))
       .filter(({ type }) => type === "gate.readiness-recorded")
@@ -395,9 +404,9 @@ test("promotion never inherits readiness; the new run records its own", async ()
     ["inherited", "ready", "ready", "closed"],
   );
   for (const gate of sameScope.gates.slice(1, 3)) {
-    assert.equal(gate.inheritedFromRunId, undefined);
-    assert.equal(gate.decidedAt, undefined);
-    assert.ok(gate.readyAt);
+    assert.equal(field(gate, "inheritedFromRunId"), undefined);
+    assert.equal(field(gate, "decidedAt"), undefined);
+    assert.ok(field(gate, "readyAt"));
   }
   const promotedEvents = await events(root, sameScope.runId);
   assert.deepEqual(
@@ -412,8 +421,11 @@ test("promotion never inherits readiness; the new run records its own", async ()
   const changedScope = await service.promote("prod", "local/prod");
   assert.deepEqual(
     changedScope.gates.map(({ state }) => state),
-    ["inherited", "closed", "closed", "closed"],
+    ["open", "closed", "closed", "closed"],
   );
+  await assert.rejects(service.nextTask(), /Gate 1 approval is required/u);
+  await service.decideGateNumber(1, "approved", "tester");
+  assert.equal((await service.nextTask()).status, "task");
 });
 
 test("a run file that records readiness outside lab Gates 2 and 3 is rejected", async () => {
@@ -441,15 +453,23 @@ test("a run file that records readiness outside lab Gates 2 and 3 is rejected", 
         value.gates[gate - 1] = readyGate(gate);
       }),
     );
-    await assert.rejects(new ApexService(root).status(), /ready is only valid for lab Gates 2 and 3/u);
+    await assert.rejects(new ApexService(root).status(), /does not match the current contract/u);
   }
   await writeFile(
     runPath,
     forged((value) => {
-      value.gates[1] = { ...readyGate(2), decidedAt: "2026-01-01T00:00:00.000Z" };
+      value.purpose = "production";
+      value.gates[1] = readyGate(2);
     }),
   );
-  await assert.rejects(new ApexService(root).status(), /cannot carry decision or inheritance fields/u);
+  await assert.rejects(new ApexService(root).status(), /ready is only valid for lab Gates 2 and 3/u);
+  await writeFile(
+    runPath,
+    forged((value) => {
+      value.gates[1] = { ...readyGate(2), decidedAt: "2026-01-01T00:00:00.000Z" } as never;
+    }),
+  );
+  await assert.rejects(new ApexService(root).status(), /does not match the current contract/u);
   await writeFile(
     runPath,
     forged((value) => {
@@ -458,10 +478,10 @@ test("a run file that records readiness outside lab Gates 2 and 3 is rejected", 
         state: "approved",
         dependencyHash: "a".repeat(64),
         readyAt: "2026-01-01T00:00:00.000Z",
-      };
+      } as never;
     }),
   );
-  await assert.rejects(new ApexService(root).status(), /only allowed on a ready gate/u);
+  await assert.rejects(new ApexService(root).status(), /does not match the current contract/u);
   await writeFile(runPath, original);
   await assertLabReadinessAbsent(new ApexService(root));
 });

@@ -6734,8 +6734,11 @@ export class ApexService {
       );
     }
     if (gateNumber === 4) assertDeploymentPurposeUsable(run.purpose);
-    if (gateNumber === 4)
-      await this.assertGeneratedReviewUnmodified(join(this.operationsReviewDirectory(run), "approval.md"));
+    if (gateNumber === 4) {
+      // The approver relies on the generated preview material, so hand edits block the decision.
+      for (const name of ["README.md", "deployment-preview.md", "approval.md"])
+        await this.assertGeneratedReviewUnmodified(join(this.operationsReviewDirectory(run), name));
+    }
     const gate = run.gates.find(({ gate }) => gate === gateNumber);
     if (gate === undefined) throw new ApexError("APEX_USAGE", `Unknown gate ${gateNumber}`, EXIT_CODES.usage);
     const events = await this.journal(run).replay();
@@ -7736,7 +7739,8 @@ export class ApexService {
     const sameScope = source.targetScope === targetScope;
     const inherited = promoted.gates.map((gate) => {
       const sourceGate = source.gates.find(({ gate: number }) => number === gate.gate)!;
-      const inheritable = gate.gate === 1 || (sameScope && gate.gate <= 3);
+      // Gate 1 binds the target, so a changed target needs a fresh human confirmation in the new run.
+      const inheritable = sameScope && gate.gate <= 3;
       return inheritable && (sourceGate.state === "approved" || sourceGate.state === "inherited")
         ? inheritGate(sourceGate, source.runId, sourceGate.dependencyHash, this.clock().toISOString())
         : gate;
@@ -7791,7 +7795,7 @@ export class ApexService {
       sourceDependencyRevision: this.dependencyRevision(source, sourceEvents),
       targetScopeChanged: !sameScope,
       invalidated: [
-        ...(!sameScope ? ["governance", "gate-2", "gate-3"] : []),
+        ...(!sameScope ? ["governance", "gate-1", "gate-2", "gate-3"] : []),
         "codegen",
         "validation",
         "preview",
@@ -7800,23 +7804,29 @@ export class ApexService {
         "inventory",
       ],
     });
+    const reopen: Array<readonly [number, string]> = [];
+    // A changed target needs its own human confirmation, so Gate 1 opens for the new run.
+    if (!sameScope) reopen.push([1, "requirements-review"]);
     // Readiness is never inherited: the new run re-evaluates it from the inherited reviews and current validators.
     if (sameScope) {
       for (const [gateNumber, reviewNode] of [
         [2, "architecture-review"],
         [3, "plan-review"],
       ] as const) {
-        if (source.gates.find(({ gate }) => gate === gateNumber)?.state !== "ready") continue;
-        const promotedEvents = await this.journal(updated).replay();
-        const reviewDependencyHash = this.latestPayloadHash(
-          promotedEvents,
-          "task.completed",
-          "dependencyHash",
-          (payload) => payload.nodeId === reviewNode,
-        );
-        if (reviewDependencyHash === undefined || this.reviewBlockers(promotedEvents, reviewNode).length > 0) break;
-        await this.openRunGate(await this.runRepository(updated).read(), gateNumber, reviewDependencyHash);
+        if (source.gates.find(({ gate }) => gate === gateNumber)?.state === "ready")
+          reopen.push([gateNumber, reviewNode]);
       }
+    }
+    for (const [gateNumber, reviewNode] of reopen) {
+      const promotedEvents = await this.journal(updated).replay();
+      const reviewDependencyHash = this.latestPayloadHash(
+        promotedEvents,
+        "task.completed",
+        "dependencyHash",
+        (payload) => payload.nodeId === reviewNode,
+      );
+      if (reviewDependencyHash === undefined || this.reviewBlockers(promotedEvents, reviewNode).length > 0) break;
+      await this.openRunGate(await this.runRepository(updated).read(), gateNumber, reviewDependencyHash);
     }
     await this.writeSelection({ projectId: updated.projectId, runId: updated.runId });
     return this.runRepository(updated).read();
