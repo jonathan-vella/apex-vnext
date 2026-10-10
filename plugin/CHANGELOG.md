@@ -10,6 +10,12 @@ When you prepare a release, rename `## [Unreleased]` to the new version.
 
 ## [Unreleased]
 
+- Operations skills re-ported at the pinned upstream commit (CP-18/CP-21): full recipe/CLI/azd/SDK and service
+  references, migration scenarios/runtime examples and inline Mermaid syntax. Script/workflow sources are
+  non-executable references. Native-provider authority, task/evidence boundaries, the current runtime's Gate 4 and the
+  unavailable status of the planned DECISION-036 flow (CP-26 to CP-30) are preserved; no deployment or Mermaid renderer
+  capability is added.
+
 - Azure design skills re-ported from `jonathan-vella/apex` (CP-18): trigger-rich descriptions, retail pricing, SKU
   availability and cost tool references, guidance aligned to the read-only `apex-azure-pricing` tools, and the upstream
   Azure CLI and azd commands. Read commands run directly; commands that change Azure route through `apex deploy` and

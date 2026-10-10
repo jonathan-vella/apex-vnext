@@ -22,6 +22,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   versus published-release pins, plugin tree verification, host/client sandbox observations and unrun evidence
   worksheets. Correct the installation guides' preview status; azd/CI CLIENT-039/040 remain blocked pending CP-26,
   clean-host proof remains pending, and app typed-outcome export remains an explicit gap.
+- The five shipped operations skills (`apex-azure-deploy`, `apex-azure-diagnostics`, `apex-azure-kusto`,
+  `apex-azure-cloud-migrate` and `apex-mermaid`) are re-ported from the same pinned upstream commit (CP-18/CP-21).
+  Progressive-disclosure references retain deployment recipes, azd/CLI, identity and messaging SDKs, service
+  diagnostics, eight migration scenarios, six Functions runtimes and inline Mermaid syntax/styling. Scripts and
+  pipeline examples are non-executable Markdown references. Direct reads stay task-scoped; mutations remain behind
+  exact previews, the current runtime's Gate 4 approval and trusted execution. Purpose-bound delivery (DECISION-036:
+  azd for Bicep only, native Terraform CLI, CI-owned production runs with human approval verified before apply) is
+  described as planned work (CP-26 to CP-30), not shipped behavior; OIDC identity is not human approval. Mermaid
+  renderer availability is unchanged; standalone diagrams remain Python-owned. Per-file upstream coverage, pins,
+  manifest and guidance catalog are updated.
 - The shipped Azure design skills (`apex-azure-defaults`, `apex-azure-adr`, `apex-azure-compute`, `apex-azure-storage`,
   `apex-azure-rbac`, `apex-azure-quotas`, `apex-azure-cost-optimization`, `apex-azure-governance`,
   `apex-azure-compliance`, `apex-azure-resources`, `apex-entra-app-registration` and `apex-microsoft-docs`) are

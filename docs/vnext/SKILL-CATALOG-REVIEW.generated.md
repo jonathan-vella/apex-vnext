@@ -53,108 +53,236 @@ Live provider and paired-client qualification are not run by this artifact or it
 
 `unmapped-current-source` means a managed source file lacks a current delivery entry and must fail validation.
 
-| Skill                        | Resource                                              | Availability   | Owner                 | Evidence boundary                                          |
-| ---------------------------- | ----------------------------------------------------- | -------------- | --------------------- | ---------------------------------------------------------- |
-| apex-artifacts               | references/presentation-conventions.md                | current-source | packages/renderers    | Plugin-owned managed source; not capability qualification. |
-| apex-artifacts               | references/reference-only-outlines.md                 | current-source | packages/renderers    | Plugin-owned managed source; not capability qualification. |
-| apex-artifacts               | templates/architecture-assessment.md                  | current-source | packages/renderers    | Plugin-owned managed source; not capability qualification. |
-| apex-artifacts               | templates/cost-estimate.md                            | current-source | packages/renderers    | Plugin-owned managed source; not capability qualification. |
-| apex-artifacts               | templates/deployment-summary.md                       | current-source | packages/renderers    | Plugin-owned managed source; not capability qualification. |
-| apex-artifacts               | templates/governance-constraints.md                   | current-source | packages/renderers    | Plugin-owned managed source; not capability qualification. |
-| apex-artifacts               | templates/implementation-plan.md                      | current-source | packages/renderers    | Plugin-owned managed source; not capability qualification. |
-| apex-artifacts               | templates/operations-runbook.md                       | current-source | packages/renderers    | Plugin-owned managed source; not capability qualification. |
-| apex-artifacts               | templates/requirements.md                             | current-source | packages/renderers    | Plugin-owned managed source; not capability qualification. |
-| apex-artifacts               | templates/resource-inventory.md                       | current-source | packages/renderers    | Plugin-owned managed source; not capability qualification. |
-| apex-azure-adr               | references/decision-examples.md                       | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-adr               | references/decision-guardrails.md                     | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-adr               | references/decision-quality.md                        | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-adr               | references/decision-record-fields.md                  | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-cloud-migrate     | references/lambda-to-functions-assessment.md          | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-cloud-migrate     | references/migration-readiness.md                     | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-cloud-migrate     | references/staged-validation-handoff.md               | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-cloud-migrate     | references/workload-mapping.md                        | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-compliance        | references/azure-quick-review.md                      | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-compliance        | references/azure-resource-graph.md                    | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-compliance        | references/compliance-finding-criteria.md             | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-compliance        | references/keyvault-expiration-audit.md               | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-compliance        | references/operational-checklist.md                   | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-compliance        | references/remediation-patterns.md                    | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-compute           | references/compute-selection.md                       | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-compute           | references/pricing-evidence.md                        | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-compute           | references/recommendation-and-scale-rules.md          | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-compute           | references/retail-prices-api.md                       | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-cost-optimization | references/azure-resource-graph.md                    | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-cost-optimization | references/cost-assessment-criteria.md                | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-cost-optimization | references/cost-cli-workflow.md                       | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-cost-optimization | references/cost-tool-guardrails.md                    | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-cost-optimization | references/operational-checklist.md                   | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-defaults          | references/avm-binding-guidance.md                    | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-defaults          | references/azure-cli-and-azd.md                       | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-defaults          | references/baseline-fallbacks.md                      | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-defaults          | references/cost-monitoring.md                         | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-defaults          | references/decision-boundaries.md                     | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-defaults          | references/governance-effects.md                      | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-defaults          | references/naming.md                                  | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-defaults          | references/network-planning.md                        | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-defaults          | references/retail-pricing.md                          | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-defaults          | references/security-baseline.md                       | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-defaults          | references/service-selection.md                       | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-defaults          | references/tag-precedence.md                          | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-deploy            | references/operational-checklist.md                   | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-deploy            | references/preview-recovery-verification.md           | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-diagnostics       | references/diagnostic-interpretation.md               | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-diagnostics       | references/operational-checklist.md                   | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-governance        | references/evidence-interpretation.md                 | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-governance        | references/operational-checklist.md                   | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-governance        | references/policy-cli-diagnostics.md                  | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-kusto             | references/kql-evidence-interpretation.md             | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-kusto             | references/operational-checklist.md                   | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-prepare           | references/preparation-lineage.md                     | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-quotas            | references/capacity-decision-rules.md                 | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-quotas            | references/operational-checklist.md                   | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-quotas            | references/quota-cli-commands.md                      | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-quotas            | references/quota-workflows.md                         | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-quotas            | references/sku-availability.md                        | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-rbac              | references/assignment-intent.md                       | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-rbac              | references/least-privilege-selection.md               | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-rbac              | references/role-cli-and-iac.md                        | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-resources         | references/azure-resource-graph.md                    | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-resources         | references/inventory-query-patterns.md                | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-resources         | references/operational-checklist.md                   | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-storage           | references/security-and-governance.md                 | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-storage           | references/service-auth-and-sdk-boundary.md           | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-storage           | references/storage-cli-commands.md                    | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-storage           | references/storage-selection.md                       | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-validate          | references/operational-checklist.md                   | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-azure-validate          | references/preflight-evidence.md                      | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-bicep-patterns          | references/avm-and-codegen-acceptance.md              | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-bicep-patterns          | references/codegen-acceptance-checklist.md            | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-bicep-patterns          | references/compiler-and-provider-gotchas.md           | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-bicep-patterns          | references/module-interfaces-and-parameters.md        | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-bicep-patterns          | references/network-and-observability.md               | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-entra-app-registration  | references/capability-receipts.md                     | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-entra-app-registration  | references/cli-commands.md                            | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-entra-app-registration  | references/design-and-diagnostics.md                  | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-entra-app-registration  | references/graph-bicep-example.md                     | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-entra-app-registration  | references/oauth-registration-model.md                | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-entra-app-registration  | references/permissions-and-credentials.md             | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-mermaid                 | references/styling.md                                 | current-source | packages/renderers    | Plugin-owned managed source; not capability qualification. |
-| apex-mermaid                 | references/syntax.md                                  | current-source | packages/renderers    | Plugin-owned managed source; not capability qualification. |
-| apex-microsoft-docs          | references/learn-cli.md                               | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-microsoft-docs          | references/research-method.md                         | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-terraform-import        | references/adoption-attestation.md                    | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-terraform-import        | references/import-assessment.md                       | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-terraform-import        | references/import-mapping.md                          | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-terraform-import        | references/mapping-and-adoption-attestation.md        | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-terraform-patterns      | references/module-composition-and-refactor.md         | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-terraform-patterns      | references/module-composition-and-state-boundaries.md | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-terraform-patterns      | references/module-locks-and-codegen-acceptance.md     | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-terraform-patterns      | references/network-and-observability.md               | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-terraform-patterns      | references/plan-and-change-assessment.md              | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-terraform-test          | references/evidence-acceptance.md                     | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-terraform-test          | references/plan-mode-and-mock-design.md               | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-terraform-test          | references/plan-mode-test-design.md                   | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
-| apex-terraform-test          | references/test-design.md                             | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| Skill                        | Resource                                                         | Availability   | Owner                 | Evidence boundary                                          |
+| ---------------------------- | ---------------------------------------------------------------- | -------------- | --------------------- | ---------------------------------------------------------- |
+| apex-artifacts               | references/presentation-conventions.md                           | current-source | packages/renderers    | Plugin-owned managed source; not capability qualification. |
+| apex-artifacts               | references/reference-only-outlines.md                            | current-source | packages/renderers    | Plugin-owned managed source; not capability qualification. |
+| apex-artifacts               | templates/architecture-assessment.md                             | current-source | packages/renderers    | Plugin-owned managed source; not capability qualification. |
+| apex-artifacts               | templates/cost-estimate.md                                       | current-source | packages/renderers    | Plugin-owned managed source; not capability qualification. |
+| apex-artifacts               | templates/deployment-summary.md                                  | current-source | packages/renderers    | Plugin-owned managed source; not capability qualification. |
+| apex-artifacts               | templates/governance-constraints.md                              | current-source | packages/renderers    | Plugin-owned managed source; not capability qualification. |
+| apex-artifacts               | templates/implementation-plan.md                                 | current-source | packages/renderers    | Plugin-owned managed source; not capability qualification. |
+| apex-artifacts               | templates/operations-runbook.md                                  | current-source | packages/renderers    | Plugin-owned managed source; not capability qualification. |
+| apex-artifacts               | templates/requirements.md                                        | current-source | packages/renderers    | Plugin-owned managed source; not capability qualification. |
+| apex-artifacts               | templates/resource-inventory.md                                  | current-source | packages/renderers    | Plugin-owned managed source; not capability qualification. |
+| apex-azure-adr               | references/decision-examples.md                                  | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-adr               | references/decision-guardrails.md                                | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-adr               | references/decision-quality.md                                   | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-adr               | references/decision-record-fields.md                             | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-cloud-migrate     | references/execution-boundaries.md                               | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-cloud-migrate     | references/lambda-to-functions-assessment.md                     | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-cloud-migrate     | references/migration-readiness.md                                | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-cloud-migrate     | references/services/app-service/app-engine-to-app-service.md     | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-cloud-migrate     | references/services/app-service/assessment.md                    | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-cloud-migrate     | references/services/app-service/beanstalk-to-app-service.md      | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-cloud-migrate     | references/services/app-service/code-migration.md                | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-cloud-migrate     | references/services/app-service/global-rules.md                  | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-cloud-migrate     | references/services/app-service/heroku-to-app-service.md         | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-cloud-migrate     | references/services/container-apps/assessment-guide.md           | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-cloud-migrate     | references/services/container-apps/cloudrun-assessment-guide.md  | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-cloud-migrate     | references/services/container-apps/cloudrun-to-container-apps.md | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-cloud-migrate     | references/services/container-apps/fargate-assessment-guide.md   | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-cloud-migrate     | references/services/container-apps/fargate-to-container-apps.md  | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-cloud-migrate     | references/services/container-apps/k8s-to-container-apps.md      | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-cloud-migrate     | references/services/container-apps/spring-apps-to-aca.md         | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-cloud-migrate     | references/services/container-apps/spring-assessment-guide.md    | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-cloud-migrate     | references/services/container-apps/spring-dependency-patterns.md | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-cloud-migrate     | references/services/functions/assessment.md                      | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-cloud-migrate     | references/services/functions/code-migration.md                  | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-cloud-migrate     | references/services/functions/global-rules.md                    | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-cloud-migrate     | references/services/functions/lambda-to-functions.md             | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-cloud-migrate     | references/services/functions/runtimes/csharp.md                 | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-cloud-migrate     | references/services/functions/runtimes/java.md                   | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-cloud-migrate     | references/services/functions/runtimes/javascript.md             | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-cloud-migrate     | references/services/functions/runtimes/powershell.md             | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-cloud-migrate     | references/services/functions/runtimes/python.md                 | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-cloud-migrate     | references/services/functions/runtimes/typescript.md             | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-cloud-migrate     | references/staged-validation-handoff.md                          | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-cloud-migrate     | references/upstream-coverage.md                                  | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-cloud-migrate     | references/workflow-details.md                                   | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-cloud-migrate     | references/workload-mapping.md                                   | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-compliance        | references/azure-quick-review.md                                 | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-compliance        | references/azure-resource-graph.md                               | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-compliance        | references/compliance-finding-criteria.md                        | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-compliance        | references/keyvault-expiration-audit.md                          | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-compliance        | references/operational-checklist.md                              | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-compliance        | references/remediation-patterns.md                               | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-compute           | references/compute-selection.md                                  | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-compute           | references/pricing-evidence.md                                   | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-compute           | references/recommendation-and-scale-rules.md                     | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-compute           | references/retail-prices-api.md                                  | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-cost-optimization | references/azure-resource-graph.md                               | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-cost-optimization | references/cost-assessment-criteria.md                           | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-cost-optimization | references/cost-cli-workflow.md                                  | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-cost-optimization | references/cost-tool-guardrails.md                               | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-cost-optimization | references/operational-checklist.md                              | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-defaults          | references/avm-binding-guidance.md                               | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-defaults          | references/azure-cli-and-azd.md                                  | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-defaults          | references/baseline-fallbacks.md                                 | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-defaults          | references/cost-monitoring.md                                    | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-defaults          | references/decision-boundaries.md                                | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-defaults          | references/governance-effects.md                                 | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-defaults          | references/naming.md                                             | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-defaults          | references/network-planning.md                                   | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-defaults          | references/retail-pricing.md                                     | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-defaults          | references/security-baseline.md                                  | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-defaults          | references/service-selection.md                                  | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-defaults          | references/tag-precedence.md                                     | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-deploy            | references/execution-boundaries.md                               | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-deploy            | references/global-rules.md                                       | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-deploy            | references/live-role-verification.md                             | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-deploy            | references/operational-checklist.md                              | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-deploy            | references/pre-deploy-checklist.md                               | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-deploy            | references/preview-recovery-verification.md                      | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-deploy            | references/recipes/README.md                                     | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-deploy            | references/recipes/azcli/README.md                               | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-deploy            | references/recipes/azcli/errors.md                               | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-deploy            | references/recipes/azcli/verify.md                               | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-deploy            | references/recipes/azd/README.md                                 | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-deploy            | references/recipes/azd/ef-migrations.md                          | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-deploy            | references/recipes/azd/errors.md                                 | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-deploy            | references/recipes/azd/functions-deploy.md                       | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-deploy            | references/recipes/azd/post-deployment.md                        | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-deploy            | references/recipes/azd/sql-entra-auth.md                         | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-deploy            | references/recipes/azd/sql-managed-identity.md                   | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-deploy            | references/recipes/azd/verify.md                                 | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-deploy            | references/recipes/bicep/README.md                               | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-deploy            | references/recipes/bicep/errors.md                               | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-deploy            | references/recipes/bicep/verify.md                               | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-deploy            | references/recipes/cicd/README.md                                | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-deploy            | references/recipes/cicd/errors.md                                | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-deploy            | references/recipes/cicd/examples/azdo-azd.yml.md                 | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-deploy            | references/recipes/cicd/examples/azdo-multistage.yml.md          | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-deploy            | references/recipes/cicd/examples/github-azd.yml.md               | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-deploy            | references/recipes/cicd/examples/github-bicep.yml.md             | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-deploy            | references/recipes/cicd/verify.md                                | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-deploy            | references/recipes/terraform/README.md                           | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-deploy            | references/recipes/terraform/errors.md                           | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-deploy            | references/recipes/terraform/verify.md                           | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-deploy            | references/region-availability.md                                | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-deploy            | references/script-examples/run-sql.sh.md                         | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-deploy            | references/sdk/azd-deployment.md                                 | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-deploy            | references/sdk/azure-identity-dotnet.md                          | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-deploy            | references/sdk/azure-identity-java.md                            | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-deploy            | references/sdk/azure-identity-py.md                              | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-deploy            | references/sdk/azure-identity-ts.md                              | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-deploy            | references/troubleshooting.md                                    | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-deploy            | references/upstream-coverage.md                                  | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/aks/aks-troubleshooting.md                            | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/aks/general-diagnostics.md                            | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/aks/load-balancer-and-ingress.md                      | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/aks/network-policy.md                                 | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/aks/networking.md                                     | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/aks/node-issues.md                                    | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/aks/pod-failures.md                                   | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/aks/references/aks-mcp.md                             | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/aks/references/command-flows.md                       | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/aks/references/inspektor-gadget.md                    | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/aks/references/structured-input-modes.md              | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/aks/spot-and-zone-issues.md                           | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/aks/upgrade-operations.md                             | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/app-service/README.md                                 | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/azure-resource-graph.md                               | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/compute/references/cannot-connect-to-vm.md            | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/compute/references/credential-auth-errors.md          | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/compute/references/firewall-blocking.md               | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/compute/references/network-connectivity.md            | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/compute/references/rdp-connectivity.md                | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/compute/references/rdp-service-config.md              | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/compute/references/ssh-connectivity.md                | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/compute/references/vm-agent-not-responding.md         | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/compute/vm-troubleshooting.md                         | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/container-apps/README.md                              | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/diagnostic-interpretation.md                          | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/execution-boundaries.md                               | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/functions/README.md                                   | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/infraops-health-checks.md                             | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/infraops-kql-templates.md                             | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/infraops-remediation-playbooks.md                     | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/kql-queries.md                                        | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/messaging/README.md                                   | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/messaging/azure-eventhubs-dotnet.md                   | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/messaging/azure-eventhubs-java.md                     | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/messaging/azure-eventhubs-js.md                       | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/messaging/azure-eventhubs-py.md                       | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/messaging/azure-servicebus-dotnet.md                  | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/messaging/azure-servicebus-java.md                    | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/messaging/azure-servicebus-js.md                      | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/messaging/azure-servicebus-py.md                      | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/messaging/service-troubleshooting.md                  | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/operational-checklist.md                              | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/script-examples/README.md                             | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/script-examples/aks-baseline.ps1.md                   | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/script-examples/aks-baseline.sh.md                    | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/script-examples/appservice-diagnostics.ps1.md         | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/script-examples/appservice-diagnostics.sh.md          | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/script-examples/containerapp-diagnostics.ps1.md       | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/script-examples/containerapp-diagnostics.sh.md        | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/script-examples/pod-evidence.ps1.md                   | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/script-examples/pod-evidence.sh.md                    | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/script-examples/run-ig.ps1.md                         | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/script-examples/run-ig.sh.md                          | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/script-examples/test-messaging-connectivity.ps1.md    | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/script-examples/test-messaging-connectivity.sh.md     | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-diagnostics       | references/upstream-coverage.md                                  | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-governance        | references/evidence-interpretation.md                            | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-governance        | references/operational-checklist.md                              | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-governance        | references/policy-cli-diagnostics.md                             | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-kusto             | references/common-issues.md                                      | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-kusto             | references/execution-boundaries.md                               | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-kusto             | references/fallback-strategy.md                                  | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-kusto             | references/kql-evidence-interpretation.md                        | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-kusto             | references/operational-checklist.md                              | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-kusto             | references/query-patterns.md                                     | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-kusto             | references/upstream-coverage.md                                  | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-prepare           | references/preparation-lineage.md                                | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-quotas            | references/capacity-decision-rules.md                            | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-quotas            | references/operational-checklist.md                              | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-quotas            | references/quota-cli-commands.md                                 | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-quotas            | references/quota-workflows.md                                    | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-quotas            | references/sku-availability.md                                   | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-rbac              | references/assignment-intent.md                                  | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-rbac              | references/least-privilege-selection.md                          | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-rbac              | references/role-cli-and-iac.md                                   | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-resources         | references/azure-resource-graph.md                               | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-resources         | references/inventory-query-patterns.md                           | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-resources         | references/operational-checklist.md                              | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-storage           | references/security-and-governance.md                            | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-storage           | references/service-auth-and-sdk-boundary.md                      | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-storage           | references/storage-cli-commands.md                               | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-storage           | references/storage-selection.md                                  | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-validate          | references/operational-checklist.md                              | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-azure-validate          | references/preflight-evidence.md                                 | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-bicep-patterns          | references/avm-and-codegen-acceptance.md                         | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-bicep-patterns          | references/codegen-acceptance-checklist.md                       | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-bicep-patterns          | references/compiler-and-provider-gotchas.md                      | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-bicep-patterns          | references/module-interfaces-and-parameters.md                   | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-bicep-patterns          | references/network-and-observability.md                          | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-entra-app-registration  | references/capability-receipts.md                                | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-entra-app-registration  | references/cli-commands.md                                       | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-entra-app-registration  | references/design-and-diagnostics.md                             | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-entra-app-registration  | references/graph-bicep-example.md                                | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-entra-app-registration  | references/oauth-registration-model.md                           | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-entra-app-registration  | references/permissions-and-credentials.md                        | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-mermaid                 | references/styling.md                                            | current-source | packages/renderers    | Plugin-owned managed source; not capability qualification. |
+| apex-mermaid                 | references/syntax-cheatsheet.md                                  | current-source | packages/renderers    | Plugin-owned managed source; not capability qualification. |
+| apex-mermaid                 | references/syntax.md                                             | current-source | packages/renderers    | Plugin-owned managed source; not capability qualification. |
+| apex-mermaid                 | references/upstream-coverage.md                                  | current-source | packages/renderers    | Plugin-owned managed source; not capability qualification. |
+| apex-microsoft-docs          | references/learn-cli.md                                          | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-microsoft-docs          | references/research-method.md                                    | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-terraform-import        | references/adoption-attestation.md                               | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-terraform-import        | references/import-assessment.md                                  | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-terraform-import        | references/import-mapping.md                                     | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-terraform-import        | references/mapping-and-adoption-attestation.md                   | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-terraform-patterns      | references/module-composition-and-refactor.md                    | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-terraform-patterns      | references/module-composition-and-state-boundaries.md            | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-terraform-patterns      | references/module-locks-and-codegen-acceptance.md                | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-terraform-patterns      | references/network-and-observability.md                          | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-terraform-patterns      | references/plan-and-change-assessment.md                         | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-terraform-test          | references/evidence-acceptance.md                                | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-terraform-test          | references/plan-mode-and-mock-design.md                          | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-terraform-test          | references/plan-mode-test-design.md                              | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
+| apex-terraform-test          | references/test-design.md                                        | current-source | APEX managed guidance | Plugin-owned managed source; not capability qualification. |
 
 ## Deferred Obligations
 
