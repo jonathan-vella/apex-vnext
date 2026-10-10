@@ -36,6 +36,6 @@ terraform {
 The approved CLI, managed identity or OIDC principal must have the required access. Do not configure `access_key`,
 SAS or connection strings as fallback. `ARM_USE_AZUREAD=true` is a backend auth setting, not mutation authorization.
 
-Backend resource/container creation goes through an accepted infrastructure binding, `apex preview`, local Gate 4
+Backend resource/container creation goes through an accepted infrastructure binding, `apex preview`, Gate 4
 and `apex deploy`. Missing bootstrap capability is a blocker. Bootstrap approval does not authorize state migration,
 initialization, import or workload deployment.

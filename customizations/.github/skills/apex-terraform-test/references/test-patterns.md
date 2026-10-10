@@ -184,7 +184,8 @@ jobs:
 This is a static offline-unit-test sketch: replace action placeholders with reviewed full commit SHAs and the
 Terraform version with the accepted toolchain. The selected file must explicitly use mocks and plan mode.
 No Azure credentials or apply/cleanup runs belong in this job. Live integration needs a separately supported bounded
-operation, local Gate 4 and exact imported authority; ordinary CI execution is not approval.
+operation, the current Gate 4 and exact preview binding; CI job identity (OIDC) or an environment pause is not human
+approval. Planned purpose-bound and CI-owned production flows (CP-27 to CP-29) are not shipped.
 
 ### GitLab CI
 

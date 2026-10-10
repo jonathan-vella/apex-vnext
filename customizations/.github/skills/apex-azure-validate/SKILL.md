@@ -61,7 +61,7 @@ Read [the authority boundary](references/kernel-boundary.md) before using recipe
 - [Preflight](references/infraops-preflight.md), [roles](references/role-verification.md),
   [policy](references/policy-validation.md) and [availability](references/region-availability.md) - diagnostic checks.
 - [Recipe index](references/recipes/README.md) - azd, Azure CLI, Bicep and Terraform command/error guidance;
-  execution remains subject to the kernel boundary, and CP-26 azd support is planned.
+  execution remains subject to the kernel boundary; azd is the planned Bicep-only executor (CP-26), not available today.
 
 - [Preflight evidence model](references/preflight-evidence.md) - freshness, acceptance outcomes, and remediation
   routing.

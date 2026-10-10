@@ -62,7 +62,8 @@ before loading an upstream-derived reference.
   [phase adaptation](references/phases.md) and [binding fields](references/plan-template.md) - kernel-safe handoff.
 - [azd configuration](references/recipes/azd/README.md), [Azure CLI](references/recipes/azcli/README.md),
   [Bicep](references/recipes/bicep/README.md) and [Terraform](references/recipes/terraform/README.md) - static
-  configuration and provider syntax. azd execution support is planned in CP-26, not currently available.
+  configuration and provider syntax. azd is the planned executor for Bicep only (CP-26, #443), not available today;
+  Terraform uses the native CLI.
 - [.NET Aspire](references/aspire.md), [APIM](references/apim.md),
   [Node.js](references/runtimes/nodejs.md), [Functions](references/services/functions/README.md) and
   [Durable Task Scheduler](references/services/durable-task-scheduler/README.md) - select by accepted workload.

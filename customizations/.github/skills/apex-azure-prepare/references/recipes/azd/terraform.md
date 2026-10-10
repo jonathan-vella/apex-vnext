@@ -7,6 +7,10 @@
 > Runtime defaults, effective policy tags, security invariants and exact AVM locks override sample values.
 > Raw resources illustrate provider syntax; use AVM first and record any accepted coverage exception.
 
+> **Not an APEX execution path.** DECISION-036 keeps two IaC languages and adds no azd Terraform adapter: azd is the
+> planned executor for Bicep only (CP-26, #443), and native Terraform CLI with an exact saved plan is the Terraform
+> path. This page is upstream context for reading existing `azure.yaml` files; do not select it for new work.
+
 # AZD with Terraform
 
 Use Azure Developer CLI (azd) with Terraform as the infrastructure provider.
@@ -305,19 +309,17 @@ Converting existing Terraform project to use azd:
 ## CI/CD Integration
 
 Static GitHub Actions workflow generation is preparation. It is **not** `azd pipeline config`.
-That command has no native preview and remote Azure/Entra/GitHub-setting side effects.
-CP-26 support is planned; the following provider command is historical syntax, never a directly runnable generator:
+That command has no native preview and remote Azure/Entra/GitHub-setting side effects; APEX never runs it, and the
+planned production setup (CP-29, #458) is operator-owned, reviewable configuration.
 
 ```bash
-# Changes Entra identities/federation, Azure roles and GitHub settings.
-# Needs its own preview and local Gate 4 through the planned apex deploy operation.
+# Changes Entra identities/federation, Azure roles and GitHub settings. Operator-owned; never run by the agent.
 # azd pipeline config
 ```
 
-The approved GitHub Actions pipeline must use OIDC, accept a recipient-bound one-hop handoff and execute only
-the imported locally approved preview. It cannot create/refresh Gate 4 approval or run a new unapproved plan.
-Production CI apply remains blocked until encrypted recipient-bound transport is qualified.
-Service deployment is separate: its own Gate 4 binds the service list and package digests.
+Production execution is planned to be CI-owned (CP-28, #457) and gated on a verified candidate-bound human review
+receipt; OIDC job identity or an environment pause alone is not approval. Until that lands, the current runtime gates
+and handoff stay enforced and a workflow cannot create or refresh approval or run an unapproved plan.
 Azure DevOps setup is upstream context, not a supported vNext production pipeline.
 
 ## Comparison: azd+Terraform vs Pure Terraform
@@ -325,18 +327,17 @@ Azure DevOps setup is upstream context, not a supported vNext production pipelin
 | Aspect               | Pure Terraform       | azd + Terraform                   |
 | -------------------- | -------------------- | --------------------------------- |
 | **IaC**              | Terraform            | Terraform                         |
-| **Provision**        | Exact saved-plan apply through APEX | `azd provision` replans before apply; unqualified and blocked |
+| **Provision**        | Exact saved-plan apply through APEX | `azd provision` replans before apply; not an APEX path |
 | **Deploy apps**      | Manual scripts       | `azd deploy` (automatic)          |
 | **Environment mgmt** | Workspaces           | `azd env`                         |
 | **Auth**             | Manual az login      | `azd auth login`                  |
-| **CI/CD**            | Static reviewed workflow | `azd pipeline config` has remote mutations and no native preview; planned/blocked |
+| **CI/CD**            | Static reviewed workflow | `azd pipeline config` has remote mutations and no native preview; operator-owned |
 | **Multi-service**    | Manual orchestration | Automatic from azure.yaml         |
 | **Learning curve**   | Medium               | Low                               |
 
-This is a tooling comparison, not a current APEX execution menu. azd Terraform provisioning cannot preserve an
-existing exact-approved saved plan; native Terraform remains lifecycle authority. Current `azd deploy --preview`
-cannot combine with `--from-package`, so immutable package execution also needs a resolved bounded operation.
-Do not weaken approval contracts to excuse replanning. First CP-26 delivery scope requires a human decision.
+This is a tooling comparison, not an APEX execution menu. azd Terraform provisioning cannot preserve an existing
+exact-approved saved plan; native Terraform CLI remains the Terraform lifecycle and APEX never runs `azd up`.
+Do not weaken approval contracts to excuse replanning.
 
 ## When NOT to Use azd+Terraform
 

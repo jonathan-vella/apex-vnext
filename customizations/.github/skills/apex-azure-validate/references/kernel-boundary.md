@@ -37,47 +37,35 @@ can contain credentials. Accepted results must match scope, exact source/depende
 Do not retrieve secret values or switch identities as a troubleshooting shortcut.
 
 Commands that change Azure, Entra, GitHub settings or managed Terraform state never run directly by the agent.
-They require `apex preview`, a separate human decision at local Gate 4 via `apex gate decide`, and
-`apex deploy --preview <hash>`, or an already-approved pipeline. Approval binds the exact preview, actor, target,
-operation, recipient, commit, dependency revision, writer epoch and expiry. A changed preview requires new approval.
+Today they require `apex preview`, a separate human decision at Gate 4 via `apex gate decide`, and
+`apex deploy --preview <hash>`. Approval binds the exact preview, actor, target, operation, recipient, commit,
+dependency revision, writer epoch and expiry. A changed preview requires new approval.
 Readiness, source generation and a successful partial check never authorize apply.
 
-Current native deployment tracks are Bicep and Terraform: Bicep previews use
+Current native deployment tracks are Bicep and Terraform (`IacTool` is `bicep` or `terraform`): Bicep previews use
 `az deployment group|sub what-if`; Terraform applies only the exact saved plan approved at Gate 4.
 Provider mutation commands retained in examples are syntax for those bounded operations, never instructions to execute.
-An environment flag, shell confirmation, local plan status or CI environment approval is not an APEX gate decision.
-Never suppress provider errors, refresh approval in CI, or execute an unbound fallback.
+An environment flag, shell confirmation, local plan status, CI environment approval or OIDC job identity is not an
+APEX gate decision. Never suppress provider errors, refresh approval in CI, or execute an unbound fallback.
 
-## Planned azd and Pipeline Support
+## Planned Purpose-Bound Delivery
 
-Revised DECISION-035 and #443 select the following design;
-**CP-26 is planned, not current runtime functionality**:
+The runtime gates, preview binding and qualification handoff above stay enforced until their replacements are
+implemented and qualified. DECISION-036 and ADR-0007 select the following
+target; **none of it is shipped behavior**:
 
-- Labs: `azd provision --preview`, then separately approved `azd provision` through `apex deploy`.
-- Service deployment: a separate preview and Gate 4 decision binds the service list and package digests;
-  only then may the runtime run `azd deploy` for those packages.
-- APEX **never runs `azd up`**. Its upstream appearances are historical context; no single preview covers both steps.
-- Static `azure.yaml` and GitHub Actions generation is reviewable preparation, not pipeline setup.
-  `azd pipeline config` changes identities, federated credentials, role assignments and GitHub settings.
-  It needs its own preview and Gate 4 authorization through `apex deploy`; static workflow generation does not grant it.
-- CI accepts a recipient-bound one-hop handoff and executes only the imported locally approved preview.
-  It cannot create, replace or refresh Gate 4 approval. Production CI apply remains blocked until encrypted
-  recipient-bound transport qualification. A sample `azd` workflow is not such a qualified transport.
+- Executors: azd is the executor for **Bicep only** (CP-26, #443). Native Terraform CLI is the Terraform path with
+  exact saved plans, normal backend locking and unchanged dependencies. There is no azd Terraform adapter.
+- APEX **never runs `azd up`**. Provisioning and application deployment stay separate operations.
+- Non-production purpose (CP-27, #456): confirm intent once and approve the final deployment preview. Gates 1-3
+  become readiness checkpoints; required reviews, deterministic checks, risk decisions and each destructive
+  operation remain blocking.
+- Production (CP-28, #457; setup CP-29, #458): opt-in and CI-owned, with a verified candidate-bound human review
+  receipt before apply. OIDC job identity or an environment pause alone is not human approval.
+- Static `azure.yaml` and GitHub Actions generation is reviewable preparation, not pipeline setup or approval.
+  Commands that configure identities, federated credentials, role assignments or GitHub settings are
+  operator-owned setup that this skill never runs.
 
-Keep unsupported azd service, pipeline-setup, state-adoption and live-test execution explicit as blockers.
-An older reference that says “run”, “deploy”, “update plan” or “approve” must be interpreted through these boundaries,
-never as current runtime availability or independent mutation authority.
-
-### Known azd Constraints
-
-- azd's Terraform provisioning `Deploy()` calls `plan()` again before `Apply()` in 1.34.0 and current upstream.
-  `azd provision` therefore does **not** execute an existing exact-approved Terraform saved plan.
-  Native Terraform plan/apply remains lifecycle authority. The azd provider path is planned/unqualified and fails
-  closed; do not accept a hash-only workaround, silent replan, or weaker decision contract.
-- Current `azd deploy --preview` rejects combination with `--from-package`. Do not describe a preview/package
-  sequence as qualified exact-package execution. Service-list/package digest authority needs a separately resolved
-  bounded operation before it can run.
-- `azd pipeline config` has no native preview and makes remote Azure/Entra/GitHub-setting changes.
-  Its own APEX preview authority must be designed explicitly; a dry-run label or static YAML is not that authority.
-- The first CP-26 delivery scope needs a human decision resolving these constraints. Until then, preserve accurate
-  technical examples as design material and report unsupported execution as blocked.
+Report unsupported azd, pipeline-setup, state-adoption and live-test execution as blockers. An older reference that
+says “run”, “deploy”, “update plan” or “approve” must be read through these boundaries, never as current runtime
+availability or independent mutation authority. Documentation or skill text does not unblock production.

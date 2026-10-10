@@ -1,7 +1,8 @@
 # Azure Developer CLI Quick Reference
 
 Adapted from `jonathan-vella/apex@c209d8bb765681aa21dce5d3cd2a3b080dad8d5e`.
-Read [the authority boundary](../kernel-boundary.md). CP-26 execution support is planned, not implemented.
+Read [the authority boundary](../kernel-boundary.md). azd is the planned executor for Bicep only (CP-26, #443); it is
+not implemented, and it is never a Terraform executor.
 
 ## Setup and Context
 
@@ -23,21 +24,21 @@ If authentication is missing, the user signs in to the intended tenant. `azd ini
 # Read-only provisioning preview; accepted kernel preview evidence is still required.
 azd provision --preview
 
-# Provider syntax only: Changes Azure. Planned CP-26 runtime, exact preview + local Gate 4.
+# Provider syntax only: Changes Azure. Planned CP-26 runtime (Bicep only); not enabled today.
 # azd provision
 
-# Changes Azure: separate preview/Gate 4 binds service list and package digests.
+# Changes Azure: planned CP-26 operation, separate from provisioning; not enabled today.
 # azd deploy --service <accepted-service>
 
-# Changes Entra/RBAC/GitHub settings: its own preview and Gate 4 through apex deploy.
+# Changes Entra/RBAC/GitHub settings: operator-owned setup; the agent never runs it.
 # azd pipeline config
 ```
 
 Historical upstream quick starts used `azd up`; APEX never runs that composite command.
 azd Terraform provisioning replans inside `Deploy()` before `Apply()`; it cannot execute an existing exact-approved
-Terraform saved plan. Keep native Terraform authority and fail closed on the unqualified azd provider path.
+Terraform saved plan, and DECISION-036 adds no azd Terraform adapter. Terraform uses the native CLI.
 Current `azd deploy --preview` cannot combine with `--from-package`; `azd pipeline config` has no native preview.
-These require a first-delivery scope decision for CP-26, not exceptions to approval or package-digest authority.
+These are CP-26 design constraints, not exceptions to approval or package-digest authority.
 
 ## Configuration Guidance
 
@@ -51,5 +52,5 @@ These require a first-delivery scope decision for CP-26, not exceptions to appro
   `azure.yaml`, environment transcripts or workflow files.
 - Hooks are reviewable source, not a bypass. Never use blanket error suppression for RBAC/policy failures.
   Observe existing assignments, distinguish absence from read failure, and stop on unexpected provider results.
-- Static OIDC workflow generation is not identity/federation/RBAC setup. CI must execute only an imported locally
-  approved preview after recipient-bound one-hop handoff; production apply remains blocked pending qualification.
+- Static OIDC workflow generation is not identity/federation/RBAC setup. OIDC job identity is not human approval:
+  CI-owned production runs (CP-28) and setup (CP-29) are planned, and the current runtime gates stay enforced.

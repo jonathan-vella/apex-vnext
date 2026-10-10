@@ -22,14 +22,17 @@ templates: there is no compatibility requirement for scripts that bypass kernel 
 ```text
 accepted Terraform binding
   → apex preview (saved plan, exact target and source)
-  → human local Gate 4 decision (apex gate decide)
+  → human Gate 4 decision (apex gate decide)
   → apex deploy --preview <hash>
   → accepted operation/output evidence
 ```
+
+This is today's enforced runtime flow. The planned purpose-bound lab flow (CP-27, #456) and CI-owned production runs
+(CP-28, #457) do not replace it until implemented and qualified.
 
 A shell `yes/no` prompt is not Gate 4. A sequence of phases does not share blanket approval:
 each changed preview must be separately approved with its operation, recipient and expiry.
 Never run provider apply or a local phase loop directly.
 
-azd provisioning/service execution and pipeline configuration are planned CP-26 operations.
-Do not replace current native Terraform execution with `azd provision`, and never run `azd up`.
+azd is not the Terraform executor: DECISION-036 keeps native Terraform CLI for Terraform and plans azd for Bicep only
+(CP-26). Do not replace native Terraform execution with `azd provision`, and never run `azd up`.

@@ -11,40 +11,20 @@
 
 Terraform workflow for Azure deployments.
 
-> **⚠️ IMPORTANT: Consider azd+Terraform First**
->
-> If you're deploying to Azure, you should **default to [azd with Terraform](../azd/terraform.md) ** instead of pure
-> Terraform. azd+Terraform gives you:
->
-> - Terraform's IaC capabilities
-> - Simple `azd up` (historical upstream only; APEX never runs it) deployment workflow
-> - Built-in environment management
-> - Automatic CI/CD pipeline generation
-> - Service orchestration from azure.yaml
->
-> → **See [azd+Terraform documentation](../azd/terraform.md)** ←
+> **Native Terraform CLI is the Terraform path.** DECISION-036 keeps two IaC languages and adds no azd Terraform
+> adapter; azd is the planned executor for Bicep only (CP-26, #443). Use this recipe for Terraform work, bind one
+> accepted track, and never run `azd up`.
 
-## When to Use Pure Terraform (Without azd)
+## When to Use This Recipe
 
-Only use pure Terraform workflow when you have specific requirements that prevent using azd:
+Use this recipe whenever the accepted selected-track binding is Terraform:
 
-- **Multi-cloud deployments** where Azure is not the primary target
-- **Complex Terraform modules/workspaces** that are incompatible with azd conventions
-- **Existing Terraform CI/CD** pipelines that are hard to migrate
-- **Organization mandate** for pure Terraform workflow without any wrapper tools
-- **Explicitly requested** by the user to use Terraform without azd
+- Exact saved-plan preview and apply with normal backend locking and unchanged dependencies
+- Multi-cloud or module-heavy Terraform workspaces and existing Terraform CI/CD
+- Any Terraform request, including Azure-first multi-service apps; deployment of application services stays a
+  separate operation from provisioning
 
-## When to Use azd+Terraform Instead
-
-Use azd+Terraform (the default) when:
-
-- **Azure-first deployment** (even if you want multi-cloud IaC)
-- Want **`azd up` (historical upstream only; APEX never runs it) simplicity** with Terraform IaC
-- **Multi-service apps** needing orchestration
-- Team wants to learn Terraform with a simpler workflow
-
-→ See [azd+Terraform documentation](../azd/terraform.md)
-
+The [azd with Terraform](../azd/terraform.md) page is upstream context for reading existing `azure.yaml` files only.
 ## Before Generation
 
 **REQUIRED: Research best practices before generating any files.**

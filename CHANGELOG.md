@@ -38,9 +38,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   retain service, Functions, CLI, azd, SDK, provider/test/import and full document-outline guidance.
   Current typed artifacts, accepted evidence, freshness, writer ownership and kernel gates remain authoritative;
   obsolete upstream plan/status/recall formats and direct mutation scripts do not become runtime interfaces.
-  Read diagnostics are allowed; mutations require exact preview plus local Gate 4 and bounded deployment.
-  DECISION-035 azd/service/pipeline execution is explicitly planned CP-26 work, never a current bypass;
-  APEX never runs `azd up`, and production CI apply stays blocked pending transport qualification.
+  Read diagnostics are allowed; mutations still require exact preview plus the current Gate 4 and bounded deployment.
+  Per DECISION-036 and ADR-0007, azd is documented as the planned Bicep-only executor (CP-26) and native Terraform CLI
+  as the Terraform path; APEX never runs `azd up`. The purpose-bound lab flow (CP-27) and CI-owned production runs
+  (CP-28/CP-29) are described only as planned, and OIDC job identity is not human approval.
   Invocation metadata, current delivery mappings, upstream pins and the generated catalog are updated.
   Retired root guidance stays archived; its hash-bound draft mappings are preserved in the upstream pins.
   Other skill groups remain unchanged for later batches.

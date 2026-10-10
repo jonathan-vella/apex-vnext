@@ -71,7 +71,7 @@ Report findings; don't fix them here.
 - Return findings to the kernel-selected owning task and include accepted report-only evidence.
 - Preparation gaps return to the owning task through **apex-azure-prepare**, not a generic plan-status update.
 - Local development role gaps remain findings. **apex-azure-rbac** supplies analysis, not grant authority;
-  a role mutation requires its own supported preview, local Gate 4 and `apex deploy`.
+  a role mutation requires its own supported preview, Gate 4 and `apex deploy`.
 
 ```markdown
 ## Role Assignment Verification

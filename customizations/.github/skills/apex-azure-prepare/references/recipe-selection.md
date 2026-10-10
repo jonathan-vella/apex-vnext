@@ -8,16 +8,15 @@ workspace detection suggests questions, not an automatic track change.
 
 | Configuration | Useful context | Static files | Execution boundary |
 | --- | --- | --- | --- |
-| azd + Bicep | Azure multi-service apps, environment/service packaging | `azure.yaml`, Bicep, service files | Planned CP-26; separate provisioning and service Gate 4 decisions |
-| azd + Terraform | Terraform expertise with azd environment/service management | `azure.yaml` with `infra.provider: terraform`, HCL | Planned/unqualified; azd replans during provisioning, so native Terraform retains saved-plan authority |
+| azd + Bicep | Azure multi-service apps, environment/service packaging | `azure.yaml`, Bicep, service files | Planned azd executor for Bicep only (CP-26, #443); not enabled today |
+| azd + Terraform | Upstream context only | `azure.yaml` with `infra.provider: terraform`, HCL | Not an APEX path: DECISION-036 adds no azd Terraform adapter; native Terraform CLI with exact saved plans is the Terraform path |
 | Azure CLI | Existing scripts, imperative service diagnostics, custom integration | Reviewed syntax and diagnostic queries | Read directly; mutations only through a supported bounded operation |
 | Bicep | Azure-native declarative infrastructure | Bicep modules and accepted parameter binding | Current native Bicep preview/deploy track |
 | Terraform | Accepted provider/module/state management | HCL, locks, backend and parameter binding | Current native saved-plan preview/deploy track |
 
-azd can use Bicep or Terraform. Do not default every Terraform request to azd or imply CP-26 is delivered.
-`azd up` is historical upstream context only; APEX never runs it.
-Current azd package deployment and pipeline setup also have unresolved preview constraints;
-see [known constraints](kernel-boundary.md#known-azd-constraints). Unsupported paths fail closed.
+Do not route Terraform requests through azd or imply CP-26 is delivered. `azd up` is historical upstream context
+only; APEX never runs it, and provisioning and application deployment stay separate operations. See
+[planned purpose-bound delivery](kernel-boundary.md#planned-purpose-bound-delivery). Unsupported paths fail closed.
 
 ## Detection and Preservation
 
@@ -33,6 +32,6 @@ Static GitHub Actions generation is not `azd pipeline config` and does not autho
 
 ## Technical References
 
-- [azd](recipes/azd/README.md), [Terraform with azd](recipes/azd/terraform.md)
+- [azd](recipes/azd/README.md), [Terraform with azd (upstream context only)](recipes/azd/terraform.md)
 - [Azure CLI](recipes/azcli/README.md), [Bicep](recipes/bicep/README.md),
   [Terraform](recipes/terraform/README.md)

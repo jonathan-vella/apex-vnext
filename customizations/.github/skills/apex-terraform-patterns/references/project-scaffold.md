@@ -23,8 +23,8 @@ infra/terraform/{project}/
 ├── outputs.tf              # Resource IDs, endpoints, connection info
 ├── bootstrap-backend.sh    # Bash: provision storage account for state
 ├── bootstrap-backend.ps1   # PowerShell: same
-├── deploy.sh               # Bash deployment script (deprecated — use azd)
-├── deploy.ps1              # PowerShell deployment script (deprecated — use azd)
+├── deploy.sh               # Bash deployment script (deprecated — native Terraform CLI via APEX)
+├── deploy.ps1              # PowerShell deployment script (deprecated — native Terraform CLI via APEX)
 └── modules/                # Optional — only for complex sub-compositions
     └── {component}/
         ├── main.tf
@@ -98,5 +98,5 @@ modules without moving their inclusion boundary to the corresponding phase.
 | Terraform Configurations | `infra/terraform/{project}/`                                    |
 | Bootstrap Backend (Bash) | `infra/terraform/{project}/bootstrap-backend.sh`                |
 | Bootstrap Backend (PS)   | `infra/terraform/{project}/bootstrap-backend.ps1`               |
-| Deploy Script (Bash)     | `infra/terraform/{project}/deploy.sh` _(deprecated — use azd)_  |
-| Deploy Script (PS)       | `infra/terraform/{project}/deploy.ps1` _(deprecated — use azd)_ |
+| Deploy Script (Bash)     | `infra/terraform/{project}/deploy.sh` _(deprecated — native Terraform CLI via APEX)_  |
+| Deploy Script (PS)       | `infra/terraform/{project}/deploy.ps1` _(deprecated — native Terraform CLI via APEX)_ |
