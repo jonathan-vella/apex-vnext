@@ -199,9 +199,44 @@ resource eventSubscription 'Microsoft.EventGrid/systemTopics/eventSubscriptions@
 
 **RBAC requirement**: Assign **EventGrid EventSubscription Contributor** role to the UAMI.
 
-**Secret handling**: `listKeys()` returns a function system key that is embedded in the webhook URL. Treat it as a
-secret: never emit it as a template output, log it or put it in reports, review it as its own deployment decision, and
-prefer a keyless alternative if the platform supports one for the accepted design.
+**Secret handling**: the blob trigger with an Event Grid source is reached only through the
+`/runtime/webhooks/blobs` endpoint, and Microsoft Learn documents only the function system key (`blobs_extension`) in
+the URL for it. No Entra ID or managed-identity alternative is documented for that endpoint. `listKeys()` therefore
+returns a secret that is embedded in the subscription's webhook URL. Treat this pattern as a recorded exception:
+never emit the key as a template output, log it or put it in reports, and review the subscription as its own
+deployment decision. For new work, prefer one of the keyless designs below when the workload allows it:
+
+- **Queue hand-off with managed identity.** Event Grid delivers the blob events to a Storage queue with its own
+  identity, and a queue-triggered function reads them with an identity-based connection. The system topic needs an
+  identity that holds Storage Queue Data Message Sender on the queue's storage account, and the function identity needs
+  the accepted queue read role. Confirm the property names with accepted evidence.
+
+  ```bicep
+  resource eventSubscription 'Microsoft.EventGrid/systemTopics/eventSubscriptions@2025-02-15' = {
+    parent: systemTopic
+    name: 'blob-events-to-queue'
+    properties: {
+      deliveryWithResourceIdentity: {
+        identity: { type: 'SystemAssigned' }
+        destination: {
+          endpointType: 'StorageQueue'
+          properties: {
+            resourceId: storageAccount.id
+            queueName: blobEventsQueueName
+          }
+        }
+      }
+      filter: {
+        includedEventTypes: [ 'Microsoft.Storage.BlobCreated' ]
+        subjectBeginsWith: '/blobServices/default/containers/${sourceContainerName}/'
+      }
+    }
+  }
+  ```
+
+- **Event Grid trigger function.** Use an `EventGridTrigger` function with an `AzureFunction` destination, whose
+  resource ID is the function's, so the template carries no key. You then handle the Event Grid event schema yourself
+  instead of the blob trigger's binding.
 
 ## User Assigned Managed Identity (UAMI) Auth Patterns
 

@@ -101,7 +101,8 @@ const blobOutput = output.storageBlob({
 > internally for poison-message tracking with EventGrid source, even though you're not using a queue trigger.
 > 3. **Event Grid subscription via Bicep/ARM**: Do NOT create event subscriptions via CLI — webhook validation times out
 > on Flex Consumption. Deploy as a Bicep resource using `listKeys()` to obtain the `blobs_extension` system key (a
-> secret: keep it out of outputs, logs and reports).
+> secret and a recorded exception: keep it out of outputs, logs and reports). Prefer the keyless queue hand-off or
+> Event Grid trigger designs in the linked pattern when the workload allows it.
 >
 > See [lambda-to-functions.md](../lambda-to-functions.md#flex-consumption--blob-trigger-with-eventgrid-source) for full
 > Bicep patterns.
