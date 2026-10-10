@@ -76,7 +76,7 @@ For each high-priority finding:
 
 1. Explain the risk in plain language.
 2. Show the remediation as the IaC change and the equivalent CLI from [remediation patterns](remediation-patterns.md).
-   The fix ships through `apex preview`, Gate 4 and `apex deploy`, or through the approved pipeline; the agent never
+   The fix ships through `apex preview`, Gate 4 and `apex deploy`; the agent never
    applies it.
 3. Estimate effort and impact.
 
@@ -99,9 +99,9 @@ For each high-priority finding:
 
 ### Recommended Actions
 
-1. **[Issue]** - [Brief remediation, routed through apex deploy or the approved pipeline]
-2. **[Issue]** - [Brief remediation, routed through apex deploy or the approved pipeline]
-3. **[Issue]** - [Brief remediation, routed through apex deploy or the approved pipeline]
+1. **[Issue]** - [Brief remediation, routed through apex deploy]
+2. **[Issue]** - [Brief remediation, routed through apex deploy]
+3. **[Issue]** - [Brief remediation, routed through apex deploy]
 
 ### Next Steps
 

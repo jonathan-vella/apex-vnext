@@ -217,7 +217,7 @@ az quota operation list --output table
 ## az quota update
 
 Request a quota increase. This changes the subscription's quota. The agent proposes the target scope, quota name, new
-limit and buffer; the human approves it, and it is delivered through `apex deploy` (Gate 4) or the approved pipeline.
+limit and buffer; the human approves it, and it is delivered through `apex deploy` (Gate 4).
 
 ```bash
 az quota update --resource-name NAME --scope SCOPE --limit-object value=N [--resource-type TYPE] [--no-wait]

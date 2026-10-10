@@ -386,8 +386,8 @@ az webapp config set \
 
 ## Bulk Remediation Script
 
-For multiple resources of the same type, the upstream loop is shown below. In APEX, a bulk change is a reviewed IaC or
-approved pipeline change like any other; the loop documents the operation and is never run by the agent.
+For multiple resources of the same type, the upstream loop is shown below. In APEX, a bulk change is a reviewed IaC
+change routed through `apex deploy` like any other; the loop documents the operation and is never run by the agent.
 
 ```powershell
 # Changes Azure: route through apex deploy (Gate 4) or the approved pipeline. Never run directly.

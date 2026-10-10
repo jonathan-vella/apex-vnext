@@ -79,10 +79,11 @@ lookups and cost monitoring checks. It also states the routing rule every APEX A
   against the approved subscription and scope. Their output is an observation; a typed APEX decision still cites
   accepted evidence from `apex/taskContext`.
 - **Commands that change Azure, Entra ID or GitHub settings** (create, update, delete, assign, register, deploy, `azd
-  provision`, `azd deploy`, `azd pipeline config`) are never run by the agent. They reach Azure only through `apex
-  preview`, the current runtime's Gate 4 decision and `apex deploy` (Bicep or Terraform). azd becomes a Bicep-only
-  executor under CP-26 and a CI-owned production run with human approval verified before apply is a planned target
-  (DECISION-036); neither is available today. APEX never runs `azd up`.
+  provision`, `azd deploy`, `azd pipeline config`) are never run by the agent. Supported IaC changes reach Azure only
+  through `apex preview`, the current runtime's Gate 4 decision and `apex deploy` (Bicep or Terraform). The azd
+  commands have no runtime route today: azd becomes a Bicep-only executor under CP-26, `azd pipeline config` waits for
+  CP-29 setup, and a CI-owned production run with human approval verified before apply is a planned target
+  (DECISION-036). APEX never runs `azd up`.
 
 ## Capability Boundaries
 

@@ -69,8 +69,8 @@ az redis list --subscription <subscription-id> --output table
 az redis show --name <cache-name> --resource-group <rg-name> --subscription <subscription-id>
 ```
 
-Redis mutation commands belong only in a separately approved remediation plan routed through `apex deploy` (Gate 4) or
-the approved pipeline, never in an assessment.
+Redis mutation commands belong only in a separately approved remediation plan routed through `apex deploy` (Gate 4),
+never in an assessment.
 
 ## Step 2: Orphan Discovery With azqr
 
@@ -206,8 +206,8 @@ The assessment output the task stages carries:
   reservations or storage tiering. Each shows the actual baseline, actual metrics, validated pricing and estimated
   savings with its method.
 - Monthly and annual estimated savings.
-- Implementation as routed changes: each opportunity names the IaC or pipeline change that would deliver it through
-  `apex deploy` (Gate 4) or the approved pipeline, never a command for the agent to run.
+- Implementation as routed changes: each opportunity names the IaC change that would deliver it through
+  `apex deploy` (Gate 4), never a command for the agent to run.
 - The data sources: cost query and response, pricing queries and meters, and applicable free allowances.
 
 Portal link format:
