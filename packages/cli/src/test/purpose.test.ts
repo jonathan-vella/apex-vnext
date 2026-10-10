@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
-import { mkdir, readFile, readdir } from "node:fs/promises";
+import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
+import { CONTRACT_VERSION } from "@apexops/contracts";
 import { execute } from "../cli.js";
 import { ApexError, EXIT_CODES, normalizeError } from "../errors.js";
 import { ApexService } from "../service.js";
@@ -159,6 +160,7 @@ test("run configurations without a purpose or with an unknown purpose are reject
   const root = await tempRoot();
   const service = new ApexService(root);
   const { runId } = await service.init({ projectId: "demo", riskOwner: "partner" });
+  const original = await readFile(await runFile(root, "demo", runId), "utf8");
   for (const purpose of [undefined, "dev", "non-production"]) {
     await editRun(root, "demo", runId, { purpose });
     await assert.rejects(
@@ -174,7 +176,12 @@ test("run configurations without a purpose or with an unknown purpose are reject
       String(purpose),
     );
   }
-  await editRun(root, "demo", runId, { purpose: "lab" });
+  await writeFile(await runFile(root, "demo", runId), "{ not json");
+  await assert.rejects(service.status(), (error: unknown) => {
+    const normalized = normalizeError(error);
+    return normalized.code === "APEX_VALIDATION" && /not valid JSON/u.test(normalized.message);
+  });
+  await writeFile(await runFile(root, "demo", runId), original);
   assert.equal((await service.status()).run.purpose, "lab");
 });
 
@@ -199,6 +206,21 @@ test("bootstrap resume conflicts when the requested purpose differs from the sel
   await assert.rejects(service.bootstrap({ ...input, purpose: "production" }), isProductionRejection);
 
   await editRun(root, "demo", initial.runId!, { purpose: "production" });
-  await assert.rejects(service.bootstrap({ ...input, purpose: "lab" }), /resume is blocked/u);
+  for (const requested of [{ purpose: "lab" as const }, {}]) {
+    assert.equal(
+      (
+        await service.planBootstrap({
+          schemaVersion: CONTRACT_VERSION,
+          projectId: input.projectId,
+          riskOwner: input.riskOwner,
+          client: input.clientId,
+          ...requested,
+        })
+      ).status,
+      "blocked",
+    );
+    await assert.rejects(service.bootstrap({ ...input, ...requested }), /resume is blocked/u);
+  }
+  await editRun(root, "demo", initial.runId!, { purpose: "lab" });
   assert.equal((await service.bootstrap(input)).resumed, true);
 });

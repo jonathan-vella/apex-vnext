@@ -82,6 +82,8 @@ test("project store rejects run configurations without a current purpose", async
   await assert.rejects(store.getRun("demo", "run-old"), /\/purpose.*start a new run with apex project create/);
   await writeFile(path, JSON.stringify({ ...run, purpose: "staging" }));
   await assert.rejects(store.getRun("demo", "run-old"), RunConfigInvalidError);
+  await writeFile(path, "{ not json");
+  await assert.rejects(store.getRun("demo", "run-old"), /not valid JSON/);
 });
 
 test("Gate 4 inheritance is always denied", () => {

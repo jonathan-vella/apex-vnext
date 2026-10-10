@@ -13,7 +13,12 @@ export class RunConfigInvalidError extends Error {
 /** Parses persisted run.json content and rejects anything that does not match the current run contract. */
 export function parseRunConfig(raw: string): RunConfigV1 {
   registerContractFormats();
-  const value: unknown = JSON.parse(raw);
+  let value: unknown;
+  try {
+    value = JSON.parse(raw);
+  } catch {
+    throw new RunConfigInvalidError(["/: not valid JSON"]);
+  }
   if (Value.Check(RunConfigV1Schema, value)) return value;
   const issues = [...Value.Errors(RunConfigV1Schema, value)]
     .slice(0, 3)

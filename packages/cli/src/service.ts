@@ -1737,6 +1737,7 @@ export class ApexService {
       );
     await this.assertSafeDestination(this.root, this.projects.runDirectory(selection.projectId, selection.runId));
     const run = await this.run(selection, { readOnly: true });
+    assertDeploymentPurposeUsable(run.purpose);
     const project = await this.projects.getProject(selection.projectId);
     const customization = await this.customizationSelection();
     if (

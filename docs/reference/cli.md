@@ -23,7 +23,7 @@ Commands that change installation, capability, transfer, or improvement state ma
 | `apex customizations reinstall` | Optional `--customizations-source`                                                                                                |
 
 `--purpose` is `lab` (the default) or `production`. It is stored on the run, is part of the dependency revision and cannot
-change within a run; `apex promote` keeps the source run's purpose and rejects a different one. `production` is
+change within a run; `apex project promote` keeps the source run's purpose and rejects a different one. `production` is
 rejected until the CI-owned production flow ships (CP-28/CP-29); use `lab`. Runs created before purpose existed have no
 `purpose` and are rejected: create a new project.
 

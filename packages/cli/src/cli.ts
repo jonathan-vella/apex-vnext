@@ -16,7 +16,14 @@ import {
   type ArchetypeBatchConfigV1,
 } from "@apexops/contracts";
 import { Value } from "@sinclair/typebox/value";
-import { EventJournal, ValidatorRegistry, WriterTransferStore, atomicWriteJson, sha256Json } from "@apexops/kernel";
+import {
+  EventJournal,
+  ValidatorRegistry,
+  WriterTransferStore,
+  atomicWriteJson,
+  parseRunConfig,
+  sha256Json,
+} from "@apexops/kernel";
 import {
   evaluateQualityScorecard,
   renderQualityScorecardEvaluation,
@@ -187,15 +194,7 @@ async function configuredProviders(
       runId: string;
     };
     const runDirectory = join(root, ".apex", "projects", selection.projectId, "runs", selection.runId);
-    const run = JSON.parse(await readFile(join(runDirectory, "run.json"), "utf8")) as {
-      projectId: string;
-      runId: string;
-      purpose: DeploymentPurpose;
-      targetScope: string;
-      iacTool: "bicep" | "terraform";
-      runtimeLockHash: string;
-      ownerEpoch: number;
-    };
+    const run = parseRunConfig(await readFile(join(runDirectory, "run.json"), "utf8"));
     const journal = new EventJournal(join(runDirectory, "journal"));
     const events = await journal.replay();
     const dependencyRevision = calculateDependencyRevision(run, events);
