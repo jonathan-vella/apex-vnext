@@ -10,7 +10,9 @@ and thin workspace projection are shipped in the `0.11.0-next.2` preview; live q
 The slice results below are exploratory history, not current release evidence. Use the
 [human-run qualification kit](../how-to/qualify-live-clients.md) to freeze a candidate, prepare each host and record
 scenario applicability and bounded evidence. Published `0.11.0-next.2` does not include #431; a source build at
-`7fbb02e1593a26ee710e6735df1ac21641efcee4` must not be identified by that version alone.
+`a4bc16fbe4eadea48902ab054ea7f02a8bdd008a` after #454 must not be identified by that version alone.
+The earlier #431 source candidate and its exploratory results remain historical; the current candidate needs fresh
+affected-scenario evidence without restoring retired root guidance.
 
 Each client runs on its supported host with client local sandboxing on, without Docker or a devcontainer. Required
 outcomes follow the [PRD](PRD.md), including both environment profiles, COE reuse and conversational changes. Basic

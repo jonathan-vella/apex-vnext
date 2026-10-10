@@ -15,13 +15,15 @@ production and production-setup paths. Do not substitute direct azd commands.
 
 ## 1. Freeze The Candidate
 
-This preparation targets source **`7fbb02e1593a26ee710e6735df1ac21641efcee4`** (main after #431).
+This preparation targets source **`a4bc16fbe4eadea48902ab054ea7f02a8bdd008a`** (main after #454).
 Published **`0.11.0-next.2`** predates #431: its source is
 `e7776c6beb162c80e1846673d436de35056c1ab5`. The published plugin tree SHA-256 is
 `93407061c09f00cc1251a582a16840547a6c7bbe256c468aba0c4d2c4f15df22`, recorded in the
 [marketplace provenance](https://github.com/jonathan-vella/apex-plugins/blob/0917d99c49a5cc9bdbfe849890ff1eba7779d410/.github/plugin/provenance.json)
 at marketplace commit `0917d99c49a5cc9bdbfe849890ff1eba7779d410`. Retain that commit and the provenance file hash if
-testing the release. Neither the release nor a matching version string proves qualification of #431.
+testing the release. Neither the release nor a matching version string proves qualification of this source candidate.
+The earlier #431 source candidate is historical; #454 retired root guidance and changed current delivery declarations.
+Retain archived provenance, but do not restore retired runtime paths or carry earlier client passes forward.
 
 Build CLI tarballs and the plugin from **one clean exact-source checkout**. A source build currently still reports
 `0.11.0-next.2`; distinguish it by source commit, release-manifest hash and plugin tree hash, not version alone.
@@ -31,7 +33,7 @@ worksheet and rerun affected scenarios, rather than carrying passes forward.
 From the source repository, create the candidate checkout (PowerShell or Bash):
 
 ```text
-git worktree add --detach ../apex-client-candidate 7fbb02e1593a26ee710e6735df1ac21641efcee4
+git worktree add --detach ../apex-client-candidate a4bc16fbe4eadea48902ab054ea7f02a8bdd008a
 ```
 
 In that checkout, check `git rev-parse HEAD` and `git status --porcelain` (must be empty). Restore dependencies with
