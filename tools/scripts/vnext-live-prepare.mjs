@@ -808,7 +808,6 @@ export async function prepareQualificationState(args, dependencies = {}) {
       review(PROJECT_ID, runId, "architecture", architecture.outputHashes.architecture, now),
       now,
     );
-    await service.decideGateNumber(2, "approved", args.actor);
     artifacts.intent.sourceHashes = {
       requirements: requirements.outputHashes.requirements,
       architecture: architecture.outputHashes.architecture,
@@ -830,7 +829,6 @@ export async function prepareQualificationState(args, dependencies = {}) {
       review(PROJECT_ID, runId, "plan", plan.outputHashes["implementation-intent"], now),
       now,
     );
-    await service.decideGateNumber(3, "approved", args.actor);
     await complete(service, `codegen-${args.track}`, [
       { kind: "logical-resource-manifest", value: artifacts.logicalManifest },
       { kind: "iac-handoff", value: artifacts.handoff },

@@ -37,6 +37,7 @@ import {
 } from "@apexops/contracts";
 import {
   WORKFLOW_VALIDATOR_OWNERSHIP,
+  isReadinessGate,
   sha256Json,
   type ValidationIssue,
   type ValidatorRegistry,
@@ -66,13 +67,14 @@ export interface WorkflowGateValidatorContext {
   readonly now: string;
   readonly run: RunConfigV1;
   readonly gate: GateRecordV1;
-  readonly approval: ApprovalEvidenceV1;
+  /** Absent for a lab Gate 2/3 readiness checkpoint, which is a kernel record and never a human decision. */
+  readonly approval?: ApprovalEvidenceV1;
   readonly artifactHashes: Readonly<Record<string, string>>;
   readonly completedNodes: readonly string[];
   readonly reviewBlockers: readonly string[];
   readonly expectedDependencyHash?: string;
   readonly currentDependencyRevision: string;
-  readonly expectedApprovalRecipientIdentity: string;
+  readonly expectedApprovalRecipientIdentity?: string;
   readonly provedPreviewTransferClaimHash?: string;
   readonly preview?: DeploymentPreviewV1;
 }
@@ -896,7 +898,11 @@ function gateReady(expectedGate: 1 | 2 | 3, value: unknown): ValidationIssue[] {
   if (context.expectedDependencyHash === undefined || context.gate.dependencyHash !== context.expectedDependencyHash) {
     issues.push({ path: "/gate/dependencyHash", message: "Gate is not bound to the current review dependency" });
   }
-  if (context.approval.dependencyHash !== context.gate.dependencyHash) {
+  if (context.approval === undefined) {
+    if (!isReadinessGate(context.run.purpose, expectedGate)) {
+      issues.push({ path: "/approval", message: "Human approval evidence is required for this gate" });
+    }
+  } else if (context.approval.dependencyHash !== context.gate.dependencyHash) {
     issues.push({ path: "/approval/dependencyHash", message: "Approval is not bound to the open gate" });
   }
   return issues;
@@ -945,6 +951,7 @@ function gateApprovalBindingComplete(value: unknown): ValidationIssue[] {
   const preview = context.preview;
   if (preview === undefined) return issue("/preview", "Current deployment preview is required");
   const approval = context.approval;
+  if (approval === undefined) return issue("/approval", "Human approval evidence is required");
   const valid =
     approval.gate === 4 &&
     approval.decision === "approved" &&

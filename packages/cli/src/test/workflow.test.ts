@@ -32,6 +32,7 @@ import {
   tempRoot,
   workloadDecisionManifest,
   completeReviewTask,
+  assertLabReadiness,
 } from "./helpers.js";
 
 async function recordRequirementsRound(service: ApexService, answers: Record<string, InputValueV1>): Promise<void> {
@@ -266,7 +267,7 @@ test("confirmed requirements revision invalidates proof without approvals or fil
   const after = await service.status();
   assert.equal(after.task, "requirements");
   assert.equal(after.events, before.events + 1);
-  assert.ok(after.run.gates.every(({ state }) => state !== "approved" && state !== "inherited"));
+  assert.ok(after.run.gates.every(({ state }) => !["approved", "inherited", "ready"].includes(state)));
   assert.equal(await readFile(join(root, "manual-design.md"), "utf8"), "Retain this manual edit\n");
   const restarted = new ApexService(root);
   const task = await restarted.nextTask();
@@ -735,7 +736,7 @@ test("full requirements to fake deploy workflow survives restart", async () => {
   ).replay();
   const gateValidators = new Map(
     events.flatMap((event) =>
-      event.type === "gate.decided"
+      event.type === "gate.decided" || event.type === "gate.readiness-recorded"
         ? [
             [
               (event.payload as { gate: number }).gate,
@@ -744,6 +745,16 @@ test("full requirements to fake deploy workflow survives restart", async () => {
           ]
         : [],
     ),
+  );
+  assert.deepEqual(
+    events.filter(({ type }) => type === "gate.decided").map(({ payload }) => (payload as { gate: number }).gate),
+    [1, 4],
+  );
+  assert.deepEqual(
+    events
+      .filter(({ type }) => type === "gate.readiness-recorded")
+      .map(({ payload }) => (payload as { gate: number }).gate),
+    [2, 3],
   );
   assert.deepEqual(gateValidators.get(1), ["gate:requirements-ready"]);
   assert.deepEqual(gateValidators.get(2), ["gate:architecture-cost-governance-ready"]);
@@ -2486,7 +2497,7 @@ async function planTaskContextScenario(pngAvailable: boolean): Promise<void> {
     await readFile(join(reviewsDirectory, "architecture-findings.md"), "utf8"),
     /Reviewed artifact kind: architecture/u,
   );
-  await service.decideGateNumber(2, "approved", "tester");
+  await assertLabReadiness(service, 2);
 
   const issued = await service.nextTask();
   assert.equal(issued.status, "task");

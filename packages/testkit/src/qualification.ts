@@ -247,7 +247,7 @@ async function runTrack(
     async () => {
       const sameScope = await context.service.promote("stage", "local");
       const sameScopeStates = sameScope.gates.map(({ state }) => state);
-      if (sameScopeStates.join(",") !== "inherited,inherited,inherited,closed")
+      if (sameScopeStates.join(",") !== "inherited,ready,ready,closed")
         throw new Error(`Unexpected same-scope promoted gates: ${sameScopeStates.join(",")}`);
       await context.service.use(sameScope.projectId, context.runId as never);
       const changedScope = await context.service.promote("prod", "local/prod");
@@ -500,7 +500,7 @@ async function completeCreativeWorkflow(context: TrackContext): Promise<void> {
   await complete(context, "architecture-review", [
     { kind: "review-findings", value: review(context, "architecture", architectureHashes.architecture!) },
   ]);
-  await context.service.decideGateNumber(2, "approved", "qualification");
+  await requireReadiness(context, 2);
   restart(context);
   const plan = planBundle(context, {
     requirements: requirementHashes.requirements!,
@@ -512,11 +512,17 @@ async function completeCreativeWorkflow(context: TrackContext): Promise<void> {
   await complete(context, "plan-review", [
     { kind: "review-findings", value: review(context, "plan", planHashes["implementation-intent"]!) },
   ]);
-  await context.service.decideGateNumber(3, "approved", "qualification");
+  await requireReadiness(context, 3);
   restart(context);
   await complete(context, `codegen-${track}`, codegenBundle(context, plan));
   await complete(context, `validation-${track}`, [{ kind: "validation-evidence", value: validation(context) }]);
   if (runId.length === 0) throw new Error("Run was not initialized");
+}
+
+/** Lab Gates 2 and 3 are kernel readiness checkpoints; qualification never records a human decision for them. */
+async function requireReadiness(context: TrackContext, gate: 2 | 3): Promise<void> {
+  const state = (await context.service.status()).run.gates.find((candidate) => candidate.gate === gate)?.state;
+  if (state !== "ready") throw new Error(`Gate ${gate} readiness was not recorded (state ${state})`);
 }
 
 async function complete(

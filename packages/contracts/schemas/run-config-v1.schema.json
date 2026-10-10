@@ -32,6 +32,10 @@
             "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$",
             "type": "string"
           },
+          "readyAt": {
+            "format": "date-time",
+            "type": "string"
+          },
           "reason": {
             "minLength": 1,
             "type": "string"
@@ -44,6 +48,10 @@
               },
               {
                 "const": "open",
+                "type": "string"
+              },
+              {
+                "const": "ready",
                 "type": "string"
               },
               {

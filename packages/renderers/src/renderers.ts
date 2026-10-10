@@ -210,6 +210,7 @@ export function renderRunStatus(run: RunConfigV1): string {
       gate.state,
       gate.state === "inherited" ? optional(gate.inheritedFromRunId) : "-",
       optional(gate.decidedAt),
+      optional(gate.readyAt),
       optional(gate.reason),
       gate.dependencyHash,
     ]);
@@ -220,6 +221,7 @@ export function renderRunStatus(run: RunConfigV1): string {
       ["Project", run.projectId],
       ["Run", run.runId],
       ["Environment", run.environment],
+      ["Purpose", run.purpose],
       ["Target scope", run.targetScope],
       ["IaC tool", run.iacTool],
       ["Parent run", optional(run.parentRunId)],
@@ -229,7 +231,10 @@ export function renderRunStatus(run: RunConfigV1): string {
     "",
     "## Gates",
     "",
-    markdownTable(["Gate", "State", "Inherited From", "Decided", "Reason", "Dependency Hash"], gates),
+    markdownTable(
+      ["Gate", "State", "Inherited From", "Decided", "Readiness Recorded", "Reason", "Dependency Hash"],
+      gates,
+    ),
   ].join("\n");
 }
 

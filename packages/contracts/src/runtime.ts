@@ -43,6 +43,7 @@ export const ProjectConfigV1Schema = Type.Object(
 export const GateStateSchema = Type.Union([
   Type.Literal("closed"),
   Type.Literal("open"),
+  Type.Literal("ready"),
   Type.Literal("approved"),
   Type.Literal("inherited"),
   Type.Literal("rejected"),
@@ -55,6 +56,7 @@ export const GateRecordV1Schema = Type.Object(
     state: GateStateSchema,
     dependencyHash: Sha256Schema,
     decidedAt: Type.Optional(IsoDateTimeSchema),
+    readyAt: Type.Optional(IsoDateTimeSchema),
     inheritedFromRunId: Type.Optional(RunIdSchema),
     reason: Type.Optional(NonEmptyStringSchema),
   },

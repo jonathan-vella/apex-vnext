@@ -53,7 +53,13 @@
       "gateNumber": 1,
       "name": "Requirements",
       "ownerRole": "approver",
-      "sourceDependencies": ["requirements-v1", "requirements-review", "accepted-risk-scopes"],
+      "sourceDependencies": [
+        "requirements-v1",
+        "requirements-review",
+        "run-config.purpose",
+        "run-config.targetScope",
+        "accepted-risk-scopes"
+      ],
       "validators": ["gate:requirements-ready"],
       "invalidates": []
     },
@@ -139,6 +145,7 @@
       "name": "Architecture and Cost",
       "ownerRole": "approver",
       "sourceDependencies": [
+        "gate-1",
         "architecture-v1",
         "cost-estimate-v1",
         "workload-decision-manifest-v1",
@@ -260,6 +267,8 @@
       "name": "Implementation Plan",
       "ownerRole": "approver",
       "sourceDependencies": [
+        "gate-1",
+        "gate-2",
         "implementation-intent-v1",
         "iac-binding-v1",
         "environment-inputs-v1",
