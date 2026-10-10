@@ -11,9 +11,10 @@
 The maintainer accepted
 [DECISION-036](DECISIONS.md#decision-036-deliver-non-production-first-with-purpose-bound-approval):
 non-production first, azd/Bicep and native Terraform, one lab intent confirmation plus final preview approval, optional
-production setup and CI-owned production runs with human approval verified before apply. This is a target design,
-not implemented purpose/approval behavior. Current four-gate runtime and qualification-transfer controls remain active;
-production is not unblocked. CP-26 through CP-30 own delivery and qualification.
+production setup and CI-owned production runs with human approval verified before apply. The typed purpose and the lab
+gate flow (CP-27: one Gate 1 intent confirmation, kernel-recorded Gate 2 and 3 readiness, final Gate 4 approval) are
+implemented; azd/Bicep execution, CI-owned production runs and setup (CP-26, CP-28, CP-29) and their qualification
+(CP-30) are not. Qualification-transfer controls remain active; production is not unblocked.
 
 PR #454 merged the repository cleanup at `a4bc16fbe4eadea48902ab054ea7f02a8bdd008a`. Preserve its archive catalog,
 retired-root rules and guidance provenance; maintenance archives do not supply active workflow authority.

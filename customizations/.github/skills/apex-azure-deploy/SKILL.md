@@ -21,7 +21,8 @@ Gate 4, evidence, recovery and state; the selected native provider owns its life
   constraints and IaC/package inputs. A Markdown checklist or upstream plan status is not validation proof.
 - Before execution, `apex preview` provides a current, complete preview for the selected operation. The current
   runtime's Gate 4 must approve that exact preview; approval binds hashes, recipient, expiry and ownership, not a
-  general deploy intent. Today's runtime gates stay enforced; planned purpose-bound approval changes nothing yet.
+  general deploy intent. A lab run has one Gate 1 intent confirmation and this final Gate 4 approval; Gates 2 and 3
+  are kernel readiness checkpoints, never approvals. Each apply and destroy needs its own preview and approval.
 - Missing, stale, mismatched or incomplete inputs block deployment. Return to their owning task, not automatic
   initialization or infrastructure regeneration.
 
@@ -43,12 +44,13 @@ Gate 4, evidence, recovery and state; the selected native provider owns its life
 
 ## Planned Purpose-Bound Delivery: Not Available Yet
 
-DECISION-036 and ADR-0007 select the target below. It is **planned**, not shipped behavior; today's runtime gates,
-previews and qualification handoff stay enforced until the replacements are implemented and qualified.
+The lab gate flow (CP-27 [#456](https://github.com/jonathan-vella/apex-vnext/issues/456)) is current runtime: one Gate 1
+intent confirmation, kernel-recorded Gate 2 and 3 readiness checkpoints and the final Gate 4 preview approval, with
+required reviews, deterministic checks, risk decisions and each apply or destroy preview and approval still blocking.
+`production` is blocked. DECISION-036 and ADR-0007 select the executor and production targets below. They are
+**planned**, not shipped behavior; today's previews and qualification handoff stay enforced until the replacements are
+implemented and qualified.
 
-- **Lab flow (CP-27 [#456](https://github.com/jonathan-vella/apex-vnext/issues/456)):** confirm purpose and workload
-  intent once, then approve the final deployment preview. Required reviews, deterministic checks, risk decisions and
-  each destructive operation still need their own confirmation.
 - **Executors (CP-26 [#443](https://github.com/jonathan-vella/apex-vnext/issues/443)):** azd is the executor for
   Bicep only; native Terraform CLI executes Terraform with an exact saved plan and normal backend locking. There is no
   azd Terraform path. Provisioning and application delivery stay separate operations.

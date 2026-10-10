@@ -108,7 +108,7 @@ Copilot CLI on Linux and WSL2, unless noted.
 | `CLIENT-028` | The plugin installs through the Copilot CLI store; its agents, skills, hooks and MCP server load once in each client                                   |
 | `CLIENT-029` | Plugin MCP starts with `node` from the plugin folder without registry access and receives the workspace explicitly                                     |
 | `CLIENT-030` | Plugin update and rollback preserve an active run; on Windows the update follows the documented VS Code steps                                          |
-| `CLIENT-031` | One APEX agent completes every stage without agent switches; it reuses stated project values and stops at gates                                        |
+| `CLIENT-031` | One APEX agent completes every stage without agent switches; it reuses stated project values and stops at human gates (Gate 1, Gate 4)                 |
 | `CLIENT-032` | Hidden workers never ask questions, and the hook denies the APEX agent as a `task` target                                                              |
 | `CLIENT-033` | Review findings come only from captured rubber-duck output bound to the prompt and artifact; tampering fails closed                                    |
 | `CLIENT-034` | Sessions in app-created worktrees share the main checkout's `.apex/`, and a second writer is rejected (app, CLI)                                       |
@@ -125,6 +125,29 @@ CLIENT-039 through CLIENT-042 are DECISION-036 target acceptance, not implemente
 CP-26/CP-27 own the non-production path; CP-28/CP-29 own production execution/setup; CP-30 owns deployment qualification.
 CP-20 may qualify current client mechanics independently. Deferred production outcomes are not passing evidence and
 are not required to claim the initial non-production milestone complete.
+
+The lab approval flow (CP-27) is implemented in the kernel and guidance, but no client has been qualified against it.
+`CLIENT-006` and `CLIENT-031` should observe it per client now; `CLIENT-039` and `CLIENT-041` add it to their own
+outcomes once they become runnable:
+
+- **Purpose.** A new run reports purpose `lab`; `production` is rejected with a stable error. The Gate 1 confirmation
+  states the purpose, target and requirements it binds, and a different purpose needs a new run. Promotion to a
+  different target reopens Gate 1 and redoes the requirements review in the new run; same-target promotion inherits it.
+- **One intent confirmation.** Gate 1 is the only intent decision the agent asks for, through the kernel-routed
+  `gateDecide` with the user's explicit confirmation.
+- **No Gate 2/3 prompts.** After the Architecture and Plan reviews and deterministic checks pass, the kernel records
+  Gate 2 and 3 as `ready` (with `readyAt` and a `gate.readiness-recorded` event) with no approval evidence or actor, and
+  the agent neither asks for them nor calls `gateDecide`. `gateDecide` or `gate decide` for a lab Gate 2 or 3 is refused
+  with reason `GATE_READINESS_AUTOMATIC`. Until readiness is recorded, `nextTask` reports
+  `Gate N readiness checkpoint is not recorded: <reason>` and the agent relays that blocker instead of asking for
+  approval. `ready` never satisfies Gate 1, Gate 4 or production.
+- **Final approval.** Gate 4 remains the single final approval and is decided only in the trusted terminal. Its
+  `operations/deployment-preview.md` Approval Context shows purpose, target, gate provenance, architecture, cost
+  estimate and accepted risks; its tamper check is best-effort and local (immutable binding is
+  [#466](https://github.com/jonathan-vella/apex-vnext/issues/466)). Apply and destroy each need their own preview and
+  approval; changed requirements, a new risk acceptance or a stale preview need a new confirmation.
+
+A readiness checkpoint recorded as, or counted as, human approval fails these scenarios.
 
 `CLIENT-039` through `CLIENT-042` are **planned and not runnable**: CP-26 to CP-30 have not delivered the azd/Bicep,
 purpose-bound, CI-owned production or setup paths. Do not run these scenarios through direct azd commands or claim

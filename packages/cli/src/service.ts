@@ -4097,7 +4097,7 @@ export class ApexService {
       )
         throw new ApexError(
           "APEX_VALIDATION",
-          "Governance content changed; reconcile governance and obtain new policy, plan and gate approvals before proceeding",
+          "Governance content changed; reconcile governance and obtain new policy and plan results; Gate 2 and 3 readiness is then re-recorded and Gate 4 needs a new approval before proceeding",
           EXIT_CODES.validation,
         );
       const latest = await this.latestGovernanceObservation(run, events, governanceHash, governance, snapshot);
@@ -5980,7 +5980,7 @@ export class ApexService {
       this.writeGeneratedReview(
         join(directory, "challenger-findings.md"),
         Buffer.from(
-          "# Challenger Findings\n\nRequirements challenger review is pending. Gate 1 cannot be approved until the reviewer completes this document.\n",
+          "# Challenger Findings\n\nRequirements challenger review is pending. The Gate 1 intent confirmation cannot be given until the reviewer completes this document.\n",
           "utf8",
         ),
       ),
@@ -6149,7 +6149,7 @@ export class ApexService {
       this.writeGeneratedReview(
         join(directory, "challenger-findings.md"),
         Buffer.from(
-          "# Challenger Findings\n\nArchitecture challenger review is pending. Gate 2 cannot be approved until the reviewer completes this document.\n",
+          "# Challenger Findings\n\nArchitecture challenger review is pending. Gate 2 readiness cannot be recorded until the reviewer completes this document.\n",
           "utf8",
         ),
       ),
@@ -6274,7 +6274,7 @@ export class ApexService {
       this.writeGeneratedReview(
         join(directory, "challenger-findings.md"),
         Buffer.from(
-          "# Challenger Findings\n\nImplementation-plan challenger review is pending. Gate 3 cannot be approved until the reviewer completes this document.\n",
+          "# Challenger Findings\n\nImplementation-plan challenger review is pending. Gate 3 readiness cannot be recorded until the reviewer completes this document.\n",
           "utf8",
         ),
       ),

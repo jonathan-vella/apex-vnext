@@ -77,7 +77,7 @@ blocks resumption. The strict exact-file-set rule above continues to apply to un
 For either an imported workload or an existing manual copy, recover relevant decisions into a consumer-scoped
 `requirements-v1` JSON document. Confirm only facts that apply to this consumer; retain unresolved facts as unknowns.
 Use `requirements preview-adoption`, review its candidate and impact, then `requirements adopt --yes` with that proposal
-hash. The next Requirements task reuses that exact candidate, followed by normal review and Gate 1 approval.
+hash. The next Requirements task reuses that exact candidate, followed by normal review and the Gate 1 intent confirmation.
 For later changes, use `requirements preview-change` and `requirements revise --yes`. See the
 [command contract](../reference/cli.md#requirements-adoption-and-change) for flags and conflict handling.
 
@@ -102,7 +102,9 @@ apex render --kind preview
 Use `--provider terraform` for a Terraform run. For recipient-bound handoff, add `--recipient RECIPIENT_ID` when
 creating the preview.
 
-Review target, operation, dependency revision, IaC hash, change set, warnings, and intended recipient.
+Review target, operation, dependency revision, IaC hash, change set, warnings, and intended recipient. Gate 4 is the
+single final approval for a lab: also review the Approval Context in `operations/deployment-preview.md` (purpose,
+target, gate provenance, architecture, cost estimate and accepted risks).
 
 ## Approve The Exact Preview
 
@@ -117,7 +119,8 @@ apex approval show --json
 ```
 
 Omit `--recipient` only for a same-writer local operation. Approval expires no later than the preview and cannot be
-reused after dependency, ownership, target, track, or IaC changes.
+reused after dependency, ownership, target, track, or IaC changes. Destruction needs its own preview and approval; an
+approved apply never covers it.
 
 ## Deploy
 

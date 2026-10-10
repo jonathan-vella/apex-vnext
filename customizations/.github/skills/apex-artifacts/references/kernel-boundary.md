@@ -48,18 +48,17 @@ Provider mutation commands retained in examples are syntax for those bounded ope
 An environment flag, shell confirmation, local plan status, CI environment approval or OIDC job identity is not an
 APEX gate decision. Never suppress provider errors, refresh approval in CI, or execute an unbound fallback.
 
-## Planned Purpose-Bound Delivery
+## Purpose-Bound Delivery
 
-The runtime gates, preview binding and qualification handoff above stay enforced until their replacements are
-implemented and qualified. DECISION-036 and ADR-0007 select the following
-target; **none of it is shipped behavior**:
+Lab runs (CP-27, #456) confirm intent once at Gate 1 (purpose, target and requirements), record Gates 2 and 3 as
+kernel readiness checkpoints and approve the final deployment preview at Gate 4. Required reviews, deterministic
+checks, risk decisions and each apply or destroy preview and approval remain blocking; a readiness checkpoint is never
+human approval. `production` is blocked. The preview binding and qualification handoff above stay enforced.
+DECISION-036 and ADR-0007 select the following target; **none of it is shipped behavior**:
 
 - Executors: azd is the executor for **Bicep only** (CP-26, #443). Native Terraform CLI is the Terraform path with
   exact saved plans, normal backend locking and unchanged dependencies. There is no azd Terraform adapter.
 - APEX **never runs `azd up`**. Provisioning and application deployment stay separate operations.
-- Non-production purpose (CP-27, #456): confirm intent once and approve the final deployment preview. Gates 1-3
-  become readiness checkpoints; required reviews, deterministic checks, risk decisions and each destructive
-  operation remain blocking.
 - Production (CP-28, #457; setup CP-29, #458): opt-in and CI-owned, with a verified candidate-bound human review
   receipt before apply. OIDC job identity or an environment pause alone is not human approval.
 - Static `azure.yaml` and GitHub Actions generation is reviewable preparation, not pipeline setup or approval.

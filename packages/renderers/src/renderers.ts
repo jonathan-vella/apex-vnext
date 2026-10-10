@@ -177,7 +177,7 @@ export function renderDeploymentGuide(input: {
     "## Deployment Procedure",
     "",
     "1. Inspect `apex status --json` and `apex doctor --json`; resolve missing prerequisites and stale inputs.",
-    "2. Complete required reviews, Gates 1 through 3, source generation and all native source validators for this accepted plan.",
+    "2. Complete required reviews, the Gate 1 intent confirmation, the Gate 2 and 3 readiness checkpoints, source generation and all native source validators for this accepted plan.",
     `3. With explicit cloud-operation authorization, request \`apex preview --operation apply --provider ${binding.track} --json\`. Terraform preview may perform authenticated planning.`,
     "4. Review the exact preview, resource ownership, replacements, deletions, policy results and blockers. A human must approve Gate 4 for that exact fresh preview and recipient.",
     "5. Execute only the approved preview through `apex deploy --preview PREVIEW_HASH --json`; never substitute an unbound provider command.",

@@ -367,8 +367,8 @@ Maintainer direction accepted on 2026-10-09, with lab prompt scope confirmed on 
   changes, risk decisions and each destructive operation still require their own relevant confirmation. The kernel
   implements this as a `ready` gate state recorded for lab Gates 2 and 3 only (no actor, approval evidence or human
   decision event, never inherited by promotion) and keeps Gate 1 and Gate 4 human-only. There is no cost threshold:
-  Gate 4 shows architecture, cost estimate and accepted risks. CLI/MCP routing, managed guidance and client
-  qualification updates are CP-27 PR 3.
+  Gate 4 shows architecture, cost estimate and accepted risks. CLI/MCP descriptions, managed guidance and the client
+  qualification plan describe this flow (CP-27 PR 3); the scenarios are not yet run.
 - **Executors.** Use azd for Bicep and native Terraform CLI for Terraform. Keep two IaC languages; do not add an azd
   Terraform adapter. Preserve source/parameter/environment binding for Bicep and exact saved plans with normal
   backend locking and unchanged dependencies for Terraform. Provisioning and application deployment stay separate;

@@ -44,7 +44,8 @@ boundary; kernel task, evidence, ownership and approval checks remain authoritat
 
 Handoff buttons and specialist switches are gone. The `apex-next` skill reads kernel status and the next task, then
 maps the owner role to a stage skill for the same APEX agent or to one hidden worker. It carries the user's requested
-outcome to the next stop point and stops while a gate is pending.
+outcome to the next stop point and stops while a human gate (the Gate 1 intent confirmation or the final Gate 4
+approval) is pending. Gate 2 and 3 are kernel-recorded readiness checkpoints in a lab run, so it never prompts for them.
 
 ## Built-In Helpers
 

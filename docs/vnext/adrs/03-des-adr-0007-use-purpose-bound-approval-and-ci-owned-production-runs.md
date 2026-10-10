@@ -108,10 +108,10 @@ workflow; their checks are not disabled by this documentation change. Do not gen
 temporary public-endpoint exception into a production default.
 
 Implementation must update typed purpose/approval contracts, routing, CLI/MCP and managed guidance together. The kernel
-now records lab Gates 2 and 3 as readiness checkpoints; CLI/MCP prompts, managed guidance and client qualification
-still describe the earlier four-gate prompts until CP-27 PR 3 lands. Production gate prompts, native providers and the
-local-to-CI qualification workflow remain enforced until their tested replacements land. No new runtime command or
-production authorization is created by this ADR.
+now records lab Gates 2 and 3 as readiness checkpoints, and CLI/MCP descriptions, managed guidance and the client
+qualification plan describe that flow (CP-27 PR 3; the scenarios are not yet run). Production gate prompts, native
+providers and the local-to-CI qualification workflow remain enforced until their tested replacements land. No new
+runtime command or production authorization is created by this ADR.
 
 ## Acceptance And Revisit Triggers
 

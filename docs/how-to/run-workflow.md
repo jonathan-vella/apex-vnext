@@ -1,6 +1,6 @@
 # Run The Workflow
 
-> [Current Version](../../VERSION.md) | Move one environment and IaC track through typed tasks and human gates.
+> [Current Version](../../VERSION.md) | Run one environment and IaC track: typed tasks, intent confirmation, approval.
 
 ## Select The Project
 
@@ -47,8 +47,8 @@ apex project promote \
 The promoted run remains in the same project and is selected automatically. It inherits only applicable upstream
 evidence; it always needs its own code generation, validation, preview, and Gate 4 approval. A different target also
 redoes the requirements review and needs a fresh Gate 1 confirmation, and a lab run records its own Gate 2 and 3
-readiness. Repeat for production with its production target. Return to a prior environment with
-`apex project use --project payments --run RUN_ID`.
+readiness. `production` runs are blocked until the CI-owned production flow ships; the run's purpose is kept on
+promotion. Return to a prior environment with `apex project use --project payments --run RUN_ID`.
 
 Use the `APEX` agent in Copilot CLI (`copilot --agent apex`) as the normal interactive entry point; the VS Code
 Copilot harness runs the same projection. Ask it what is next: the `apex-next` skill maps the kernel owner role to a
@@ -176,11 +176,11 @@ apex governance import --reference --json
 ```
 
 The reference comes from a pinned Azure Landing Zones Library release (root, landing zones and corp archetypes). It is
-an assumption, not your policy: a subscription target can design, price and pass Gate 2 on it, but planning requires
-the reviewed subscription baseline. After Gate 2 the kernel issues a `governance-refresh` task: select and import the
-reviewed baseline as below. A `policy-refresh` task follows, where APEX carries matching mappings and the Architect
-decides only new or changed controls. Gate 2 stays approved (a lab run: ready) unless a control is `blocked`, which
-reopens Architecture.
+an assumption, not your policy: a subscription target can design, price and reach Gate 2 readiness on it, but planning
+requires the reviewed subscription baseline. After Gate 2 the kernel issues a `governance-refresh` task: select and
+import the reviewed baseline as below. A `policy-refresh` task follows, where APEX carries matching mappings and the
+Architect decides only new or changed controls. Gate 2 stays approved (a lab run: ready) unless a control is `blocked`,
+which reopens Architecture.
 
 The Architect maps every enforcing policy (deny, modify, deployIfNotExists) to a designed component inside
 Architecture. APEX marks policies whose resource types match no component `not-applicable`; every other
@@ -247,23 +247,40 @@ journal/state files. Legacy snapshots without content digests still require a se
 The current deployment reconciliation path requires a recorded execution receipt. Without one, remain blocked for
 operator/provider-supported resolution; repeating `apex reconcile` or deployment does not establish the missing outcome.
 
-## Decide Gates
+## Confirm Intent And Approve The Final Preview
 
-Inspect accepted artifacts and validation before each decision:
+A lab run has two human decisions: the Gate 1 intent confirmation and the final Gate 4 preview approval. Gates 2 and 3
+are readiness checkpoints that the kernel records itself. See [Workflow and gates](../explanation/workflow-and-gates.md).
+
+### Gate 1: Confirm Intent
+
+Inspect the accepted requirements and the run's purpose and target before confirming:
 
 ```bash
 apex render --kind requirements
 apex gate decide --gate 1 --decision approved --actor USER_ID --json
 ```
 
+Confirming Gate 1 binds the purpose (`lab`), the target and the accepted requirements. Changed requirements reopen
+Gate 1, and a different purpose or target needs a new run (promotion to a different target reopens Gate 1). Through MCP
+the agent calls `apex/gateDecide` for Gate 1 only after your explicit confirmation.
+
 Requirements acceptance also materializes a read-only Gate 1 review package at
 `agent-output/<project>/<run>/`. Review `01-requirements.md`, `README.md`,
 `service-recommendations.md`, `sku-preferences.md`, and `challenger-findings.md`
-before approving Gate 1. These documents are derived from accepted APEX state;
+before confirming Gate 1. These documents are derived from accepted APEX state;
 regeneration overwrites local edits.
 
 Conflict-aware selective updates are planned under `REQ-CHANGE-001`; until implemented, do not treat manual edits to
 these generated packages as persistent project intent. Ask APEX to revise accepted decisions through supported tasks.
+
+### Gates 2 And 3: Readiness Checkpoints
+
+Gates 2 and 3 have no prompt. When a gate opens, its required review has no open finding and its validators pass, the
+kernel records `ready` (with `readyAt`) and a `gate.readiness-recorded` event, without approval evidence or an actor.
+`apex gate decide` and `apex/gateDecide` refuse Gate 2 and 3 in a lab run with reason `GATE_READINESS_AUTOMATIC`. Until
+readiness is recorded, `nextTask` reports `Gate N readiness checkpoint is not recorded: <reason>`; resolve the blocking
+review finding (including an unaccepted risk) or validator failure it names.
 
 Architecture acceptance materializes `agent-output/<project>/<run>/architecture/` with authoritative assessment, cost,
 SKU, and challenger Markdown. It also includes editable Python, SVG, and PNG views for Architecture topology,
@@ -274,8 +291,13 @@ replace or block typed review evidence.
 Architecture assumes regional service/SKU availability and sufficient quota. Regional, zonal, deployment, restore,
 failover, and capacity details may appear as descriptive assumptions, but APEX does not request, validate, or gate them.
 
-Repeat the inspection and decision ceremony for architecture/cost and implementation plan. Gate 4 is decided only after
-an exact provider preview exists. Rejection or upstream changes reopen the earliest affected work.
+### Gate 4: Approve The Final Preview
+
+Gate 4 is decided only after an exact provider preview exists. The generated `operations/deployment-preview.md` shows an
+Approval Context with the purpose, target, gate provenance, architecture, cost estimate and accepted risks so the single
+final approval is informed. There is no cost threshold. Its tamper check is best-effort and local; binding it
+immutably is tracked in [#466](https://github.com/jonathan-vella/apex-vnext/issues/466). Apply and destroy each need
+their own preview and Gate 4 approval. Rejection or upstream changes reopen the earliest affected work.
 
 ## Generate And Validate IaC
 

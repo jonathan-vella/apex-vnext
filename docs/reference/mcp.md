@@ -74,7 +74,8 @@ The Requirements, Architecture and Plan reviews (`requirements-review`, `archite
    block in the output. The capture is stored in the object store and bound in the `task.completed` event; the
    `review-findings-v1` artifact carries the nonce, capture hash, prompt hash and response hash.
 5. `nextTask` then returns `needs_review` for every open finding, including `info`. The APEX agent records a disposition
-   for each through `reviewDecide`; gates still need the user's approval.
+   for each through `reviewDecide`. A lab run still needs the user's Gate 1 intent confirmation and final Gate 4
+   approval; Gates 2 and 3 are recorded by the kernel when their reviews and checks pass.
 
 The answer block is one JSON object: `findings` lists `{ "id"?, "severity", "title", "detail" }` with severity
 `critical`, `high`, `medium`, `low` or `info`, and IDs default to `F-1`, `F-2` and so on. The Architecture review also

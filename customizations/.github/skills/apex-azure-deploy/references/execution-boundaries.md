@@ -35,24 +35,24 @@ Today's Bicep track uses `az deployment group|sub what-if` and bound `create`; T
 An ad hoc what-if or local plan is an observation, not an authorization receipt. Current runtime gates and the
 existing qualification handoff stay enforced until their replacements are implemented and qualified.
 
-**Purpose-bound delivery is planned (DECISION-036, ADR-0007).** Do not claim any of the following exists today:
+**Executor and production delivery is planned (DECISION-036, ADR-0007).** The lab gate flow (CP-27
+[#456](https://github.com/jonathan-vella/apex-vnext/issues/456)) is current runtime: one Gate 1 intent confirmation,
+kernel-recorded Gate 2 and 3 readiness checkpoints and the final Gate 4 preview approval, with each apply or destroy
+needing its own preview and approval; `production` is blocked. Do not claim any of the following exists today:
 
-1. Lab flow (CP-27 [#456](https://github.com/jonathan-vella/apex-vnext/issues/456)): confirm purpose and workload
-   intent once, then approve the final deployment preview. Required reviews and deterministic checks stay blocking;
-   changed intent, risk decisions and each destructive operation need their own confirmation.
-2. Executors (CP-26 [#443](https://github.com/jonathan-vella/apex-vnext/issues/443)): azd executes Bicep only, bound
+1. Executors (CP-26 [#443](https://github.com/jonathan-vella/apex-vnext/issues/443)): azd executes Bicep only, bound
    to source, parameters and environment. Native Terraform CLI executes Terraform from an exact saved plan with normal
    backend locking and unchanged dependencies. There is no azd Terraform adapter.
-3. Provisioning and application delivery are separate operations; a service-delivery preview binds the service list
+2. Provisioning and application delivery are separate operations; a service-delivery preview binds the service list
    and package digests. `azure.yaml` and workflow generation are static CodeGen output; `azd pipeline config` creates
    Entra identities, federation, roles and GitHub variables, so it needs its own preview and approval and is not a
    private user-run bypass.
-4. Production (CP-28 [#457](https://github.com/jonathan-vella/apex-vnext/issues/457), setup CP-29
+3. Production (CP-28 [#457](https://github.com/jonathan-vella/apex-vnext/issues/457), setup CP-29
    [#458](https://github.com/jonathan-vella/apex-vnext/issues/458)): opt-in and CI-owned. GitHub Actions owns the
    execution run and preview, and the kernel verifies a candidate-bound human review receipt before apply. OIDC job
    identity, the triggering actor or an environment pause is not human approval; missing approval features or failed
    checks block production. Protected artifacts, anti-replay and audit still apply.
-5. Qualification of the purpose-bound flow is CP-30 [#455](https://github.com/jonathan-vella/apex-vnext/issues/455).
+4. Qualification of the purpose-bound flow is CP-30 [#455](https://github.com/jonathan-vella/apex-vnext/issues/455).
 
 APEX **never runs `azd up`**. Upstream mentions explain historical combined provision/build/deploy behavior only;
 there is no single approval that can safely cover it. Unsupported operations return a blocker, not weaker gates.
