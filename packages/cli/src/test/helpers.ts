@@ -613,7 +613,20 @@ export async function qualityReport(root: string, runId: string, projectId = "de
   };
 }
 
-export async function prepareValidatedRun(service: ApexService, runId: string, track: "bicep" | "terraform") {
+/** Lab Gates 2 and 3 are recorded by the kernel; no human decision exists for them. */
+export async function assertLabReadiness(service: ApexService, gate: 2 | 3): Promise<void> {
+  const run = await service["currentRun"]();
+  const record = run.gates.find((item) => item.gate === gate);
+  if (record?.state !== "ready" || record.readyAt === undefined)
+    throw new Error(`Gate ${gate} readiness was not recorded (state ${record?.state})`);
+}
+
+export async function prepareValidatedRun(
+  service: ApexService,
+  runId: string,
+  track: "bicep" | "terraform",
+  options: { requirements?: RequirementsV1; acceptAvailability?: boolean; stopBeforeCodegen?: boolean } = {},
+) {
   const nextTask = async (expected: string) => {
     const next = await nextTaskAfterInput(service);
     if (next.status !== "task" || next.task.taskType !== expected) throw new Error(`Expected ${expected}`);
@@ -621,12 +634,14 @@ export async function prepareValidatedRun(service: ApexService, runId: string, t
   };
   const complete = async (expected: string, outputs: TaskOutput[]) =>
     completeOutputs(service, await nextTask(expected), outputs);
-  const requirementHashes = await complete("requirements", [{ kind: "requirements", value: requirements() }]);
+  const requirementHashes = await complete("requirements", [
+    { kind: "requirements", value: options.requirements ?? requirements() },
+  ]);
   await complete("requirements-review", [
     { kind: "review-findings", value: review(runId, "requirements", requirementHashes.outputHashes.requirements!) },
   ]);
   await service.decideGateNumber(1, "approved", "tester");
-  await acceptAvailabilityEvidence(service, runId);
+  if (options.acceptAvailability !== false) await acceptAvailabilityEvidence(service, runId);
   const governanceHash = await importReferenceGovernance(service);
   const architectureValue = architecture(runId);
   const costValue = costEstimate(runId);
@@ -649,7 +664,7 @@ export async function prepareValidatedRun(service: ApexService, runId: string, t
   await complete("architecture-review", [
     { kind: "review-findings", value: review(runId, "architecture", architectureHashes.outputHashes.architecture!) },
   ]);
-  await service.decideGateNumber(2, "approved", "tester");
+  await assertLabReadiness(service, 2);
   const plan = planBundle(
     runId,
     track,
@@ -665,7 +680,8 @@ export async function prepareValidatedRun(service: ApexService, runId: string, t
   await complete("plan-review", [
     { kind: "review-findings", value: review(runId, "plan", planHashes.outputHashes["implementation-intent"]!) },
   ]);
-  await service.decideGateNumber(3, "approved", "tester");
+  await assertLabReadiness(service, 3);
+  if (options.stopBeforeCodegen === true) return;
   await complete(`codegen-${track}`, codegenBundle(runId, track, plan));
   await complete(`validation-${track}`, [{ kind: "validation-evidence", value: validationEvidence(runId, track) }]);
 }

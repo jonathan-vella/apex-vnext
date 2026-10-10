@@ -14,6 +14,7 @@ import {
   DeploymentPreviewV1Schema,
   DiagnosisV1Schema,
   EnvironmentInputsV1Schema,
+  GateRecordV1Schema,
   ExecutionPlanAttestationV1Schema,
   GovernanceConstraintsV1Schema,
   GovernanceObservationReceiptV1Schema,
@@ -1899,6 +1900,42 @@ describe("target family contracts", () => {
       }),
       false,
     );
+  });
+
+  it("never represents a readiness checkpoint as approval evidence", () => {
+    const base = {
+      schemaVersion: CONTRACT_VERSION,
+      projectId: "example-project",
+      runId: "run-1",
+      gate: 2,
+      actor: "maintainer",
+      dependencyHash: hash,
+      writerEpoch: 1,
+      decidedAt: timestamp,
+    };
+    assert.equal(Value.Check(ApprovalEvidenceV1Schema, { ...base, decision: "approved", mechanism: "tty" }), true);
+    assert.equal(Value.Check(ApprovalEvidenceV1Schema, { ...base, decision: "ready", mechanism: "tty" }), false);
+    assert.equal(Value.Check(ApprovalEvidenceV1Schema, { ...base, decision: "approved", mechanism: "kernel" }), false);
+    assert.equal(
+      Value.Check(ApprovalEvidenceV1Schema, { ...base, decision: "approved", mechanism: "readiness" }),
+      false,
+    );
+    const { actor: _actor, ...withoutActor } = base;
+    assert.equal(
+      Value.Check(ApprovalEvidenceV1Schema, { ...withoutActor, decision: "approved", mechanism: "tty" }),
+      false,
+    );
+    const gate = { gate: 2, state: "ready", dependencyHash: hash, readyAt: timestamp };
+    assert.equal(Value.Check(GateRecordV1Schema, gate), true);
+    assert.equal(Value.Check(GateRecordV1Schema, { ...gate, state: "readiness" }), false);
+    const { readyAt: _readyAt, ...withoutReadyAt } = gate;
+    assert.equal(Value.Check(GateRecordV1Schema, withoutReadyAt), false);
+    assert.equal(Value.Check(GateRecordV1Schema, { ...gate, gate: 1 }), false);
+    assert.equal(Value.Check(GateRecordV1Schema, { ...gate, gate: 4 }), false);
+    assert.equal(Value.Check(GateRecordV1Schema, { ...gate, decidedAt: timestamp }), false);
+    assert.equal(Value.Check(GateRecordV1Schema, { ...gate, inheritedFromRunId: "run-0" }), false);
+    assert.equal(Value.Check(GateRecordV1Schema, { ...gate, state: "approved" }), false);
+    assert.equal(Value.Check(GateRecordV1Schema, { gate: 2, state: "approved", dependencyHash: hash }), true);
   });
 
   it("permits only local and inherited approval mechanisms", () => {

@@ -34,8 +34,8 @@ Project creation selects the new project's first run. Use `apex project use` to 
 
 ## Promote A Project Environment
 
-Each workload has one run per environment. After Gates 1 through 3 for the selected run are approved, create the next
-environment run:
+Each workload has one run per environment. After Gate 1 is approved and Gates 2 and 3 are approved or, for a lab run,
+recorded as readiness checkpoints for the selected run, create the next environment run:
 
 ```bash
 apex project promote \
@@ -45,8 +45,10 @@ apex project promote \
 ```
 
 The promoted run remains in the same project and is selected automatically. It inherits only applicable upstream
-evidence; it always needs its own code generation, validation, preview, and Gate 4 approval. Repeat for production
-with its production target. Return to a prior environment with `apex project use --project payments --run RUN_ID`.
+evidence; it always needs its own code generation, validation, preview, and Gate 4 approval. A different target also
+redoes the requirements review and needs a fresh Gate 1 confirmation, and a lab run records its own Gate 2 and 3
+readiness. Repeat for production with its production target. Return to a prior environment with
+`apex project use --project payments --run RUN_ID`.
 
 Use the `APEX` agent in Copilot CLI (`copilot --agent apex`) as the normal interactive entry point; the VS Code
 Copilot harness runs the same projection. Ask it what is next: the `apex-next` skill maps the kernel owner role to a
@@ -177,7 +179,8 @@ The reference comes from a pinned Azure Landing Zones Library release (root, lan
 an assumption, not your policy: a subscription target can design, price and pass Gate 2 on it, but planning requires
 the reviewed subscription baseline. After Gate 2 the kernel issues a `governance-refresh` task: select and import the
 reviewed baseline as below. A `policy-refresh` task follows, where APEX carries matching mappings and the Architect
-decides only new or changed controls. Gate 2 stays approved unless a control is `blocked`, which reopens Architecture.
+decides only new or changed controls. Gate 2 stays approved (a lab run: ready) unless a control is `blocked`, which
+reopens Architecture.
 
 The Architect maps every enforcing policy (deny, modify, deployIfNotExists) to a designed component inside
 Architecture. APEX marks policies whose resource types match no component `not-applicable`; every other

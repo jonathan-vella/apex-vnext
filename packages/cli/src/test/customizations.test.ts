@@ -515,7 +515,7 @@ test("promotion invalidates environment-specific gates when target scope changes
   const promoted = await service.promote("prod", "subscription/prod");
   assert.deepEqual(
     promoted.gates.map((gate) => gate.state),
-    ["inherited", "closed", "closed", "closed"],
+    ["closed", "closed", "closed", "closed"],
   );
 });
 

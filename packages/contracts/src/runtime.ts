@@ -43,23 +43,47 @@ export const ProjectConfigV1Schema = Type.Object(
 export const GateStateSchema = Type.Union([
   Type.Literal("closed"),
   Type.Literal("open"),
+  Type.Literal("ready"),
   Type.Literal("approved"),
   Type.Literal("inherited"),
   Type.Literal("rejected"),
   Type.Literal("invalidated"),
 ]);
 
-export const GateRecordV1Schema = Type.Object(
-  {
-    gate: Type.Integer({ minimum: 1, maximum: 4 }),
-    state: GateStateSchema,
-    dependencyHash: Sha256Schema,
-    decidedAt: Type.Optional(IsoDateTimeSchema),
-    inheritedFromRunId: Type.Optional(RunIdSchema),
-    reason: Type.Optional(NonEmptyStringSchema),
-  },
-  { additionalProperties: false },
-);
+/**
+ * A gate is either a decided or pending record, or a kernel readiness checkpoint (`ready`): lab Gates 2 and 3 only,
+ * with `readyAt` and without any decision or inheritance fields. A readiness checkpoint is never approval evidence.
+ * That readiness is valid only for `lab` runs is enforced by `parseRunConfig` and the gate validators.
+ */
+export const GateRecordV1Schema = Type.Union([
+  Type.Object(
+    {
+      gate: Type.Integer({ minimum: 1, maximum: 4 }),
+      state: Type.Union([
+        Type.Literal("closed"),
+        Type.Literal("open"),
+        Type.Literal("approved"),
+        Type.Literal("inherited"),
+        Type.Literal("rejected"),
+        Type.Literal("invalidated"),
+      ]),
+      dependencyHash: Sha256Schema,
+      decidedAt: Type.Optional(IsoDateTimeSchema),
+      inheritedFromRunId: Type.Optional(RunIdSchema),
+      reason: Type.Optional(NonEmptyStringSchema),
+    },
+    { additionalProperties: false },
+  ),
+  Type.Object(
+    {
+      gate: Type.Integer({ minimum: 2, maximum: 3 }),
+      state: Type.Literal("ready"),
+      dependencyHash: Sha256Schema,
+      readyAt: IsoDateTimeSchema,
+    },
+    { additionalProperties: false },
+  ),
+]);
 
 export const RunConfigV1Schema = Type.Object(
   {

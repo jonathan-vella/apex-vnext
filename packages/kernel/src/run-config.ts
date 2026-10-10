@@ -1,5 +1,6 @@
 import { RunConfigV1Schema, registerContractFormats, type RunConfigV1 } from "@apexops/contracts";
 import { Value } from "@sinclair/typebox/value";
+import { isReadinessGate } from "./gates.js";
 
 export class RunConfigInvalidError extends Error {
   constructor(readonly issues: readonly string[]) {
@@ -19,9 +20,22 @@ export function parseRunConfig(raw: string): RunConfigV1 {
   } catch {
     throw new RunConfigInvalidError(["/: not valid JSON"]);
   }
-  if (Value.Check(RunConfigV1Schema, value)) return value;
+  if (Value.Check(RunConfigV1Schema, value)) {
+    const gateIssues = readinessGateIssues(value);
+    if (gateIssues.length > 0) throw new RunConfigInvalidError(gateIssues);
+    return value;
+  }
   const issues = [...Value.Errors(RunConfigV1Schema, value)]
     .slice(0, 3)
     .map((error) => `${error.path === "" ? "/" : error.path}: ${error.message}`);
   throw new RunConfigInvalidError(issues);
+}
+
+/** The schema fixes the shape of a ready gate; its lab-only restriction depends on the run purpose. */
+function readinessGateIssues(run: RunConfigV1): string[] {
+  return run.gates.flatMap((gate, index) =>
+    gate.state === "ready" && !isReadinessGate(run.purpose, gate.gate)
+      ? [`/gates/${index}/state: ready is only valid for lab Gates 2 and 3`]
+      : [],
+  );
 }

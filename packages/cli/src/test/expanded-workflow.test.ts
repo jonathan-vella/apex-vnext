@@ -60,6 +60,7 @@ import {
   writeJson,
   completeOutputs,
   completeReviewTask,
+  assertLabReadiness,
 } from "./helpers.js";
 
 async function importTestGovernance(service: ApexService): Promise<string> {
@@ -179,7 +180,7 @@ async function reachCodegen(
   await complete(service, "architecture-review", [
     { kind: "review-findings", value: review(runId, "architecture", architectureHashes.architecture!) },
   ]);
-  await service.decideGateNumber(2, "approved", "tester");
+  await assertLabReadiness(service, 2);
 
   const plan = planBundle(
     runId,
@@ -227,7 +228,7 @@ async function reachCodegen(
   await complete(service, "plan-review", [
     { kind: "review-findings", value: review(runId, "plan", planHashes["implementation-intent"]!) },
   ]);
-  await service.decideGateNumber(3, "approved", "tester");
+  await assertLabReadiness(service, 3);
   return { taskId: await task(service, `codegen-${track}`), plan };
 }
 
@@ -1694,7 +1695,7 @@ test("task-bound workflow validators reject semantic and evidence mutations", as
     review(runId, "architecture", architectureHashes.outputHashes.architecture!),
   );
 
-  await service.decideGateNumber(2, "approved", "tester");
+  await assertLabReadiness(service, 2);
 
   const sourceHashes = {
     requirements: requirementHashes.outputHashes.requirements!,
@@ -1719,7 +1720,7 @@ test("task-bound workflow validators reject semantic and evidence mutations", as
       value: review(runId, "plan", planHashes.outputHashes["implementation-intent"]!),
     },
   ]);
-  await service.decideGateNumber(3, "approved", "tester");
+  await assertLabReadiness(service, 3);
 
   const validCodegen = codegenBundle(runId, "bicep", validPlan);
   const incompleteCodegen = structuredClone(validCodegen) as TaskOutput[];
@@ -1811,7 +1812,10 @@ test("architecture assumes availability and permits dismissal of out-of-scope re
     ]),
     { status: "resolved" },
   );
-  await assert.rejects(service.nextTask(), /Gate 2 approval is required/);
+  assert.equal((await service.status()).run.gates[1]?.state, "ready");
+  const afterReadiness = await service.nextTask();
+  assert.equal(afterReadiness.status, "task");
+  if (afterReadiness.status === "task") assert.equal(afterReadiness.task.taskType, "plan");
 });
 
 test("authorized capability adapter accepts native architecture availability evidence", async () => {
@@ -3191,8 +3195,10 @@ test("promotion inherits neutral progression and restarts at the first environme
   assert.equal(sameScope.purpose, "lab");
   assert.deepEqual(
     sameScope.gates.map(({ state }) => state),
-    ["inherited", "inherited", "inherited", "closed"],
+    ["inherited", "ready", "ready", "closed"],
   );
+  assert.equal((sameScope.gates[1] as { inheritedFromRunId?: string }).inheritedFromRunId, undefined);
+  assert.equal((sameScope.gates[2] as { inheritedFromRunId?: string }).inheritedFromRunId, undefined);
   assert.equal((await service.nextTask()).status, "task");
   assert.equal((await service.status()).task, "codegen-bicep");
 
@@ -3201,8 +3207,23 @@ test("promotion inherits neutral progression and restarts at the first environme
   assert.equal(changedScope.purpose, "lab");
   assert.deepEqual(
     changedScope.gates.map(({ state }) => state),
-    ["inherited", "closed", "closed", "closed"],
+    ["closed", "closed", "closed", "closed"],
   );
+  // Gate 1 binds the target, so the changed target redoes the requirements review in the new run and needs its own
+  // human confirmation bound to the new target.
+  const parentGate1 = (await new RunRepository(join(root, ".apex", "projects", "demo", "runs", runId)).read())
+    .gates[0]!;
+  const requirementsHash = service["acceptedArtifactHashes"](
+    await service["journal"](changedScope).replay(),
+  ).requirements!;
+  await complete(service, "requirements-review", [
+    { kind: "review-findings", value: review(changedScope.runId, "requirements", requirementsHash) },
+  ]);
+  const childGate1 = (await service.status()).run.gates[0]!;
+  assert.equal(childGate1.state, "open");
+  assert.notEqual(childGate1.dependencyHash, parentGate1.dependencyHash);
+  await assert.rejects(service.nextTask(), /Gate 1 approval is required/);
+  await service.decideGateNumber(1, "approved", "tester");
   const next = await service.nextTask();
   assert.equal(next.status, "task");
   if (next.status === "task") assert.equal(next.task.taskType, "governance-discovery");
@@ -4036,7 +4057,7 @@ for (const track of ["bicep", "terraform"] as const) {
     await complete(service, "architecture-review", [
       { kind: "review-findings", value: review(runId, "architecture", policy.architecture!) },
     ]);
-    await service.decideGateNumber(2, "approved", "tester");
+    await assertLabReadiness(service, 2);
     const hashes = service["acceptedArtifactHashes"](await journal.replay());
     const plan = planBundle(
       runId,
@@ -4054,7 +4075,7 @@ for (const track of ["bicep", "terraform"] as const) {
     await complete(service, "plan-review", [
       { kind: "review-findings", value: review(runId, "plan", planHashes["implementation-intent"]!) },
     ]);
-    await service.decideGateNumber(3, "approved", "tester");
+    await assertLabReadiness(service, 3);
     await service.generateIac(await task(service, `codegen-${track}`));
     await complete(service, `validation-${track}`, [
       { kind: "validation-evidence", value: validationEvidence(runId, track) },
@@ -5293,7 +5314,7 @@ async function approveOnReferenceGovernance(findings: Record<string, unknown>[] 
   await complete(service, "architecture-review", [
     { kind: "review-findings", value: review(runId, "architecture", architectureHashes.architecture!) },
   ]);
-  await service.decideGateNumber(2, "approved", "tester");
+  await assertLabReadiness(service, 2);
   await task(service, "governance-refresh");
   const path = join(root, "baseline.json");
   const observedAt = new Date(Math.floor(Date.now() / 1000) * 1000 - 60_000).toISOString();
@@ -5312,7 +5333,7 @@ test("reference governance refreshes to the subscription baseline without reopen
   assert.equal(MCP_OUTPUT_SCHEMAS.taskContext.safeParse(context).success, true);
   assert.deepEqual((context as { governanceFindings?: unknown[] }).governanceFindings, []);
   const gate = (await service.status()).run.gates[1];
-  assert.equal(gate?.state, "approved");
+  assert.equal(gate?.state, "ready");
   await service.completeTaskOutputs(policyTask, [{ kind: "policy-property-map", value: template }]);
   assert.deepEqual((await service.status()).run.gates[1], gate);
   await task(service, "plan");

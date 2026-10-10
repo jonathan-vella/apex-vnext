@@ -89,7 +89,8 @@ apex doctor --json
 apex status --json
 ```
 
-Complete Gates 1 through 3 and configure the selected native provider before requesting a real preview.
+Complete Gate 1 (a human confirmation); in a lab run Gates 2 and 3 record automatically as kernel readiness checkpoints
+once their reviews and checks pass. Then configure the selected native provider before requesting a real preview.
 
 ## Create And Review A Preview
 

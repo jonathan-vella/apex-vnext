@@ -141,7 +141,10 @@ export class WorkflowEngine {
     if (completed.has(root)) return true;
     if (root.startsWith("gate-")) {
       const gateState = state.gateStates?.[root];
-      return gateState === "approved" || gateState === "inherited";
+      if (gateState === "approved" || gateState === "inherited") return true;
+      return (
+        gateState === "ready" && (root === "gate-2" || root === "gate-3") && getPath(state.run, "purpose") === "lab"
+      );
     }
     if (dependency.startsWith("run-config.")) {
       return getPath(state.run, dependency.slice("run-config.".length)) !== undefined;

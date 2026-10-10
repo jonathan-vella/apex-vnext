@@ -205,14 +205,18 @@ export function renderDeploymentGuide(input: {
 export function renderRunStatus(run: RunConfigV1): string {
   const gates = [...run.gates]
     .sort((left, right) => left.gate - right.gate)
-    .map((gate) => [
-      gate.gate,
-      gate.state,
-      gate.state === "inherited" ? optional(gate.inheritedFromRunId) : "-",
-      optional(gate.decidedAt),
-      optional(gate.reason),
-      gate.dependencyHash,
-    ]);
+    .map((gate) => {
+      const fields = gate as Partial<Record<"decidedAt" | "readyAt" | "reason" | "inheritedFromRunId", string>>;
+      return [
+        gate.gate,
+        gate.state,
+        gate.state === "inherited" ? optional(fields.inheritedFromRunId) : "-",
+        optional(fields.decidedAt),
+        optional(fields.readyAt),
+        optional(fields.reason),
+        gate.dependencyHash,
+      ];
+    });
   return [
     "# Run Status",
     "",
@@ -220,6 +224,7 @@ export function renderRunStatus(run: RunConfigV1): string {
       ["Project", run.projectId],
       ["Run", run.runId],
       ["Environment", run.environment],
+      ["Purpose", run.purpose],
       ["Target scope", run.targetScope],
       ["IaC tool", run.iacTool],
       ["Parent run", optional(run.parentRunId)],
@@ -229,7 +234,10 @@ export function renderRunStatus(run: RunConfigV1): string {
     "",
     "## Gates",
     "",
-    markdownTable(["Gate", "State", "Inherited From", "Decided", "Reason", "Dependency Hash"], gates),
+    markdownTable(
+      ["Gate", "State", "Inherited From", "Decided", "Readiness Recorded", "Reason", "Dependency Hash"],
+      gates,
+    ),
   ].join("\n");
 }
 

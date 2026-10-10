@@ -215,7 +215,7 @@ test("run status displays sorted inherited gate provenance", () => {
     { gate: 4, state: "closed", dependencyHash: hash("d") },
     { gate: 2, state: "inherited", dependencyHash: hash("b"), inheritedFromRunId: "parent-run", reason: "promotion" },
     { gate: 1, state: "approved", dependencyHash: hash("a"), decidedAt: "2026-07-01T10:00:00Z" },
-    { gate: 3, state: "open", dependencyHash: hash("c") },
+    { gate: 3, state: "ready", dependencyHash: hash("c"), readyAt: "2026-07-01T10:05:00Z" },
   ];
   const run: RunConfigV1 = {
     schemaVersion: "1.0.0",
@@ -234,7 +234,9 @@ test("run status displays sorted inherited gate provenance", () => {
 
   const rendered = renderRunStatus(run);
   assert.equal(rendered, renderRunStatus({ ...run, gates: [...gates].reverse() }));
-  assert.match(rendered, /\| 2 \| inherited \| parent-run \| - \| promotion \|/);
+  assert.match(rendered, /\| 2 \| inherited \| parent-run \| - \| - \| promotion \|/);
+  assert.match(rendered, /\| 3 \| ready \| - \| - \| 2026-07-01T10:05:00Z \| - \|/);
+  assert.match(rendered, /- \*\*Purpose:\*\* lab/);
   assert.ok(rendered.indexOf("| 1 |") < rendered.indexOf("| 4 |"));
 });
 

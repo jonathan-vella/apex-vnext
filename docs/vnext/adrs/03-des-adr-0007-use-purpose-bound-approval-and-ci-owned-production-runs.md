@@ -107,9 +107,11 @@ a mandatory production prerequisite. Both records remain evidence for the existi
 workflow; their checks are not disabled by this documentation change. Do not generalize the qualification backend's
 temporary public-endpoint exception into a production default.
 
-Implementation must update typed purpose/approval contracts, routing, CLI/MCP and managed guidance together. Current
-Gate 1 through 4 prompts, native providers and local-to-CI qualification workflow remain enforced until their tested
-replacements land. No new runtime command or production authorization is created by this ADR.
+Implementation must update typed purpose/approval contracts, routing, CLI/MCP and managed guidance together. The kernel
+now records lab Gates 2 and 3 as readiness checkpoints; CLI/MCP prompts, managed guidance and client qualification
+still describe the earlier four-gate prompts until CP-27 PR 3 lands. Production gate prompts, native providers and the
+local-to-CI qualification workflow remain enforced until their tested replacements land. No new runtime command or
+production authorization is created by this ADR.
 
 ## Acceptance And Revisit Triggers
 

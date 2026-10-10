@@ -184,7 +184,8 @@ export class RunRepository {
       const actualHash = sha256Json(current as unknown as JsonValue);
       if (actualHash !== input.expectedRunHash)
         throw new Error(`Stale run hash: expected ${input.expectedRunHash}, found ${actualHash}`);
-      const journalHead = await this.journal.head();
+      const journal = this.journal.bound({ projectId: current.projectId, runId: current.runId });
+      const journalHead = await journal.head();
       if (input.expectedJournalHead !== undefined && input.expectedJournalHead !== journalHead) {
         throw new Error(
           `Stale journal head: expected ${String(input.expectedJournalHead)}, found ${String(journalHead)}`,
@@ -204,7 +205,7 @@ export class RunRepository {
       };
       await atomicWriteJson(this.intentPath, intent, { refuseOverwrite: true });
       await this.faultInjector?.("intent");
-      const event = await this.journal.append({
+      const event = await journal.append({
         ...input.event,
         expectedHead: journalHead,
         payload: {

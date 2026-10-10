@@ -142,6 +142,7 @@ import {
   EvidencePolicy,
   EvidenceStore,
   EventJournal,
+  JournalIdentityError,
   ImprovementStore,
   ObjectStore,
   ProjectStore,
@@ -172,6 +173,8 @@ import {
   decideGate,
   inheritGate,
   invalidateGate,
+  isReadinessGate,
+  markGateReady,
   openGate,
   parseRunConfig,
   sha256Bytes,
@@ -2853,8 +2856,8 @@ export class ApexService {
     | { status: "task"; task: TaskEnvelopeV1 }
   > {
     const selection = await this.selection();
-    const run = await this.run(selection);
-    const events = await this.journal(run).replay();
+    let run = await this.run(selection);
+    let events = await this.journal(run).replay();
     await this.sweepCaptures(events);
     const requirements = this.artifactHash(events, "requirements");
     const governanceInput = await this.governanceInputState(run, events);
@@ -2880,7 +2883,13 @@ export class ApexService {
         task: (await this.currentIssuedTask(run, events, TASKS[0]!.id)) ?? (await this.issueTask(run, TASKS[0]!, [])),
       };
     }
-    const route = await this.route(run, events);
+    let route = await this.route(run, events);
+    // An open lab readiness gate that could not be recorded earlier (for example after a stale head) is retried here.
+    if (route.blockers.length > 0 && route.reviewGate === undefined && (await this.retryLabReadiness(run))) {
+      run = await this.run(selection);
+      events = await this.journal(run).replay();
+      route = await this.route(run, events);
+    }
     if (route.blockers.length > 0 && route.reviewGate !== undefined) {
       return { status: "needs_review", review: await this.pendingReview(events, route.reviewGate) };
     }
@@ -6717,9 +6726,20 @@ export class ApexService {
   ): Promise<ApprovalEvidenceV1> {
     await this.assertNoPendingReview("gateDecide");
     const run = await this.currentRun();
+    if (isReadinessGate(run.purpose, gateNumber)) {
+      throw new ApexError(
+        "APEX_VALIDATION",
+        `Gate ${gateNumber} is a kernel readiness checkpoint for a ${run.purpose} run: it is recorded automatically once its required reviews and checks pass and has no human decision; resolve blocking review findings or validation failures instead, and confirm Gate 1 and the final Gate 4 preview`,
+        EXIT_CODES.validation,
+        { reason: "GATE_READINESS_AUTOMATIC", gate: gateNumber, purpose: run.purpose },
+      );
+    }
     if (gateNumber === 4) assertDeploymentPurposeUsable(run.purpose);
-    if (gateNumber === 4)
-      await this.assertGeneratedReviewUnmodified(join(this.operationsReviewDirectory(run), "approval.md"));
+    if (gateNumber === 4) {
+      // The approver relies on the generated preview material, so hand edits block the decision.
+      for (const name of ["README.md", "deployment-preview.md", "approval.md"])
+        await this.assertGeneratedReviewUnmodified(join(this.operationsReviewDirectory(run), name));
+    }
     const gate = run.gates.find(({ gate }) => gate === gateNumber);
     if (gate === undefined) throw new ApexError("APEX_USAGE", `Unknown gate ${gateNumber}`, EXIT_CODES.usage);
     const events = await this.journal(run).replay();
@@ -7142,6 +7162,7 @@ export class ApexService {
               return `- ${this.reviewMarkdownText(action)} ${this.reviewMarkdownText(resourceId)}${material ? " (material)" : ""}${detail}`;
             })
             .join("\n");
+    const approvalContext = await this.approvalContextMarkdown(run, await this.journal(run).replay());
     const previewContent = [
       "# Deployment Preview",
       "",
@@ -7160,6 +7181,7 @@ export class ApexService {
         ? "- None."
         : preview.blockers.map((blocker) => `- ${this.reviewMarkdownText(blocker)}`).join("\n"),
       "",
+      approvalContext,
     ].join("\n");
     await mkdir(directory, { recursive: true });
     await Promise.all([
@@ -7172,6 +7194,127 @@ export class ApexService {
       ),
       this.writeGeneratedReview(join(directory, "deployment-preview.md"), Buffer.from(previewContent, "utf8")),
     ]);
+  }
+
+  /** Deterministic, bounded summary so the single final approval is informed by accepted evidence. */
+  private async approvalContextMarkdown(
+    run: RunConfigV1,
+    events: Awaited<ReturnType<EventJournal["replay"]>>,
+  ): Promise<string> {
+    const text = (value: string, max = 240) =>
+      this.reviewMarkdownText(value.length > max ? `${value.slice(0, max - 1)}…` : value);
+    const gateState = (gateNumber: number) => run.gates.find(({ gate }) => gate === gateNumber)?.state ?? "unknown";
+    const gateLines =
+      run.purpose === "lab"
+        ? [
+            `- Gate 1: human intent confirmation (${gateState(1)})`,
+            `- Gates 2 and 3: kernel readiness checkpoints (${gateState(2)}, ${gateState(3)}); not human approvals`,
+          ]
+        : [1, 2, 3].map((gateNumber) => `- Gate ${gateNumber}: ${gateState(gateNumber)}`);
+    const lines = [
+      "## Approval Context",
+      "",
+      `- Purpose: ${text(run.purpose)}`,
+      `- Target: ${text(run.targetScope)}`,
+      `- Environment: ${text(run.environment)}`,
+      `- IaC track: ${text(run.iacTool)}`,
+      ...gateLines,
+      "",
+      "## Architecture",
+      "",
+    ];
+    const architectureHash = this.artifactHash(events, "architecture");
+    if (architectureHash === undefined) {
+      lines.push("- Accepted architecture is unavailable.", "");
+    } else {
+      const architecture = await this.objects.getJson<ArchitectureV1>(architectureHash);
+      lines.push(
+        `- Title: ${text(architecture.title)}`,
+        `- Summary: ${text(architecture.summary, 600)}`,
+        `- Architecture hash: ${architectureHash}`,
+        "",
+        "### Components",
+        "",
+        ...architecture.components
+          .slice(0, 25)
+          .map(({ id, service, purpose }) => `- ${text(id)} (${text(service)}): ${text(purpose)}`),
+        ...(architecture.components.length > 25 ? [`- ${architecture.components.length - 25} more components`] : []),
+        "",
+        "### Architecture Risks",
+        "",
+        ...(architecture.risks.length === 0
+          ? ["- None recorded."]
+          : architecture.risks.slice(0, 10).map((risk) => `- ${text(risk)}`)),
+        ...(architecture.risks.length > 10 ? [`- ${architecture.risks.length - 10} more risks`] : []),
+        "",
+      );
+    }
+    lines.push("## Cost Estimate", "");
+    const costHash = this.artifactHash(events, "cost-estimate");
+    if (costHash === undefined) {
+      lines.push("- Accepted cost estimate is unavailable.", "");
+    } else {
+      const cost = await this.objects.getJson<CostEstimateV1>(costHash);
+      const items = [...cost.lineItems].sort(
+        (left, right) => right.monthlyCost - left.monthlyCost || (left.id < right.id ? -1 : 1),
+      );
+      lines.push(
+        `- Estimated monthly total: ${cost.totalMonthlyCost} ${text(cost.currency)}`,
+        `- Pricing date: ${text(cost.pricingDate)}`,
+        `- Pricing status: ${cost.pricingStatus ?? "complete"}`,
+        `- Unpriced items: ${cost.unpricedItems?.length ?? 0}`,
+        `- Cost estimate hash: ${costHash}`,
+        "",
+        ...items
+          .slice(0, 20)
+          .map(({ id, service, sku, monthlyCost }) => `- ${text(id)} (${text(service)}, ${text(sku)}): ${monthlyCost}`),
+        ...(items.length > 20 ? [`- ${items.length - 20} more line items`] : []),
+        "",
+        ...(cost.assumptions.length === 0
+          ? []
+          : ["### Cost Assumptions", "", ...cost.assumptions.slice(0, 10).map((item) => `- ${text(item)}`), ""]),
+      );
+    }
+    lines.push("## Accepted Risks", "");
+    const currentReviewHashes = new Set(
+      ["requirements-review", "architecture-review", "plan-review"].flatMap((nodeId) => {
+        const hash = this.latestPayloadHash(
+          events,
+          "task.completed",
+          "reviewHash",
+          (payload) => payload.nodeId === nodeId,
+        );
+        return hash === undefined ? [] : [hash];
+      }),
+    );
+    const now = this.clock().getTime();
+    const accepted = new Map<string, ReviewResolution>();
+    for (const event of events) {
+      if (event.type !== "review.resolved") continue;
+      const resolution = (event.payload as { resolution?: ReviewResolution }).resolution;
+      if (
+        resolution?.disposition === "accepted-risk" &&
+        currentReviewHashes.has(resolution.reviewHash) &&
+        resolution.expiresAt !== undefined &&
+        Date.parse(resolution.expiresAt) > now
+      ) {
+        accepted.set(`${resolution.reviewHash}:${resolution.findingId}`, resolution);
+      }
+    }
+    const risks = [...accepted.values()].sort((left, right) => (left.findingId < right.findingId ? -1 : 1));
+    lines.push(
+      ...(risks.length === 0
+        ? ["- None."]
+        : risks
+            .slice(0, 20)
+            .map(
+              (risk) =>
+                `- ${text(risk.findingId)} (expires ${text(risk.expiresAt ?? "")}, owner ${text(risk.owner ?? risk.actor)}): ${text(risk.rationale)}`,
+            )),
+      ...(risks.length > 20 ? [`- ${risks.length - 20} more accepted risks`] : []),
+      "",
+    );
+    return lines.join("\n");
   }
 
   private async materializeOperationsApprovalPackage(
@@ -7579,8 +7722,12 @@ export class ApexService {
         );
     }
     const sourceEvents = await this.journal(source).replay();
-    if (![1, 2, 3].every((gate) => this.gateApproved(source, gate)))
-      throw new ApexError("APEX_AUTHORIZATION", "Promotion requires approved Gates 1-3", EXIT_CODES.authorization);
+    if (![1, 2, 3].every((gate) => this.gateSatisfied(source, gate, sourceEvents)))
+      throw new ApexError(
+        "APEX_AUTHORIZATION",
+        "Promotion requires an approved Gate 1 and approved or recorded-ready Gates 2 and 3",
+        EXIT_CODES.authorization,
+      );
     await this.acquireRunWriterLease(source);
     const promoted = await this.projects.createRun(source.projectId, {
       environment,
@@ -7593,17 +7740,21 @@ export class ApexService {
     const sameScope = source.targetScope === targetScope;
     const inherited = promoted.gates.map((gate) => {
       const sourceGate = source.gates.find(({ gate: number }) => number === gate.gate)!;
-      const inheritable = gate.gate === 1 || (sameScope && gate.gate <= 3);
+      // Gate 1 binds the target, so a changed target needs a fresh human confirmation in the new run.
+      const inheritable = sameScope && gate.gate <= 3;
       return inheritable && (sourceGate.state === "approved" || sourceGate.state === "inherited")
         ? inheritGate(sourceGate, source.runId, sourceGate.dependencyHash, this.clock().toISOString())
         : gate;
     });
     const updated = { ...promoted, gates: inherited };
     await atomicWriteJson(this.runPath(updated), updated);
+    // Gate 1 binds the target. A changed target therefore redoes requirements-review in the new run, so the Gate 1
+    // dependency hash is computed there (it includes the new target) instead of being copied from the parent run.
     const neutralNodes = new Set([
       "requirements",
-      "requirements-review",
-      ...(sameScope ? ["governance-discovery", "architecture", "architecture-review", "plan", "plan-review"] : []),
+      ...(sameScope
+        ? ["requirements-review", "governance-discovery", "architecture", "architecture-review", "plan", "plan-review"]
+        : []),
     ]);
     const inheritedReviewHashes = new Set<string>();
     for (const event of sourceEvents) {
@@ -7648,7 +7799,7 @@ export class ApexService {
       sourceDependencyRevision: this.dependencyRevision(source, sourceEvents),
       targetScopeChanged: !sameScope,
       invalidated: [
-        ...(!sameScope ? ["governance", "gate-2", "gate-3"] : []),
+        ...(!sameScope ? ["requirements-review", "governance", "gate-1", "gate-2", "gate-3"] : []),
         "codegen",
         "validation",
         "preview",
@@ -7657,8 +7808,30 @@ export class ApexService {
         "inventory",
       ],
     });
+    const reopen: Array<readonly [number, string]> = [];
+    // Readiness is never inherited: the new run re-evaluates it from the inherited reviews and current validators.
+    if (sameScope) {
+      for (const [gateNumber, reviewNode] of [
+        [2, "architecture-review"],
+        [3, "plan-review"],
+      ] as const) {
+        if (source.gates.find(({ gate }) => gate === gateNumber)?.state === "ready")
+          reopen.push([gateNumber, reviewNode]);
+      }
+    }
+    for (const [gateNumber, reviewNode] of reopen) {
+      const promotedEvents = await this.journal(updated).replay();
+      const reviewDependencyHash = this.latestPayloadHash(
+        promotedEvents,
+        "task.completed",
+        "dependencyHash",
+        (payload) => payload.nodeId === reviewNode,
+      );
+      if (reviewDependencyHash === undefined || this.reviewBlockers(promotedEvents, reviewNode).length > 0) break;
+      await this.openRunGate(await this.runRepository(updated).read(), gateNumber, reviewDependencyHash);
+    }
     await this.writeSelection({ projectId: updated.projectId, runId: updated.runId });
-    return updated;
+    return this.runRepository(updated).read();
   }
 
   async doctor(
@@ -8305,6 +8478,44 @@ export class ApexService {
       dependencyHash,
       ...(reopened ? { previousState: gate.state } : {}),
     });
+    if (isReadinessGate(run.purpose, gateNumber)) await this.recordGateReadiness(run, gateNumber);
+  }
+
+  /**
+   * Records the lab Gate 2/3 readiness checkpoint once the gate validators and required reviews pass.
+   * It is a kernel record, not a decision: no actor, no approval evidence and no `gate.decided` event.
+   * A failing validator or open review finding leaves the gate open and unrecorded.
+   */
+  private async recordGateReadiness(run: RunConfigV1, gateNumber: number): Promise<boolean> {
+    if (!isReadinessGate(run.purpose, gateNumber)) return false;
+    const current = await this.runRepository(run).read();
+    const gate = current.gates.find((item) => item.gate === gateNumber);
+    if (gate === undefined || gate.state !== "open") return false;
+    const events = await this.journal(current).replay();
+    let validatorIds: string[];
+    try {
+      validatorIds = await this.validateGateValidators(current, gate, events, undefined, undefined);
+    } catch (error) {
+      if (error instanceof ApexError && error.code === "APEX_VALIDATION") return false;
+      throw error;
+    }
+    await this.assertCurrentWriterAuthority(
+      current,
+      new WriterTransferStore(this.projects.runDirectory(current.projectId, current.runId), this.clock),
+    );
+    await this.mutateRun(
+      current,
+      {
+        ...current,
+        gates: current.gates.map((item) =>
+          item.gate === gateNumber ? markGateReady(item, current.purpose, this.clock().toISOString()) : item,
+        ),
+      },
+      "gate.readiness-recorded",
+      { gate: gateNumber, dependencyHash: gate.dependencyHash, validatorIds },
+      events.at(-1)?.hash ?? null,
+    );
+    return true;
   }
 
   private async mutateRun(
@@ -8636,7 +8847,10 @@ export class ApexService {
   }
 
   private journal(run: RunConfigV1): EventJournal {
-    return new EventJournal(join(this.projects.runDirectory(run.projectId, run.runId), "journal"));
+    return new EventJournal(join(this.projects.runDirectory(run.projectId, run.runId), "journal"), {
+      projectId: run.projectId,
+      runId: run.runId,
+    });
   }
 
   private runPath(run: RunConfigV1): string {
@@ -8663,7 +8877,20 @@ export class ApexService {
     const run = readOnly
       ? parseRunConfig(await readFile(join(directory, "run.json"), "utf8"))
       : await this.runRepository(selection).read();
-    const events = await this.journal(run).replay();
+    let events: EventV1[];
+    try {
+      events = await this.journal(run).replay();
+    } catch (error) {
+      if (error instanceof JournalIdentityError)
+        throw new ApexError(
+          "APEX_CONFLICT",
+          "The run journal belongs to a different project or run; restore the run state from its own backup",
+          EXIT_CODES.conflict,
+          undefined,
+          { cause: error },
+        );
+      throw error;
+    }
     this.assertRequirementsIntakeAdmitted(events, run.ownerEpoch);
     const retired = events.some((event) => {
       if (event.type !== "task.completed") return false;
@@ -9476,8 +9703,14 @@ export class ApexService {
               ? {}
               : { reviewGate: descriptor.gate ?? 2 }),
           };
-        if (descriptor.gate !== undefined && !this.gateApproved(run, descriptor.gate)) {
-          return { blockers: [`Gate ${descriptor.gate} approval is required`] };
+        if (descriptor.gate !== undefined && !this.gateSatisfied(run, descriptor.gate, events)) {
+          return {
+            blockers: [
+              isReadinessGate(run.purpose, descriptor.gate)
+                ? `Gate ${descriptor.gate} readiness checkpoint is not recorded${await this.readinessBlockedReason(run, descriptor.gate, events)}`
+                : `Gate ${descriptor.gate} approval is required`,
+            ],
+          };
         }
         continue;
       }
@@ -9487,7 +9720,7 @@ export class ApexService {
         }
         const preview = this.latestPayloadHash(events, "preview.created", "previewHash");
         if (preview === undefined) return { blockers: ["Deployment preview is required"] };
-        if (!this.gateApproved(run, 4)) return { blockers: ["Gate 4 approval is required"] };
+        if (!this.gateSatisfied(run, 4, events)) return { blockers: ["Gate 4 approval is required"] };
         return { blockers: ["Deployment and inventory are required"] };
       }
       return { task: descriptor, blockers: [] };
@@ -9495,9 +9728,81 @@ export class ApexService {
     return { blockers: [] };
   }
 
-  private gateApproved(run: RunConfigV1, gateNumber: number): boolean {
-    const state = run.gates.find(({ gate }) => gate === gateNumber)?.state;
-    return state === "approved" || state === "inherited";
+  private async retryLabReadiness(run: RunConfigV1): Promise<boolean> {
+    let recorded = false;
+    for (const gateNumber of [2, 3]) {
+      if (run.gates.find(({ gate }) => gate === gateNumber)?.state !== "open") continue;
+      recorded = (await this.recordGateReadiness(run, gateNumber)) || recorded;
+    }
+    return recorded;
+  }
+
+  private async readinessBlockedReason(
+    run: RunConfigV1,
+    gateNumber: number,
+    events: Awaited<ReturnType<EventJournal["replay"]>>,
+  ): Promise<string> {
+    const gate = run.gates.find((item) => item.gate === gateNumber);
+    if (gate?.state !== "open") return "";
+    try {
+      await this.validateGateValidators(run, gate, events, undefined, undefined);
+      return "";
+    } catch (error) {
+      if (!(error instanceof ApexError) || !Array.isArray(error.details)) return "";
+      const messages = (error.details as ValidationIssue[]).map(({ message }) => message).slice(0, 5);
+      return messages.length === 0 ? "" : `: ${messages.join("; ")}`;
+    }
+  }
+
+  /**
+   * Human approval, inheritance, or (lab Gates 2 and 3 only) a kernel readiness checkpoint.
+   *
+   * An approved gate is trusted from the run file, which sits inside the local state directory this process owns, so
+   * raw tampering with that directory is outside the threat model. Readiness is held to a stronger standard because
+   * no human vouches for it: it must be proven by the journal (see {@link readinessProven}).
+   */
+  private gateSatisfied(
+    run: RunConfigV1,
+    gateNumber: number,
+    events: Awaited<ReturnType<EventJournal["replay"]>>,
+  ): boolean {
+    const gate = run.gates.find((candidate) => candidate.gate === gateNumber);
+    if (gate?.state === "approved" || gate?.state === "inherited") return true;
+    if (gate?.state !== "ready" || !isReadinessGate(run.purpose, gateNumber)) return false;
+    return this.readinessProven(run, gate, events);
+  }
+
+  /**
+   * A `ready` gate counts only when the latest journal event touching that gate is the kernel's own readiness record
+   * for this run, the record's committed post-state contains exactly this gate record, and the gate is still bound to
+   * the current review dependency. A later invalidation, open, reopen or decision therefore revokes it, and a copied
+   * older record or a foreign journal cannot restore it.
+   */
+  private readinessProven(
+    run: RunConfigV1,
+    gate: RunConfigV1["gates"][number],
+    events: Awaited<ReturnType<EventJournal["replay"]>>,
+  ): boolean {
+    const reviewNode = { 2: "architecture-review", 3: "plan-review" }[gate.gate];
+    if (reviewNode === undefined) return false;
+    const latest = events.findLast((event) => {
+      const payload = event.payload as { gate?: unknown; nodeIds?: unknown };
+      return event.type === "workflow.invalidated"
+        ? Array.isArray(payload.nodeIds) && payload.nodeIds.includes(`gate-${gate.gate}`)
+        : event.type.startsWith("gate.") && payload.gate === gate.gate;
+    });
+    if (latest?.type !== "gate.readiness-recorded") return false;
+    if (latest.projectId !== run.projectId || latest.runId !== run.runId) return false;
+    const payload = latest.payload as { dependencyHash?: unknown; transaction?: { after?: { gates?: unknown } } };
+    if (payload.dependencyHash !== gate.dependencyHash) return false;
+    const committed = Array.isArray(payload.transaction?.after?.gates)
+      ? (payload.transaction.after.gates as RunConfigV1["gates"]).find((candidate) => candidate.gate === gate.gate)
+      : undefined;
+    if (committed === undefined || sha256Json(committed) !== sha256Json(gate)) return false;
+    return (
+      this.latestPayloadHash(events, "task.completed", "dependencyHash", (item) => item.nodeId === reviewNode) ===
+      gate.dependencyHash
+    );
   }
 
   private reviewBlockers(events: Awaited<ReturnType<EventJournal["replay"]>>, nodeId: string): string[] {
@@ -9545,8 +9850,14 @@ export class ApexService {
     assertDeploymentPurposeUsable(run.purpose);
     events = this.governanceWorkflowEvents(events);
     await this.assertImportedGovernanceCurrent(run, events);
-    if (!this.gateApproved(run, 3))
-      throw new ApexError("APEX_AUTHORIZATION", "Gate 3 approval is required before preview", EXIT_CODES.authorization);
+    if (!this.gateSatisfied(run, 3, events))
+      throw new ApexError(
+        "APEX_AUTHORIZATION",
+        isReadinessGate(run.purpose, 3)
+          ? "Gate 3 readiness checkpoint must be recorded before preview"
+          : "Gate 3 approval is required before preview",
+        EXIT_CODES.authorization,
+      );
     const engine = await this.lockedWorkflowEngine(run);
     const aliases: Partial<Record<ArtifactKind, string>> = {
       requirements: "requirements-v1",
@@ -9593,9 +9904,7 @@ export class ApexService {
     }
     const completedNodes = [
       ...this.completedNodeIds(events),
-      ...run.gates.flatMap((gate) =>
-        gate.state === "approved" || gate.state === "inherited" ? [`gate-${gate.gate}`] : [],
-      ),
+      ...run.gates.flatMap((gate) => (this.gateSatisfied(run, gate.gate, events) ? [`gate-${gate.gate}`] : [])),
     ];
     const route = engine.route({
       run: {
@@ -10504,8 +10813,8 @@ export class ApexService {
     run: RunConfigV1,
     gate: RunConfigV1["gates"][number],
     events: Awaited<ReturnType<EventJournal["replay"]>>,
-    approval: ApprovalEvidenceV1,
-    expectedApprovalRecipientIdentity: string,
+    approval: ApprovalEvidenceV1 | undefined,
+    expectedApprovalRecipientIdentity: string | undefined,
   ): Promise<string[]> {
     const workflow = await this.lockedWorkflowEngine(run);
     const nodeId = `gate-${gate.gate}`;
@@ -10555,12 +10864,12 @@ export class ApexService {
       now: this.clock().toISOString(),
       run,
       gate,
-      approval,
+      ...(approval === undefined ? {} : { approval }),
       artifactHashes,
       completedNodes,
       reviewBlockers: reviewNodes.flatMap((reviewNode) => this.reviewBlockers(events, reviewNode)),
       currentDependencyRevision: this.dependencyRevision(run, events),
-      expectedApprovalRecipientIdentity,
+      ...(expectedApprovalRecipientIdentity === undefined ? {} : { expectedApprovalRecipientIdentity }),
       ...(provedPreviewTransferClaimHash === undefined ? {} : { provedPreviewTransferClaimHash }),
       ...(expectedDependencyHash === undefined ? {} : { expectedDependencyHash }),
       ...(preview === undefined ? {} : { preview }),
