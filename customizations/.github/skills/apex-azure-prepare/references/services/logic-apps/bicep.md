@@ -76,12 +76,15 @@ resource logicAppStandard 'Microsoft.Web/sites@2025-03-01' = {
 
 ## API Connection
 
+Shape follows Microsoft Learn's "Authenticate access with a managed identity in Azure Logic Apps" for a Standard
+workflow and a connector with several authentication types (`kind: 'V2'`, `managedIdentityAuth`). No connection string
+or key is read or embedded in the deployment.
+
 ```bicep
-// Managed-identity connection: no connection string or key is read or embedded in the deployment.
-// Grant the identity the accepted least-privilege Service Bus data role; verify the connector schema with accepted evidence.
 resource serviceBusConnection 'Microsoft.Web/connections@2016-06-01' = {
   name: 'servicebus-connection'
   location: location
+  kind: 'V2'
   properties: {
     displayName: 'Service Bus Connection'
     api: {
@@ -89,12 +92,33 @@ resource serviceBusConnection 'Microsoft.Web/connections@2016-06-01' = {
     }
     parameterValueSet: {
       name: 'managedIdentityAuth'
-      values: {
-        namespaceEndpoint: {
-          value: 'sb://${serviceBus.name}.servicebus.windows.net/'
-        }
+      values: {}
+    }
+  }
+}
+
+// Learn requires an access policy for the identity that uses the connection.
+resource serviceBusConnectionAccess 'Microsoft.Web/connections/accessPolicies@2016-06-01' = {
+  parent: serviceBusConnection
+  name: logicAppIdentityPrincipalId
+  location: location
+  properties: {
+    principal: {
+      type: 'ActiveDirectory'
+      identity: {
+        objectId: logicAppIdentityPrincipalId
+        tenantId: tenant().tenantId
       }
     }
   }
 }
 ```
+
+- Grant the identity the accepted least-privilege Service Bus data role (for example Azure Service Bus Data Receiver
+  or Sender) at the narrowest scope.
+- The connector's managed-identity parameter set can require connector-specific values, for example the Service Bus
+  namespace endpoint. Take the exact parameter names from accepted evidence (the `managedApis/servicebus`
+  `connectionParameterSets` read) instead of copying them from this sample.
+- The built-in Service Bus connector with managed identity is configured in `connections.json` on the Standard app and
+  needs no `Microsoft.Web/connections` resource. Prefer it when the workflow only needs built-in operations.
+- Never accept `listKeys()`, a connection string or a SAS key as the connection credential for new work.
