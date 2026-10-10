@@ -836,10 +836,7 @@
       "id": "apex-unslop",
       "owner": "APEX managed guidance",
       "entrypoint": ".github/skills/apex-unslop/SKILL.md",
-      "files": [
-        ".github/skills/apex-unslop/LICENSE.txt",
-        ".github/skills/apex-unslop/SKILL.md"
-      ],
+      "files": [".github/skills/apex-unslop/LICENSE.txt", ".github/skills/apex-unslop/SKILL.md"],
       "manifestOwner": "plugin",
       "status": "current-source",
       "capabilityQualification": "not-established-by-this-registry"

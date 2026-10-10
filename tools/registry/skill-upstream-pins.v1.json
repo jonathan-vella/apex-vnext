@@ -74,10 +74,7 @@
         "Deduplicated the service-selection text previously repeated in two references",
         "az storage commands restored in references/storage-cli-commands.md with --auth-mode login, data-plane role requirements and a routing table: read and diagnostic commands may run directly; commands that change Azure are marked '# Changes Azure' and routed through apex preview, Gate 4 and apex deploy or the approved GitHub Actions pipeline that runs only the locally approved preview (DECISION-035, ADR-0002); downloads need separate authorization for the local file"
       ],
-      "dropped": [
-        "SDK quick references and code samples",
-        "Durability figures and Azure MCP documentation calls"
-      ]
+      "dropped": ["SDK quick references and code samples", "Durability figures and Azure MCP documentation calls"]
     },
     {
       "skill": "apex-azure-rbac",
