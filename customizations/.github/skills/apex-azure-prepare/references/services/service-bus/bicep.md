@@ -16,6 +16,10 @@ resource serviceBus 'Microsoft.ServiceBus/namespaces@2026-01-01' = {
     name: 'Standard'
     tier: 'Standard'
   }
+  properties: {
+    disableLocalAuth: true // Entra ID only: no SAS keys or connection strings
+    minimumTlsVersion: '1.2'
+  }
 }
 ```
 

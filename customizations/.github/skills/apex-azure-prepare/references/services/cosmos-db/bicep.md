@@ -25,11 +25,29 @@ resource cosmosAccount 'Microsoft.DocumentDB/databaseAccounts@2026-03-15' = {
     consistencyPolicy: {
       defaultConsistencyLevel: 'Session'
     }
+    disableLocalAuth: true // Entra ID only: no account keys or connection strings
     capabilities: [
       {
         name: 'EnableServerless'
       }
     ]
+  }
+}
+```
+
+## Data-Plane Role Assignment
+
+Cosmos DB data access uses its own role system. Grant the application identity the accepted built-in role at the
+narrowest scope (`...0001` is Data Reader, `...0002` is Data Contributor).
+
+```bicep
+resource cosmosSqlRoleAssignment 'Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments@2026-03-15' = {
+  parent: cosmosAccount
+  name: guid(cosmosAccount.id, appPrincipalId, '00000000-0000-0000-0000-000000000002')
+  properties: {
+    roleDefinitionId: '${cosmosAccount.id}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002'
+    principalId: appPrincipalId
+    scope: cosmosAccount.id
   }
 }
 ```

@@ -6,13 +6,21 @@
 
 # Cosmos DB SDK Connection Patterns
 
+The account disables local (key) authentication, so clients authenticate with Microsoft Entra ID. Do not use account
+keys or `COSMOS_CONNECTION_STRING` for new work. Grant the identity the accepted Cosmos DB data-plane role (for example
+the built-in Data Contributor) with a `sqlRoleAssignments` resource, as in [Bicep patterns](bicep.md).
+
 ## Node.js
 
 ```javascript
 const { CosmosClient } = require("@azure/cosmos");
+const { DefaultAzureCredential } = require("@azure/identity");
 
-const client = new CosmosClient(process.env.COSMOS_CONNECTION_STRING);
-const database = client.database("appdb");
+const client = new CosmosClient({
+  endpoint: process.env.COSMOS_ENDPOINT,
+  aadCredentials: new DefaultAzureCredential(),
+});
+const database = client.database(process.env.COSMOS_DATABASE);
 const container = database.container("items");
 
 // Query example
@@ -26,11 +34,12 @@ const { resources } = await container.items
 ## Python
 
 ```python
-from azure.cosmos import CosmosClient
 import os
+from azure.cosmos import CosmosClient
+from azure.identity import DefaultAzureCredential
 
-client = CosmosClient.from_connection_string(os.environ["COSMOS_CONNECTION_STRING"])
-database = client.get_database_client("appdb")
+client = CosmosClient(os.environ["COSMOS_ENDPOINT"], credential=DefaultAzureCredential())
+database = client.get_database_client(os.environ["COSMOS_DATABASE"])
 container = database.get_container_client("items")
 
 # Query example
@@ -43,10 +52,14 @@ items = container.query_items(
 ## .NET
 
 ```csharp
+using Azure.Identity;
 using Microsoft.Azure.Cosmos;
 
-var client = new CosmosClient(Environment.GetEnvironmentVariable("COSMOS_CONNECTION_STRING"));
-var database = client.GetDatabase("appdb");
+var client = new CosmosClient(
+    Environment.GetEnvironmentVariable("COSMOS_ENDPOINT"),
+    new DefaultAzureCredential()
+);
+var database = client.GetDatabase(Environment.GetEnvironmentVariable("COSMOS_DATABASE"));
 var container = database.GetContainer("items");
 
 // Query example

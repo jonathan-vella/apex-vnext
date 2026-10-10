@@ -18,10 +18,10 @@ Globally distributed, multi-model database for low-latency data at scale.
 
 ## Required Supporting Resources
 
-| Resource      | Purpose                                |
-| ------------- | -------------------------------------- |
-| None required | Cosmos DB is fully managed             |
-| Key Vault     | Store connection strings (recommended) |
+| Resource      | Purpose                                                      |
+| ------------- | ------------------------------------------------------------ |
+| None required | Cosmos DB is fully managed                                   |
+| Identity      | User-assigned managed identity with a Cosmos data-plane role |
 
 ## Capacity Modes
 
@@ -45,11 +45,13 @@ Recommendation: Use **Session** for most applications.
 
 ## Environment Variables
 
-| Variable                   | Value                                           |
-| -------------------------- | ----------------------------------------------- |
-| `COSMOS_CONNECTION_STRING` | Primary connection string (Key Vault reference) |
-| `COSMOS_ENDPOINT`          | Account endpoint URL                            |
-| `COSMOS_DATABASE`          | Database name                                   |
+| Variable          | Value                |
+| ----------------- | -------------------- |
+| `COSMOS_ENDPOINT` | Account endpoint URL |
+| `COSMOS_DATABASE` | Database name        |
+
+Clients use Microsoft Entra ID and managed identity with the Cosmos DB built-in data-plane roles. The account sets
+`disableLocalAuth: true`, so no connection string or account key is part of the contract.
 
 ## References
 

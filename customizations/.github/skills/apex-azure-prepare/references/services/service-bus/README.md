@@ -19,10 +19,10 @@ Enterprise messaging with queues and pub/sub topics.
 
 ## Required Supporting Resources
 
-| Resource      | Purpose                           |
-| ------------- | --------------------------------- |
-| None required | Service Bus is self-contained     |
-| Key Vault     | Store connection strings (legacy) |
+| Resource      | Purpose                                      |
+| ------------- | -------------------------------------------- |
+| None required | Service Bus is self-contained                |
+| Identity      | Managed identity with Service Bus data roles |
 
 ## SKU Selection
 
@@ -47,13 +47,7 @@ Enterprise messaging with queues and pub/sub topics.
 - `Azure Service Bus Data Sender` (69a216fc-b8fb-44d8-bc22-1f3c2cd27a39) - for sending
 - `Azure Service Bus Data Receiver` (4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0) - for receiving
 
-### Connection String (Legacy)
-
-| Variable                       | Value                         |
-| ------------------------------ | ----------------------------- |
-| `SERVICEBUS_CONNECTION_STRING` | Connection string (Key Vault) |
-| `SERVICEBUS_NAMESPACE`         | Namespace name                |
-| `SERVICEBUS_QUEUE`             | Queue name                    |
+Connection strings and SAS keys are not part of the contract for new work; the namespace disables local authentication.
 
 ## References
 

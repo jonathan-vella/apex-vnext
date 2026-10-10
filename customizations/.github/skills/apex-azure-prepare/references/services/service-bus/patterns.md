@@ -113,51 +113,8 @@ foreach (var message in messages)
 > - `Azure Service Bus Data Sender` (69a216fc-b8fb-44d8-bc22-1f3c2cd27a39) - for sending
 > - `Azure Service Bus Data Receiver` (4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0) - for receiving
 
-### Connection String (Legacy)
-
-#### Node.js
-
-```javascript
-const { ServiceBusClient } = require("@azure/service-bus");
-
-const client = new ServiceBusClient(process.env.SERVICEBUS_CONNECTION_STRING);
-
-// Send
-const sender = client.createSender("orders");
-await sender.sendMessages({ body: { orderId: "123" } });
-
-// Receive
-const receiver = client.createReceiver("orders");
-const messages = await receiver.receiveMessages(10);
-for (const message of messages) {
-  await receiver.completeMessage(message);
-}
-```
-
-#### Python
-
-```python
-from azure.servicebus import ServiceBusClient, ServiceBusMessage
-
-client = ServiceBusClient.from_connection_string(
-    os.environ["SERVICEBUS_CONNECTION_STRING"]
-)
-sender = client.get_queue_sender("orders")
-
-with sender:
-    sender.send_messages(ServiceBusMessage('{"orderId": "123"}'))
-```
-
-#### .NET
-
-```csharp
-var client = new ServiceBusClient(
-    Environment.GetEnvironmentVariable("SERVICEBUS_CONNECTION_STRING")
-);
-var sender = client.CreateSender("orders");
-
-await sender.SendMessageAsync(new ServiceBusMessage("{\"orderId\": \"123\"}"));
-```
+Connection strings and SAS keys are not used for new work: the namespace sets `disableLocalAuth: true` and clients use
+Microsoft Entra ID with the roles above.
 
 ## Dead Letter Handling
 
