@@ -8,19 +8,24 @@ Commands that change installation, capability, transfer, or improvement state ma
 
 ## Lifecycle
 
-| Command                         | Required or notable flags                                                                                                |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `apex version`                  | None                                                                                                                     |
-| `apex init`                     | `--project --risk-owner --target`; optional `--name --environment --iac --client --customizations-source`                |
-| `apex bootstrap`                | `--project --risk-owner --target` or `--file`; `--yes`; optional client, name, environment, IaC, and repo creation flags |
-| `apex project create`           | `--project --risk-owner --target`; optional `--name --environment --iac`                                                 |
-| `apex project promote`          | `--environment --target`                                                                                                 |
-| `apex update`                   | Optional `--customizations-source`                                                                                       |
-| `apex setup`                    | Optional `--live`                                                                                                        |
-| `apex doctor`                   | Optional `--fix --yes`                                                                                                   |
-| `apex customizations rollback`  | None                                                                                                                     |
-| `apex customizations uninstall` | None                                                                                                                     |
-| `apex customizations reinstall` | Optional `--customizations-source`                                                                                       |
+| Command                         | Required or notable flags                                                                                                         |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `apex version`                  | None                                                                                                                              |
+| `apex init`                     | `--project --risk-owner --target`; optional `--name --environment --purpose --iac --client --customizations-source`               |
+| `apex bootstrap`                | `--project --risk-owner --target` or `--file`; `--yes`; optional client, name, environment, purpose, IaC, and repo creation flags |
+| `apex project create`           | `--project --risk-owner --target`; optional `--name --environment --purpose --iac`                                                |
+| `apex project promote`          | `--environment --target`; optional `--purpose` (must equal the run purpose)                                                       |
+| `apex update`                   | Optional `--customizations-source`                                                                                                |
+| `apex setup`                    | Optional `--live`                                                                                                                 |
+| `apex doctor`                   | Optional `--fix --yes`                                                                                                            |
+| `apex customizations rollback`  | None                                                                                                                              |
+| `apex customizations uninstall` | None                                                                                                                              |
+| `apex customizations reinstall` | Optional `--customizations-source`                                                                                                |
+
+`--purpose` is `lab` (the default) or `production`. It is stored on the run, is part of the dependency revision and cannot
+change within a run; `apex promote` keeps the source run's purpose and rejects a different one. `production` is
+rejected until the CI-owned production flow ships (CP-28/CP-29); use `lab`. Runs created before purpose existed have no
+`purpose` and are rejected: create a new project.
 
 `--client` accepts only `github-copilot-cli`, the default. `--iac terraform` selects Terraform; otherwise initialization
 selects Bicep. `--risk-owner` is required when creating a project and must be `partner` or `customer`; review

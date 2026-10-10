@@ -50,6 +50,8 @@ finding actions and `reviewDecide`.
 The returned request ID, expected head, and owner epoch are required for `recordInput`.
 `projectCreate` requires `riskOwner` (`partner` or `customer`). `reviewDecide` accept-risk decisions derive owner from
 that project value; omit `expiresAt` to use the 90-day default.
+`projectCreate` and `promote` accept an optional `purpose` (`lab`, the default, or `production`). A run's purpose cannot
+change, and `production` is rejected with `APEX_VALIDATION` until the CI-owned production flow ships (CP-28/CP-29).
 
 ## Rubber-Duck Reviews
 
