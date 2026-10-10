@@ -14,17 +14,30 @@ Each run has one active writer epoch. Cross-device or CI handoff requires a boun
 commit, workflow, sender, recipient, current head, and expiry. Importing state does not automatically grant writer or
 provider authority.
 
+The [accepted production target](../vnext/adrs/03-des-adr-0007-use-purpose-bound-approval-and-ci-owned-production-runs.md)
+originates an execution run in CI rather than transferring writer authority from a developer. Single-writer and epoch
+protections still apply within that run. The current transfer protocol remains enforced where used until the
+replacement is implemented and qualified.
+
 ## Preview And Approval
 
 A preview is proof for one exact dependency revision, IaC track, target, operation, owner epoch, and execution recipient.
 Approval must reference that preview and expire no later than it. Deployment revalidates the binding before and after the
 provider operation.
 
+DECISION-036 permits a future CI-hosted human review surface, not workflow self-approval. The kernel must verify the
+actual reviewer and bound candidate before apply; a triggering actor or OIDC token is not human approval evidence.
+Unavailable repository approval features, wrong purpose or target, changed artifacts and expired evidence block
+production. Labs keep explicit operation approval and native Terraform state locking despite fewer prompts.
+
 ## Secrets And Evidence
 
 Credentials, secret values, Terraform state, and Terraform saved plans are prohibited from Git. Evidence is bounded,
 redacted, content-addressed, and classified as required, accepted operational, optional diagnostic, or quarantined local
 output. Uncertain output stays local until reviewed.
+
+Removing the developer-to-CI handoff does not make CI saved plans or state safe public artifacts. The production
+target still requires protected encrypted storage, digest checks, bounded retrieval, retention and cleanup.
 
 ## Azure Baseline
 

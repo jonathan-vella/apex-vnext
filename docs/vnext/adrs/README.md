@@ -5,11 +5,12 @@ These records preserve accepted or proposed vNext architecture decisions. The co
 
 | ADR                                                                                             | Status   |
 | ----------------------------------------------------------------------------------------------- | -------- |
-| [ADR-0002: Local Gate 4](03-des-adr-0002-use-local-gate-4-before-ci-handoff.md)                 | Accepted |
-| [ADR-0003: Entra-only handoff](03-des-adr-0003-use-bounded-entra-only-handoff-session.md)       | Accepted |
+| [ADR-0002: Local Gate 4](03-des-adr-0002-use-local-gate-4-before-ci-handoff.md)                 | Existing qualification; production target superseded by ADR-0007 |
+| [ADR-0003: Entra-only handoff](03-des-adr-0003-use-bounded-entra-only-handoff-session.md)       | Existing qualification only |
 | [ADR-0004: Bounded improvement](03-des-adr-0004-use-bounded-observe-and-propose-improvement.md) | Accepted |
 | [ADR-0005: Client projections](03-des-adr-0005-use-selected-client-agent-projections.md)        | Proposed |
 | [ADR-0006: CLI worker kernel authority](03-des-adr-0006-omit-cli-autonomous-workers.md)         | Accepted |
+| [ADR-0007: Purpose-bound approval and CI-owned production](03-des-adr-0007-use-purpose-bound-approval-and-ci-owned-production-runs.md) | Accepted design; implementation pending |
 
 ADR-0001 is superseded and retained only in the
 retired qualification history. Current decisions are self-contained and do not require historical files.

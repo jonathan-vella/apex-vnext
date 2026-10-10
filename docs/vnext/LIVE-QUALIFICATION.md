@@ -3,12 +3,23 @@
 This procedure is a separately authorized release activity. Ordinary code generation, documentation, validation, or
 package qualification does not authorize cloud access or mutation.
 
+## Purpose And Implementation Status
+
+[ADR-0007](adrs/03-des-adr-0007-use-purpose-bound-approval-and-ci-owned-production-runs.md) selects non-production
+first and CI-owned production execution with human approval verified before apply. Those purpose/approval paths are
+planned, not implemented by this procedure. Initial non-production acceptance is separate from deferred production.
+
+The steps below exercise the existing native providers and local-to-CI qualification handoff retained after #454.
+They are not the new production setup kit or the future azd/Bicep lab executor. Do not skip current gates or reinterpret
+the qualification backend's network exception as production authorization.
+
 ## Preconditions
 
 - exact clean candidate commit and package set;
 - explicit human authorization naming subscription, target, tracks, operations, budget, and expiry;
 - target-subscription reviewed policy baseline and pricing evidence;
 - explicit ALZ-backed or standalone lab/demo profile and supplied-versus-owned resource boundaries;
+- explicit deployment purpose and actual target; non-production purpose does not choose the foundation profile;
 - authenticated least-privilege Azure CLI identity;
 - isolated Bicep and Terraform targets with cleanup ownership;
 - deterministic and package qualification already passing;
@@ -58,6 +69,22 @@ redacted logs. Terraform evidence also binds the lockfile, configuration tree, s
 
 Do not commit credentials, secret values, Terraform state, saved plans, transport material, or unredacted provider
 output.
+
+### Future Purpose-Bound Qualification
+
+CP-30 must add separately authorized scenarios after the relevant implementation lands:
+
+- Non-production: confirm intent once, retain required reviews/validation, approve the final preview and exercise
+  azd/Bicep and native Terraform apply, inventory, recovery, destroy and cleanup in both foundations.
+- Production rehearsal: CI originates the execution run/preview; actual human approval is validated before apply,
+  with run/attempt/commit/target/artifact identity and expiry. Missing or stale approval and unavailable protection
+  features block execution. CI artifacts remain protected even without a developer-to-CI handoff.
+- Setup: read-only readiness, reviewable configuration, explicitly approved provisioning and post-checks must report
+  partial failure and missing prerequisites rather than success. Setup or a rehearsal does not by itself authorize
+  production use.
+
+Retain negative-case proof for purpose/target changes, exact-plan tampering, replay, identity, state locking,
+secret handling and cleanup. Current historical evidence cannot qualify a changed implementation.
 
 ## Failure And Recovery
 

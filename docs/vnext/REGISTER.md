@@ -49,6 +49,19 @@ and the repository archives.
 - **State:** Open by design
 - **Closure proof:** Deterministic adversarial tests and live transfer scenarios pass on the candidate.
 
+### Purpose-Bound Approval Transition
+
+- **Owner:** Kernel, product and operations maintainers
+- **Impact:** A lab purpose could authorize a production target, a CI triggering identity could be mistaken for an
+  approving human, or a generated setup kit could be mislabeled production-ready.
+- **Mitigation:** Implement ADR-0007 through CP-26 to CP-30; keep current checks until replacements pass. Confirm
+  purpose independently of foundation, validate candidate-bound human approval before apply and protect CI artifacts.
+  Unsupported consumer approval controls block production with guidance.
+- **State:** Accepted design; implementation and qualification pending
+- **Closure proof:** Wrong-purpose, wrong-reviewer/run/attempt/target, replay, expiry and artifact-substitution tests,
+  plus exact-candidate separately authorized live readiness and cleanup evidence. Non-production release claims
+  remain distinct from deferred production acceptance.
+
 ### Governance Snapshot Freshness
 
 - **Owner:** Governance and kernel maintainers

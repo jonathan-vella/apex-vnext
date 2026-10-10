@@ -47,13 +47,19 @@ materials are optional retention only: current checks do not depend on their pre
 ## DECISION-010: Keep Deployment Approval In APEX Gate 4
 
 Gate 4 binds one exact preview, actor, target, operation, recipient, dependency revision, writer epoch, and expiry. CI
-environment protection is defense in depth, not APEX approval authority. See
-[ADR-0002](adrs/03-des-adr-0002-use-local-gate-4-before-ci-handoff.md).
+cannot manufacture human approval. DECISION-036 changes the target production approval location to CI: the kernel
+verifies a bound human review receipt before apply. The existing local approval and qualification handoff remain
+enforced until that replacement is implemented and qualified. See
+[ADR-0002](adrs/03-des-adr-0002-use-local-gate-4-before-ci-handoff.md) and
+[ADR-0007](adrs/03-des-adr-0007-use-purpose-bound-approval-and-ci-owned-production-runs.md).
 
 ## DECISION-011: Use A Bounded Entra-Only Handoff Session
 
 Cross-boundary state and provider handoff uses short-lived recipient-bound evidence without shared static transport
-secrets. See [ADR-0003](adrs/03-des-adr-0003-use-bounded-entra-only-handoff-session.md).
+secrets. This remains the existing qualification path, not a requirement to transfer developer authority into future
+production CI runs. DECISION-036 selects CI-owned production execution from the start; CI artifacts still require
+protection. See [ADR-0003](adrs/03-des-adr-0003-use-bounded-entra-only-handoff-session.md) and
+[ADR-0007](adrs/03-des-adr-0007-use-purpose-bound-approval-and-ci-owned-production-runs.md).
 
 ## DECISION-012: Support VS Code And GitHub Copilot CLI
 
@@ -319,6 +325,9 @@ recorded in CP-20.
 
 ## DECISION-035: Deploy With azd For Labs And GitHub Actions Pipelines For Production
 
+Superseded in its executor/purpose and production-approval scope by DECISION-036. The following records the
+2026-10-08 design; it is not permission to implement the superseded handoff model as the new production path.
+
 Maintainer direction on 2026-10-08. Production deployments run through GitHub Actions pipelines; labs deploy from a
 local device with azd. Both keep the kernel's deployment authority, `REQ-APPROVAL-001` and
 [ADR-0002](adrs/03-des-adr-0002-use-local-gate-4-before-ci-handoff.md): local Gate 4 is the only deployment approval.
@@ -343,6 +352,34 @@ local device with azd. Both keep the kernel's deployment authority, `REQ-APPROVA
 Today's tracks: Bicep previews with `az deployment group|sub what-if` and deploys with `az deployment group|sub create`;
 Terraform previews with `terraform plan -out` and applies that saved plan. CP-26 owns delivery; CLIENT-039 and
 CLIENT-040 qualify it.
+
+## DECISION-036: Deliver Non-Production First With Purpose-Bound Approval
+
+Maintainer direction accepted on 2026-10-09, with lab prompt scope confirmed on 2026-10-10.
+
+- **Product boundary.** APEX is open source and initially delivers non-production scenarios. Production is an opt-in,
+  readiness-checked capability, not a prerequisite for installation or the initial non-production release.
+- **Purpose.** Preselect non-production and confirm the actual workload purpose and target. This is separate from
+  ALZ-backed versus standalone foundation; neither choice is inferred from names or repository visibility.
+- **Lab ceremony.** Confirm intent once and approve the final deployment preview; Gate 1 through 3 are readiness
+  checkpoints, not separate approval prompts. Required reviews and deterministic checks remain blocking. Intent
+  changes, risk decisions and each destructive operation still require their own relevant confirmation.
+- **Executors.** Use azd for Bicep and native Terraform CLI for Terraform. Keep two IaC languages; do not add an azd
+  Terraform adapter. Preserve source/parameter/environment binding for Bicep and exact saved plans with normal
+  backend locking and unchanged dependencies for Terraform. Provisioning and application deployment stay separate;
+  APEX does not run `azd up`.
+- **Production.** GitHub Actions owns the execution run and preview from the start. A supported human approval
+  adapter supplies a candidate-bound review receipt the kernel verifies before apply. No developer-to-CI plan, key
+  or writer transfer is mandatory. Retain execution ownership, anti-replay, artifact confidentiality and audit.
+- **Setup.** Inspect production prerequisites, generate reviewable configuration, apply explicitly approved setup
+  changes with separate operator permissions, then verify. Missing approval features or failed checks block
+  production; OIDC alone is not approval.
+- **Delivery.** Record design and acceptance first, implement the lab path, prepare production guidance/automation,
+  then qualify CI-owned production execution. Existing runtime gates and qualification handoff stay enforced until
+  replacements are tested. Documentation does not unblock production.
+
+[ADR-0007](adrs/03-des-adr-0007-use-purpose-bound-approval-and-ci-owned-production-runs.md) owns the detailed boundary,
+supersession and acceptance rules. CP-26 through CP-30 track implementation and qualification.
 
 Historical archive entries are indexed in the [catalog](../../.archive/CATALOG.json);
 the [restore guide](../../.archive/RESTORE.md) grants no runtime, release or deployment authority.

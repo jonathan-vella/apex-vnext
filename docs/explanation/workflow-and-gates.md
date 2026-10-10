@@ -21,8 +21,20 @@ business rules. Human-owned gates authorize progression.
 |    3 | Implementation intent, IaC binding, environment inputs, and review are acceptable. |
 |    4 | The exact current preview is approved for its bound recipient and operation.       |
 
-Gate 4 is local runtime authority. CI may transport and prove the approved candidate, but it does not silently recreate
-or inherit approval.
+This table describes the current runtime. Gate 4 is currently local runtime authority. The existing qualification
+workflow transports and proves an approved candidate; it does not silently recreate or inherit approval.
+
+### Accepted Purpose-Bound Target
+
+[DECISION-036](../vnext/DECISIONS.md#decision-036-deliver-non-production-first-with-purpose-bound-approval) selects a
+lighter non-production ceremony: confirm workload intent once, then approve the final deployment preview. Gates 1
+through 3 become readiness checkpoints, not fictitious human approvals; required reviews and deterministic checks stay
+blocking. Changed intent, risks and destructive operations still need relevant confirmation.
+
+Production is opt-in. CI owns the execution run and preview from the start, and the kernel verifies an actual
+candidate-bound human review receipt before apply. OIDC job identity or an environment pause alone is not approval.
+This target is not implemented by a prose update: current prompts/transfer checks remain enforced until tested
+replacements land. See [ADR-0007](../vnext/adrs/03-des-adr-0007-use-purpose-bound-approval-and-ci-owned-production-runs.md).
 
 ## Invalidation
 
@@ -62,9 +74,11 @@ new import commands or conflict-aware regeneration already exist:
    require confirmation; unrelated files and decisions remain intact.
 6. Consumer governance, validation, preview and approval are bound to the new target before deployment.
 
-Both environment profiles are required: ALZ-backed workloads consume supplied networking, identity and monitoring by
+Both foundation profiles are required: ALZ-backed workloads consume supplied networking, identity and monitoring by
 default; standalone labs/demos can provision their own workload support resources. Both obey applicable policy and
 security. They are profile/ownership choices in one workflow, not separate engines or inferred from subscription count.
+Deployment purpose is a separate confirmed choice; non-production does not imply standalone, and a foundation choice
+does not authorize production.
 
 ## Output And Handoff
 
