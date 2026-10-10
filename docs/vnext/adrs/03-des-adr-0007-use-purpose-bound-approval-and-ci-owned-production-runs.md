@@ -119,3 +119,13 @@ replacements land. No new runtime command or production authorization is created
 - Terraform applies only the approved saved plan under native state locking; Bicep binds the approved deployment inputs.
 - Setup failure, unavailable GitHub approval features, artifact exposure and incomplete cleanup fail explicitly.
 - Retest policy if GitHub approval APIs, azd behavior, runner identities or consumer repository capabilities change.
+
+---
+
+<div align="center">
+
+| [Previous ADR](03-des-adr-0006-omit-cli-autonomous-workers.md) | [Project Index](README.md) | Next ADR |
+| -------------------------------------------------------------- | -------------------------- | -------- |
+| [ADR-0006](03-des-adr-0006-omit-cli-autonomous-workers.md)     | [README](README.md)        | None     |
+
+</div>

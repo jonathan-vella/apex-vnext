@@ -184,8 +184,8 @@ deployment approval. Agent names, hidden flags and parent routing are not authen
 
 <div align="center">
 
-| ⬅️ [Previous ADR](03-des-adr-0005-use-selected-client-agent-projections.md) | 🏠 [Project Index](README.md) | Next ADR ➡️ |
-| --------------------------------------------------------------------------- | ----------------------------- | ----------- |
-| [ADR-0005](03-des-adr-0005-use-selected-client-agent-projections.md)        | [README](README.md)           | None        |
+| ⬅️ [Previous ADR](03-des-adr-0005-use-selected-client-agent-projections.md) | 🏠 [Project Index](README.md) | Next ADR ➡️                                                                            |
+| --------------------------------------------------------------------------- | ----------------------------- | -------------------------------------------------------------------------------------- |
+| [ADR-0005](03-des-adr-0005-use-selected-client-agent-projections.md)        | [README](README.md)           | [ADR-0007](03-des-adr-0007-use-purpose-bound-approval-and-ci-owned-production-runs.md) |
 
 </div>

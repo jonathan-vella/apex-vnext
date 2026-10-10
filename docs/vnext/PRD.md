@@ -318,7 +318,7 @@ assist discovery and guidance but cannot own initialization, schemas, state, pla
 
 ### REQ-APPROVAL-001: Preview And Approval Binding
 
-Deployment Preview is the production approval ceremony. Approval must bind actor and run identity, target, operation,
+Deployment Preview is the deployment approval ceremony. Approval must bind actor and run identity, target, operation,
 inputs, IaC tree, policy envelope, preview, commit, owner epoch, recipient, and expiry. Stale, substituted, incomplete,
 or rejected evidence must fail closed. The kernel owns acceptance of approval evidence, not its physical location.
 Non-production uses local operation-specific confirmation. Production uses an authenticated human review through a
