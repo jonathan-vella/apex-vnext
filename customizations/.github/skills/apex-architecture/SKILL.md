@@ -66,9 +66,10 @@ review or task.
     reopen Architecture and Gate 2.
 12. After `apex/reviewDecide`, call `apex/status`. In a lab run Gate 2 is an automatic readiness checkpoint that the
     kernel records once the review and deterministic checks pass. Never ask the user to approve Gate 2 and never call
-    `apex/gateDecide` for it. If readiness is not recorded, report the blocking finding, review or validator result
-    from status and stop; otherwise follow `apex/nextTask`. The user's later confirmations are Gate 1 (intent) and
-    Gate 4 (final preview).
+    `apex/gateDecide` for it. If status shows a "readiness checkpoint is not recorded" blocker, call `apex/nextTask` once
+    to retry recording it; if it still reports the blocker, report the blocking finding, review or validator result and
+    stop. Otherwise follow `apex/nextTask`. The user's later confirmations are Gate 1 (intent) and Gate 4 (final
+    preview).
 
 ## Boundaries
 

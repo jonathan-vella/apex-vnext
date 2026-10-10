@@ -179,8 +179,8 @@ The reference comes from a pinned Azure Landing Zones Library release (root, lan
 an assumption, not your policy: a subscription target can design, price and reach Gate 2 readiness on it, but planning
 requires the reviewed subscription baseline. After Gate 2 the kernel issues a `governance-refresh` task: select and
 import the reviewed baseline as below. A `policy-refresh` task follows, where APEX carries matching mappings and the
-Architect decides only new or changed controls. Gate 2 stays approved (a lab run: ready) unless a control is `blocked`,
-which reopens Architecture.
+Architect decides only new or changed controls. Gate 2 stays `ready` unless a control is `blocked`, which reopens
+Architecture.
 
 The Architect maps every enforcing policy (deny, modify, deployIfNotExists) to a designed component inside
 Architecture. APEX marks policies whose resource types match no component `not-applicable`; every other
@@ -279,8 +279,9 @@ these generated packages as persistent project intent. Ask APEX to revise accept
 Gates 2 and 3 have no prompt. When a gate opens, its required review has no open finding and its validators pass, the
 kernel records `ready` (with `readyAt`) and a `gate.readiness-recorded` event, without approval evidence or an actor.
 `apex gate decide` and `apex/gateDecide` refuse Gate 2 and 3 in a lab run with reason `GATE_READINESS_AUTOMATIC`. Until
-readiness is recorded, `nextTask` reports `Gate N readiness checkpoint is not recorded: <reason>`; resolve the blocking
-review finding (including an unaccepted risk) or validator failure it names.
+readiness is recorded, `nextTask` retries recording it and, if it still cannot, reports the blocker
+`Gate N readiness checkpoint is not recorded: <reason>`. Resolve the blocking review finding (including an unaccepted
+risk) or validator failure it names.
 
 Architecture acceptance materializes `agent-output/<project>/<run>/architecture/` with authoritative assessment, cost,
 SKU, and challenger Markdown. It also includes editable Python, SVG, and PNG views for Architecture topology,

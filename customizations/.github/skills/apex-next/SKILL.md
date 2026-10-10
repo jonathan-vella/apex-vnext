@@ -19,7 +19,8 @@ active and loads the mapped skill, delegates one hidden worker, or runs one capt
 ## Workflow
 
 1. Call `apex/status` first. For a status-only request, no selected project, a pending human gate, a blocker, or a
-   terminal run, report the kernel state and stop.
+   terminal run, report the kernel state and stop. A Gate 2 or 3 "readiness checkpoint is not recorded" blocker is the
+   exception: only `apex/nextTask` retries recording it, so call it once and stop only if it still reports the blocker.
 2. Call `apex/nextTask` only after status leaves runnable work for the selected project. Do not call it again for the
    same unanswered input request or unresolved review, and do not poll.
 3. Map the kernel result to a same-agent skill or hidden worker. Do not ask the user to choose a role and do not search
@@ -63,9 +64,9 @@ active and loads the mapped skill, delegates one hidden worker, or runs one capt
 6. After worker completion or same-agent stage completion, call `apex/status`. If a human gate (Gate 1 or Gate 4) is
    pending, report it and stop. Never call `apex/nextTask` after `apex/reviewDecide` or `apex/reviewComplete` while a
    human gate is pending. Gate 2 and 3 are kernel-recorded readiness checkpoints in a lab run: add no prompt for them,
-   never call `apex/gateDecide` for them, and follow what status or `apex/nextTask` returns. If readiness is not
-   recorded (the blocker reads "readiness checkpoint is not recorded" with a reason), report that blocking review or
-   validation finding.
+   never call `apex/gateDecide` for them, and follow what status or `apex/nextTask` returns. If status shows a
+   "readiness checkpoint is not recorded" blocker, call `apex/nextTask` once to retry recording it; if it still reports
+   the blocker, report that blocking review or validation finding and stop.
 
 ## Rubber-duck reviews
 

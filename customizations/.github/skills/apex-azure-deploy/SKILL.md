@@ -42,7 +42,7 @@ Gate 4, evidence, recovery and state; the selected native provider owns its life
 7. Treat SQL identity setup, EF migrations, application delivery and pipeline configuration as separate operations
    when not covered by the approved preview. They are not implicit post-deployment permission.
 
-## Planned Purpose-Bound Delivery: Not Available Yet
+## Purpose-Bound Delivery: Lab Flow Current, Executors And Production Not Available Yet
 
 The lab gate flow (CP-27 [#456](https://github.com/jonathan-vella/apex-vnext/issues/456)) is current runtime: one Gate 1
 intent confirmation, kernel-recorded Gate 2 and 3 readiness checkpoints and the final Gate 4 preview approval, with

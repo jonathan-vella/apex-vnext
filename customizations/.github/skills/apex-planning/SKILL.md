@@ -48,8 +48,9 @@ Use this skill only when the kernel routes the active foreground `APEX` agent to
     confirmation.
 11. After `apex/reviewDecide`, call `apex/status`. In a lab run Gate 3 is an automatic readiness checkpoint that the
     kernel records once the review and deterministic checks pass. Never ask the user to approve Gate 3 and never call
-    `apex/gateDecide` for it. If readiness is not recorded, report the blocking finding, review or validator result
-    from status and stop; otherwise follow `apex/nextTask`.
+    `apex/gateDecide` for it. If status shows a "readiness checkpoint is not recorded" blocker, call `apex/nextTask` once
+    to retry recording it; if it still reports the blocker, report the blocking finding, review or validator result and
+    stop. Otherwise follow `apex/nextTask`.
 12. Invoke `APEX CodeGen` or `APEX Validator` only for an explicit worker task in the kernel envelope, and rubber-duck
     only for a kernel review task.
 
