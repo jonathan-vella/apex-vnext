@@ -56,7 +56,12 @@ async function fixture(start = "2026-01-01T00:00:00.000Z") {
     defaultIacTool: "bicep",
     riskOwner: "partner",
   });
-  await store.createRun("demo", { environment: "dev", targetScope: "local", runtimeLockHash: "a".repeat(64) });
+  await store.createRun("demo", {
+    environment: "dev",
+    purpose: "lab",
+    targetScope: "local",
+    runtimeLockHash: "a".repeat(64),
+  });
   const runDirectory = store.runDirectory("demo", "run-1");
   const lockDirectory = join(root, ".apex", "local");
   const repository = new RunRepository(runDirectory, { clock, idSource });
@@ -332,7 +337,12 @@ test("a call that changes the selected run still serializes identical calls", as
     defaultIacTool: "bicep",
     riskOwner: "partner",
   });
-  await store.createRun("next", { environment: "dev", targetScope: "local", runtimeLockHash: "a".repeat(64) });
+  await store.createRun("next", {
+    environment: "dev",
+    purpose: "lab",
+    targetScope: "local",
+    runtimeLockHash: "a".repeat(64),
+  });
   const nextRepository = new RunRepository(store.runDirectory("next", "run-1"));
   let selected: "demo" | "next" = "demo";
   const currentScope = async (): Promise<RepeatScope> => {
@@ -414,7 +424,12 @@ test("the call that creates the first selection is answered as a repeat", async 
             defaultIacTool: "bicep",
             riskOwner: "partner",
           });
-          await store.createRun("demo", { environment: "dev", targetScope: "local", runtimeLockHash: "a".repeat(64) });
+          await store.createRun("demo", {
+            environment: "dev",
+            purpose: "lab",
+            targetScope: "local",
+            runtimeLockHash: "a".repeat(64),
+          });
           repository = new RunRepository(store.runDirectory("demo", "run-1"));
           return { created: "demo" };
         },

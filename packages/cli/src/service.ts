@@ -96,6 +96,7 @@ import {
   type QualityMeasurementsV1,
   type RequirementsV1,
   type RequirementsAmendmentV1,
+  type DeploymentPurpose,
   type RunConfigV1,
   type RunId,
   type RuntimeBundleLockV1,
@@ -172,6 +173,7 @@ import {
   inheritGate,
   invalidateGate,
   openGate,
+  parseRunConfig,
   sha256Bytes,
   sha256Json,
   validateInputAnswers,
@@ -234,6 +236,7 @@ import {
   type BundledPluginDeclaration,
 } from "./assets.js";
 import { dependencyRevision as calculateDependencyRevision } from "./dependency-revision.js";
+import { assertDeploymentPurposeUsable, DEFAULT_DEPLOYMENT_PURPOSE } from "./purpose.js";
 import { currentHostEnvironment, firstReleaseVersion, hostDoctorChecks, type HostEnvironment } from "./host-profile.js";
 import { ApexError, EXIT_CODES, governanceBaselineApexError, retiredProjectionError } from "./errors.js";
 import { MCP_TOOL_REVIEW_GUARDS, type ReviewGuardedTool } from "./mcp-tool-effects.js";
@@ -994,12 +997,14 @@ export class ApexService {
     projectId: ProjectId;
     displayName?: string;
     environment?: string;
+    purpose?: DeploymentPurpose;
     targetScope?: string;
     iacTool?: "bicep" | "terraform";
     riskOwner: RiskOwner;
     customizationsSource?: string;
     clientId?: BundledClientProjection["id"];
   }): Promise<{ projectId: ProjectId; runId: RunId }> {
+    if (input.purpose !== undefined) assertDeploymentPurposeUsable(input.purpose);
     await this.initializeWorkspace(input);
     return this.createProject(input);
   }
@@ -1602,6 +1607,7 @@ export class ApexService {
         "Onboarding configuration is malformed or oversized",
         EXIT_CODES.validation,
       );
+    if (config.purpose !== undefined) assertDeploymentPurposeUsable(config.purpose);
     const checks: BootstrapPlanV1["checks"] = [];
     const inspect = async (path: string) => {
       await this.assertSafeDestination(this.root, path);
@@ -1731,12 +1737,14 @@ export class ApexService {
       );
     await this.assertSafeDestination(this.root, this.projects.runDirectory(selection.projectId, selection.runId));
     const run = await this.run(selection, { readOnly: true });
+    assertDeploymentPurposeUsable(run.purpose);
     const project = await this.projects.getProject(selection.projectId);
     const customization = await this.customizationSelection();
     if (
       config.projectId !== selection.projectId ||
       (config.displayName !== undefined && config.displayName !== project.displayName) ||
       (config.environment !== undefined && config.environment !== run.environment) ||
+      (config.purpose !== undefined && config.purpose !== run.purpose) ||
       (config.targetScope !== undefined && config.targetScope !== run.targetScope) ||
       (config.iacTool !== undefined && config.iacTool !== run.iacTool) ||
       (config.riskOwner !== undefined && config.riskOwner !== project.riskOwner) ||
@@ -1767,6 +1775,7 @@ export class ApexService {
     projectId: ProjectId;
     displayName?: string;
     environment?: string;
+    purpose?: DeploymentPurpose;
     targetScope?: string;
     iacTool?: "bicep" | "terraform";
     riskOwner: RiskOwner;
@@ -1784,6 +1793,7 @@ export class ApexService {
     projectId?: ProjectId;
     displayName?: string;
     environment?: string;
+    purpose?: DeploymentPurpose;
     targetScope?: string;
     iacTool?: "bicep" | "terraform";
     riskOwner?: RiskOwner;
@@ -1801,6 +1811,7 @@ export class ApexService {
     projectId?: ProjectId;
     displayName?: string;
     environment?: string;
+    purpose?: DeploymentPurpose;
     targetScope?: string;
     iacTool?: "bicep" | "terraform";
     riskOwner?: RiskOwner;
@@ -1816,7 +1827,7 @@ export class ApexService {
   }> {
     if (
       input.projectId === undefined &&
-      [input.displayName, input.environment, input.targetScope, input.iacTool, input.riskOwner].some(
+      [input.displayName, input.environment, input.purpose, input.targetScope, input.iacTool, input.riskOwner].some(
         (value) => value !== undefined,
       )
     )
@@ -1828,6 +1839,7 @@ export class ApexService {
     if (input.projectId !== undefined && input.riskOwner === undefined) {
       throw new ApexError("APEX_VALIDATION", "Project risk owner must be partner or customer", EXIT_CODES.validation);
     }
+    if (input.purpose !== undefined) assertDeploymentPurposeUsable(input.purpose);
     const riskOwner = input.riskOwner;
     if (await this.pathExistsLstat(join(this.root, ".apex"))) {
       const { clientId, ...settings } = input;
@@ -1873,10 +1885,13 @@ export class ApexService {
     projectId: ProjectId;
     displayName?: string;
     environment?: string;
+    purpose?: DeploymentPurpose;
     targetScope?: string;
     iacTool?: "bicep" | "terraform";
     riskOwner: RiskOwner;
   }): Promise<{ projectId: ProjectId; runId: RunId }> {
+    const purpose = input.purpose ?? DEFAULT_DEPLOYMENT_PURPOSE;
+    assertDeploymentPurposeUsable(purpose);
     let runtimeLock: unknown;
     try {
       runtimeLock = JSON.parse(await readFile(join(this.root, ".apex", "apex.lock.json"), "utf8")) as unknown;
@@ -1902,6 +1917,7 @@ export class ApexService {
     });
     const run = await this.projects.createRun(input.projectId, {
       environment: input.environment ?? "dev",
+      purpose,
       targetScope: input.targetScope ?? "local",
       runtimeLockHash,
     });
@@ -6701,6 +6717,7 @@ export class ApexService {
   ): Promise<ApprovalEvidenceV1> {
     await this.assertNoPendingReview("gateDecide");
     const run = await this.currentRun();
+    if (gateNumber === 4) assertDeploymentPurposeUsable(run.purpose);
     if (gateNumber === 4)
       await this.assertGeneratedReviewUnmodified(join(this.operationsReviewDirectory(run), "approval.md"));
     const gate = run.gates.find(({ gate }) => gate === gateNumber);
@@ -7548,15 +7565,26 @@ export class ApexService {
     return this.objects.getJson(hash);
   }
 
-  async promote(environment: string, targetScope: string): Promise<RunConfigV1> {
+  async promote(environment: string, targetScope: string, purpose?: DeploymentPurpose): Promise<RunConfigV1> {
     await this.assertNoPendingReview("promote");
     const source = await this.currentRun();
+    assertDeploymentPurposeUsable(source.purpose);
+    if (purpose !== undefined) {
+      assertDeploymentPurposeUsable(purpose);
+      if (purpose !== source.purpose)
+        throw new ApexError(
+          "APEX_VALIDATION",
+          `Deployment purpose cannot change within a run (this run is '${source.purpose}'); start a new project with the purpose you need`,
+          EXIT_CODES.validation,
+        );
+    }
     const sourceEvents = await this.journal(source).replay();
     if (![1, 2, 3].every((gate) => this.gateApproved(source, gate)))
       throw new ApexError("APEX_AUTHORIZATION", "Promotion requires approved Gates 1-3", EXIT_CODES.authorization);
     await this.acquireRunWriterLease(source);
     const promoted = await this.projects.createRun(source.projectId, {
       environment,
+      purpose: source.purpose,
       targetScope,
       runtimeLockHash: source.runtimeLockHash,
       iacTool: source.iacTool,
@@ -8633,7 +8661,7 @@ export class ApexService {
       }
     }
     const run = readOnly
-      ? (JSON.parse(await readFile(join(directory, "run.json"), "utf8")) as RunConfigV1)
+      ? parseRunConfig(await readFile(join(directory, "run.json"), "utf8"))
       : await this.runRepository(selection).read();
     const events = await this.journal(run).replay();
     this.assertRequirementsIntakeAdmitted(events, run.ownerEpoch);
@@ -9514,6 +9542,7 @@ export class ApexService {
     run: RunConfigV1,
     events: Awaited<ReturnType<EventJournal["replay"]>>,
   ): Promise<void> {
+    assertDeploymentPurposeUsable(run.purpose);
     events = this.governanceWorkflowEvents(events);
     await this.assertImportedGovernanceCurrent(run, events);
     if (!this.gateApproved(run, 3))
@@ -9571,6 +9600,7 @@ export class ApexService {
     const route = engine.route({
       run: {
         iacTool: run.iacTool,
+        purpose: run.purpose,
         targetScope: run.targetScope,
         governanceRefreshRequired: await this.referenceGovernanceNeedsRefresh(run, events),
         policyRefreshRequired: await this.policyMapNeedsRefresh(events),
@@ -10810,7 +10840,7 @@ export class ApexService {
       }
     }
     const activeValidatorIds = workflow.activeValidatorIds({
-      run: { iacTool: run.iacTool, targetScope: run.targetScope },
+      run: { iacTool: run.iacTool, purpose: run.purpose, targetScope: run.targetScope },
       artifacts,
     });
     const executedValidatorIds = new Set<string>();

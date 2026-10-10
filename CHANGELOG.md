@@ -14,6 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Bind a typed deployment `purpose` (`lab` or `production`) to every run (CP-27, part 1). `apex init`, `bootstrap` and
+  `project create` accept `--purpose` (MCP `projectCreate` and `promote` accept `purpose`) and default to `lab`;
+  `purpose` joins the dependency revision and the workflow source dependencies, so a change invalidates affected
+  previews and approvals. `production` fails closed with `APEX_VALIDATION` until CP-28/CP-29, and a run's purpose cannot
+  change. Run configurations without `purpose` are rejected; start a new project. Gate 1-4 behavior is unchanged; the
+  lab gate flow is a later part of CP-27.
+
 - Align the shipped Azure design skills' command-routing guidance with DECISION-036: today's `apex preview`, Gate 4 and
   `apex deploy` flow is stated as the enforced path, azd is described as a planned Bicep-only executor (CP-26) and
   CI-owned production runs with human approval verified before apply as a planned target, and the retired local-Gate-4

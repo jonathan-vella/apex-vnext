@@ -7,6 +7,7 @@ import { sha256Json, type JsonValue } from "./canonical.js";
 import { EventJournal, type AppendEventInput } from "./event-journal.js";
 import { DirectoryLock } from "./directory-lock.js";
 import { atomicWriteJson, readPublishedFile } from "./files.js";
+import { parseRunConfig } from "./run-config.js";
 
 export interface RunMutation {
   expectedRunHash: string;
@@ -360,7 +361,7 @@ export class RunRepository {
   }
 
   private async readRaw(): Promise<RunConfigV1> {
-    return JSON.parse(await readFile(this.runPath, "utf8")) as RunConfigV1;
+    return parseRunConfig(await readFile(this.runPath, "utf8"));
   }
 
   private async readWriterLease(): Promise<RunWriterLeaseSnapshot | undefined> {

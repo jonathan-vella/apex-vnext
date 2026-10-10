@@ -58,7 +58,8 @@ subscription so the application team can deploy its existing code.
 
 ### Deployment Purpose
 
-Deployment purpose is independent of the foundation profiles above. Preselect non-production for new projects and
+Deployment purpose is independent of the foundation profiles above. Every run carries a typed `purpose` of `lab`
+(non-production) or `production`. Preselect `lab` for new projects and
 confirm purpose and actual Azure target; do not infer either from a `dev` name, subscription count or repository
 visibility. An ALZ-backed workload may be non-production, and a standalone foundation is not permission for production.
 
@@ -70,6 +71,11 @@ visibility. An ALZ-backed workload may be non-production, and a standalone found
 Changing purpose or target creates a new purpose-bound run and invalidates affected preview/approval authority.
 Lab approval cannot promote to production. Existing four-gate prompts remain current behavior until the
 purpose-bound workflow is implemented; this plan does not synthesize approvals or bypass current controls.
+
+Current implementation: `purpose` is a required run field, project and run creation default it to `lab`, and it is part
+of the dependency revision. `production` is a valid contract value but fails closed with a stable error until
+`REQ-PRODUCTION-001` (CP-28/CP-29) ships. A run's purpose cannot change; promotion keeps it. Confirming purpose at
+Gate 1 and the lab approval flow are planned.
 
 ## Functional Requirements
 

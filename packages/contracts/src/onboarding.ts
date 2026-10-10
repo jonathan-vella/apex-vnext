@@ -1,6 +1,7 @@
 import { Type, type Static } from "@sinclair/typebox";
 import {
   ContractVersionSchema,
+  DeploymentPurposeSchema,
   EnvironmentSchema,
   IacToolSchema,
   NonEmptyStringSchema,
@@ -18,6 +19,7 @@ export const OnboardingConfigV1Schema = Type.Object(
     displayName: Type.Optional(NonEmptyStringSchema),
     client: Type.Optional(BootstrapClientSchema),
     environment: Type.Optional(EnvironmentSchema),
+    purpose: Type.Optional(DeploymentPurposeSchema),
     targetScope: Type.Optional(NonEmptyStringSchema),
     iacTool: Type.Optional(IacToolSchema),
     riskOwner: Type.Optional(RiskOwnerSchema),

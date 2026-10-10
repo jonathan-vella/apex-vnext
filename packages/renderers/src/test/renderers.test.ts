@@ -222,6 +222,7 @@ test("run status displays sorted inherited gate provenance", () => {
     projectId: "sample-project",
     runId: "prod-run",
     environment: "prod",
+    purpose: "lab",
     targetScope: "/subscriptions/example",
     iacTool: "bicep",
     createdAt: "2026-07-01T09:00:00Z",

@@ -360,7 +360,8 @@ Maintainer direction accepted on 2026-10-09, with lab prompt scope confirmed on 
 - **Product boundary.** APEX is open source and initially delivers non-production scenarios. Production is an opt-in,
   readiness-checked capability, not a prerequisite for installation or the initial non-production release.
 - **Purpose.** Preselect non-production and confirm the actual workload purpose and target. This is separate from
-  ALZ-backed versus standalone foundation; neither choice is inferred from names or repository visibility.
+  ALZ-backed versus standalone foundation; neither choice is inferred from names or repository visibility. The typed
+  values are `lab` (every non-production scenario) and `production`; `production` stays blocked until CP-28/CP-29.
 - **Lab ceremony.** Confirm intent once and approve the final deployment preview; Gate 1 through 3 are readiness
   checkpoints, not separate approval prompts. Required reviews and deterministic checks remain blocking. Intent
   changes, risk decisions and each destructive operation still require their own relevant confirmation.

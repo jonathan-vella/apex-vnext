@@ -61,7 +61,7 @@
       "id": "governance-discovery",
       "kind": "capability",
       "ownerRole": "governance-operator",
-      "sourceDependencies": ["gate-1", "run-config.targetScope", "governance-capability-lock"],
+      "sourceDependencies": ["gate-1", "run-config.purpose", "run-config.targetScope", "governance-capability-lock"],
       "outputs": ["governance-constraints-v1"],
       "validators": [
         "schema:governance-constraints-v1",
@@ -154,7 +154,7 @@
       "id": "governance-refresh",
       "kind": "capability",
       "ownerRole": "governance-operator",
-      "sourceDependencies": ["gate-2", "run-config.targetScope", "governance-capability-lock"],
+      "sourceDependencies": ["gate-2", "run-config.purpose", "run-config.targetScope", "governance-capability-lock"],
       "outputs": ["governance-constraints-v1"],
       "validators": [
         "schema:governance-constraints-v1",
@@ -417,6 +417,7 @@
         "environment-inputs-v1",
         "governance-constraints-v1",
         "quota-evidence-current",
+        "run-config.purpose",
         "run-config.targetScope",
         "toolchain"
       ],
@@ -444,6 +445,7 @@
         "governance-constraints-v1",
         "quota-evidence-current",
         "terraform-state-lineage-and-serial",
+        "run-config.purpose",
         "run-config.targetScope",
         "toolchain"
       ],
@@ -470,6 +472,7 @@
         "governance-constraints-v1",
         "environment-inputs-v1",
         "iac-tree-hash",
+        "run-config.purpose",
         "run-config.targetScope",
         "repository-head",
         "owner-epoch",
@@ -543,7 +546,12 @@
       "id": "inventory",
       "kind": "capability",
       "ownerRole": "inventory-operator",
-      "sourceDependencies": ["operation-record-v1", "logical-resource-manifest-v1", "run-config.targetScope"],
+      "sourceDependencies": [
+        "operation-record-v1",
+        "logical-resource-manifest-v1",
+        "run-config.purpose",
+        "run-config.targetScope"
+      ],
       "outputs": ["resource-inventory-v1"],
       "validators": ["inventory:secret-free", "inventory:source-coverage", "inventory:eventual-consistency-reconciled"],
       "invalidates": ["diagnosis", "quality"]
@@ -552,7 +560,12 @@
       "id": "diagnosis",
       "kind": "capability",
       "ownerRole": "diagnostician",
-      "sourceDependencies": ["resource-inventory-v1", "operation-record-v1", "run-config.targetScope"],
+      "sourceDependencies": [
+        "resource-inventory-v1",
+        "operation-record-v1",
+        "run-config.purpose",
+        "run-config.targetScope"
+      ],
       "outputs": ["diagnosis-report-v1"],
       "validators": ["diagnosis:read-only", "diagnosis:secret-free"],
       "invalidates": ["quality"]

@@ -38,6 +38,7 @@ export async function createScenario(workspaceRoot: string, options: ScenarioOpt
   });
   const run = await projectStore.createRun(project.projectId, {
     environment: options.environment ?? "test",
+    purpose: "lab",
     targetScope: options.targetScope ?? "/subscriptions/00000000-0000-0000-0000-000000000000",
     runtimeLockHash: fixtureHash("runtime-lock"),
   });

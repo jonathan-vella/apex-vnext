@@ -22,10 +22,10 @@ design, not the executable gates or live authorization.
 
 ### Separate Deployment Purpose From Foundation
 
-Record deployment purpose explicitly as non-production or production. Preselect non-production for new projects, but
-require confirmation of the actual target and purpose. Do not infer purpose from resource names, subscription count,
-repository visibility, or a `dev` label. ALZ-backed versus standalone foundation is an independent ownership choice.
-Neither axis implies permission to create or delete shared platform resources.
+Record deployment purpose explicitly as the typed value `lab` (non-production) or `production`. Preselect `lab` for
+new projects, but require confirmation of the actual target and purpose. Do not infer purpose from resource names,
+subscription count, repository visibility, or a `dev` label. ALZ-backed versus standalone foundation is an independent
+ownership choice. Neither axis implies permission to create or delete shared platform resources.
 
 Production opt-in requires a new purpose-bound run and current readiness evidence. Changing purpose or target
 invalidates affected previews and approval; a lab approval cannot authorize production execution.

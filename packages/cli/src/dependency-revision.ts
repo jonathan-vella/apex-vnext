@@ -1,7 +1,10 @@
 import type { EventV1, RunConfigV1 } from "@apexops/contracts";
 import { sha256Json } from "@apexops/kernel";
 
-type DependencyRevisionRun = Pick<RunConfigV1, "projectId" | "runId" | "targetScope" | "iacTool" | "runtimeLockHash">;
+type DependencyRevisionRun = Pick<
+  RunConfigV1,
+  "projectId" | "runId" | "purpose" | "targetScope" | "iacTool" | "runtimeLockHash"
+>;
 
 export function dependencyRevision(run: DependencyRevisionRun, events: readonly EventV1[]): string {
   const artifacts = events.reduce<Record<string, string>>((current, event) => {
@@ -23,6 +26,7 @@ export function dependencyRevision(run: DependencyRevisionRun, events: readonly 
   return sha256Json({
     projectId: run.projectId,
     runId: run.runId,
+    purpose: run.purpose,
     targetScope: run.targetScope,
     iacTool: run.iacTool,
     runtimeLockHash: run.runtimeLockHash,

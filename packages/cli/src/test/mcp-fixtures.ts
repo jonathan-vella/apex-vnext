@@ -8,6 +8,7 @@ export const run = {
   schemaVersion: "1.0.0",
   ...selection,
   environment: "dev",
+  purpose: "lab",
   targetScope: "local",
   iacTool: "bicep",
   createdAt: timestamp,
