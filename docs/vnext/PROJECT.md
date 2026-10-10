@@ -1,12 +1,22 @@
 # APEX vNext Checkpoint
 
-- **Updated:** 2026-10-05
+- **Updated:** 2026-10-10
 - **Repository:** `jonathan-vella/apex-vnext`
 - **Integration branch:** `main`
 - **Product status:** Pre-release
 - **Release candidate:** None selected
 
 ## Current State
+
+The maintainer accepted
+[DECISION-036](DECISIONS.md#decision-036-deliver-non-production-first-with-purpose-bound-approval):
+non-production first, azd/Bicep and native Terraform, one lab intent confirmation plus final preview approval, optional
+production setup and CI-owned production runs with human approval verified before apply. This is a target design,
+not implemented purpose/approval behavior. Current four-gate runtime and qualification-transfer controls remain active;
+production is not unblocked. CP-26 through CP-30 own delivery and qualification.
+
+PR #454 merged the repository cleanup at `a4bc16fbe4eadea48902ab054ea7f02a8bdd008a`. Preserve its archive catalog,
+retired-root rules and guidance provenance; maintenance archives do not supply active workflow authority.
 
 The approved direction is a COE workload factory with independent archetype reuse and conversational changes.
 Both ALZ-backed workloads and standalone single-subscription labs/demos are day-one requirements. Under DECISION-033
@@ -374,8 +384,10 @@ Archived delegation is not current authority: it does not authorize commits, mer
 or renewed spending. Live qualification and release actions require separate explicit human authorization
 and current actual/projected cost evidence; historical estimates do not establish deployment headroom.
 
-Protect all pre-existing resources. Local human Gate 4 and exact candidate, recipient, preview hash, ownership
-and expiry binding remain mandatory. Unsupported native checks, unresolved expressions and unverified module
+Protect all pre-existing resources. The existing runtime still requires local human Gate 4 and exact candidate,
+recipient, preview hash, ownership and expiry binding. DECISION-036 changes the future approval location, not the
+current executable checks; production requires separately qualified CI-owned approval and readiness.
+Unsupported native checks, unresolved expressions and unverified module
 ownership remain blockers, not presumed compliance. Historical pass counts do not qualify this candidate.
 Use the [restore guide](../../.archive/RESTORE.md) for inspection only; it does not revive approvals.
 

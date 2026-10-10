@@ -5,6 +5,10 @@ engineering intent into governed Azure workload infrastructure, code, and useful
 It sits between an existing platform landing zone and separately developed application code, and also supports
 standalone single-subscription labs and demos from day one.
 
+Under [DECISION-036](DECISIONS.md#decision-036-deliver-non-production-first-with-purpose-bound-approval), APEX is
+open source and initially delivers non-production workloads. Production is an opt-in capability with separately
+qualified readiness, approval and execution; it is not an installation or initial non-production release prerequisite.
+
 The existing TypeScript runtime, npm CLI, and managed Copilot clients are foundations, not reasons to expand the product.
 This document defines the target contract; [PROJECT.md](PROJECT.md) distinguishes implemented behavior from remaining
 work. Updating this plan does not implement new commands or authorize live operations.
@@ -19,6 +23,8 @@ work. Updating this plan does not implement new commands or authorize live opera
 - Reuse one COE archetype per consumer project, then adapt only what changes.
 - Keep one authoritative location per fact, reuse existing contracts and parameters, and avoid parallel frameworks.
 - Preserve durable state, human gates, Azure Policy precedence, security, and equivalent Bicep/Terraform outcomes.
+- Reduce non-production approval prompts without removing required validation, reviews or deployment confirmation.
+- Provide reviewable production setup guidance and automation without claiming production support before qualification.
 
 Input efficiency is a design goal. No token baseline, comparative benchmark, new telemetry framework, or claimed
 percentage reduction is required now. Existing correctness and safety checks remain in force.
@@ -49,6 +55,21 @@ ownership, or deployment approval. No ALZ does not imply that no Azure Policy is
 
 APEX does not develop application code or deploy foundation landing zones. It provisions the workload into the assigned
 subscription so the application team can deploy its existing code.
+
+### Deployment Purpose
+
+Deployment purpose is independent of the foundation profiles above. Preselect non-production for new projects and
+confirm purpose and actual Azure target; do not infer either from a `dev` name, subscription count or repository
+visibility. An ALZ-backed workload may be non-production, and a standalone foundation is not permission for production.
+
+| Purpose        | Target experience                                                                                  | Release boundary                                         |
+| -------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| Non-production | Confirm workload intent once, retain required reviews/checks, approve the final deployment preview | Initial delivery; no production CI setup required        |
+| Production     | Explicit opt-in, verified setup, CI-owned execution and bound human approval before apply          | Deferred until the new path is implemented and qualified |
+
+Changing purpose or target creates a new purpose-bound run and invalidates affected preview/approval authority.
+Lab approval cannot promote to production. Existing four-gate prompts remain current behavior until the
+purpose-bound workflow is implemented; this plan does not synthesize approvals or bypass current controls.
 
 ## Functional Requirements
 
@@ -94,6 +115,9 @@ Bootstrap configures the repository, runtime, clients and governance prerequisit
 project ID, project environment, workload target or IaC choice. A configured workspace with zero projects is a valid
 ready-to-start state. Only after setup does the APEX agent gather workload details and create the first project
 through the kernel-owned project operation. Empty-workspace status and health checks must not require a selected run.
+
+Project creation preselects non-production purpose but confirms the workload target; it does not default the independent
+foundation choice. Production setup is optional and follows `REQ-PRODUCTION-001`, not ordinary installation.
 
 After confirming repository identity and workload choices, configure APEX and the selected clients. When no usable
 GitHub remote exists, offer repository creation and a reviewed push, showing owner, visibility and exact changes.
@@ -160,8 +184,11 @@ may legitimately affect many files. Preserve unaffected files and user content. 
 ### REQ-STATE-001: Runtime State And Writer Authority
 
 The runtime must use a hash-linked event journal, atomic persistence, compare-and-swap mutation, one active-writer lease,
-ownership epochs, crash reconciliation, and explicit local-to-CI writer transfer bound to project, run, repository,
-branch, commit, recipient, and expiry.
+ownership epochs and crash reconciliation. Production CI originates and owns its execution run and preview; reviewed
+authoring intent/source may be supplied, but no developer-to-CI plan, decryption key or writer transfer is required.
+Bind CI authority to repository, workflow/run/attempt, commit, target and expiry. Existing cross-boundary transfer
+remains validated where used in the current qualification path; retain its audit evidence without making it a
+production prerequisite.
 
 ### REQ-CONTRACT-001: Persisted Contracts And Compatibility
 
@@ -172,8 +199,11 @@ versions.
 ### REQ-WORKFLOW-001: Workflow And Gates
 
 A data-only workflow manifest must be routing authority. A run targets one environment, one Azure scope, and one IaC
-track. It exposes Requirements, Architecture and Cost, Implementation Plan, and Deployment Preview as the only human
-approval gates; required deterministic validation and reviews remain blocking preconditions.
+track and confirmed deployment purpose. Requirements, Architecture and Cost, Implementation Plan, and Deployment
+Preview remain the stage boundaries. For non-production, one confirmed workload intent and final deployment approval
+replace separate Gate 1 through 3 prompts; those stages are readiness checkpoints, not fabricated human decisions.
+Required deterministic validation and reviews remain blocking preconditions. Production execution approval is
+verified in CI under `REQ-APPROVAL-001`; changes and risk decisions still require affected human confirmation.
 
 Retain requirements-review, architecture-review (which also covers the policy map) and plan-review. Each must
 complete against its current subject and required dependencies before the corresponding gate can proceed. Both clients
@@ -269,20 +299,48 @@ Bicep preview, apply, inventory, reconciliation, and destroy must use native Azu
 ownership where qualified. A fallback may operate only when it proves complete managed-resource coverage and safe delete
 semantics.
 
+The target Bicep execution path uses a bounded azd executor, not a third IaC language. Bind source, resolved parameters,
+environment, azd version and allowed hooks/extensions/layers to the approved what-if. Unsupported mutation surfaces
+fail closed; what-if remains a prediction against mutable Azure state, not an immutable Terraform plan. Provisioning
+and approved application-package deployment are separate operations; do not run `azd up`. The native Bicep path remains
+current behavior until azd execution is implemented and qualified.
+
 ### REQ-TERRAFORM-001: Terraform Lifecycle
 
 Terraform must use a secured Azure Storage backend with identity-based access, locking, retention, and compliant
 networking. Preview must create a protected saved plan; approval and apply must bind that exact plan, lineage, serial,
-inputs, commit, recipient, and expiry. Production CI apply remains blocked until recipient-bound encrypted transport is
-qualified. Native Terraform CLI and provider interfaces remain lifecycle authorities; Terraform or Azure MCP tools may
+inputs, commit, recipient, and expiry. Use native Terraform CLI rather than azd's Terraform provider; preserve normal
+state locking and do not replan or upgrade dependencies after approval. Production CI apply remains blocked until
+CI-owned runs, protected artifacts and pre-apply human approval verification are implemented and qualified under
+`REQ-PRODUCTION-001` and `REQ-APPROVAL-001`. Native Terraform CLI and provider interfaces remain lifecycle
+authorities; Terraform or Azure MCP tools may
 assist discovery and guidance but cannot own initialization, schemas, state, plans, imports, apply, or destroy.
 
 ### REQ-APPROVAL-001: Preview And Approval Binding
 
 Deployment Preview is the production approval ceremony. Approval must bind actor and run identity, target, operation,
 inputs, IaC tree, policy envelope, preview, commit, owner epoch, recipient, and expiry. Stale, substituted, incomplete,
-or rejected evidence must fail closed. APEX Gate 4 owns this decision; external CI environment protection is not an
-approval authority.
+or rejected evidence must fail closed. The kernel owns acceptance of approval evidence, not its physical location.
+Non-production uses local operation-specific confirmation. Production uses an authenticated human review through a
+supported GitHub approval adapter; the kernel validates its candidate-bound receipt before apply. Bind actual reviewer,
+repository, workflow/run/attempt, source commit, environment, target, operation, preview/plan digest, writer and expiry.
+An OIDC triggering actor, generic PR approval, automated workflow or unbound environment pause is not that receipt.
+Unavailable protection features, missing approval or a changed candidate block production without a lab fallback.
+Current local Gate 4 and qualification-transfer checks remain enforced until the replacement is tested.
+
+### REQ-PRODUCTION-001: Optional Production Readiness And Setup
+
+Production setup is opt-in and separate from the initial non-production experience. Reuse bounded bootstrap/governance
+discovery, planning and authorized provisioning rather than creating another state machine. Inspect prerequisites
+read-only, generate reviewable workflow/IaC and operator instructions, apply only an explicitly approved setup plan,
+then verify ready, missing or blocked outcomes. Missing privileges produce administrator guidance, not escalation.
+
+Check actual consumer repository approval features and branch/environment protection, scoped OIDC trust and role
+assignments, target governance, backend locking/networking and sensitive-artifact access, retention and cleanup.
+Use full-commit-SHA Action pins. Separate setup administration from deployment rights; planning still needs normal
+backend locking permissions. CI-to-CI plans/state require protected encrypted storage and integrity checks, never
+public saved-plan artifacts or committed secrets. Do not assume an open-source tool's consumers have public repositories
+or GitHub plans with identical controls. Successful configuration is not qualification or deployment approval.
 
 ### REQ-OPS-001: Operations, Promotion, And Diagnosis
 
@@ -589,7 +647,8 @@ does not become the default for other workloads. Human quality review complement
 - Transcript scraping or direct promotion of observations into instructions, agents, skills, or code.
 - Azure Resource Manager MCP deployment, cancellation, or budget-write tools in managed APEX workflows.
 - Generic unscoped Bicep destroy or post-approval Terraform plan regeneration.
-- Production Terraform CI apply before encrypted recipient-bound plan transport is proven.
+- Production execution before purpose-bound readiness, CI-owned runs, protected artifacts and pre-apply human approval
+  verification are implemented and qualified.
 - External repository or organization webhook changes without separate authorization.
 
 ## Release Metrics
@@ -610,6 +669,8 @@ Cutover requires all of the following on the exact candidate head:
 - Every active requirement above maps to passing automated evidence or an explicitly required manual/live result.
   Explicitly deferred requirements remain backlog items, not passing evidence or current cutover gates.
 - Both ALZ-backed and standalone lab/demo profiles pass without weakening policy or shared-resource ownership.
+- Non-production purpose is explicitly confirmed, independent of foundation choice; the intent-confirmation and final
+  deployment-approval flow retains required reviews, deterministic checks, target ownership and native safety.
 - COE import and conversational changes preserve independent origin, exclude source authority, and leave unaffected
   outputs unchanged; manual conflicts require confirmation.
 - Human review against the output-quality reference passes; mandatory application and operational handoff is complete.
@@ -630,7 +691,9 @@ Cutover requires all of the following on the exact candidate head:
 - Changed guidance and automation have identified consumers, behavior, diagnostics, security boundaries and proof tests.
   Any executable gate alignment required by this revised plan is complete; no existing check is bypassed.
 - Bicep and Terraform preview, approval, apply, inventory, diagnosis, destroy, and recovery scenarios are qualified.
-- Local APEX Gate 4 approval, GitHub OIDC, and local-to-CI writer transfer are proven.
+- Non-production local deployment approval and purpose separation are proven. Production requirements remain deferred
+  until CI-owned runs, OIDC, artifact protection, actual human approval receipts and readiness are qualified; an initial
+  non-production release does not claim production support.
 - Scorecard sample requirements and unavailable-data dispositions are satisfied.
 - Release and rollback rehearsals, documentation audit, and `npm run validate:all` pass.
 - Every open risk has an owner and acceptable release disposition.

@@ -4,6 +4,15 @@
 
 ## Shared Contract
 
+Current provider behavior is documented below.
+[DECISION-036](../vnext/DECISIONS.md#decision-036-deliver-non-production-first-with-purpose-bound-approval) selects a
+bounded azd executor for Bicep and retains native Terraform CLI. azd is not a third IaC language. CP-26 implements its
+input, environment, hook and operation boundaries; no new executor is enabled by this document.
+
+Non-production purpose will use confirmed intent and final deployment approval with required reviews/checks retained.
+Production will be opt-in, CI-owned and subject to verified human approval before apply. These purpose/approval
+behaviors remain planned until their runtime and qualification work lands.
+
 Each run selects exactly one IaC track. Both tracks consume the same approved requirements, architecture, governance,
 policy map, and implementation intent. Both must produce typed bindings, generated files, validation evidence, an exact
 preview, approval evidence, an operation record, and inventory.
