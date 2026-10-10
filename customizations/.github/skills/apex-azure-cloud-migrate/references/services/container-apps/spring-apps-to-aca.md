@@ -46,13 +46,15 @@ Assess your Spring Boot application for migration readiness:
 ## Migration Workflow
 
 1. **Assess** — Analyze application for migration readiness
-   > Present findings and complexity rating to user. Ask: "Assessment complete — proceed with containerization?"
+   > Report findings and the complexity rating through the active task's input contract, then stop until the kernel
+   > selects the containerization stage; a chat reply does not advance the stage.
 2. **Containerize** — Create Dockerfile, build image, push to ACR
 3. **Provision** — Create Container Apps environment, configure logging
 4. **Deploy** — Deploy container to Azure Container Apps
 5. **Optimize** — Add Spring Cloud components (Config, Eureka, Gateway)
 
-Provisioning and deployment go through **apex-azure-prepare** with approval; see
+Return IaC needs to the kernel-selected preparation/CodeGen task (`apex-azure-prepare`); provisioning and deployment
+are separate kernel-selected lifecycle tasks with their own preview and approval; see
 [Workflow Routing](../../../SKILL.md#workflow-routing).
 
 ## Key Differences from Azure Spring Apps
@@ -81,7 +83,7 @@ After successful migration:
 2. Set up CI/CD pipeline with GitHub Actions / Azure DevOps
 3. Configure custom domains and SSL certificates
 4. Implement autoscaling rules
-5. Hand off to `apex-azure-prepare` for infrastructure optimization
+5. Return infrastructure optimization to the kernel-selected preparation/CodeGen task
 
 ## Port Source
 

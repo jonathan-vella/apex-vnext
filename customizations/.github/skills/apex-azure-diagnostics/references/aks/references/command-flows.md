@@ -13,19 +13,10 @@
 Resolve subscription -> resolve resource group -> resolve cluster -> inspect cluster state -> inspect node pools -> inspect resource health -> inspect recent operations
 ```
 
-CLI fallback when AKS-MCP cannot perform the cluster baseline read — run the
-**[`aks-baseline`](../../script-examples/aks-baseline.sh.md)** script, which gathers cluster state, node pools, and
-recent operations as one read-only digest:
-
-```bash
-# bash
-./scripts/aks-baseline.sh -g <resource-group> -n <cluster-name>
-```
-
-```powershell
-# PowerShell
-.\scripts\aks-baseline.ps1 -ResourceGroup <resource-group> -Cluster <cluster-name>
-```
+CLI fallback when AKS-MCP cannot perform the cluster baseline read — use the individual `az aks show`,
+`az aks nodepool list` and activity-log reads within the accepted task scope. The
+[`aks-baseline`](../../script-examples/aks-baseline.sh.md) source example shows upstream's single read-only digest; it
+is non-executable and not installed.
 
 ## Kubernetes Baseline Flow
 
@@ -33,9 +24,8 @@ recent operations as one read-only digest:
 Check API reachability -> inspect nodes -> inspect kube-system -> inspect events -> inspect affected namespace -> inspect pod details and logs
 ```
 
-CLI fallback when AKS-MCP cannot perform the Kubernetes baseline read — the same
-**[`aks-baseline`](../../script-examples/aks-baseline.sh.md)** script also covers node readiness, unhealthy pods,
-kube-system health, and recent warning events. Pass `--namespace` to include an affected namespace, then deep-dive on a
+CLI fallback when AKS-MCP cannot perform the Kubernetes baseline read — cover node readiness, unhealthy pods,
+kube-system health and recent warning events with the reads below, include the affected namespace, then deep-dive on a
 specific pod:
 
 ```bash
@@ -47,24 +37,13 @@ kubectl get pods -n <namespace>
 ```
 
 For pod detail and logs, gather the read-only evidence bundle (describe, current + previous logs, resources vs usage)
-with the pod-evidence script — [`../../../scripts/pod-evidence.sh`](../../script-examples/pod-evidence.sh.md) /
-[`../../../scripts/pod-evidence.ps1`](../../script-examples/pod-evidence.ps1.md):
+with these reads; the [`pod-evidence`](../../script-examples/pod-evidence.sh.md) source example is non-executable and
+not installed. Bound logs with `--tail` and keep only redacted excerpts:
 
 ```bash
-../../../scripts/pod-evidence.sh <pod-name> -n <namespace>
-../../../scripts/pod-evidence.sh --all-failing
 kubectl describe pod <pod-name> -n <namespace>
-kubectl logs <pod-name> -n <namespace> --previous
-```
-
-```powershell
-../../../scripts/pod-evidence.ps1 <pod-name> -Namespace <namespace>
-../../../scripts/pod-evidence.ps1 -AllFailing
-```
-
-```powershell
-# PowerShell
-.\scripts\aks-baseline.ps1 -ResourceGroup <resource-group> -Cluster <cluster-name> -Namespace <namespace>
+kubectl logs <pod-name> -n <namespace> --tail=200
+kubectl logs <pod-name> -n <namespace> --previous --tail=200
 ```
 
 ## Connectivity Flow
@@ -114,7 +93,7 @@ kubectl describe quota -n <namespace>
 ## Deep Diagnostics Flow (Inspektor Gadget)
 
 ```text
-Standard diagnostics inconclusive -> select gadget from symptom-to-gadget map -> run `scripts/run-ig.sh` (or `run-ig.ps1`; resolves node, applies timeout) -> interpret output -> correlate with prior evidence
+Standard diagnostics inconclusive -> select gadget from symptom-to-gadget map -> run the gadget through an available authorized capability (the `run-ig` example is a non-executable source) -> interpret output -> correlate with prior evidence
 ```
 
 Use when steps 1–3 of the evidence order (Azure-side, Kubernetes-side, and detector evidence) do not reveal root cause.

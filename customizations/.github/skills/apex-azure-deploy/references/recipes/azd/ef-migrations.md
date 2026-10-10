@@ -26,13 +26,14 @@ find . -name "*.csproj" -exec grep -l "Microsoft.EntityFrameworkCore" {} \;
 ### Method 1: Reviewed azd Hook (Upstream Context)
 
 Only automate when the approved deployment plan includes migrations. Generate and review the SQL first (Method 2).
-Use the shared executor in `postprovision` (per-project: `infra/{iac}/{project}/azure.yaml`):
+Upstream shape for a `postprovision` hook (per-project: `infra/{iac}/{project}/azure.yaml`); no SQL executor is installed,
+so this stays blocked unless an authorized migration capability exists:
 
 ```yaml
 hooks:
   postprovision:
     shell: sh
-    run: bash ./scripts/run-sql.sh migrations.sql
+    run: echo "BLOCKED: no qualified SQL executor is installed for migrations.sql" && exit 1
 ```
 
 Supply approval values from the human-approved deployment process, never auto-approve current files in a hook.
@@ -51,7 +52,8 @@ dotnet ef migrations script --idempotent --output migrations.sql
 Review destructive/data changes, backup/rollback and required schema privileges. After target/file approval:
 
 ```bash
-bash ./scripts/run-sql.sh migrations.sql
+# Run migrations.sql only through an available, authorized SQL capability bound to the approved target and reviewed file.
+# No SQL executor is shipped; the source example is non-executable, so report a verification gap if none exists.
 ```
 
 ### Method 3: Application Startup (Dev Only)
@@ -73,7 +75,8 @@ The upstream combined file can illustrate a single review scope; combining steps
 See [sql-managed-identity.md](sql-managed-identity.md) for SQL grant patterns.
 
 ```bash
-bash ./scripts/run-sql.sh approved-grants-and-migrations.sql
+# Run approved-grants-and-migrations.sql only through an available, authorized SQL capability bound to the approved target and reviewed file.
+# No SQL executor is shipped; the source example is non-executable, so report a verification gap if none exists.
 ```
 
 Review the combined file as one operation. Use a distinct migration identity for DDL; do not grant runtime DDL by default.

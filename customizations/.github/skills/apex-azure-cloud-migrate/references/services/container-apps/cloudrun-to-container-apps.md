@@ -34,7 +34,9 @@ Detailed guidance for migrating Cloud Run serverless containers to Azure Contain
 1. **Assess** — Analyze Cloud Run config → [cloudrun-assessment-guide.md](cloudrun-assessment-guide.md)
 2. **Images** — Migrate GCR/Artifact Registry → ACR
 3. **Config** — Convert YAML, secrets → Key Vault, set up infrastructure
-4. **Hand off** — IaC and deployment go through **apex-azure-prepare** with approval; see [Workflow Routing](../../../SKILL.md#workflow-routing)
+4. **Hand off** — Return IaC needs to authorized preparation/CodeGen (`apex-azure-prepare`); deployment is a separate
+   kernel-selected lifecycle task with its own preview and approval; see
+   [Workflow Routing](../../../SKILL.md#workflow-routing)
 5. **Validate** — Health checks, logs, scaling verification
 
 ## Service Dependency Mappings

@@ -67,7 +67,7 @@ Structure the diagnostic report as:
 ## Diagnostic Report: {resource-name}
 
 **Assessment Date**: {date}
-**Assessed By**: APEX Diagnose Agent
+**Evidence Producer**: {accepted evidence producer and receipt reference from the active task}
 **Overall Health**: 🟢 Healthy | 🟡 Degraded | 🔴 Unhealthy
 
 ### Findings Summary

@@ -11,9 +11,9 @@
 | ----------------- | --------------------------------------------- |
 | Syntax error      | `az bicep build` to check                     |
 | Missing parameter | Add to parameters file                        |
-| Invalid property  | Check `mcp_bicep_get_az_resource_type_schema` |
+| Invalid property  | Check the accepted resource type schema       |
 | Resource conflict | Check existing resources                      |
-| Deployment failed | `az deployment sub show --name <name>`        |
+| Deployment failed | `az deployment sub operation list --name <name>` with a failed-state query |
 | Permission denied | Verify RBAC roles                             |
 
 ## Cleanup (DESTRUCTIVE)

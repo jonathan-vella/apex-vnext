@@ -9,25 +9,19 @@
 
 Use Inspektor Gadget for low-level node/pod diagnostics when `kubectl` is insufficient.
 
-## Run Script
+## Run Script (Source Example)
 
-Invoke gadgets with the `run-ig` script ([`scripts/run-ig.sh`](../../script-examples/run-ig.sh.md) /
-[`scripts/run-ig.ps1`](../../script-examples/run-ig.ps1.md)). It resolves the node from the pod, injects
-the pinned IG image/version, applies the default `--timeout` for the gadget type, adds the k8s
-filters, and handles the `tcpdump` variant. You still choose **which** gadget (see the
-Symptom-to-Gadget Map) and interpret the output.
+The `run-ig` helper ([bash](../../script-examples/run-ig.sh.md) / [PowerShell](../../script-examples/run-ig.ps1.md))
+is a non-executable source example and is not installed. Upstream, it resolves the node from the pod, injects the
+pinned IG image/version, applies a default `--timeout` per gadget type, adds the k8s filters and handles the `tcpdump`
+variant. It creates a privileged debug pod, so any gadget run is a remote mutation that needs an available authorized
+capability, a fresh preview, the current Gate 4 approval and trusted execution. You still choose **which** gadget (see
+the Symptom-to-Gadget Map) and interpret the output.
 
-```bash
-./scripts/run-ig.sh --gadget trace_dns --pod <pod> --ns <ns> --dry-run   # show the user first
-./scripts/run-ig.sh --gadget trace_dns --pod <pod> --ns <ns> --approve   # node auto-resolved
-./scripts/run-ig.sh --gadget snapshot_process --node <node> --approve    # node-wide
-```
+Illustrative target shapes (not commands): `trace_dns` for pod `<pod>` in `<ns>` (node resolved from the pod) and
+`snapshot_process` for node `<node>` (node-wide).
 
-```powershell
-.\scripts\run-ig.ps1 -Gadget trace_dns -Pod <pod> -Namespace <ns> -Approve
-```
-
-**Options** (bash flags below; PowerShell uses PascalCase equivalents: `-Gadget`, `-Pod`,
+**Source-example options** (bash flags below; PowerShell uses PascalCase equivalents: `-Gadget`, `-Pod`,
 `-Namespace`/`-Ns`, `-Node`, `-Container`, `-Timeout`, `-Filter`, `-Pf`, `-IgVersion`,
 `-DryRun`, `-Approve`): `--gadget` (required); target `--pod`/`--ns` **or** `--node`; `--container`;
 `--timeout <s>` override; `--filter <arg>` (repeatable IG-flag passthrough, e.g.
@@ -36,12 +30,13 @@ Symptom-to-Gadget Map) and interpret the output.
 `snapshot_*`/`top_*` → 5s, `trace_*`/`profile_*`/`tcpdump` → 30s. Returns the gadget JSON (pcap-ng for tcpdump) plus a
 `Ran gadget X on node Y` summary. IG version is pinned to `v0.51.0` in the scripts.
 
-> **Approval required:** IG uses `kubectl debug --profile=sysadmin` (a privileged debug pod).
-> **Ask the user before running the script** and confirm RBAC; use `--dry-run` to preview.
+> **Approval required:** IG uses `kubectl debug --profile=sysadmin` (a privileged debug pod). The example's
+> `--dry-run`/`--approve` switches and a chat confirmation are not kernel approval; confirm RBAC and use the trusted
+> ceremony.
 
 ## Common Filters
 
-The k8s scope filters and `--timeout` are set by the script. Pass any other IG flag below via
+The k8s scope filters and `--timeout` are set by the source example. Pass any other IG flag below via
 its repeatable `--filter`, e.g. `--filter --max-entries --filter 20`.
 
 | Filter | Description |
@@ -70,13 +65,12 @@ its repeatable `--filter`, e.g. `--filter --max-entries --filter 20`.
 
 #### tcpdump gadget
 
-Run via `--gadget tcpdump`; the script sets `-o pcap-ng` and pipes to `tcpdump -nvr -` when
+Run as the `tcpdump` gadget; the source example sets `-o pcap-ng` and pipes to `tcpdump -nvr -` when
 available. Use `--pf "<expr>"` for tcpdump filters (e.g., `port 80`, `host 10.0.0.1`); `--pf`
 is only valid for the `tcpdump` gadget.
 
-```bash
-./scripts/run-ig.sh --gadget tcpdump --pod <pod> --ns <ns> --pf "port 80" --approve
-```
+Packet captures can contain payloads, tokens and personal data. Capture only with explicit task authorization and narrow
+filters, and never store or log payload content as evidence.
 
 ### Process & Workload
 

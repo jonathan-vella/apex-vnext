@@ -53,7 +53,7 @@ bypasses approval.
 
 ```bash
 # Read only the accepted non-secret endpoint output.
-terraform output api_url
+terraform output -raw api_url
 ```
 
 ## Application Deployment

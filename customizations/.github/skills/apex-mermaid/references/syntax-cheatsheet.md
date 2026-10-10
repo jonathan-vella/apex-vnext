@@ -69,11 +69,14 @@ erDiagram
 
 ## Azure Resource Visualization
 
-For visualizing live Azure resource groups as Python-rendered standalone architecture diagrams, use the
-`apex-azure-resources` skill (Mode B: Visualize). It runs Azure Resource Graph
-queries and outputs Mermaid resource relationship diagrams.
+Standalone architecture, network, runtime and as-built diagrams of live Azure resources use the kernel's Python
+diagram path from accepted typed data, never Mermaid. The `apex-azure-resources` skill only interprets accepted
+inventory evidence; it does not render diagrams or run Resource Graph queries. If that rendering capability or the
+accepted inventory is unavailable, return the documented blocker instead of a Mermaid substitute.
 
-### Resource Diagram Conventions
+### Inline Resource Relationship Conventions
+
+Apply these only inside a registered, supported inline Markdown slot.
 
 - Group by layer: Network, Compute, Data, Security, Monitoring
 - Include resource details in node labels (use `<br/>` for line breaks)

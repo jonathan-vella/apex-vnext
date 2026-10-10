@@ -32,7 +32,7 @@ check.
 
 When standard diagnostics do not reveal root cause, use **Inspektor Gadget** for real-time, low-level node and pod
 observability (DNS traces, TCP traces, process snapshots, file access traces). See
-[references/inspektor-gadget.md](references/inspektor-gadget.md) for the gadget catalog, the `run-ig` script, and
+[references/inspektor-gadget.md](references/inspektor-gadget.md) for the gadget catalog, the `run-ig` source example, and
 symptom-to-gadget mapping.
 
 See [references/aks-mcp.md](references/aks-mcp.md),
@@ -85,21 +85,12 @@ If cluster identity is missing, stop and ask for it.
 
 ## Safe Fallback Checks
 
-When AKS-MCP cannot perform the baseline read, run the **[`aks-baseline`](../script-examples/aks-baseline.sh.md)**
-script. It executes the read-only cluster + Kubernetes baseline sweep (provisioning state, node pools, activity log,
-node readiness, unhealthy pods, kube-system health, warning events) and returns a single labeled digest:
+When AKS-MCP cannot perform the baseline read, use the individual read commands below (the
+[`aks-baseline`](../script-examples/aks-baseline.sh.md) source example shows upstream's single labeled digest of
+provisioning state, node pools, activity log, node readiness, unhealthy pods, kube-system health and warning events;
+it is non-executable and not installed).
 
-```bash
-# bash
-./scripts/aks-baseline.sh -g <resource-group> -n <cluster-name> [--namespace <namespace>]
-```
-
-```powershell
-# PowerShell
-.\scripts\aks-baseline.ps1 -ResourceGroup <resource-group> -Cluster <cluster-name> [-Namespace <namespace>]
-```
-
-Then deep-dive on a specific pod as the digest indicates:
+Then deep-dive on a specific pod as the evidence indicates:
 
 ```bash
 az aks show -g <resource-group> -n <cluster-name>
@@ -112,20 +103,9 @@ kubectl describe pod <pod-name> -n <namespace>
 kubectl logs <pod-name> -n <namespace> --previous
 ```
 
-For unhealthy pods, gather the full read-only evidence bundle (describe, current + previous logs, resources vs usage)
-with the pod-evidence script instead of running the commands one by one —
-[`../../scripts/pod-evidence.sh`](../script-examples/pod-evidence.sh.md) /
-[`../../scripts/pod-evidence.ps1`](../script-examples/pod-evidence.ps1.md):
-
-```bash
-../../scripts/pod-evidence.sh <pod-name> -n <namespace>
-../../scripts/pod-evidence.sh --all-failing
-```
-
-```powershell
-../../scripts/pod-evidence.ps1 <pod-name> -Namespace <namespace>
-../../scripts/pod-evidence.ps1 -AllFailing
-```
+For unhealthy pods, gather the read-only evidence bundle (describe, current + previous logs, resources vs usage) with
+the commands in [pod-failures.md](pod-failures.md#evidence-bundle-script); the
+[`pod-evidence`](../script-examples/pod-evidence.sh.md) source example is non-executable and not installed.
 
 See [pod-failures.md](pod-failures.md) for how to interpret the digest.
 

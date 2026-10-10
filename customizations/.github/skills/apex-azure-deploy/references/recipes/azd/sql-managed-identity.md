@@ -29,7 +29,8 @@ ALTER ROLE db_datawriter ADD MEMBER [approved-runtime-identity];
 ```
 
 ```bash
-bash ./scripts/run-sql.sh grant-runtime.sql
+# Run grant-runtime.sql only through an available, authorized SQL capability bound to the approved target and reviewed file.
+# No SQL executor is shipped; the source example is non-executable, so report a verification gap if none exists.
 ```
 
 ## Database Roles
@@ -46,18 +47,19 @@ bash ./scripts/run-sql.sh grant-runtime.sql
 
 ## Automate with azd Hook
 
-Only add a grant hook when explicitly approved in the deployment plan. Copy the shared executor to the project;
-supply target/file approval through the human-approved deployment process, never compute approval in the hook.
-Add `postprovision` hook to `azure.yaml` (per-project: `infra/{iac}/{project}/azure.yaml`):
+Only add a grant hook when explicitly approved in the deployment plan. No SQL executor is installed (the shared helper
+is a non-executable source example), so a hook needs an available authorized SQL capability whose target/file approval
+comes from the human-approved deployment process, never computed in the hook. Upstream `postprovision` shape in
+`azure.yaml` (per-project: `infra/{iac}/{project}/azure.yaml`), blocked until such a capability exists:
 
 ```yaml
 hooks:
   postprovision:
     shell: sh
-    run: bash ./scripts/run-sql.sh grant-runtime.sql
+    run: echo "BLOCKED: no qualified SQL executor is installed for grant-runtime.sql" && exit 1
 ```
 
-The shared executor fails on missing/stale approval or SQL errors. Never use `continueOnError` for grants.
+An authorized executor must fail on missing/stale approval or SQL errors. Never use `continueOnError` for grants.
 
 ## Verification
 
@@ -72,7 +74,8 @@ Place this read-only query in a separately reviewed `verify-roles.sql`:
   ```
 
   ```bash
-  bash ./scripts/run-sql.sh verify-roles.sql
+  # Run verify-roles.sql only through an available, authorized SQL capability bound to the approved target and reviewed file.
+  # No SQL executor is shipped; the source example is non-executable, so report a verification gap if none exists.
 ```
 
 Expected: identity and roles match the approved set, with no unintended schema permissions.

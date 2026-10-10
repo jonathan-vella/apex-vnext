@@ -100,7 +100,8 @@ const blobOutput = output.storageBlob({
 > 2. **Queue endpoint**: Set `AzureWebJobsStorage__queueServiceUri` in app settings. The blob extension uses queues
 > internally for poison-message tracking with EventGrid source, even though you're not using a queue trigger.
 > 3. **Event Grid subscription via Bicep/ARM**: Do NOT create event subscriptions via CLI — webhook validation times out
-> on Flex Consumption. Deploy as a Bicep resource using `listKeys()` to obtain the `blobs_extension` system key.
+> on Flex Consumption. Deploy as a Bicep resource using `listKeys()` to obtain the `blobs_extension` system key (a
+> secret: keep it out of outputs, logs and reports).
 >
 > See [lambda-to-functions.md](../lambda-to-functions.md#flex-consumption--blob-trigger-with-eventgrid-source) for full
 > Bicep patterns.

@@ -42,9 +42,10 @@ catch (ServiceBusException ex) when (ex.Reason == ServiceBusFailureReason.Servic
 - **Session processor slow switching**: Tune `SessionIdleTimeout` to reduce wait time between sessions.
 - **Batch size limits**: Batch limit is artificially computed on the client from the max message size sent by the
   service. Send large messages individually if batch creation fails.
-- **Transactions across entities**: Requires all entities on same namespace. Use `ServiceBusClient.CreateSender` with
-  `via` entity support.
-- **WebSockets**: Use `ServiceBusTransportType.AmqpWebSockets` when AMQP ports (5761, 5762) are blocked.
+- **Transactions across entities**: Requires all entities on the same namespace. Set
+  `ServiceBusClientOptions.EnableCrossEntityTransactions` to `true` and use the same `ServiceBusClient` for every sender
+  and receiver in the transaction.
+- **WebSockets**: Use `ServiceBusTransportType.AmqpWebSockets` when AMQP ports (5671, 5672) are blocked.
 
 ## Port Source
 

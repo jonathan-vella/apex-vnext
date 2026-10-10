@@ -9,7 +9,8 @@
 
 # Troubleshooting
 
-This reference covers common errors encountered during Azure deployment with `azd` and how to resolve them.
+This reference covers common errors reported by `azd` and how to resolve them. azd is a planned executor for Bicep only
+(DECISION-036, CP-26); today's runtime does not run it, so treat fixes and commands as provider context for diagnosis.
 
 ## Language Not Supported
 
@@ -86,7 +87,8 @@ resource staticWebApp 'Microsoft.Web/staticSites@2025-03-01' = {
 }
 ```
 
-After updating, run `azd provision` to apply the tag, then `azd deploy`.
+After updating, the tag change needs its own approved provisioning operation, and any application delivery is a separate
+operation.
 
 ## Location Not Available for Resource Type
 

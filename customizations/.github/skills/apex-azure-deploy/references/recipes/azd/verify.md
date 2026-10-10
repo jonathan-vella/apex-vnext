@@ -27,8 +27,8 @@ Showing deployed resources:
 ## Step 2: Health Check
 
 ```bash
-# Get endpoint
-ENDPOINT=$(azd env get-value AZURE_SUBSCRIPTION_ID | grep -E "SERVICE_.*_URI|.*_ENDPOINT" | head -1 | cut -d'=' -f2)
+# Read one task-selected, non-secret service URI key by name (for example SERVICE_API_URI); never dump the environment
+ENDPOINT=$(azd env get-value <task-selected-service-uri-key>)
 
 # Test endpoint
 curl -f "$ENDPOINT/health" || curl -f "$ENDPOINT"
@@ -42,7 +42,7 @@ For deployments with Azure SQL Database and managed identity:
 
 ### Verify SQL Access
 
-Use the [reviewed SQL executor](sql-entra-auth.md#reviewed-sql-execution) with explicit data-plane approval.
+Follow the [reviewed SQL execution guidance](sql-entra-auth.md#reviewed-sql-execution) with explicit data-plane approval.
 Put this query in `verify-identity.sql`:
 
 ```sql
@@ -50,7 +50,8 @@ SELECT name, type_desc FROM sys.database_principals WHERE type = 'E';
 ```
 
 ```bash
-bash ./scripts/run-sql.sh verify-identity.sql
+# Run verify-identity.sql only through an available, authorized SQL capability bound to the approved target and reviewed file.
+# No SQL executor is shipped; the source example is non-executable, so report a verification gap if none exists.
 ```
 
 **Expected:** Should list the App Service or Container App managed identity.
@@ -66,7 +67,8 @@ SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE='BASE TABLE';
 ```
 
 ```bash
-bash ./scripts/run-sql.sh verify-schema.sql
+# Run verify-schema.sql only through an available, authorized SQL capability bound to the approved target and reviewed file.
+# No SQL executor is shipped; the source example is non-executable, so report a verification gap if none exists.
 ```
 
 **Expected:** Should list application tables (not just `__EFMigrationsHistory`).

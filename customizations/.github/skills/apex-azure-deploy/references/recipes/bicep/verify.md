@@ -14,9 +14,11 @@ az resource list --resource-group <rg-name> --output table
 ## Get Deployment Outputs
 
 ```bash
+# Project one accepted non-secret output by name; never dump all outputs, which can include sensitive values.
 az deployment sub show \
   --name main \
-  --query properties.outputs
+  --query "properties.outputs.<accepted-output-name>.value" \
+  --output tsv
 ```
 
 ## Health Check

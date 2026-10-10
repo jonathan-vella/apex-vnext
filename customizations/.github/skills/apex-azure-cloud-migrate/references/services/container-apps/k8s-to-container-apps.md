@@ -82,7 +82,8 @@ See [assessment-guide.md](assessment-guide.md) for detailed checklist.
 - Map the Container Apps environment, ingress, scaling rules and health probes
 - Set up Key Vault references for secrets
 
-Hand the mapping to **apex-azure-prepare** for IaC and approved deployment; see
+Return the mapping to the kernel-selected preparation/CodeGen task (`apex-azure-prepare`) for IaC. Deployment is a
+separate kernel-selected lifecycle task with its own preview and approval; see
 [Workflow Routing](../../../SKILL.md#workflow-routing).
 
 ### Phase 5: Verify and Test

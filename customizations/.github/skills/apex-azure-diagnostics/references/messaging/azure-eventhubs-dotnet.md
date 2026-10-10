@@ -48,7 +48,7 @@ Configure via `EventHubsRetryOptions` when creating the client. See [Configuring
 - **High CPU**: Limit to 1.5–3 partitions per CPU core and test at scale thoroughly if above that threshold.
 - **Azure Functions**: After upgrading to v5.0+ extensions, update binding types. Reduce logging noise by filtering
   `Azure.Messaging.EventHubs` to Warning.
-- **WebSockets**: Use `EventHubsTransportType.AmqpWebSockets` to connect over port 443 when AMQP ports (5761, 5762) are
+- **WebSockets**: Use `EventHubsTransportType.AmqpWebSockets` to connect over port 443 when AMQP ports (5671, 5672) are
   blocked.
 
 ## Checkpointing (BlobCheckpointStore)

@@ -20,20 +20,10 @@ systematic flow:
 6. System pods health
 7. Activity log
 
-Run the **[`aks-baseline`](../script-examples/aks-baseline.sh.md)** script instead of issuing these commands one by one.
-It performs the entire read-only sweep above and prints a single labeled digest (provisioning state, node pool summary,
-recent activity log, node readiness, unhealthy pods, kube-system health, and recent warning events), so you get one
-summarized result instead of seven raw dumps.
-
-```bash
-# bash
-./scripts/aks-baseline.sh -g <rg> -n <cluster> [--namespace <ns>]
-```
-
-```powershell
-# PowerShell
-.\scripts\aks-baseline.ps1 -ResourceGroup <rg> -Cluster <cluster> [-Namespace <ns>]
-```
+Run the individual read commands above within the accepted task scope. The
+[`aks-baseline`](../script-examples/aks-baseline.sh.md) source example shows how upstream prints a single labeled digest
+(provisioning state, node pool summary, recent activity log, node readiness, unhealthy pods, kube-system health and
+recent warning events); it is non-executable and not installed.
 
 After reviewing the digest, deep-dive into a specific pod with `kubectl describe` / `kubectl logs`.
 

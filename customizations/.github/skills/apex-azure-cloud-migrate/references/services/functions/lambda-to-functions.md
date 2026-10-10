@@ -199,6 +199,10 @@ resource eventSubscription 'Microsoft.EventGrid/systemTopics/eventSubscriptions@
 
 **RBAC requirement**: Assign **EventGrid EventSubscription Contributor** role to the UAMI.
 
+**Secret handling**: `listKeys()` returns a function system key that is embedded in the webhook URL. Treat it as a
+secret: never emit it as a template output, log it or put it in reports, review it as its own deployment decision, and
+prefer a keyless alternative if the platform supports one for the accepted design.
+
 ## User Assigned Managed Identity (UAMI) Auth Patterns
 
 ### DefaultAzureCredential with UAMI

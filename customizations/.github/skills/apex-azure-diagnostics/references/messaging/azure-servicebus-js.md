@@ -31,10 +31,10 @@ Guide](https://github.com/Azure/azure-sdk-for-js/blob/main/sdk/servicebus/servic
 export AZURE_LOG_LEVEL=verbose
 
 # Or granular control
-export DEBUG=azure*,rhea*
+export DEBUG="azure*,rhea*"
 
 # Errors only
-export DEBUG=azure:service-bus:error,azure:core-amqp:error,rhea-promise:error,rhea:events,rhea:frames,rhea:io,rhea:flow
+export DEBUG="azure:service-bus:error,azure:core-amqp:error,rhea-promise:error,rhea:events,rhea:frames,rhea:io,rhea:flow"
 ```
 
 Log to file:
@@ -42,6 +42,9 @@ Log to file:
 ```bash
 node app.js > out.log 2>debug.log
 ```
+
+`rhea:frames` and `rhea:io` log raw AMQP frames that can contain message payloads and credentials, and `verbose` logs
+can too. Enable them only with explicit task authorization, and keep only redacted excerpts as evidence.
 
 ## Key Issues
 

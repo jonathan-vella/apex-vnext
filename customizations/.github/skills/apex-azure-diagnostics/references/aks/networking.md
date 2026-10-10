@@ -40,8 +40,9 @@ Pods that are running but not Ready are removed from Endpoints. Check `kubectl g
 
 **Deep diagnostics with Inspektor Gadget** (when the above checks are inconclusive):
 
-Use [`scripts/run-ig.sh`](references/inspektor-gadget.md) (or `run-ig.ps1`) with `--pod <pod-name> --ns <ns>` and these
-gadgets:
+Use the Inspektor Gadget catalog ([references/inspektor-gadget.md](references/inspektor-gadget.md); a gadget run is a
+privileged remote operation that needs an available authorized capability) for pod `<pod-name>` in namespace `<ns>`,
+with and these gadgets:
 
 - `snapshot_socket` — check what ports the pod is listening on
 - `trace_tcp` — trace connect/accept/close events
@@ -93,9 +94,10 @@ Custom VNet DNS must forward `.cluster.local` to the CoreDNS ClusterIP and other
 
 **Deep diagnostics with Inspektor Gadget** (when the above checks are inconclusive):
 
-Use [`scripts/run-ig.sh`](references/inspektor-gadget.md) (or `run-ig.ps1`) with `--pod <pod-name> --ns <ns>` and
-`trace_dns`. Key signals: `rcode=3` (NXDOMAIN), `rcode=2` (SERVFAIL), high `latency` values, queries going to unexpected
-destinations.
+Use the Inspektor Gadget catalog ([references/inspektor-gadget.md](references/inspektor-gadget.md); a gadget run is a
+privileged remote operation that needs an available authorized capability) for pod `<pod-name>` in namespace `<ns>`,
+with and `trace_dns`. Key signals: `rcode=3` (NXDOMAIN), `rcode=2` (SERVFAIL), high `latency` values, queries going to
+unexpected destinations.
 
 See [references/inspektor-gadget.md](references/inspektor-gadget.md).
 

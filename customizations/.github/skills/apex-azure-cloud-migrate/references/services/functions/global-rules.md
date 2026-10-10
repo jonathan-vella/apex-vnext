@@ -77,7 +77,7 @@ Request missing user-owned choices through the kernel input contract before:
   trigger)
 - **Event Grid subscriptions via Bicep/ARM only**: Do NOT create Event Grid event subscriptions via CLI — webhook
   validation fails on Flex Consumption with "response code Unknown". Deploy as Bicep resources using `listKeys()` to
-  resolve the `blobs_extension` system key at deployment time
+  resolve the `blobs_extension` system key at deployment time (a secret: keep it out of outputs, logs and reports)
 - **azd init on non-empty directories**: `azd init --template` refuses non-empty directories. Authorized preparation may
   stage reviewed files in an approved empty project-local directory; preserve source and existing IaC
 

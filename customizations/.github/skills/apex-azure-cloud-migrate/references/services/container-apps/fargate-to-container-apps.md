@@ -45,7 +45,9 @@ Guidance for migrating AWS Fargate (ECS) containerized workloads to Azure Contai
 2. **Migrate Images** — Pull from ECR, push to ACR
 3. **Map Services** — Convert AWS dependencies to Azure equivalents
 4. **Convert Config** — Transform task definitions to Container Apps CLI flags
-5. **Hand off** — IaC and deployment go through **apex-azure-prepare** with approval; see [Workflow Routing](../../../SKILL.md#workflow-routing)
+5. **Hand off** — Return IaC needs to authorized preparation/CodeGen (`apex-azure-prepare`); deployment is a separate
+   kernel-selected lifecycle task with its own preview and approval; see
+   [Workflow Routing](../../../SKILL.md#workflow-routing)
 6. **Validate** — Health checks, scaling, monitoring
 
 ## Service Dependency Mappings

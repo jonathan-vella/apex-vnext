@@ -8,8 +8,9 @@
 # Terraform Verification
 
 ```bash
-terraform output
-terraform output -json
+# Read only accepted non-secret outputs by name; never dump all outputs (`terraform output -json` prints
+# sensitive values in plaintext).
+terraform output -raw <accepted-non-secret-output-name>
 ```
 
 ## Health Check

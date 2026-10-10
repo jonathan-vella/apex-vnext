@@ -9,19 +9,23 @@
 
 ## Evidence Bundle Script
 
-For **any** pod symptom below, run the **pod-evidence** script to collect the same
-read-only evidence bundle. Per pod it digests **STATUS**, **STATE** (exit code, reason,
-last state), **EVENTS**, current/previous **LOGS**, and **RESOURCES** (requests vs
-`top`). It only gathers; interpret with the tables.
-
-Bash [`../../scripts/pod-evidence.sh`](../script-examples/pod-evidence.sh.md) · PowerShell [`../../scripts/pod-evidence.ps1`](../script-examples/pod-evidence.ps1.md)
+For **any** pod symptom below, collect the same read-only evidence bundle with individual scoped reads. Per pod it
+digests **STATUS**, **STATE** (exit code, reason, last state), **EVENTS**, current/previous **LOGS**, and **RESOURCES**
+(requests vs `top`). It only gathers; interpret with the tables. The
+[`pod-evidence`](../script-examples/pod-evidence.sh.md) source example
+([PowerShell](../script-examples/pod-evidence.ps1.md)) shows the upstream bundle; it is non-executable and not installed.
 
 ```bash
-../../scripts/pod-evidence.sh <pod-name> -n <namespace>   # one pod
-../../scripts/pod-evidence.sh --all-failing               # all unhealthy pods
+kubectl get pod <pod-name> -n <namespace> -o wide
+kubectl describe pod <pod-name> -n <namespace>
+kubectl logs <pod-name> -n <namespace> --tail=200
+kubectl logs <pod-name> -n <namespace> --previous --tail=200
+kubectl top pod <pod-name> -n <namespace>
+kubectl get pods -A --field-selector=status.phase!=Running   # all non-running pods
 ```
 
-PowerShell: `../../scripts/pod-evidence.ps1 <pod-name> -Namespace <namespace>` (`-AllFailing` scans all).
+Logs can contain request payloads, tokens or personal data: bound them with `--tail` and keep only redacted excerpts as
+evidence.
 
 ---
 
@@ -46,12 +50,13 @@ LOGS** (last crashed container).
 vs live usage. Fix: increase `resources.limits.memory` or optimize application memory usage.
 
 **OOM kill tracing with Inspektor Gadget:** Run `trace_oomkill` for the pod to see which process was killed and memory
-at kill time: `scripts/run-ig.sh --gadget trace_oomkill --pod <pod-name> --ns <namespace>` (or `run-ig.ps1`).
+at kill time: use the `trace_oomkill` gadget through an available authorized capability (see [Inspektor Gadget](references/inspektor-gadget.md)).
 
 **Deep diagnostics with Inspektor Gadget** (when logs and describe are inconclusive):
 
-Use [`scripts/run-ig.sh`](references/inspektor-gadget.md) (or `run-ig.ps1`) with `--pod <pod-name> --ns <namespace>` and
-these gadgets:
+Use the Inspektor Gadget catalog ([references/inspektor-gadget.md](references/inspektor-gadget.md); a gadget run is a
+privileged remote operation that needs an available authorized capability) for pod `<pod-name>` in namespace
+`<namespace>`, with and these gadgets:
 
 - `trace_exec` — see what the container executes at startup
 - `trace_open` — find missing configs/secrets (retval -2 = ENOENT, -13 = EACCES)

@@ -28,10 +28,10 @@ Guide](https://github.com/Azure/azure-sdk-for-js/blob/main/sdk/eventhub/event-hu
 export AZURE_LOG_LEVEL=verbose
 
 # Or use DEBUG for granular control
-export DEBUG=azure*,rhea*
+export DEBUG="azure*,rhea*"
 
 # Errors only
-export DEBUG=azure:*:(error|warning),rhea-promise:error,rhea:events,rhea:frames,rhea:io,rhea:flow
+export DEBUG="azure:*:(error|warning),rhea-promise:error,rhea:events,rhea:frames,rhea:io,rhea:flow"
 ```
 
 Browser:
@@ -39,6 +39,9 @@ Browser:
 ```javascript
 localStorage.debug = "azure:*:info";
 ```
+
+`rhea:frames` and `rhea:io` log raw AMQP frames that can contain message payloads and credentials, and `verbose` logs
+can too. Enable them only with explicit task authorization, and keep only redacted excerpts as evidence.
 
 ## Key Issues
 

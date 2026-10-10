@@ -192,21 +192,13 @@ az webapp config ssl show --certificate-name CERT -g RG
 
 ---
 
-## Combined Diagnostic Script
+## Combined Diagnostic Script (Source Example)
 
-Use the [`appservice-diagnostics`](../script-examples/appservice-diagnostics.sh.md) script
-([PowerShell](../script-examples/appservice-diagnostics.ps1.md)) to collect everything in one call.
-It prints clearly labeled sections — app config, recent deployments, app settings, and
-custom domains — and a summary line describing what it collected. Interpreting the output
-remains your job.
-
-```powershell
-..\..\scripts\appservice-diagnostics.ps1 -Name <app> -ResourceGroup <rg>
-```
-
-```bash
-../../scripts/appservice-diagnostics.sh --name <app> --resource-group <rg>
-```
+The [`appservice-diagnostics`](../script-examples/appservice-diagnostics.sh.md) source example
+([PowerShell](../script-examples/appservice-diagnostics.ps1.md)) shows how upstream collects app config, recent
+deployments, app settings and custom domains in one call. It is a non-executable example and is not installed: use
+the individual read commands in this guide within the accepted task scope, redact app setting values, and submit the
+observations through the task's evidence contract. Interpreting the output remains your job.
 
 ## Port Source
 

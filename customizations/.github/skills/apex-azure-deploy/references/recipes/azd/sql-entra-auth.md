@@ -52,7 +52,8 @@ mutation needs the full trusted deployment ceremony. Deployment readiness alone 
 The helper preserves SQL failure exit status (`-b`) and never disables certificate checks.
 
 ```bash
-bash ./scripts/run-sql.sh verify.sql
+# Run verify.sql only through an available, authorized SQL capability bound to the approved target and reviewed file.
+# No SQL executor is shipped; the source example is non-executable, so report a verification gap if none exists.
 ```
 
 For connectivity checks, the reviewed `verify.sql` contains `SELECT 1;`. Never log tokens or full environments.

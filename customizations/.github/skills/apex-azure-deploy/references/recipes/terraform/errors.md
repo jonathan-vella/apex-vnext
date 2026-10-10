@@ -9,23 +9,20 @@
 
 | Error            | Resolution                                 |
 | ---------------- | ------------------------------------------ |
-| State lock error | Wait or `terraform force-unlock <lock-id>` |
-| Resource exists  | `terraform import <resource>`              |
+| State lock error | Wait; confirm the lock is stale and no operation is running before any `force-unlock` |
+| Resource exists  | `terraform import <resource>` is a state change needing its own approved operation |
 | Backend denied   | Check storage permissions                  |
-| Provider error   | `terraform init -upgrade`                  |
+| Provider error   | Diagnose the error first; provider upgrades need a separate validated change |
 
 ## Cleanup (DESTRUCTIVE)
 
-```bash
-# Changes remote state — context only; fresh preview + current Gate 4 + trusted execution required.
-terraform destroy -auto-approve
-```
-
-Selective:
+Destroy runs only from a kernel-created destroy preview (a saved destroy plan) with its own approval. Never use
+`-auto-approve`, and a targeted destroy needs its own separately validated saved plan:
 
 ```bash
 # Changes remote state — context only; fresh preview + current Gate 4 + trusted execution required.
-terraform destroy -target=azurerm_container_app.api
+terraform plan -destroy -out=<approved-plan-file>
+terraform apply <approved-plan-file>
 ```
 
 ⚠️ Permanently deletes resources.
