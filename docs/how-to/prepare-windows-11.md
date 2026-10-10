@@ -10,7 +10,8 @@ Use one host per workspace.
 Docker, a devcontainer and a clone of the APEX development repository are not consumer prerequisites. Install tools for
 the selected host and requested stage; cloud credentials are not needed merely to inspect local project state. Both
 workload profiles follow the [PRD boundary](../vnext/PRD.md#workload-boundary). Check the
-[release status](manage-installation.md) before you install: the APEX plugin has no published release yet.
+[release status](manage-installation.md) before you install: the published preview and a same-version source candidate
+can contain different bytes. Use the [qualification kit](qualify-live-clients.md) for human-run exact-candidate tests.
 
 ## Prepare Native Windows For VS Code Or The App
 

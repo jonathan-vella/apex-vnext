@@ -8,11 +8,13 @@ passed.
 Under [DECISION-033][decision-033] the supported clients are the VS Code Copilot harness and the GitHub Copilot app on
 native Windows, and GitHub Copilot CLI on Linux and WSL2. The `apex` plugin package and the thin `apex init` projection
 are implemented: `.github/copilot/settings.json` enables the plugin, which carries the agents, skills and MCP servers.
-No plugin release is published yet, and live qualification of the three clients is pending under the [client
+Plugin/CLI preview `0.11.0-next.2` is published, and live qualification of the three clients is pending under the [client
 pivot](../vnext/ROADMAP.md#client-pivot). VS Code Local is retired. Both ALZ-backed workloads and standalone labs/demos,
 independent COE import, conversational changes and complete design/operational output are release goals. They are not
 marked implemented by this support matrix. See the [checkpoint](../vnext/PROJECT.md) and
 [target client scenarios](../vnext/CLIENT-QUALIFICATION.md).
+The [human-run qualification kit](../how-to/qualify-live-clients.md) distinguishes the published release from source
+after #431, retains actual sandbox/host observations, and marks the undelivered CP-26 azd/CI scenarios blocked.
 
 ## Support Matrix
 
