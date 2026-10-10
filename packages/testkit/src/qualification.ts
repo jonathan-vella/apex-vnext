@@ -252,7 +252,7 @@ async function runTrack(
       await context.service.use(sameScope.projectId, context.runId as never);
       const changedScope = await context.service.promote("prod", "local/prod");
       const changedScopeStates = changedScope.gates.map(({ state }) => state);
-      if (changedScopeStates.join(",") !== "open,closed,closed,closed")
+      if (changedScopeStates.join(",") !== "closed,closed,closed,closed")
         throw new Error(`Unexpected changed-scope promoted gates: ${changedScopeStates.join(",")}`);
       await context.service.use(changedScope.projectId, context.runId as never);
     },

@@ -142,6 +142,7 @@ import {
   EvidencePolicy,
   EvidenceStore,
   EventJournal,
+  JournalIdentityError,
   ImprovementStore,
   ObjectStore,
   ProjectStore,
@@ -7747,10 +7748,13 @@ export class ApexService {
     });
     const updated = { ...promoted, gates: inherited };
     await atomicWriteJson(this.runPath(updated), updated);
+    // Gate 1 binds the target. A changed target therefore redoes requirements-review in the new run, so the Gate 1
+    // dependency hash is computed there (it includes the new target) instead of being copied from the parent run.
     const neutralNodes = new Set([
       "requirements",
-      "requirements-review",
-      ...(sameScope ? ["governance-discovery", "architecture", "architecture-review", "plan", "plan-review"] : []),
+      ...(sameScope
+        ? ["requirements-review", "governance-discovery", "architecture", "architecture-review", "plan", "plan-review"]
+        : []),
     ]);
     const inheritedReviewHashes = new Set<string>();
     for (const event of sourceEvents) {
@@ -7795,7 +7799,7 @@ export class ApexService {
       sourceDependencyRevision: this.dependencyRevision(source, sourceEvents),
       targetScopeChanged: !sameScope,
       invalidated: [
-        ...(!sameScope ? ["governance", "gate-1", "gate-2", "gate-3"] : []),
+        ...(!sameScope ? ["requirements-review", "governance", "gate-1", "gate-2", "gate-3"] : []),
         "codegen",
         "validation",
         "preview",
@@ -7805,8 +7809,6 @@ export class ApexService {
       ],
     });
     const reopen: Array<readonly [number, string]> = [];
-    // A changed target needs its own human confirmation, so Gate 1 opens for the new run.
-    if (!sameScope) reopen.push([1, "requirements-review"]);
     // Readiness is never inherited: the new run re-evaluates it from the inherited reviews and current validators.
     if (sameScope) {
       for (const [gateNumber, reviewNode] of [
@@ -8845,7 +8847,10 @@ export class ApexService {
   }
 
   private journal(run: RunConfigV1): EventJournal {
-    return new EventJournal(join(this.projects.runDirectory(run.projectId, run.runId), "journal"));
+    return new EventJournal(join(this.projects.runDirectory(run.projectId, run.runId), "journal"), {
+      projectId: run.projectId,
+      runId: run.runId,
+    });
   }
 
   private runPath(run: RunConfigV1): string {
@@ -8872,7 +8877,20 @@ export class ApexService {
     const run = readOnly
       ? parseRunConfig(await readFile(join(directory, "run.json"), "utf8"))
       : await this.runRepository(selection).read();
-    const events = await this.journal(run).replay();
+    let events: EventV1[];
+    try {
+      events = await this.journal(run).replay();
+    } catch (error) {
+      if (error instanceof JournalIdentityError)
+        throw new ApexError(
+          "APEX_CONFLICT",
+          "The run journal belongs to a different project or run; restore the run state from its own backup",
+          EXIT_CODES.conflict,
+          undefined,
+          { cause: error },
+        );
+      throw error;
+    }
     this.assertRequirementsIntakeAdmitted(events, run.ownerEpoch);
     const retired = events.some((event) => {
       if (event.type !== "task.completed") return false;
@@ -9737,8 +9755,11 @@ export class ApexService {
   }
 
   /**
-   * Human approval, inheritance, or (lab Gates 2 and 3 only) a kernel readiness checkpoint. A ready gate counts only
-   * while the journal holds the matching kernel record, so a hand-edited run file cannot manufacture readiness.
+   * Human approval, inheritance, or (lab Gates 2 and 3 only) a kernel readiness checkpoint.
+   *
+   * An approved gate is trusted from the run file, which sits inside the local state directory this process owns, so
+   * raw tampering with that directory is outside the threat model. Readiness is held to a stronger standard because
+   * no human vouches for it: it must be proven by the journal (see {@link readinessProven}).
    */
   private gateSatisfied(
     run: RunConfigV1,
@@ -9748,11 +9769,40 @@ export class ApexService {
     const gate = run.gates.find((candidate) => candidate.gate === gateNumber);
     if (gate?.state === "approved" || gate?.state === "inherited") return true;
     if (gate?.state !== "ready" || !isReadinessGate(run.purpose, gateNumber)) return false;
-    return events.some((event) => {
-      if (event.type !== "gate.readiness-recorded") return false;
-      const payload = event.payload as { gate?: unknown; dependencyHash?: unknown };
-      return payload.gate === gateNumber && payload.dependencyHash === gate.dependencyHash;
+    return this.readinessProven(run, gate, events);
+  }
+
+  /**
+   * A `ready` gate counts only when the latest journal event touching that gate is the kernel's own readiness record
+   * for this run, the record's committed post-state contains exactly this gate record, and the gate is still bound to
+   * the current review dependency. A later invalidation, open, reopen or decision therefore revokes it, and a copied
+   * older record or a foreign journal cannot restore it.
+   */
+  private readinessProven(
+    run: RunConfigV1,
+    gate: RunConfigV1["gates"][number],
+    events: Awaited<ReturnType<EventJournal["replay"]>>,
+  ): boolean {
+    const reviewNode = { 2: "architecture-review", 3: "plan-review" }[gate.gate];
+    if (reviewNode === undefined) return false;
+    const latest = events.findLast((event) => {
+      const payload = event.payload as { gate?: unknown; nodeIds?: unknown };
+      return event.type === "workflow.invalidated"
+        ? Array.isArray(payload.nodeIds) && payload.nodeIds.includes(`gate-${gate.gate}`)
+        : event.type.startsWith("gate.") && payload.gate === gate.gate;
     });
+    if (latest?.type !== "gate.readiness-recorded") return false;
+    if (latest.projectId !== run.projectId || latest.runId !== run.runId) return false;
+    const payload = latest.payload as { dependencyHash?: unknown; transaction?: { after?: { gates?: unknown } } };
+    if (payload.dependencyHash !== gate.dependencyHash) return false;
+    const committed = Array.isArray(payload.transaction?.after?.gates)
+      ? (payload.transaction.after.gates as RunConfigV1["gates"]).find((candidate) => candidate.gate === gate.gate)
+      : undefined;
+    if (committed === undefined || sha256Json(committed) !== sha256Json(gate)) return false;
+    return (
+      this.latestPayloadHash(events, "task.completed", "dependencyHash", (item) => item.nodeId === reviewNode) ===
+      gate.dependencyHash
+    );
   }
 
   private reviewBlockers(events: Awaited<ReturnType<EventJournal["replay"]>>, nodeId: string): string[] {

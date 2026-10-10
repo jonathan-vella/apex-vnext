@@ -48,11 +48,31 @@ async function readEventFile(path: string): Promise<string> {
   }
 }
 
+export class JournalIdentityError extends Error {
+  constructor(sequence: number) {
+    super(`Journal event ${sequence} belongs to a different project or run than the one that loaded it`);
+    this.name = "JournalIdentityError";
+  }
+}
+
+export interface JournalIdentity {
+  projectId: ProjectId;
+  runId: RunId;
+}
+
 export class EventJournal {
   readonly directory: string;
 
-  constructor(directory: string) {
+  /** With an identity, `replay` rejects any event written for another project or run. */
+  constructor(
+    directory: string,
+    private readonly identity?: JournalIdentity,
+  ) {
     this.directory = resolve(directory);
+  }
+
+  bound(identity: JournalIdentity): EventJournal {
+    return new EventJournal(this.directory, identity);
   }
 
   async head(): Promise<string | null> {
@@ -144,6 +164,12 @@ export class EventJournal {
       identity ??= event;
       if (event.projectId !== identity.projectId || event.runId !== identity.runId) {
         throw new Error(`Corrupt journal identity at sequence ${event.sequence}`);
+      }
+      if (
+        this.identity !== undefined &&
+        (event.projectId !== this.identity.projectId || event.runId !== this.identity.runId)
+      ) {
+        throw new JournalIdentityError(event.sequence);
       }
       events.push(event);
       previousHash = hash;

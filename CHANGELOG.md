@@ -21,7 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and Gate 4 the final human preview approval, which now shows the purpose, target, architecture, cost estimate and
   accepted risks. `gateDecide` on lab Gate 2 or 3 is refused, `ready` cannot satisfy Gate 1, Gate 4, deploy or destroy,
   changed requirements invalidate it, and promotion recomputes it instead of inheriting it. Because Gate 1 binds the
-  target, promotion to a different target no longer inherits Gate 1 and reopens it for a fresh human confirmation.
+  target, promotion to a different target no longer inherits Gate 1 or the requirements review; the new run redoes the
+  review, so the Gate 1 dependency hash is computed for the new target, and needs a fresh human confirmation. A ready
+  gate counts only while the journal proves it, and a journal written for another run is rejected.
   `apex render status` lists the purpose and readiness time. CLI/MCP prompts, managed guidance and qualification
   scenarios still describe three human gate decisions until part 3.
 

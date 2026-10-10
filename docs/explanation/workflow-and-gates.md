@@ -45,12 +45,26 @@ A missing review, an unresolved blocking finding (including a risk nobody has ac
 the gate unrecorded, and `nextTask` reports it like any other unmet gate. Deciding Gate 2 or 3 on a lab run is
 refused because no human decision exists.
 
+A `ready` gate counts only while the journal proves it: the latest journal event touching that gate must be the kernel's
+readiness record for this run, its committed post-state must contain exactly this gate record, and the gate must still
+match the current review dependency. Any later invalidation, open, reopen or decision revokes it, and every run rejects
+a journal written for another project or run. Approved and inherited gates are trusted from the run file without this
+journal check, and the journal hash chain is unkeyed, so APEX does not defend against someone who can rewrite the local
+state directory. The stricter readiness check exists because no human vouches for it; it catches stale restores and
+mixed-up state, not a deliberate local attacker.
+
 Changed requirements, and therefore changed intent, invalidate Gate 1 and the downstream readiness checkpoints, which
 are recomputed after the new confirmation. Promotion inherits the Gate 1 confirmation only for the same target, because
-Gate 1 binds it; a changed target reopens Gate 1 in the new run for a fresh human confirmation. Promotion never inherits
-readiness; the promoted run records its own. A new human confirmation is needed only for changed requirements, purpose
-or target, each new risk acceptance, and each apply and destroy, which keep their own current preview and Gate 4
-approval.
+Gate 1 binds it; a changed target redoes the requirements review in the new run, so its Gate 1 dependency hash is
+computed there, and needs a fresh human confirmation. Promotion never inherits readiness; the promoted run records its
+own. A new human confirmation is needed only for changed requirements, purpose or target, each new risk acceptance, and
+each apply and destroy, which keep their own current preview and Gate 4 approval.
+
+The Gate 4 approval context (purpose, target, architecture, cost estimate and accepted risks) is written to
+`operations/deployment-preview.md` as a bounded summary of accepted artifacts. Its tamper check is a best-effort local
+comparison with a generated-review base file, the same mechanism `approval.md` uses, and its content is not recorded in
+`preview.created` or the approval evidence. The exact preview binding remains the authority for what is authorized.
+Binding the context hash is tracked in [#466](https://github.com/jonathan-vella/apex-vnext/issues/466).
 
 Still planned: the CLI and MCP prompts and `nextTask` wording, managed agent and skill guidance, and the client
 qualification scenarios still describe three human gate decisions and are updated separately (CP-27 PR 3).

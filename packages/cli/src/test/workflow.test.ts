@@ -1667,7 +1667,7 @@ test("a project promotes independently through multiple environments", async () 
   assert.equal(testRun.projectId, "demo");
   assert.equal(testRun.environment, "test");
   assert.equal(testRun.parentRunId, initialized.runId);
-  assert.equal(testRun.gates[0]?.state, "open");
+  assert.equal(testRun.gates[0]?.state, "closed");
   assert.equal(testRun.gates[1]?.state, "closed");
 
   await service.use("demo", initialized.runId);

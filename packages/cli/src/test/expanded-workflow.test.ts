@@ -3207,9 +3207,21 @@ test("promotion inherits neutral progression and restarts at the first environme
   assert.equal(changedScope.purpose, "lab");
   assert.deepEqual(
     changedScope.gates.map(({ state }) => state),
-    ["open", "closed", "closed", "closed"],
+    ["closed", "closed", "closed", "closed"],
   );
-  // Gate 1 binds the target, so the changed target needs its own human confirmation.
+  // Gate 1 binds the target, so the changed target redoes the requirements review in the new run and needs its own
+  // human confirmation bound to the new target.
+  const parentGate1 = (await new RunRepository(join(root, ".apex", "projects", "demo", "runs", runId)).read())
+    .gates[0]!;
+  const requirementsHash = service["acceptedArtifactHashes"](
+    await service["journal"](changedScope).replay(),
+  ).requirements!;
+  await complete(service, "requirements-review", [
+    { kind: "review-findings", value: review(changedScope.runId, "requirements", requirementsHash) },
+  ]);
+  const childGate1 = (await service.status()).run.gates[0]!;
+  assert.equal(childGate1.state, "open");
+  assert.notEqual(childGate1.dependencyHash, parentGate1.dependencyHash);
   await assert.rejects(service.nextTask(), /Gate 1 approval is required/);
   await service.decideGateNumber(1, "approved", "tester");
   const next = await service.nextTask();

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile, writeFile } from "node:fs/promises";
+import { cp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 import type { RunConfigV1 } from "@apexops/contracts";
@@ -421,12 +421,30 @@ test("promotion never inherits readiness; the new run records its own", async ()
   const changedScope = await service.promote("prod", "local/prod");
   assert.deepEqual(
     changedScope.gates.map(({ state }) => state),
-    ["open", "closed", "closed", "closed"],
+    ["closed", "closed", "closed", "closed"],
   );
+  // Gate 1 binds the target, so the new run redoes the requirements review and computes its own Gate 1 hash.
+  assert.equal((await sourceRunGate1(root, runId)).state, "approved");
+  const requirementsHash = service["acceptedArtifactHashes"](
+    await service["journal"](changedScope).replay(),
+  ).requirements!;
+  await completeOutputs(service, await task(service, "requirements-review"), [
+    { kind: "review-findings", value: review(changedScope.runId, "requirements", requirementsHash) },
+  ]);
+  const childGate1 = (await gates(service))[0]!;
+  assert.equal(childGate1.state, "open");
+  assert.notEqual(childGate1.dependencyHash, (await sourceRunGate1(root, runId)).dependencyHash);
   await assert.rejects(service.nextTask(), /Gate 1 approval is required/u);
   await service.decideGateNumber(1, "approved", "tester");
   assert.equal((await service.nextTask()).status, "task");
 });
+
+async function sourceRunGate1(root: string, runId: string) {
+  const run = JSON.parse(
+    await readFile(join(root, ".apex", "projects", "demo", "runs", runId, "run.json"), "utf8"),
+  ) as RunConfigV1;
+  return run.gates[0]!;
+}
 
 test("a run file that records readiness outside lab Gates 2 and 3 is rejected", async () => {
   const root = await tempRoot();
@@ -533,5 +551,105 @@ test("gate validators never accept a missing approval where a human decision is 
       run: { ...run, purpose: "production" },
     }).valid,
     false,
+  );
+});
+
+async function readyFixture() {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  const { runId } = await service.init({ projectId: "demo", riskOwner: "partner" });
+  await prepareValidatedRun(service, runId, "bicep", { stopBeforeCodegen: true });
+  const run = await service["currentRun"]();
+  const satisfied = async (candidate: RunConfigV1, gate = 2) =>
+    service["gateSatisfied"](candidate, gate, await events(root, runId));
+  return { root, service, runId, run, satisfied };
+}
+
+test("a genuine readiness record satisfies its gate and nothing else does", async () => {
+  const { run, satisfied } = await readyFixture();
+  assert.equal(await satisfied(run, 2), true);
+  assert.equal(await satisfied(run, 3), true);
+  const swapped = structuredClone(run);
+  swapped.gates[1] = { ...run.gates[2]!, gate: 2 } as RunConfigV1["gates"][number];
+  assert.equal(await satisfied(swapped, 2), false);
+  const retimed = structuredClone(run);
+  (retimed.gates[1] as { readyAt: string }).readyAt = "2030-01-01T00:00:00.000Z";
+  assert.equal(await satisfied(retimed, 2), false);
+});
+
+test("an old readiness record cannot be restored after the gate was invalidated", async () => {
+  const { root, service, runId, run, satisfied } = await readyFixture();
+  const oldGate2 = structuredClone(run.gates[1]!);
+
+  const candidate = { ...requirements(), budgetAndOperations: "Monthly limit is EUR 500" };
+  const proposal = await service.previewRequirementsChange(candidate, "Change budget");
+  await service.reviseRequirements(candidate, {
+    reason: "Change budget",
+    expectedHash: proposal.proposalHash,
+    confirm: true,
+  });
+  const invalidated = await service["currentRun"]();
+  assert.equal(invalidated.gates[1]!.state, "invalidated");
+  const restored = { ...invalidated, gates: invalidated.gates.map((gate) => (gate.gate === 2 ? oldGate2 : gate)) };
+  // The latest event touching Gate 2 is the invalidation, so the old record proves nothing.
+  assert.equal(await satisfied(restored as RunConfigV1, 2), false);
+
+  // Redo the workflow: Gate 2 is ready again with a new hash, but the old record is still not valid.
+  await prepareValidatedRun(service, runId, "bicep", {
+    requirements: candidate,
+    acceptAvailability: false,
+    stopBeforeCodegen: true,
+  });
+  const current = await service["currentRun"]();
+  assert.equal(await satisfied(current, 2), true);
+  assert.notEqual(current.gates[1]!.dependencyHash, oldGate2.dependencyHash);
+  const replayed = { ...current, gates: current.gates.map((gate) => (gate.gate === 2 ? oldGate2 : gate)) };
+  assert.equal(await satisfied(replayed as RunConfigV1, 2), false);
+  const runPath = join(root, ".apex", "projects", "demo", "runs", runId, "run.json");
+  await writeFile(runPath, `${JSON.stringify(replayed)}\n`);
+  await assert.rejects(new ApexService(root).preview({ operation: "apply", provider: "fake" }));
+});
+
+test("readiness is revoked by any later event that touches the gate", async () => {
+  for (const event of [
+    { type: "workflow.invalidated", payload: { nodeIds: ["gate-2"], artifactKinds: [], reason: "later" } },
+    { type: "gate.opened", payload: { gate: 2, dependencyHash: "a".repeat(64) } },
+    { type: "gate.reopened", payload: { gate: 2, dependencyHash: "a".repeat(64) } },
+    { type: "gate.decided", payload: { gate: 2, approvalHash: "a".repeat(64) } },
+  ]) {
+    const { service, run, satisfied } = await readyFixture();
+    assert.equal(await satisfied(run, 2), true);
+    await service["append"](run, event.type, event.payload as never);
+    assert.equal(await satisfied(run, 2), false, event.type);
+    assert.equal(await satisfied(run, 3), true, `${event.type} leaves Gate 3`);
+  }
+});
+
+test("readiness requires the gate to match the current review dependency", async () => {
+  const { service, run, satisfied } = await readyFixture();
+  // A newer architecture review without an invalidation leaves the recorded hash stale.
+  await service["append"](run, "task.completed", {
+    nodeId: "architecture-review",
+    dependencyHash: "c".repeat(64),
+    artifactHashes: {},
+  });
+  assert.equal(await satisfied(run, 2), false);
+  assert.equal(await satisfied(run, 3), true);
+});
+
+test("a journal written for another run is rejected for every gate type", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  const { runId } = await service.init({ projectId: "demo", riskOwner: "partner" });
+  await prepareValidatedRun(service, runId, "bicep", { stopBeforeCodegen: true });
+  const child = await service.promote("stage", "local");
+  const parentJournal = join(root, ".apex", "projects", "demo", "runs", runId, "journal");
+  const childJournal = join(root, ".apex", "projects", "demo", "runs", child.runId, "journal");
+  await rm(childJournal, { recursive: true, force: true });
+  await cp(parentJournal, childJournal, { recursive: true });
+  await assert.rejects(
+    new ApexService(root).status(),
+    (error: unknown) =>
+      error instanceof ApexError && error.code === "APEX_CONFLICT" && /different project or run/u.test(error.message),
   );
 });

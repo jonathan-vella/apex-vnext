@@ -46,8 +46,9 @@ apex project promote \
 
 The promoted run remains in the same project and is selected automatically. It inherits only applicable upstream
 evidence; it always needs its own code generation, validation, preview, and Gate 4 approval. A different target also
-reopens Gate 1 for a fresh confirmation, and a lab run records its own Gate 2 and 3 readiness. Repeat for production
-with its production target. Return to a prior environment with `apex project use --project payments --run RUN_ID`.
+redoes the requirements review and needs a fresh Gate 1 confirmation, and a lab run records its own Gate 2 and 3
+readiness. Repeat for production with its production target. Return to a prior environment with
+`apex project use --project payments --run RUN_ID`.
 
 Use the `APEX` agent in Copilot CLI (`copilot --agent apex`) as the normal interactive entry point; the VS Code
 Copilot harness runs the same projection. Ask it what is next: the `apex-next` skill maps the kernel owner role to a
