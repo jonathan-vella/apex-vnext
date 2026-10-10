@@ -19,7 +19,7 @@ Paths are repository-relative.
 | Current models and client toolchain                            | `config/toolchain.v1.json`                                             |
 | Artifact schemas                                               | `packages/contracts/src/`, generated `packages/contracts/schemas/`     |
 | Artifact rendering and template bindings                       | `packages/renderers/`, `customizations/.github/skills/apex-artifacts/` |
-| Guidance consumers and migration dispositions                  | `tools/registry/guidance-migration.v1.json`                            |
+| Current guidance delivery and deferred obligations             | `tools/registry/guidance-delivery.v1.json`                             |
 | Entity counts                                                  | `tools/registry/count-manifest.json`                                   |
 | Documentation navigation and inventory                         | `docs/README.md`, `docs/vnext/documentation-inventory.v1.json`         |
 | CLI and MCP public operations                                  | `docs/reference/cli.md`, `docs/reference/mcp.md`                       |

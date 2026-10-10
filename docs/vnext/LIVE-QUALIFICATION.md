@@ -23,6 +23,15 @@ If the executable qualification path still requires superseded evidence, align a
 
 ## Prepare Each Track
 
+Use an explicit current governance context with `subscription_id` and reviewed `security_exceptions`.
+The local launcher requires `--governance-file <absolute-file>` for `preview`, `dispatch` and `retrieve`.
+`recover` retains its no-endpoint-opening interface. Do not substitute historical checkout or archived evidence.
+Before any endpoint mutation the launcher also requires the file's `subscription_id` to equal the active Azure account.
+The hosted apply job requires protected nonsecret `APEX_QUALIFICATION_GOVERNANCE_JSON` and writes a regular
+mode-0600 context file under `RUNNER_TEMP`. It validates the file before endpoint opening and rechecks expiry.
+Setting that environment variable is a separately authorized maintainer prerequisite, not an action of cleanup.
+Neither the variable nor the file grants approval; local human Gate 4 and recipient/preview binding remain required.
+
 Run Bicep and Terraform as separate environment runs. For each track:
 
 Cover both profiles with separately authorized scenarios. In ALZ-backed cases, reference supplied networking, identity

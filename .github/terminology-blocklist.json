@@ -105,7 +105,6 @@
     "tmp/",
     ".git/",
     "agent-output/_baselines/",
-    "tools/tests/exec-plans/completed/",
     ".github/terminology-blocklist.json"
   ],
   "excludeLinePatterns": [

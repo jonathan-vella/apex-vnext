@@ -32,7 +32,7 @@ test("rejects every retired marker under renamed active files", () => {
 test("collector covers current schemas, config, package sources and read failures", () => {
   const inputs = collectTerraformMcpRetirementInputs();
   for (const path of [
-    "tools/schemas/iac-contract.schema.json",
+    "packages/contracts/schemas/iac-binding-v1.schema.json",
     "config/workflow.v1.json",
     "packages/capabilities/src/terraform-registry-client.ts",
   ]) {

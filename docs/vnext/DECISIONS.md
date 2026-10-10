@@ -173,7 +173,8 @@ Amended by DECISION-031, DECISION-032 and DECISION-033. Maintainer direction on 
 Managed agents, skills and MCP configuration use only the Copilot CLI agent format. Supported clients are standalone
 Copilot CLI and the VS Code Copilot harness, which runs CLI-format agents in the VS Code Agent Host. The VS Code Local
 projection, its renderer path, `.vscode/mcp.json` and the combined installation mode retire through DECISION-015 gates:
-consumer migration, replacement proof, archive provenance under `.archive/vscode-projection/`, rollback and a negative
+consumer migration, replacement proof, archive provenance under [archive catalog](../../.archive/CATALOG.json)
+(entry `.archive/vscode-projection/ROLLBACK.md`), rollback and a negative
 reintroduction check. `apex init` and `apex update` reject the retired client with a stable error code and migration
 guidance. The archive is never a runtime dependency. `github-copilot-cli` is the only installable projection;
 `github-copilot-vscode` remains the evidence identity for VS Code running CLI agents, so paired-client comparison
@@ -199,7 +200,8 @@ and Validator through `apex-next`. Under the maintainer's standing rule to take 
 slice 6 ships only Explore: the other review helpers inherit the caller's APEX completion and disposition tools, and
 agent frontmatter cannot limit Validator's shell, so Validator gets none. For slice 7, checkbox answers that map
 exactly to kernel options need no extra question; numbered or free-text answers still require explicit confirmation.
-Slice 8 archived VS Code Local under `.archive/vscode-projection/`. Only its MCP config launched the Azure MCP shim,
+Slice 8 archived VS Code Local under [archive catalog](../../.archive/CATALOG.json)
+(entry `.archive/vscode-projection/ROLLBACK.md`). Only its MCP config launched the Azure MCP shim,
 and no managed agent used Azure MCP tools, so the shim and its `@azure/mcp` dependency retired with it.
 
 ## DECISION-030: Discover Governance Before Architecture
@@ -341,3 +343,6 @@ local device with azd. Both keep the kernel's deployment authority, `REQ-APPROVA
 Today's tracks: Bicep previews with `az deployment group|sub what-if` and deploys with `az deployment group|sub create`;
 Terraform previews with `terraform plan -out` and applies that saved plan. CP-26 owns delivery; CLIENT-039 and
 CLIENT-040 qualify it.
+
+Historical archive entries are indexed in the [catalog](../../.archive/CATALOG.json);
+the [restore guide](../../.archive/RESTORE.md) grants no runtime, release or deployment authority.

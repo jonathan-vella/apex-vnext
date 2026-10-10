@@ -9,8 +9,8 @@
  * Scope: this validator is the IDE-mapping channel. It only checks schemas
  * registered in `.vscode/settings.json` `json.schemas`. Other schemas under
  * `tools/schemas/` are loaded directly by dedicated validators
- * (e.g. `validate-workflow-graph.mjs`, `validate-session-state.mjs`, `validate-explorer-graph.mjs`,
- * `validate-governance-refs.mjs`). Both channels are intentional: this one
+ * (e.g. `validate-workflow-graph.mjs`, `validate-guidance-delivery.mjs`,
+ * `validate-diagram-semantics.mjs`). Both channels are intentional: this one
  * keeps the editor's red squigglies aligned with CI; the dedicated
  * validators add semantic checks beyond raw schema conformance.
  */
@@ -52,7 +52,7 @@ for (const entry of mappings) {
   const validate = ajv.compile(schema);
   for (const match of entry.fileMatch) {
     // Expand globs in fileMatch so a single mapping can cover an entire
-    // family (e.g. agent-output/*/09-lessons-learned.json). If a glob
+    // family of current collector fixtures. If a glob
     // matches nothing it is silently skipped — that just means the
     // file family is empty in this checkout.
     const isGlob = /[*?[\]]/.test(match);

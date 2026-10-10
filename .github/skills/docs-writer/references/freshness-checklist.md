@@ -48,8 +48,8 @@ no longer exist.
 
 ### 3. Skill Count and Table
 
-**Source of truth**: List `.github/skills/*/` directories
-(exclude `README.md` file).
+**Source of truth**: `customizations/manifest.json` and `customizations/.github/skills/*/SKILL.md`
+for managed delivery; `.github/skills/*/SKILL.md` separately for repository-maintenance entry points.
 
 **Expected count**: computed dynamically from `tools/registry/count-manifest.json`
 (run `validate:no-hardcoded-counts` to verify)
@@ -85,8 +85,6 @@ appropriate category table. Remove entries for deleted skills.
 - `diagram.agent.md`
 - `adr.agent.md`
 - `docs.agent.md`
-- `site/src/content/docs/`
-- `site/public/`
 
 **Files to check**: All `docs/**/*.md`, `README.md`, and `CONTRIBUTING.md`.
 
@@ -115,15 +113,12 @@ appropriate category table. Remove entries for deleted skills.
 
 ### 8. Template Inventory Sync
 
-**Source of truth**: List `.github/skills/azure-artifacts/templates/*.template.md` files.
+**Source of truth**: `packages/renderers/src/document-registry.ts`, registered templates under
+`customizations/.github/skills/apex-artifacts/templates/`, and `customizations/manifest.json`.
 
-**Expected count** (as of 2026-02-09): computed dynamically from `tools/registry/count-manifest.json`
-(run `validate:no-hardcoded-counts` to verify)
-
-**Files to check**: Only relevant if documentation references
-template counts.
-
-**Auto-fix**: Update count reference.
+Check source/template availability, manifest ownership and template bindings.
+Run `npm run validate:artifacts`; preserve explicit reference-only and unavailable outputs.
+Do not invent templates or qualify deferred capabilities to make an inventory pass.
 
 ### 9. Support And Project Controls
 

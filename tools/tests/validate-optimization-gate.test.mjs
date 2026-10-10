@@ -8,8 +8,34 @@ const schema = JSON.parse(readFileSync("tools/registry/schemas/optimization-gate
 const scripts = JSON.parse(readFileSync("package.json", "utf8")).scripts;
 const trackedPaths = ["package.json", ".github/workflows/ci.yml", "packages/kernel/package.json", "docs/vnext/PRD.md"];
 
-test("authorized optimization gate has an exhaustive non-overlapping owned scope", () => {
+test("inactive optimization gate has an exhaustive non-overlapping owned scope", () => {
   assert.deepEqual(validateOptimizationGate({ manifest, schema, scripts, trackedPaths }), []);
+});
+
+function authorizedFixture() {
+  const fixture = structuredClone(manifest);
+  fixture.state = "authorized";
+  fixture.candidate = { status: "bound", commit: "a".repeat(40), tree: "b".repeat(40) };
+  fixture.authorization = {
+    status: "approved",
+    approver: "synthetic test actor",
+    expiresAt: "2026-10-10T00:00:00Z",
+    allowedPaths: ["**"],
+    allowedCommands: ["npm run validate:all"],
+    stopConditions: ["Synthetic fixture only; never execute a campaign."],
+    budget: { maxTrackedMutations: 0, maxMinutes: 1 },
+  };
+  return fixture;
+}
+
+test("synthetic authorized fixture preserves structural acceptance without granting a real campaign", () => {
+  assert.deepEqual(validateOptimizationGate({ manifest: authorizedFixture(), schema, scripts, trackedPaths }), []);
+  assert.equal(manifest.state, "draft");
+  assert.deepEqual(manifest.candidate, { status: "pending" });
+  assert.deepEqual(manifest.authorization, {
+    status: "pending",
+    pendingReason: "Historical authorization archived; no campaign authorized.",
+  });
 });
 
 test("structural validation does not require an authorized audit or captured baselines", () => {
@@ -22,7 +48,7 @@ test("structural validation does not require an authorized audit or captured bas
 });
 
 test("claiming audit completion still requires captured baselines", () => {
-  const incomplete = structuredClone(manifest);
+  const incomplete = authorizedFixture();
   incomplete.state = "complete";
   incomplete.findings = [];
   for (const baseline of incomplete.baselines) baseline.status = "pending";
@@ -68,8 +94,8 @@ test("inventory assigns canonical owner and consumers independently from authori
     owner: "Repository maintainers",
     consumers: ["contributors", "release controls"],
   });
-  assert.equal(manifest.authorization.status, "approved");
-  assert.equal(manifest.authorization.budget.maxTrackedMutations, 0);
+  assert.equal(manifest.authorization.status, "pending");
+  assert.deepEqual(buildOptimizationGateInventory({ manifest: authorizedFixture(), trackedPaths }), inventory);
 });
 
 test("resolved findings do not require deferred-only expiry metadata", () => {
@@ -79,7 +105,7 @@ test("resolved findings do not require deferred-only expiry metadata", () => {
 });
 
 test("complete gates reject deferred release-blocking findings", () => {
-  const complete = structuredClone(manifest);
+  const complete = authorizedFixture();
   complete.state = "complete";
   for (const baseline of complete.baselines) baseline.status = "captured";
   complete.findings = [

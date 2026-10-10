@@ -42,7 +42,6 @@ recursively invoke docs-writer from unslop or run either skill on unrelated file
 All markdown documentation **except** `agent-output/**/*.md`:
 
 - `docs/` — vNext tutorials, how-to guides, explanations, references, migration, and project controls
-- `tools/tests/exec-plans/tech-debt-tracker.md` — tech debt inventory
 - `README.md` — repo root README
 - `CONTRIBUTING.md` — contribution guidelines
 - `CHANGELOG.md` — release history
@@ -52,18 +51,22 @@ All markdown documentation **except** `agent-output/**/*.md`:
 
 | Path                                        | Governed By                                    |
 | ------------------------------------------- | ---------------------------------------------- |
-| `agent-output/**/*.md`                      | `azure-artifacts.instructions.md` + validators |
+| `agent-output/**/*.md`                      | Kernel acceptance, typed contracts and renderers |
 | `customizations/.github/agents/*.agent.md`  | `agent-authoring.instructions.md`              |
-| `.github/skills/azure-artifacts/templates/` | Read-only reference (do not modify)            |
+| `customizations/.github/skills/apex-artifacts/templates/` | Registered source templates; validation and renderer tests |
 | `**/*.bicep`                                | `iac-bicep-best-practices.instructions.md`     |
 
 ## Rules
 
-- **Out of scope, always** — `agent-output/**/*.md` (governed by `azure-artifacts.instructions.md`), `customizations/.github/agents/*.agent.md` (governed by `agent-authoring.instructions.md`), `**/*.bicep` (governed by `iac-bicep-best-practices.instructions.md`), `azure-artifacts/templates/` (read-only)
+- **Accepted outputs are not editable prose** — `agent-output/**/*.md` belongs to kernel acceptance, typed contracts
+  and registered renderers. Managed artifact guidance is `customizations/.github/skills/apex-artifacts/SKILL.md`.
+- **Keep source ownership** — agent definitions and IaC follow their authoring instructions; registered templates
+  follow `packages/renderers/src/document-registry.ts`, `validate:artifacts` and renderer tests.
 - **Single H1 rule** — the title is the only H1; everything else is H2 or deeper
 - **120-char line limit** — CI enforces this on docs and instruction files
 - **Version source of truth** is `VERSION.md`; never hard-code version numbers in prose
-- **No hard-coded counts** — use descriptive language for entity counts (per `no-hardcoded-counts.instructions.md`); `count-manifest.json` is the source of truth
+- **No hard-coded counts** — use descriptive language for entity counts (per `no-hardcoded-counts.instructions.md`);
+  `count-manifest.json` is the source of truth
 - **Verify links** — all relative links must resolve to existing files; run `npm run lint:links` before committing
 - **Run focused checks** — lint changed Markdown and check its links; validate project controls only when changed.
   Use `npm run validate:docs` for broad documentation changes. Do not run runtime/package qualification for prose-only
@@ -89,7 +92,7 @@ one-line summary so the agent knows which one to load.
 ## Guardrails
 
 - **Never modify** files in `agent-output/`, `customizations/.github/agents/`,
-  or `.github/skills/azure-artifacts/templates/`
+  or `customizations/.github/skills/apex-artifacts/templates/` during ordinary documentation maintenance
 - **Always read** the latest file version before editing
 - **Always verify** line length ≤ 120 characters after edits
 - **Preserve** existing Mermaid diagram theme directives
@@ -118,4 +121,3 @@ one-line summary so the agent knows which one to load.
 | `references/freshness-checklist.md`    | When running freshness audits                        |
 | `references/repo-architecture.md`      | When analyzing repo structure                        |
 | `references/extended-workflows.md`     | Changelog generation, proofreading, freshness fix    |
-| `references/workload-documentation.md` | Workload guide structure and lifecycle documentation |

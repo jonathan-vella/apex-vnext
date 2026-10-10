@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /** Validate non-secret Azure inputs for the vNext qualification sandbox. */
 
-import { readFileSync } from "node:fs";
+import { lstatSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { securityExceptionIssues } from "./_lib/security-exceptions.mjs";
@@ -150,32 +150,56 @@ export function qualificationContextIssues(environment, governance, now = new Da
   return issues;
 }
 
-export function validateQualificationContext(
-  environment = process.env,
-  governanceFile = "agent-output/vnext-qualification/04-governance-constraints.json",
-  now = new Date(),
-) {
-  const governance = JSON.parse(readFileSync(resolve(governanceFile), "utf8"));
+function readGovernance(governanceFile) {
+  if (typeof governanceFile !== "string" || governanceFile.trim().length === 0) {
+    throw new Error("Explicit qualification governance file is required");
+  }
+  const filename = resolve(governanceFile);
+  const info = lstatSync(filename);
+  if (!info.isFile() || info.isSymbolicLink()) throw new Error("Qualification governance must be a regular file");
+  const governance = JSON.parse(readFileSync(filename, "utf8"));
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      governance?.subscription_id ?? "",
+    )
+  ) {
+    throw new Error("Qualification governance subscription_id is missing or invalid");
+  }
+  return governance;
+}
+
+export function validateQualificationContext(environment, governanceFile, now = new Date()) {
+  const governance = readGovernance(governanceFile);
   return qualificationContextIssues(environment, governance, now);
 }
 
-export function validateQualificationSecurityException(
-  governanceFile = "agent-output/vnext-qualification/04-governance-constraints.json",
-  now = new Date(),
-) {
-  const governance = JSON.parse(readFileSync(resolve(governanceFile), "utf8"));
+export function validateQualificationSecurityException(governanceFile, now = new Date()) {
+  const governance = readGovernance(governanceFile);
   return qualificationSecurityExceptionIssues(governance, now);
 }
 
+export function qualificationGovernanceSubscription(governanceFile) {
+  return readGovernance(governanceFile).subscription_id;
+}
+
 function main() {
-  const exceptionOnly = process.argv[2] === "--security-exception-only";
-  const governanceFile = exceptionOnly ? process.argv[3] : process.argv[2];
-  const issues = exceptionOnly
-    ? validateQualificationSecurityException(governanceFile)
-    : validateQualificationContext(process.env, governanceFile);
-  if (issues.length === 0) return;
-  for (const issue of issues) console.error(`Qualification context invalid: ${issue}`);
-  process.exitCode = 1;
+  const args = process.argv.slice(2);
+  const exceptionOnly = args[0] === "--security-exception-only";
+  if (args.length !== (exceptionOnly ? 2 : 1) || args.at(-1)?.startsWith("--")) {
+    console.error("Qualification context requires <file> or --security-exception-only <file>");
+    process.exitCode = 1;
+    return;
+  }
+  try {
+    const issues = exceptionOnly
+      ? validateQualificationSecurityException(args[1])
+      : validateQualificationContext(process.env, args[0]);
+    for (const issue of issues) console.error(`Qualification context invalid: ${issue}`);
+    if (issues.length > 0) process.exitCode = 1;
+  } catch (error) {
+    console.error(`Qualification context invalid: ${error.message}`);
+    process.exitCode = 1;
+  }
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();

@@ -13,6 +13,7 @@ const ACTIVE_GLOBS = [
   "tools/tests/**/*.{mjs,js,sh,md,json}",
   "config/**/*.{json,jsonc,md}",
   "packages/*/src/**/*.{ts,js,mjs,json,md}",
+  "packages/contracts/schemas/**/*.json",
   "package.json",
 ];
 const FORBIDDEN_MARKERS = [

@@ -1,8 +1,8 @@
 {
   "schemaVersion": "documentation-inventory-v1",
   "inventoryBinding": {
-    "commit": "da708ef5e0ff63a9ff1bf1a43112c6670e3bfc0a",
-    "capturedAt": "2026-08-01",
+    "commit": "7fbb02e1593a26ee710e6735df1ac21641efcee4",
+    "capturedAt": "2026-10-09",
     "scope": "Current vNext repository documentation"
   },
   "authorities": {
@@ -14,7 +14,9 @@
     "errors": "packages/cli/src/errors.ts",
     "mcp": "packages/cli/src/mcp.ts",
     "projectControls": "docs/vnext/README.md",
-    "qualification": "tools/scripts/validate-vnext.mjs"
+    "qualification": "tools/scripts/validate-vnext.mjs",
+    "guidanceDelivery": "tools/registry/guidance-delivery.v1.json",
+    "archiveCatalog": ".archive/CATALOG.json"
   },
   "records": [
     {
@@ -66,12 +68,13 @@
       "currentPath": "docs/vnext/COPILOT-DESKTOP-PLAN.md",
       "contentClass": "contributor-doc",
       "audiences": ["repository-contributor", "maintainer"],
-      "lifecycle": "deferred",
-      "classification": "keep",
+      "lifecycle": "historical-archived",
+      "classification": "archive",
       "targetFamily": "project-control",
-      "targetPaths": ["docs/vnext/COPILOT-DESKTOP-PLAN.md"],
-      "authorityBindings": ["projectControls"],
-      "owner": "client-experience-maintainers"
+      "targetPaths": [".archive/CATALOG.json", ".archive/RESTORE.md"],
+      "authorityBindings": ["projectControls", "archiveCatalog"],
+      "owner": "client-experience-maintainers",
+      "archiveEntry": "docs/vnext/COPILOT-DESKTOP-PLAN.md"
     },
     {
       "id": "terraform-reference",
@@ -94,6 +97,21 @@
       "targetFamily": "project-control",
       "targetPaths": ["docs/vnext/adrs/**"],
       "authorityBindings": ["projectControls"]
+    },
+    {
+      "id": "current-guidance-delivery",
+      "currentPath": "tools/registry/guidance-delivery.v1.json",
+      "contentClass": "contributor-doc",
+      "audiences": ["repository-contributor", "maintainer"],
+      "lifecycle": "active",
+      "classification": "keep",
+      "targetFamily": "reference",
+      "targetPaths": [
+        "docs/vnext/SKILL-CATALOG-REVIEW.generated.md",
+        "docs/vnext/INSTRUCTION-CATALOG-REVIEW.generated.md"
+      ],
+      "authorityBindings": ["guidanceDelivery"],
+      "owner": "managed-customization-maintainers"
     }
   ]
 }

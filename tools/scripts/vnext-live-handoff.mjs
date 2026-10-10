@@ -10,7 +10,11 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { WriterTransferStore } from "../../packages/kernel/dist/index.js";
 import { VNEXT_QUALIFICATION_REPOSITORY } from "./_lib/vnext-qualification.mjs";
-import { EXPECTED_TAGS, validateQualificationSecurityException } from "./validate-vnext-qualification-context.mjs";
+import {
+  EXPECTED_TAGS,
+  qualificationGovernanceSubscription,
+  validateQualificationSecurityException,
+} from "./validate-vnext-qualification-context.mjs";
 
 const execFile = promisify(execFileCallback);
 const BRANCH = "main";
@@ -25,7 +29,6 @@ const OPERATIONS = new Set(["apply", "destroy"]);
 const STAGES = new Set(["apply", "preview-failure"]);
 const SCRIPT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const SOURCE_CLI = join(SCRIPT_ROOT, "packages/cli/dist/cli.js");
-const GOVERNANCE_FILE = join(SCRIPT_ROOT, "agent-output/vnext-qualification/04-governance-constraints.json");
 
 export function canonicalRecipient(repository, runId, attempt, job) {
   if (!repository || !/^\d+$/.test(String(runId)) || attempt !== 1 || !["preview", "apply"].includes(job)) {
@@ -138,11 +141,20 @@ export function parseArgs(argv) {
   const common = new Set(["yes", "track", "operation"]);
   const allowed =
     command === "preview"
-      ? new Set([...common, "resource_group", "storage_account", "container", "handoff_id"])
+      ? new Set([...common, "resource_group", "storage_account", "container", "handoff_id", "governance_file"])
       : command === "dispatch"
-        ? new Set([...common, "resource_group", "storage_account", "container", "ref", "handoff_id"])
+        ? new Set([...common, "resource_group", "storage_account", "container", "ref", "handoff_id", "governance_file"])
         : command === "retrieve"
-          ? new Set([...common, "resource_group", "storage_account", "container", "handoff_id", "destination", "stage"])
+          ? new Set([
+              ...common,
+              "resource_group",
+              "storage_account",
+              "container",
+              "handoff_id",
+              "destination",
+              "stage",
+              "governance_file",
+            ])
           : new Set([...common, "handoff_id", "run_id"]);
   for (const key of Object.keys(values)) {
     if (key !== "command" && !allowed.has(key)) throw new Error(`Unknown argument: --${key.replaceAll("_", "-")}`);
@@ -154,6 +166,9 @@ export function parseArgs(argv) {
   if (!TRACKS.has(values.track)) throw new Error("--track must be bicep or terraform");
   if (!OPERATIONS.has(values.operation)) throw new Error("--operation must be apply or destroy");
   if (command !== "recover") {
+    if (typeof values.governance_file !== "string" || !isAbsolute(values.governance_file)) {
+      throw new Error("--governance-file must be an explicit absolute file path");
+    }
     for (const key of ["resource_group", "storage_account"]) {
       if (typeof values[key] !== "string") throw new Error(`Missing --${key.replaceAll("_", "-")}`);
     }
@@ -280,16 +295,23 @@ async function gitState(directory, allowApexState = false) {
 }
 
 export async function withFirewall(args, action, dependencies = {}) {
-  const validateException =
-    dependencies.validateException ?? (() => validateQualificationSecurityException(GOVERNANCE_FILE));
+  if (typeof args.governance_file !== "string" || !isAbsolute(args.governance_file)) {
+    throw new Error("--governance-file must be an explicit absolute file path");
+  }
+  const validateException = dependencies.validateException ?? validateQualificationSecurityException;
   const runCommand = dependencies.run ?? run;
   const assertException = () => {
-    const exceptionIssues = validateException();
+    const exceptionIssues = validateException(args.governance_file);
     if (exceptionIssues.length > 0) {
       throw safeError("Qualification firewall exception is invalid", { issues: exceptionIssues.join("; ") });
     }
   };
   assertException();
+  const governanceSubscription = dependencies.governanceSubscription ?? qualificationGovernanceSubscription;
+  const activeSubscription = (await runCommand("az", ["account", "show", "--query", "id", "--output", "tsv"])).trim();
+  if (activeSubscription.toLowerCase() !== governanceSubscription(args.governance_file).toLowerCase()) {
+    throw safeError("Qualification governance subscription does not match the active Azure account");
+  }
   const atRestState = JSON.parse(
     await runCommand("az", [
       "storage",
@@ -527,7 +549,7 @@ async function localProviderConfig(args, temporary, account) {
     APEX_LOG_ANALYTICS_WORKSPACE_RESOURCE_ID: workspace,
     APEX_QUALIFICATION_TAGS_JSON: JSON.stringify(EXPECTED_TAGS),
   };
-  await run("node", ["tools/scripts/validate-vnext-qualification-context.mjs"], {
+  await run("node", ["tools/scripts/validate-vnext-qualification-context.mjs", args.governance_file], {
     cwd: SCRIPT_ROOT,
     env: environment,
   });

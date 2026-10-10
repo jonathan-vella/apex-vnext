@@ -141,15 +141,7 @@ const DEPRECATED_PATTERNS = [
 ];
 
 // Folders to scan
-const _SCAN_FOLDERS = [
-  "docs",
-  ".github/agents",
-  ".github/skills",
-  ".github/instructions",
-  ".github/skills/azure-artifacts/templates",
-  "agent-output",
-  "scenarios",
-];
+const _SCAN_FOLDERS = ["docs", ".github/agents", ".github/skills", ".github/instructions", "agent-output", "scenarios"];
 
 // Files to scan at root
 const SCAN_ROOT_FILES = ["README.md", "CONTRIBUTING.md", "CHANGELOG.md"];
@@ -230,9 +222,7 @@ async function main() {
   }
 
   // Scan additional directories not covered by workspace-index — in parallel.
-  await Promise.all(
-    ["docs", ".github/skills/azure-artifacts/templates"].map((folder) => scanDirectoryAsync(path.join(ROOT, folder))),
-  );
+  await Promise.all(["docs"].map((folder) => scanDirectoryAsync(path.join(ROOT, folder))));
 
   // Scan root files in parallel.
   const rootPaths = SCAN_ROOT_FILES.map((f) => path.join(ROOT, f)).filter((p) => fs.existsSync(p));

@@ -7,7 +7,22 @@ import {
   validateOptimizationAudit,
 } from "../scripts/capture-optimization-audit.mjs";
 
-const manifest = JSON.parse(readFileSync("tools/registry/optimization-gate.v1.json", "utf8"));
+const checkedIn = JSON.parse(readFileSync("tools/registry/optimization-gate.v1.json", "utf8"));
+// The checked-in gate is inactive; this synthetic authorized fixture never grants a real campaign.
+const manifest = {
+  ...checkedIn,
+  state: "authorized",
+  candidate: { status: "bound", commit: "a".repeat(40), tree: "b".repeat(40) },
+  authorization: {
+    status: "approved",
+    approver: "synthetic test actor",
+    expiresAt: "2026-10-10T00:00:00Z",
+    allowedPaths: ["**"],
+    allowedCommands: ["npm run capture:optimization-audit", "npm run validate:all"],
+    stopConditions: ["Synthetic fixture only; never execute a campaign."],
+    budget: { maxTrackedMutations: 0, maxMinutes: 1 },
+  },
+};
 const schema = JSON.parse(readFileSync("tools/registry/schemas/optimization-audit-receipt.schema.json", "utf8"));
 const candidatePaths = [".github/workflows/ci.yml", "package.json"];
 

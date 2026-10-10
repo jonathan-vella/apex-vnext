@@ -329,8 +329,8 @@
       }
     },
     {
-      "id": "test-guidance-migration",
-      "script": "test:guidance-migration",
+      "id": "test-guidance-delivery",
+      "script": "test:guidance-delivery",
       "profile": "node-test",
       "aliases": [],
       "retirement": {
@@ -509,16 +509,6 @@
       }
     },
     {
-      "id": "validate-challenger-findings",
-      "script": "validate:challenger-findings",
-      "profile": "node-validation",
-      "aliases": [],
-      "retirement": {
-        "status": "active",
-        "replacementIds": []
-      }
-    },
-    {
       "id": "validate-challenger-presence",
       "script": "validate:challenger-presence",
       "profile": "node-validation",
@@ -541,16 +531,6 @@
     {
       "id": "validate-extension-bloat",
       "script": "validate:extension-bloat",
-      "profile": "node-validation",
-      "aliases": [],
-      "retirement": {
-        "status": "active",
-        "replacementIds": []
-      }
-    },
-    {
-      "id": "validate-headings-summary",
-      "script": "validate:headings-summary",
       "profile": "node-validation",
       "aliases": [],
       "retirement": {
@@ -649,16 +629,6 @@
       }
     },
     {
-      "id": "validate-policy-precheck",
-      "script": "validate:policy-precheck",
-      "profile": "node-validation",
-      "aliases": [],
-      "retirement": {
-        "status": "active",
-        "replacementIds": []
-      }
-    },
-    {
       "id": "validate-region-canonical",
       "script": "validate:region-canonical",
       "profile": "node-validation",
@@ -729,8 +699,8 @@
       }
     },
     {
-      "id": "validate-guidance-migration",
-      "script": "validate:guidance-migration",
+      "id": "validate-guidance-delivery",
+      "script": "validate:guidance-delivery",
       "profile": "node-validation",
       "aliases": [],
       "retirement": {
@@ -897,6 +867,16 @@
         "status": "active",
         "replacementIds": []
       }
+    },
+    {
+      "id": "test-avm-source-pins",
+      "script": "test:avm-source-pins",
+      "profile": "node-test",
+      "aliases": [],
+      "retirement": {
+        "status": "active",
+        "replacementIds": []
+      }
     }
   ],
   "aggregates": [
@@ -909,7 +889,7 @@
         "validate:agents",
         "validate:skills",
         "test:skills",
-        "validate:guidance-migration",
+        "validate:guidance-delivery",
         "validate:instruction-catalog-review",
         "validate:optimization-gate",
         "validate:vscode-installation-lifecycle",
@@ -923,12 +903,10 @@
         "test:terraform-mcp-retirement",
         "validate:extension-bloat",
         "validate:docs-reference",
-        "validate:headings-summary",
         "validate:instruction-checks",
         "validate:workflow-graph",
         "validate:vnext-project-controls",
         "validate:vnext-live-workflow",
-        "validate:challenger-findings",
         "validate:challenger-presence",
         "validate:skill-checks",
         "lint:json",
@@ -945,7 +923,7 @@
         "validate:github-workflows",
         "test:github-workflows",
         "test:registry-validator-reporter",
-        "test:guidance-migration",
+        "test:guidance-delivery",
         "test:optimization-gate",
         "test:optimization-baseline",
         "test:optimization-audit",
@@ -962,8 +940,8 @@
         "validate:diagram-semantics",
         "test:diagram-semantics",
         "test:retired-automation",
-        "validate:policy-precheck",
-        "lint:safe-shell"
+        "lint:safe-shell",
+        "test:avm-source-pins"
       ],
       "continueOnError": false,
       "epilogue": null

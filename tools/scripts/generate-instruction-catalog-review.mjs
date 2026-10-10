@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Generate or validate the retired-source to managed-consumer instruction catalog. */
+/** Generate or validate the current managed workspace instruction catalog. */
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -8,43 +8,39 @@ import { format } from "prettier";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const check = process.argv.includes("--check");
-const ledgerPath = join(root, "tools", "registry", "guidance-migration.v1.json");
+const ledgerPath = join(root, "tools", "registry", "guidance-delivery.v1.json");
 const outputPath = join(root, "docs", "vnext", "INSTRUCTION-CATALOG-REVIEW.generated.md");
 
-function renderTarget(targets) {
-  return targets.length === 0 ? "not-declared" : targets.map((target) => `apex-* / ${target}`).join("; ");
-}
-
 const ledger = JSON.parse(readFileSync(ledgerPath, "utf8"));
-const entries = [...(ledger.instructionDispositions ?? [])].sort((left, right) =>
-  left.source.localeCompare(right.source),
+const entries = [...ledger.instructions].sort((left, right) =>
+  left.path < right.path ? -1 : left.path > right.path ? 1 : 0,
 );
 const rows = entries.map(
-  ({ source, disposition, targets, reason }) => `| ${source} | ${disposition} | ${renderTarget(targets)} | ${reason} |`,
+  ({ path, owner, manifestOwner }) => `| ${path} | ${owner} | ${manifestOwner} | current-source |`,
 );
 const content = await format(
   [
     "# Instruction Catalog Review",
     "",
-    "> [Current Version](../../VERSION.md) | Generated retired-source to managed-consumer instruction mapping.",
+    "> [Current Version](../../VERSION.md) | Generated current managed workspace instruction ownership.",
     "",
     "This file is generated from",
-    "[`guidance-migration.v1.json`](../../tools/registry/guidance-migration.v1.json). Do not edit it manually.",
+    "[`guidance-delivery.v1.json`](../../tools/registry/guidance-delivery.v1.json). Do not edit it manually.",
     "",
     "## Evidence Boundary",
     "",
-    "The catalog proves only the declared instruction disposition and managed target inventory.",
+    "The catalog proves only current managed source inventory and workspace ownership.",
     "It does not prove live client discovery or workflow behavior.",
     "",
-    "## Source Dispositions",
+    "## Current Workspace Instructions",
     "",
-    "| Retired source instruction | Disposition | Managed consumer target | Rationale |",
+    "| Instruction | Owner | Manifest ownership | Availability |",
     "| --- | --- | --- | --- |",
     ...rows,
     "",
     "## Related",
     "",
-    "- [Instruction migration ledger](../../tools/registry/guidance-migration.v1.json)",
+    "- [Current guidance delivery](../../tools/registry/guidance-delivery.v1.json)",
     "- [Skill catalog review](SKILL-CATALOG-REVIEW.generated.md)",
     "- [Client qualification](CLIENT-QUALIFICATION.md)",
     "",

@@ -115,222 +115,30 @@ Copilot CLI on Linux and WSL2, unless noted.
 
 ## CLI-Only Projection Probes
 
-Slice 1 of the [CLI-only projection plan](ROADMAP.md#cli-only-projection) ran local probes on 2026-09-23 at source
-checkpoint `dc289ab`. Standalone runs used Copilot CLI `1.0.88` (`linux-arm64`) with an isolated `COPILOT_HOME`,
-disposable Git fixtures under `dist/cli-probes`, explicit tool grants, synthetic agents and a fake `apex` MCP server
-that logs every call. The VS Code run used VS Code `1.139.0` (`2242ebbb`) over WSL with the built-in Copilot Chat
-extension `0.67.0`, the Copilot harness, Agent Host protocol `0.9.0` and `@github/copilot-sdk`
-`1.0.15-unstable.35393089353.gfc44743`. These results characterize the clients; they are not APEX projection or
-scenario evidence.
-
-- **Model fields.** `.agent.md` frontmatter honors `model` (a string or an ordered list), `model-policy` and
-  `reasoning-effort`. The documented `models`, `modelPolicy` and `reasoningEffort` spellings were ignored; that child
-  ran on the session model at medium effort.
-- **Worker settings.** `model: [gpt-6-luna, gpt-5.6-luna]` with `model-policy: required` and `reasoning-effort: max`
-  ran through `task` on `gpt-6-luna` at max. A per-call `task` model was replaced by the required model with a notice.
-  Direct `--agent` selection also sent max. A user `subagents` override could not change a required model but did
-  lower its effort to low; under `preferred` it changed both. Ordered lists fall back only under `required`: otherwise
-  an unavailable first entry failed `task` dispatch, and direct selection fell back to the session default model.
-  Effort `max` on `gpt-5.4-mini` failed dispatch.
-- **Tool lists.** `task` subagents received no tools beyond those declared. A directly selected agent with `tools: []`
-  also received `skill` and `sql`.
-- **Workspace MCP.** A trusted folder loaded `.mcp.json` in interactive and `-p` sessions without
-  `GITHUB_COPILOT_PROMPT_MODE_WORKSPACE_MCP`. An untrusted folder loaded it in `-p` only with that variable set to
-  `true`. `${VAR}` expanded in `env`. Relative `args` resolve against the session directory, so the server failed when
-  a session started in a subdirectory.
-- **`ask_user`.** Interactive sessions use the structured form. An `array` field with `items.enum` rendered checkboxes
-  (Space toggles, Enter accepts, Ctrl+D declines, Esc cancels) plus an "Other" free-text entry, but the model received
-  flattened text (`User responded: red, blue`), not an array. `task` subagents never receive `ask_user`, even when
-  declared; the runtime sent the child an empty tool list.
-- **`/agent` context.** `/agent <name>` switched agent and model and kept the conversation; the new agent recalled a
-  code word from an earlier turn.
-- **Sidekick.** Project and user agents with a `sidekick:` block loaded only as ordinary selectable agents. They never
-  launched in `-p`, `-p --experimental` or interactive sessions. Selected directly, `send_inbox` returned "this session
-  is not a sidekick agent".
-- **Built-in helpers.** Helpers get only tools the calling agent holds; with a `task`-only caller, Explore had no file
-  reader. With read tools and shell on the caller, glob search skipped the gitignored `.apex/work/` staging path, but
-  explicit-path reads worked. Code-review and Security-review reviewed the staged file without a diff and cited correct
-  lines. Rubber-duck on `claude-haiku-4.5` cited wrong lines, and built-in Task ran `bicep build` under
-  `shell(bicep:*)`. Helpers inherit `task`; in the `task`-only run they spawned general-purpose agents until the depth
-  limit of 4, while the runtime blocked review-to-review delegation.
-- **VS Code Copilot harness: failed.** The `harness-probe` test failed. The Agent Host listed the workspace agents and
-  flagged the `user-invocable: false` worker, but picking `harness-probe` did not apply it. Each turn named it by a
-  `vscode-remote://wsl%2Bubuntu/` URI, the host indexed `file://` URIs, and the runtime deselected it before every
-  turn, so the default agent answered. `/agent` is not a harness command either; the default agent ran `harness-probe`
-  through `task` instead. There its model list and efforts applied (`gpt-5.6-luna` high, worker `gpt-6-luna` max), but
-  `ask_user` was unavailable: the colors question never appeared, so harness multi-select is untested. `.mcp.json`
-  tools appeared from the second turn, the sidekick showed no activity, and the worker's empty tool list arrived as
-  `null` with `task` guidance.
-
-Standalone sessions `60de3415`, `973b27ef`, `531d4b2a`, `b7cd037a` and `e37cc4bc` cover model settings. `dc91aa77`,
-`e717ed91`, `3a1f34a5`, `a11b5bbf`, `366fe888` and `42e4f63e` cover workspace MCP; `bd350038`, `f14677a5`, `bfff54a8`
-and `976871e9` cover the sidekick. `b3808832` covers `ask_user` and `/agent`, `dc3278a2` covers subagent input, and
-`a2a3b50d` and `9502efed` cover helpers. The harness runtime session is `a3253c03-533b-4779-9544-7818e113abb6`. The
-results and the maintainer's decisions of the same day select these options:
-
-1. Slice 3 uses `model`, `model-policy` and `reasoning-effort`. Every listed model must support the declared effort.
-   User effort overrides remain a CLIENT-025 gap. DECISION-033 later removed these model pins.
-2. Slice 4 renders `.mcp.json` with a server command that does not depend on the session directory.
-3. Slice 5 collects required input in the foreground before delegation; the client's selection step with a prompt
-   remains the fallback. The maintainer deferred the sidekick.
-4. Slice 6 passes explicit staging paths and verifies helper line references. The maintainer granted read-only file
-   tools to Planner, Operator, Architect and Reviewer and `task` to Reviewer. Validator gets a shell limited to `bicep`
-   and `terraform` only if the CLI enforces that limit. Agents with `task` can also reach general-purpose delegation,
-   which their instructions forbid.
-5. Slice 7 uses native checkboxes where offered, mapping their text answer back to exact option values, and numbered
-   selection otherwise. Either way, the kernel validates the values.
-6. The failed harness probe blocks slice 11. The VS Code Copilot harness cannot qualify on WSL until picked agents
-   apply, through an upstream fix or a verified workaround.
+Historical probe receipts are preserved in the [archive catalog](../../.archive/CATALOG.json) (entry `docs/vnext/CLIENT-QUALIFICATION.md`).
+These results characterize the clients; they are not APEX projection or scenario evidence and do not qualify
+the current candidate. Follow the current scenario matrices, execution rules and worker acceptance constraints.
+Restoration is historical inspection only; see the [restore guide](../../.archive/RESTORE.md).
 
 ### Slice 5 Probes
 
-On 2026-09-23 two more probes ran with Copilot CLI `1.0.88` in the disposable consumer workspace, using the slice 5
-projection and the real APEX MCP server. They are probe evidence, not CLIENT-021 qualification.
-
-- **`/agent` names.** `/agent apex-requirements` (the agent file name, which autocomplete offers) and
-  `/agent APEX Architect` (the display name) both selected the agent (session `912f2454`).
-- **`apex-next` from the coordinator.** In `-p` with only `apex(status)` and `apex(nextTask)` granted, `APEX` loaded
-  `apex-next` through `skill` and called each operation once. It named `apex-requirements` for the pending intake
-  request, printed both selection steps, said routing was pending and gave a fenced scope prompt with the exact request
-  ID (session `f99a791f`). Worker delegation from the coordinator was not exercised; slice 11 covers it.
+Historical receipts are in the catalog entry above; current candidate qualification remains pending.
 
 ### Slice 6 Probes
 
-On 2026-09-23 slice 6 probes ran with Copilot CLI `1.0.88` in the same workspace. They are probe evidence, not
-qualification.
-
-- **Frontmatter tools.** `view`, `glob` and `rg` were granted; `grep` and `shell(bicep:*)` were ignored, so frontmatter
-  cannot grant a limited shell. Declaring `task` also added `read_agent`, `list_agents` and `write_agent` (session
-  `787aebd7`).
-- **Helper reach.** Under a parent holding `task`, read tools and APEX tools, Explore received only `rg`, `glob` and
-  `view`. Code-review, Security-review and Rubber-duck received the parent's full set, including the APEX tools and
-  `task` (session `8e26f681`). The `task` schema offers no per-call tool limit (session `cd261e6e`).
-- **Explore in the projection.** Under `APEX Operator`, Explore listed only its three read tools and cited line 5 for a
-  heading on line 6 (session `6be424d2`). `APEX Planner` refused an Explore request that named no workspace path
-  (session `0c2c2afa`); for a named path it reported the right line and verified it with `view` (session `c52c4a75`).
+Historical receipts are in the catalog entry above; current candidate qualification remains pending.
 
 ### Slice 7 Probes
 
-On 2026-09-23 two interactive `APEX Requirements` probes ran with Copilot CLI `1.0.88` against the real kernel. They
-are probe evidence, not CLIENT-023 qualification.
-
-- **Checkboxes.** The intake form offered `target-environments` as an array field with the four options in kernel
-  order and the recommendation as its default. The answer came back as text (`dev, test`); the agent recorded
-  `["dev", "test"]` and the kernel accepted it (session `fd948712`). A single-select answer left empty drew one
-  targeted follow-up question instead of a default.
-- **Cancellation.** Cancelling the form recorded nothing, and the agent reported the request as still pending
-  (session `af1f6ca7`).
-
-The numbered fallback did not run because the CLI offered checkboxes. Kernel and service tests cover duplicate, empty
-and unmatched values.
+Historical receipts are in the catalog entry above; current candidate qualification remains pending.
 
 ### Slice 11 Standalone Attempt
 
-On 2026-09-23 the maintainer chose to qualify standalone Copilot CLI first and record the VS Code Copilot harness as
-blocked. Runs used Copilot CLI `1.0.88` (binary SHA-256 `487b36f3…f944550`), Node `v26.9.0`, packed candidates in
-clean Git consumers under an isolated `COPILOT_HOME`, target `local` (fake provider, no Azure deployment) and synthetic
-intake answers. Each fix below needed a new candidate, because a run stays pinned to its runtime generation. This is
-exploratory evidence, not CLIENT-001 to CLIENT-027 qualification. Maintainer hints were given in the `ce561ac` run, so
-a clean full run on the final candidate is still required.
-
-| Candidate | Scope                                                        | Sessions                                                   |
-| --------- | ------------------------------------------------------------ | ---------------------------------------------------------- |
-| `994895d` | Intake to Gate 1, restart, Architecture blocked              | `2d493452`, `23aedd61`, `5896a256`, `ce3c9a3d`, `7c6ef823` |
-| `ce561ac` | Intake to Gate 2 ready (CLI tarball `c110711a80dffe4b`)      | `3fc7d20e`                                                 |
-| `a8e65b9` | Lifecycle, retired client, `-p` MCP (CLI `e5a4d511d8d0f825`) | `7edbd926`, `d7a7efc5`                                     |
-
-| ID           | Standalone CLI result                                                                                           |
-| ------------ | --------------------------------------------------------------------------------------------------------------- |
-| `CLIENT-003` | Pass: one typed answer event per request; a missing single-select drew one targeted follow-up, not a default    |
-| `CLIENT-006` | Pass: `nextTask` returned `APEX_AUTHORIZATION` while Gate 1 was open                                            |
-| `CLIENT-007` | Pass: after `/exit` and a new session, the same journal head was reported                                       |
-| `CLIENT-009` | Pass: `update`, `rollback`, `uninstall`, `reinstall` and `status` succeeded with no tracked-file drift          |
-| `CLIENT-021` | Pass (fallback): `apex-next` named `apex-requirements` and printed `/agent` with a scope prompt                 |
-| `CLIENT-023` | Pass: checkboxes in kernel order; the UI answer `dev, prod, test` was stored as `["dev", "test", "prod"]`       |
-| `CLIENT-025` | Pass for Reviewer: `subagent.configured` shows `gpt-6-luna` at max with no launch flags; others not yet run     |
-| `CLIENT-026` | Pass: `init --client github-copilot-vscode` fails with `APEX_USAGE`; an adapters test covers the retired hint   |
-| `CLIENT-027` | Pass: `-p` with `GITHUB_COPILOT_PROMPT_MODE_WORKSPACE_MCP=true` called `apex/status`; without it no APEX tool   |
-| Others       | Not run: Gates 2 to 4, Planner, CodeGen, Validator, Operator deploy, CLIENT-008 and CLIENT-024 need a clean run |
-
-Gate 1 was approved by the maintainer; the agent relayed the chat approval to `gateDecide` with `confirm: true` and
-did not ask again. Gate 2 was left open for the maintainer. Findings and fixes:
-
-- **Retired installs.** An existing VS Code install failed `update` with a generic selection error. Fixed in
-  `994895d`: `init` and `update` return `details.reason: CLIENT_PROJECTION_RETIRED` with the switch command, and
-  `apex init --client github-copilot-cli` replaces unchanged retired files.
-- **Hidden validation reasons.** `architectureComplete` failed with the generic MCP message. Fixed in `ce561ac` and
-  `3a3db69`: kernel `APEX_VALIDATION` reasons and up to five schema paths reach the agent unless they look secret.
-- **Architecture crash.** A decision manifest without `requirementIds` threw a `TypeError` (`APEX_INTERNAL`). Fixed
-  in `68bd1a8`: the submission is schema-checked first. The Architect also read "do not supply requirement
-  traceability" as covering per-decision `requirementIds`; `527d67c` clarifies the agent, skill and tool text.
-- **Governance templates.** Governance tasks had no output templates, so the Operator guessed shapes and failed. Fixed
-  in `a8e65b9`: a `policy-property-map` template and, for `local` targets only, a no-policy `governance-constraints`
-  template. Subscription targets still import a reviewed baseline.
-- **ARM MCP on WSL.** The OAuth callback returned 404 and the device-code flow hung, so pricing never connected. The
-  workaround was an `az account get-access-token` bearer header passed with `--additional-mcp-config`; the token
-  expires after about an hour, after which pricing calls hang instead of failing. A user-level MCP file did not
-  override the repository server.
-- **Other observations.** The coordinator called built-in Explore, which had no file tools. `ask_user` rejected one
-  malformed multi-field schema and the agent corrected it. The Architect asked for SLO values rather than inventing
-  them.
-
-The VS Code Copilot harness stays blocked on WSL, as the [slice 1 probe](#cli-only-projection-probes) found.
-
-On 2026-09-24 a clean run on `main` `591ce2f` (session `4d332d30`) took the maintainer's own decisions and gate
-approvals. Requirements, Architecture (four schema retries, self-corrected from issue paths) and governance completed
-without hints; the maintainer approved Gates 1 and 2. Findings were acknowledged or risk-accepted where they were
-application-level or specific to the `local` target. The run paused at planning on four gaps, fixed on
-`fix/cli-run-gaps`:
-
-- **Stale task IDs.** Every `nextTask` call issued a new task, so the ID in a scope prompt went stale when the owner
-  called `nextTask` again. `nextTask` now returns the issued task while the journal head, owner epoch and expiry are
-  unchanged.
-- **Interactive delegation.** The coordinator delegated the Planner through `task`. The four interactive specialists
-  now set `disable-model-invocation: true`, and `apex-next` routes a `status=task` result for them to `/agent`.
-- **Module versions.** The Planner had no source for exact module or API versions and refused to bind from memory. It
-  now holds `web_fetch`, limited by guidance to the public Bicep, Terraform and Azure template references.
-- **Local governance.** The Planner treated `local` governance as blocking after the kernel issued its task. Its
-  guidance now records kernel-accepted governance and accepted risks as plan assumptions.
-
-On 2026-09-24 a subscription-bound run on `main` `371e2b6` (run `b1903107`, `apex-shared` resource group) imported a
-reviewed baseline collected read-only with `-IncludeDescendants` (328 policies, 59 enforcing). The `nextTask` and
-`/agent` routing fixes held, and the maintainer approved Gate 1. Two gaps remained:
-
-- **Project inference.** Given "start a new workload" while a project was selected, the coordinator created a second
-  project from inferred values instead of asking. Its guidance now forbids deriving project values and asks whether to
-  continue the selected project.
-- **Unworkable reconciliation.** The kernel required one mapping per enforcing finding, but the Operator saw only
-  aggregate counts and had no disposition for policies on undesigned resource types. The maintainer decided on
-  [DECISION-030](DECISIONS.md): governance before Architecture, an ALZ Corp reference baseline, Architect-owned
-  mapping and kernel `not-applicable` marking.
+Historical receipts are in the catalog entry above; current candidate qualification remains pending.
 
 ### Slice 11 Re-Run On A Subscription
 
-On 2026-10-02 the maintainer ran standalone Copilot CLI `1.0.91` with Node `v26.10.0` and Bicep `0.47.16` against
-resource group `rg-qual-webapp-dev` (run `064a07aa`). The candidate was `main` at `db015a5`; the morning attempt used
-`fe99d76`. These SHAs are after the 2026-10-02 history rewrite. Gate 1 was approved, Architecture completed, and the
-run was stopped at the Gate 2 review to move to the [client pivot](ROADMAP.md#client-pivot). This is exploratory
-evidence, not scenario qualification.
-
-| Finding | Problem                                                               | Fix                                                               |
-| ------- | --------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| 1, 6    | The coordinator invented project values and bound the run to `local`  | #359 requires an explicit target scope                            |
-| 2, 3    | The scope prompt was hard to copy and covered only intake round 1     | #358; CP-13 removes scope prompts                                 |
-| 4       | A Windows `az` token ended in `\r` and broke the Authorization header | Launcher strips and validates the token                           |
-| 5       | Requirement IDs skipped numbers                                       | #357 numbers after filtering                                      |
-| 7, R3   | `nextTask` hit `APEX_AUTHORIZATION` while a gate was pending          | #358 for review decisions; the rest moves to CP-13                |
-| 8       | Architecture task context rejected `governanceFindings`               | #356; #360 checks real results against MCP contracts              |
-| R1, R2  | Project values were asked again; Requirements stopped after intake    | Moved to CP-13                                                    |
-| R4      | An incomplete baseline surfaced as `APEX_INTERNAL`                    | #364 maps baseline errors with hints; #365 refreshed the baseline |
-| R5      | The collector crashed on policy names with spaces                     | #365                                                              |
-| R6      | Service-only scripts missed date-time format registration             | Open; latent                                                      |
-| R7      | `architectureComplete` needed seven attempts                          | #366 reports every problem in one rejection                       |
-| R8      | `reviewComplete` was rejected eight times with a generic message      | #363 names failing input paths and defaults `findingIds`          |
-| R9      | Review findings drifted across blind retries                          | DECISION-031 kernel capture (CP-16)                               |
-
-The Gate 2 reviewer accepted findings were an info check-later note on performance and scale and a low finding that
-the Bicep was not traced to REQ-007. Governance imported a reviewed subscription baseline collected with
-`-IncludeDescendants`.
+Historical receipts are in the catalog entry above; current candidate qualification remains pending.
 
 ## Execution Rules
 
@@ -536,7 +344,8 @@ a confirmed free-text fallback can satisfy typed selection semantics but is not 
 DECISION-033 makes the GitHub Copilot app a supported client, so desktop qualification is no longer parked. The app
 runs the same scenarios as the other clients, plus CLIENT-034 for app-created worktrees. Turn on local sandboxing in
 the app's project settings before a run. The parked M1/M2/M3 milestones in the
-[desktop plan](COPILOT-DESKTOP-PLAN.md) are design history; their receipts and confirmed-selection observations do not
+[desktop plan](../../.archive/CATALOG.json) (entry `docs/vnext/COPILOT-DESKTOP-PLAN.md`) are design history;
+their receipts and confirmed-selection observations do not
 qualify the current candidate.
 
 ## Acceptance

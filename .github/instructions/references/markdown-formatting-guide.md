@@ -50,7 +50,9 @@ param location string = 'swedencentral'
 ## Diagram Embeds
 
 For Azure architecture artifacts, prefer **non-Mermaid** diagram files generated via
-Python diagrams (`.png`/`.svg`) and embed with Markdown images.
+kernel-rendered Python sources and outputs (`.py`, `.png`/`.svg`) from `packages/renderers`,
+bound to accepted typed sources, and embed with Markdown images. Current architecture, WAF and cost
+renderers do not imply availability of every standalone or as-built diagram class.
 
 ### Good Example
 
@@ -62,7 +64,8 @@ Source: `03-des-diagram.py`
 
 ### Mermaid Usage
 
-Mermaid is allowed only when explicitly required by template/instruction.
+Use managed `apex-mermaid` guidance only for supported renderer slots.
+There are currently no Mermaid-capable slots; report that blocker rather than generating inline output.
 If Mermaid is used, include a neutral theme directive for dark mode compatibility.
 
 ## Visual Styling Standards
@@ -80,7 +83,7 @@ If Mermaid is used, include a neutral theme directive for dark mode compatibilit
 ### Callout Types
 
 Supported: `> [!NOTE]`, `> [!TIP]`, `> [!IMPORTANT]`, `> [!WARNING]`, `> [!CAUTION]`.
-Full examples and emoji tables are in the azure-artifacts SKILL.md.
+Presentation conventions are owned by the managed `apex-artifacts` skill and registered document sources.
 
 ## Lists and Formatting
 

@@ -15,7 +15,8 @@ import { Reporter } from "./_lib/reporter.mjs";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "../..");
 const CANONICAL_PATH = path.join(REPO_ROOT, ".github/copilot-instructions.md");
-const MIRROR_PATH = path.join(REPO_ROOT, ".github/skills/azure-defaults/SKILL.md");
+const DEFAULTS_PATH = path.join(REPO_ROOT, "config/defaults.v1.json");
+const SKILL_PATH = path.join(REPO_ROOT, "customizations/.github/skills/apex-azure-defaults/SKILL.md");
 
 const r = new Reporter("Region Canonical Validator");
 r.header();
@@ -60,12 +61,19 @@ function extractRegionsTable(filePath) {
 r.tick();
 const canonical = extractRegionsTable(CANONICAL_PATH);
 r.tick();
-const skill = fs.readFileSync(MIRROR_PATH, "utf8");
-if (!skill.includes("../../copilot-instructions.md#azure-defaults-canonical")) {
-  r.error(MIRROR_PATH, "Skill must reference the canonical Azure defaults");
+const defaults = JSON.parse(fs.readFileSync(DEFAULTS_PATH, "utf8"));
+if (defaults.azureDefaults?.regionReference !== ".github/copilot-instructions.md#default-regions") {
+  r.error(DEFAULTS_PATH, "Runtime region reference must point to the canonical Default Regions section");
+}
+const skill = fs.readFileSync(SKILL_PATH, "utf8");
+if (
+  !skill.includes("runtime `securityInvariants` and `azureDefaults` configuration owns") ||
+  !skill.includes("`apex/taskContext` projects")
+) {
+  r.error(SKILL_PATH, "Managed defaults must use runtime-owned, task-projected configuration");
 }
 if (/^###\s+Default Regions\s*$/mu.test(skill)) {
-  r.error(MIRROR_PATH, "Do not duplicate the canonical region table in skill guidance");
+  r.error(SKILL_PATH, "Do not duplicate the canonical region table in skill guidance");
 }
 if (canonical) r.ok("regions-table", "Canonical region table exists and skill guidance references its owner");
 

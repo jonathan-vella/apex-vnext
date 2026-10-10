@@ -31,6 +31,15 @@ they are not implied by ordinary development or documentation changes.
 
 ## Current Status
 
+The local context validator requires an explicit file:
+`node tools/scripts/validate-vnext-qualification-context.mjs <file>`, or
+`node tools/scripts/validate-vnext-qualification-context.mjs --security-exception-only <file>`.
+Launchers require `--governance-file <absolute-file>` except for `recover`.
+The protected hosted job requires the nonsecret environment variable `APEX_QUALIFICATION_GOVERNANCE_JSON`;
+it writes `APEX_QUALIFICATION_GOVERNANCE_PATH` under `RUNNER_TEMP` with mode 0600.
+Missing, invalid, wrong-target or expired context fails closed; archives are not a fallback.
+Setting hosted configuration and running live qualification require separate authorization.
+
 APEX vNext is pre-release and no release candidate is selected. Historical qualification remains characterization only.
 Consult the [client support matrix](client-support.md) and binding [project controls](../vnext/README.md).
 

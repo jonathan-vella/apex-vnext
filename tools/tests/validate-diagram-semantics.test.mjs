@@ -63,15 +63,27 @@ test("required edge labels match exact slash-delimited segments", () => {
 
 test("active consumers reject Draw.io output and missing Python markers", () => {
   const files = new Map(registry.activeConsumers.map(({ path }) => [path, readFileSync(path, "utf8")]));
-  const designTemplate = registry.activeConsumers.find(({ id }) => id === "as-built-design-template");
-  files.set(designTemplate.path, files.get(designTemplate.path).replaceAll("07-ab-diagram.py", "07-ab-diagram.drawio"));
+  const source = registry.activeConsumers.find(({ id }) => id === "current-diagram-source");
+  files.set(source.path, `${files.get(source.path).replaceAll("readonly python", "readonly drawio")}\nretired.drawio`);
 
   assert.deepEqual(
     validateActiveConsumers(registry.activeConsumers, (filePath) => files.get(filePath)),
     [
-      "as-built-design-template: active consumer references retired Draw.io output",
-      "as-built-design-template: required marker 07-ab-diagram.py is missing",
+      "current-diagram-source: active consumer references retired Draw.io output",
+      "current-diagram-source: required marker readonly python is missing",
     ],
+  );
+});
+
+test("renamed current consumers must remain readable", () => {
+  const files = new Map(registry.activeConsumers.map(({ path }) => [path, readFileSync(path, "utf8")]));
+  const source = registry.activeConsumers.find(({ id }) => id === "current-diagram-source");
+  files.delete(source.path);
+  assert.ok(
+    validateActiveConsumers(registry.activeConsumers, (name) => {
+      if (!files.has(name)) throw new Error("Missing current source");
+      return files.get(name);
+    }).includes("current-diagram-source: active consumer is missing or unreadable"),
   );
 });
 

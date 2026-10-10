@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
+import { load } from "js-yaml";
 import {
   approvedDispatchState,
   canonicalRecipient,
@@ -39,6 +43,16 @@ const closedBackendState = JSON.stringify({
   defaultToOAuthAuthentication: true,
 });
 
+const activeSubscription = "11111111-1111-4111-8111-111111111111";
+
+function endpointRun(commands, active = activeSubscription) {
+  return async (file, args) => {
+    commands.push([file, ...args]);
+    if (args[0] === "account" && args[1] === "show") return `${active}\n`;
+    return args.includes("show") ? closedBackendState : "";
+  };
+}
+
 function rejectsMutation(name, mutate, expected) {
   test(name, () => {
     const errors = validateWorkflowText(mutate(baseline));
@@ -50,6 +64,83 @@ function rejectsMutation(name, mutate, expected) {
 }
 
 test("baseline live workflow passes", () => assert.deepEqual(validateWorkflowText(baseline), []));
+
+test("hosted context preparation fails closed without disclosure and writes only restrictive temporary context", (context) => {
+  const preparation = load(baseline).jobs.apply.steps.find(
+    (step) => step.name === "Prepare protected qualification governance context",
+  ).run;
+  const nodeSource = preparation.split("node --input-type=module <<'NODE'\n")[1].split("\nNODE")[0];
+  for (const [raw, success] of [
+    ["", false],
+    ["confidential-invalid-json", false],
+    ["[]", false],
+    ['{"subscription_id":"test"}', true],
+  ]) {
+    const directory = mkdtempSync(join(tmpdir(), "apex-hosted-context-"));
+    context.after(() => rmSync(directory, { recursive: true }));
+    const exportFile = join(directory, "environment");
+    const filename = join(directory, "apex-qualification-governance.json");
+    const result = spawnSync(process.execPath, ["--input-type=module", "-e", nodeSource], {
+      env: { ...process.env, APEX_QUALIFICATION_GOVERNANCE_JSON: raw, RUNNER_TEMP: directory, GITHUB_ENV: exportFile },
+      encoding: "utf8",
+    });
+    assert.equal(result.status, success ? 0 : 1);
+    assert.equal(result.stdout, "");
+    assert.doesNotMatch(result.stderr, /confidential-invalid-json/u);
+    assert.equal(existsSync(filename), success);
+    assert.equal(existsSync(exportFile), success);
+    if (success) {
+      assert.equal(statSync(filename).mode & 0o777, 0o600);
+      assert.equal(statSync(filename).isFile(), true);
+      assert.deepEqual(JSON.parse(readFileSync(filename, "utf8")), JSON.parse(raw));
+      assert.equal(readFileSync(exportFile, "utf8"), `APEX_QUALIFICATION_GOVERNANCE_PATH=${filename}\n`);
+      const duplicate = spawnSync(process.execPath, ["--input-type=module", "-e", nodeSource], {
+        env: {
+          ...process.env,
+          APEX_QUALIFICATION_GOVERNANCE_JSON: raw,
+          RUNNER_TEMP: directory,
+          GITHUB_ENV: exportFile,
+        },
+        encoding: "utf8",
+      });
+      assert.equal(duplicate.status, 1);
+      assert.match(duplicate.stderr, /EEXIST/u);
+    }
+  }
+});
+
+for (const [name, before, after] of [
+  ["missing protected governance variable", "${{ vars.APEX_QUALIFICATION_GOVERNANCE_JSON }}", ""],
+  ["missing context requirement", "if (!raw) throw new Error(", "if (false) throw new Error("],
+  ["unrestricted context permissions", "mode: 0o600", "mode: 0o644"],
+  ["overwriteable context", 'flag: "wx"', 'flag: "w"'],
+  ["missing explicit context file", '"$APEX_QUALIFICATION_GOVERNANCE_PATH"', '""'],
+  ["context outside runner temporary directory", "process.env.RUNNER_TEMP", "process.env.GITHUB_WORKSPACE"],
+]) {
+  rejectsMutation(name, (text) => text.replace(before, after), "qualification");
+}
+
+test("launcher rejects missing or unreadable governance before endpoint mutation", async () => {
+  const commands = [];
+  const args = { resource_group: "control-rg", storage_account: "storage", container: "handoff" };
+  const dependencies = { run: async (file, values) => commands.push([file, ...values]) };
+  await assert.rejects(
+    withFirewall(args, async () => undefined, dependencies),
+    /governance-file/u,
+  );
+  await assert.rejects(
+    withFirewall(
+      {
+        ...args,
+        governance_file: new URL("../fixtures/nonexistent-qualification-context.json", import.meta.url).pathname,
+      },
+      async () => undefined,
+      dependencies,
+    ),
+    /ENOENT/u,
+  );
+  assert.deepEqual(commands, []);
+});
 
 test("live workflow imports approval and cannot decide Gate 4 in CI", () => {
   assert.doesNotMatch(baseline, /\bgate decide\b/);
@@ -141,7 +232,8 @@ rejectsMutation(
 rejectsMutation(
   "qualification validation after endpoint opening fails",
   (text) => {
-    const validation = "          node tools/scripts/validate-vnext-qualification-context.mjs\n";
+    const validation =
+      '          node tools/scripts/validate-vnext-qualification-context.mjs "$APEX_QUALIFICATION_GOVERNANCE_PATH"\n';
     const firewall =
       '          az storage account update --resource-group "$APEX_CONTROL_RESOURCE_GROUP" --name "$APEX_BACKEND_STORAGE_ACCOUNT" --default-action Allow --only-show-errors --output none\n';
     return text.replace(validation, "").replace(firewall, `${firewall}${validation}`);
@@ -152,7 +244,7 @@ rejectsMutation(
   "missing firewall boundary exception recheck fails",
   (text) =>
     text.replace(
-      "          node tools/scripts/validate-vnext-qualification-context.mjs --security-exception-only\n",
+      '          node tools/scripts/validate-vnext-qualification-context.mjs --security-exception-only "$APEX_QUALIFICATION_GOVERNANCE_PATH"\n',
       "",
     ),
   "apply firewall boundary transaction",
@@ -486,6 +578,7 @@ test("launcher rejects an invalid exception before endpoint mutation", async () 
   await assert.rejects(
     withFirewall(
       {
+        governance_file: "/tmp/qualification-context.json",
         resource_group: "control-rg",
         storage_account: "storage",
         container: "handoff",
@@ -501,21 +594,66 @@ test("launcher rejects an invalid exception before endpoint mutation", async () 
   assert.deepEqual(commands, []);
 });
 
+test("launcher binds the governance subscription to the active account before any endpoint mutation", async () => {
+  const args = {
+    governance_file: "/tmp/qualification-context.json",
+    resource_group: "control-rg",
+    storage_account: "storage",
+    container: "handoff",
+  };
+  for (const active of ["22222222-2222-4222-8222-222222222222", ""]) {
+    const commands = [];
+    let operationRan = false;
+    await assert.rejects(
+      withFirewall(
+        args,
+        async () => {
+          operationRan = true;
+        },
+        {
+          validateException: () => [],
+          governanceSubscription: () => activeSubscription,
+          run: endpointRun(commands, active),
+        },
+      ),
+      /does not match the active Azure account/,
+    );
+    assert.equal(operationRan, false);
+    assert.deepEqual(commands, [["az", "account", "show", "--query", "id", "--output", "tsv"]]);
+  }
+  const matching = [];
+  await withFirewall(args, async () => undefined, {
+    validateException: () => [],
+    governanceSubscription: () => activeSubscription.toUpperCase(),
+    run: endpointRun(matching),
+  });
+  assert.ok(matching.some((command) => command.join(" ").includes("--default-action Allow")));
+});
+
+test("launcher passes the explicit governance file to every context validation", () => {
+  const invocations =
+    launcher.match(/run\("node", \["tools\/scripts\/validate-vnext-qualification-context\.mjs"[^\]]*\]/gu) ?? [];
+  assert.ok(invocations.length >= 1);
+  for (const invocation of invocations) assert.match(invocation, /args\.governance_file/u);
+});
+
 test("launcher restores and verifies Deny and Disabled after a local endpoint session", async () => {
   const commands = [];
   const result = await withFirewall(
     {
+      governance_file: "/tmp/qualification-context.json",
       resource_group: "control-rg",
       storage_account: "storage",
       container: "handoff",
     },
     async () => "complete",
     {
-      validateException: () => [],
-      run: async (file, args) => {
-        commands.push([file, ...args]);
-        return args.includes("show") ? closedBackendState : "";
+      validateException: (governanceFile) => {
+        assert.equal(governanceFile, "/tmp/qualification-context.json");
+        return [];
       },
+      governanceSubscription: () => activeSubscription,
+      run: endpointRun(commands),
     },
   );
   assert.equal(result, "complete");
@@ -535,6 +673,7 @@ test("launcher cleans up before propagating a protected operation failure", asyn
   await assert.rejects(
     withFirewall(
       {
+        governance_file: "/tmp/qualification-context.json",
         resource_group: "control-rg",
         storage_account: "storage",
         container: "handoff",
@@ -544,10 +683,8 @@ test("launcher cleans up before propagating a protected operation failure", asyn
       },
       {
         validateException: () => [],
-        run: async (file, args) => {
-          commands.push([file, ...args]);
-          return args.includes("show") ? closedBackendState : "";
-        },
+        governanceSubscription: () => activeSubscription,
+        run: endpointRun(commands),
       },
     ),
     /protected operation failed/,
@@ -662,6 +799,8 @@ test("launcher requires the workflow file on the default branch before dispatch"
 test("launcher strictly parses dispatch, retrieve, and recovery arguments", () => {
   const handoffId = "123e4567-e89b-42d3-a456-426614174000";
   const common = [
+    "--governance-file",
+    "/tmp/qualification-context.json",
     "--yes",
     "--track",
     "bicep",
@@ -682,6 +821,9 @@ test("launcher strictly parses dispatch, retrieve, and recovery arguments", () =
   assert.equal(parseArgs(["dispatch", ...common, "--ref", "main", "--handoff-id", handoffId]).container, "handoff");
   const retrieved = parseArgs(["retrieve", ...common, "--handoff-id", handoffId, "--destination", "/tmp/candidate"]);
   assert.equal(retrieved.stage, "apply");
+  assert.throws(() => parseArgs(["preview", ...common.slice(2)]), /governance-file/u);
+  assert.throws(() => parseArgs(["preview", ...withCommonValue("--governance-file", "relative.json")]), /absolute/u);
+  assert.throws(() => parseArgs(["preview", ...common, "--governance-file", "/tmp/other.json"]), /Duplicate/u);
   const recovered = parseArgs([
     "recover",
     "--yes",

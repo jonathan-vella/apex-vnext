@@ -9,7 +9,22 @@ import {
 } from "../scripts/build-optimization-context-receipt.mjs";
 import { normalizeClientContextSample } from "../scripts/normalize-client-context-sample.mjs";
 
-const gate = JSON.parse(readFileSync("tools/registry/optimization-gate.v1.json", "utf8"));
+const checkedInGate = JSON.parse(readFileSync("tools/registry/optimization-gate.v1.json", "utf8"));
+// The checked-in gate is inactive; this synthetic authorized fixture never grants a real campaign.
+const gate = {
+  ...checkedInGate,
+  state: "authorized",
+  candidate: { status: "bound", commit: "a".repeat(40), tree: "b".repeat(40) },
+  authorization: {
+    status: "approved",
+    approver: "synthetic test actor",
+    expiresAt: "2026-10-10T00:00:00Z",
+    allowedPaths: ["**"],
+    allowedCommands: ["npm run build:optimization-context-receipt"],
+    stopConditions: ["Synthetic fixture only; never execute a campaign."],
+    budget: { maxTrackedMutations: 0, maxMinutes: 1 },
+  },
+};
 const matrix = JSON.parse(readFileSync("tools/registry/client-context-matrix.json", "utf8"));
 const schema = JSON.parse(readFileSync("tools/registry/schemas/optimization-context-receipt.schema.json", "utf8"));
 
