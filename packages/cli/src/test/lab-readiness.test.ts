@@ -283,6 +283,9 @@ test("readiness is not recorded while a required review is missing or a blocking
       .map(({ payload }) => (payload as { gate: number }).gate),
     [2],
   );
+  const run = await service["currentRun"]();
+  const context = await service["approvalContextMarkdown"](run, await events(root, runId));
+  assert.match(context, /## Accepted Risks\n\n- F-ARCH-1 \(expires [^)]*owner partner\): Temporary acceptance\./u);
   assert.equal((await service.nextTask()).status, "task");
 });
 
