@@ -80,9 +80,9 @@ lookups and cost monitoring checks. It also states the routing rule every APEX A
   accepted evidence from `apex/taskContext`.
 - **Commands that change Azure, Entra ID or GitHub settings** (create, update, delete, assign, register, deploy, `azd
   provision`, `azd deploy`, `azd pipeline config`) are never run by the agent. They reach Azure only through `apex
-  preview`, a Gate 4 decision and `apex deploy` (Bicep, Terraform, or `azd provision` and `azd deploy` for labs), or
-  through the approved GitHub Actions workflow, which runs only the preview that local Gate 4 bound to its CI
-  recipient. Production CI apply stays blocked until recipient-bound transport is qualified. APEX never runs `azd up`.
+  preview`, the current runtime's Gate 4 decision and `apex deploy` (Bicep or Terraform). azd becomes a Bicep-only
+  executor under CP-26 and a CI-owned production run with human approval verified before apply is a planned target
+  (DECISION-036); neither is available today. APEX never runs `azd up`.
 
 ## Capability Boundaries
 

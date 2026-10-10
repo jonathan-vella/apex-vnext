@@ -67,8 +67,8 @@ done
 
 Use this when current quota is insufficient for the planned deployment. The agent records the shortfall, proposes the
 scope, quota name, new limit and buffer, and stops. The increase changes the subscription, so it is never run by the
-agent: the human approves it and it is delivered through `apex preview`, Gate 4 and `apex deploy` as a reviewed
-`Microsoft.Quota/quotas` change, or through the approved GitHub Actions pipeline.
+agent: the human approves it and it is delivered through `apex preview`, the current runtime's Gate 4 and
+`apex deploy` as a reviewed `Microsoft.Quota/quotas` change.
 
 ```bash
 # Changes Azure: route through apex deploy (Gate 4) or the approved pipeline. Never run directly.

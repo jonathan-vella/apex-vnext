@@ -55,11 +55,10 @@ AVM, Bicep and Terraform assignment shapes.
   approved scope. Their output is an observation; the typed assignment intent still cites accepted evidence from
   `apex/taskContext`.
 - **Commands that change Azure** (`az role definition create`, `az role assignment create|delete`) are never run by
-  the agent. Role changes ship in the selected IaC binding and reach Azure only through `apex preview`, a Gate 4
-  decision and `apex deploy` (Bicep, Terraform, or `azd provision` and `azd deploy` for labs), or through the approved
-  GitHub Actions workflow, which runs only the preview that local Gate 4 bound to its CI recipient. Production CI
-  apply stays blocked until recipient-bound transport is qualified. The reference marks these commands with `# Changes
-  Azure`.
+  the agent. Role changes ship in the selected IaC binding and reach Azure only through `apex preview`, the current
+  runtime's Gate 4 decision and `apex deploy` (Bicep or Terraform). A CI-owned production run with human approval
+  verified before apply is a planned target (DECISION-036), not available today. The reference marks these commands
+  with `# Changes Azure`.
 
 ## Boundaries
 

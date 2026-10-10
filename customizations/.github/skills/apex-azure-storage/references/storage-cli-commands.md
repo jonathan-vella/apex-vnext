@@ -9,7 +9,7 @@ identity (`--auth-mode login`), never account keys or SAS tokens.
 | --- | --- | --- |
 | Read and diagnostic | `az storage account list`, `az storage account show`, `az storage container list`, `az storage blob list`, `az storage queue list`, `az storage table list`, `az storage share list`, `az storage fs list`, `az storage sku list` | Directly, against the approved account and scope |
 | Reads that write local files | `az storage blob download` | Only with separate authorization for the exact blob and local path; never overwrite local files without it |
-| Changes Azure | `az storage blob upload`, account, container, lifecycle, tier, network or redundancy changes, deletes | Never by the agent. Account and configuration changes ship in IaC through `apex preview`, Gate 4 and `apex deploy`; data writes are reviewed workflow steps that run only through the approved GitHub Actions pipeline, which runs only the preview that local Gate 4 bound to its CI recipient (production CI apply stays blocked until that transport is qualified) |
+| Changes Azure | `az storage blob upload`, account, container, lifecycle, tier, network or redundancy changes, deletes | Never by the agent. Account and configuration changes ship in IaC through `apex preview`, the current runtime's Gate 4 and `apex deploy`; data writes are separate reviewed operations that need their own approval (a CI-owned production run with human approval verified before apply is a planned target, DECISION-036) |
 
 Read output is an observation; storage decisions still cite accepted evidence from `apex/taskContext`.
 

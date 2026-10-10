@@ -60,11 +60,10 @@ task state, evidence freshness, authorization, artifact acceptance, and all stat
   tokens.
 - **Commands that change Entra ID** (creating, updating or deleting registrations and service principals, credentials,
   permissions, admin consent, owners) are never run by the agent. The registration ships as Microsoft Graph Bicep and
-  reaches Entra ID only through `apex preview`, a Gate 4 decision and `apex deploy` (Bicep, Terraform, or `azd
-  provision` and `azd deploy` for labs), or through the approved GitHub Actions workflow, which runs only the preview
-  that local Gate 4 bound to its CI recipient. Production CI apply stays blocked until recipient-bound transport is
-  qualified. Admin consent stays an authorized owner's decision. References mark these commands with `# Changes
-  Azure`.
+  reaches Entra ID only through `apex preview`, the current runtime's Gate 4 decision and `apex deploy` (Bicep or
+  Terraform). A CI-owned production run with human approval verified before apply is a planned target (DECISION-036),
+  not available today. Admin consent stays an authorized owner's decision. References mark these commands with
+  `# Changes Azure`.
 
 ## Boundaries
 

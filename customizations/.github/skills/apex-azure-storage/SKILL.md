@@ -53,10 +53,9 @@ requirements.
   separate authorization for the exact blob and path.
 - **Commands that change Azure** (uploads, account, container, tier, lifecycle, network or redundancy changes,
   deletes) are never run by the agent. Configuration ships as IaC and data writes as reviewed workflow steps; both
-  reach Azure only through `apex preview`, a Gate 4 decision and `apex deploy` (Bicep, Terraform, or `azd provision`
-  and `azd deploy` for labs), or through the approved GitHub Actions workflow, which runs only the preview that local
-  Gate 4 bound to its CI recipient. Production CI apply stays blocked until recipient-bound transport is qualified.
-  The reference marks these commands with `# Changes Azure`.
+  reach Azure only through `apex preview`, the current runtime's Gate 4 decision and `apex deploy` (Bicep or
+  Terraform). A CI-owned production run with human approval verified before apply is a planned target (DECISION-036),
+  not available today. The reference marks these commands with `# Changes Azure`.
 
 ## Boundaries
 

@@ -8,7 +8,7 @@ a role; every command that creates a role or an assignment changes Azure and is 
 | Class | Commands | How it runs |
 | --- | --- | --- |
 | Read and diagnostic | `az role definition list`, `az role assignment list`, `az ad signed-in-user show`, `az ad sp show` | Directly, against the approved scope |
-| Changes Azure | `az role definition create`, `az role assignment create`, `az role assignment delete` | Never by the agent. Delivered by the selected IaC binding through `apex preview`, Gate 4 and `apex deploy`, or through the approved GitHub Actions pipeline, which runs only the preview that local Gate 4 bound to its CI recipient (production CI apply stays blocked until that transport is qualified) |
+| Changes Azure | `az role definition create`, `az role assignment create`, `az role assignment delete` | Never by the agent. Delivered by the selected IaC binding through `apex preview`, the current runtime's Gate 4 and `apex deploy` (a CI-owned production run with human approval verified before apply is a planned target, DECISION-036) |
 
 Read output is an observation. The typed assignment intent still cites accepted role-catalog, identity and scope
 evidence.
