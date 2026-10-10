@@ -92,7 +92,8 @@ logger = logging.getLogger('azure.eventhub')
 logger.setLevel(logging.DEBUG)
 logger.addHandler(handler)
 
-# Enable AMQP frame tracing
+# Enable AMQP frame tracing. Raw AMQP frames can contain message payloads, SAS tokens and credentials: enable this only
+# with explicit task authorization and keep only redacted excerpts as evidence.
 client = EventHubProducerClient(..., logging_enable=True)
 ```
 
