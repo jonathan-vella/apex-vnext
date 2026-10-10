@@ -60,10 +60,10 @@ Manual Dockerfile creation required.
 
 | Artifact      | Path                                  |
 | ------------- | ------------------------------------- |
-| Main Bicep    | `./main.bicep`                        |
-| Parameters    | `./main.parameters.json`              |
-| Modules       | `./modules/*.bicep`                   |
-| Deploy script | `./scripts/deploy.sh` or `deploy.ps1` |
+| Main Bicep    | `./infra/main.bicep`                        |
+| Parameters    | `./infra/main.parameters.json`              |
+| Modules       | `./infra/modules/*.bicep`                   |
+| Deploy script | `./infra/scripts/deploy.sh` or `deploy.ps1` |
 | Dockerfiles   | `src/<service>/Dockerfile`            |
 
 ## Deployment Commands

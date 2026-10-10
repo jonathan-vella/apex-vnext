@@ -54,7 +54,7 @@ public class ServiceBusFunctions
         [ServiceBusTrigger("%SERVICEBUS_QUEUE_NAME%", Connection = "ServiceBusConnection")]
         ServiceBusReceivedMessage message)
     {
-        _logger.LogInformation("Service Bus trigger processed message: {body}", message.Body);
+        _logger.LogInformation("Service Bus trigger processed a message (body not logged)");
         _logger.LogInformation("Message ID: {id}", message.MessageId);
         _logger.LogInformation("Delivery count: {count}", message.DeliveryCount);
         _logger.LogInformation("Enqueued time: {time}", message.EnqueuedTime);
@@ -69,7 +69,7 @@ public class ServiceBusFunctions
         [HttpTrigger(AuthorizationLevel.Function, "post", Route = "send")] HttpRequestData req)
     {
         var requestBody = await req.ReadAsStringAsync() ?? "{}";
-        _logger.LogInformation("Sending message to Service Bus: {message}", requestBody);
+        _logger.LogInformation("Sending a message to Service Bus (body not logged)");
 
         // Create HTTP response
         var response = req.CreateResponse(HttpStatusCode.OK);

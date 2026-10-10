@@ -13,7 +13,7 @@
 > outputs as inputs, never hardcode IDs.
 
 Example pins: Resource Group `0.4.0` (locally cached module metadata) and Key Vault
-`0.9.0` (the repository's existing pinned test example). These are not a claim of
+`0.11.0` (matching the example below and the AVM provider-compatibility table). These are not a claim of
 latest versions. For generated projects, retain the exact versions approved in
 the plan; validate inputs and outputs against those versions before generation.
 The fragment assumes the root variables, client-config data source, governed

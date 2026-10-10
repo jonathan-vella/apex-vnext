@@ -35,7 +35,6 @@ public class CosmosTrigger {
     ) {
         if (documents != null && documents.length > 0) {
             context.getLogger().info("Documents modified: " + documents.length);
-            context.getLogger().info("First document: " + documents[0]);
         }
     }
 }

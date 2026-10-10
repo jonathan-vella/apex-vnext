@@ -103,8 +103,8 @@ Validate IaC is ready (must complete without error):
 azd provision --preview --no-prompt
 ```
 
-> 💡 **Note:** This works for both Bicep and Terraform. azd will automatically detect the provider from `azure.yaml` and
-> run the appropriate validation (`bicep build` or `terraform plan` ).
+> 💡 **Note:** `azd provision --preview` is design syntax for the planned Bicep-only azd executor (CP-26, #443). azd is
+> not a Terraform path (DECISION-036): Terraform validation uses the native CLI (`terraform validate` and a saved plan).
 
 ### 7. Build Verification
 
@@ -132,6 +132,7 @@ for your subscription.
 
 ### 9. Aspire Container Apps Environment Variables
 
+> Planned CP-26 design material (Bicep-only azd executor); not an available operation today.
 > ⚠️ **CRITICAL for .NET Aspire projects:** When using Aspire with Container Apps in "limited mode" (in-memory
 > infrastructure generation), `azd provision` creates Azure resources but doesn't automatically populate environment
 > variables that `azd deploy` needs.

@@ -22,14 +22,14 @@ param logAnalyticsWorkspaceName string
 
 output resourceId string = storageAccount.id
 output resourceName string = storageAccount.name
-output principalId string = storageAccount.identity.?principalId ?? ''
+output principalId string? = storageAccount.identity.?principalId
 ```
 
 **Inputs (required)**: `name`, `location`, `tags`, `logAnalyticsWorkspaceName`.
 
-**Outputs (required)**: `resourceId`, `resourceName`, `principalId` (use the safe-access
-operator `.?principalId ?? ''` so modules without managed identity still expose the
-output).
+**Outputs (required)**: `resourceId`, `resourceName`, `principalId` (nullable: use the safe-access operator
+`.?principalId` so modules without managed identity return null instead of a synthesized empty identifier;
+consumers guard role assignments on a non-null value).
 
 **Why this contract**: keeps `main.bicep` composable, makes diagnostic settings wiring
 mechanical (always pass `logAnalyticsWorkspaceName`), and gives downstream RBAC modules a

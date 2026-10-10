@@ -35,7 +35,7 @@ public class Function {
             final ExecutionContext context) {
 
         Logger logger = context.getLogger();
-        logger.info("Service Bus trigger processed message: " + message);
+        logger.info("Service Bus trigger processed a message (body not logged)");
     }
 
     /**
@@ -61,7 +61,7 @@ public class Function {
         String body = request.getBody().orElse("{}");
         output.setValue(body);
 
-        logger.info("Sent message to Service Bus: " + body);
+        logger.info("Sent a message to Service Bus (body not logged)");
 
         return request.createResponseBuilder(HttpStatus.OK)
                 .header("Content-Type", "application/json")

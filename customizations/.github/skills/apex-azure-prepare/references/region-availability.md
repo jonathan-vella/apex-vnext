@@ -11,7 +11,8 @@
 
 # Azure Region Availability Index
 
-> **AUTHORITATIVE SOURCE** — Consult service-specific files BEFORE recommending any region.
+> **DISCOVERY INDEX** — Consult service-specific files BEFORE recommending any region. This static page is not
+> evidence: recommendations still need accepted current service/model/SKU availability and quota evidence for the target.
 >
 > Official reference: https://azure.microsoft.com/en-us/explore/global-infrastructure/products-by-region/table
 

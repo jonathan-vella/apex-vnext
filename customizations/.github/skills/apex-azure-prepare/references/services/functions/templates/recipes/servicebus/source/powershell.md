@@ -30,7 +30,7 @@ Create these files in your function app.
 ```powershell
 param([string] $message, $TriggerMetadata)
 
-Write-Host "Service Bus trigger processed message: $message"
+Write-Host "Service Bus trigger processed a message (body not logged)"
 Write-Host "Message ID: $($TriggerMetadata.MessageId)"
 Write-Host "Delivery count: $($TriggerMetadata.DeliveryCount)"
 Write-Host "Enqueued time: $($TriggerMetadata.EnqueuedTimeUtc)"
@@ -77,7 +77,7 @@ $body = $Request.Body | ConvertTo-Json -Compress
 # Send to Service Bus
 Push-OutputBinding -Name outputMessage -Value $body
 
-Write-Host "Sent message to Service Bus: $body"
+Write-Host "Sent a message to Service Bus (body not logged)"
 
 # Return HTTP response
 Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{

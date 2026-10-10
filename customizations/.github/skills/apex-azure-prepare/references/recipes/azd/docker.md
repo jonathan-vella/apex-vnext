@@ -88,7 +88,7 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 go build -o main .
 
-FROM alpine:latest
+FROM alpine:<accepted-version>
 WORKDIR /app
 COPY --from=build /app/main .
 EXPOSE 8080

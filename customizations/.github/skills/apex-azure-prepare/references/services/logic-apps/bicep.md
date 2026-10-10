@@ -62,7 +62,7 @@ resource logicAppStandard 'Microsoft.Web/sites@2025-03-01' = {
         }
         {
           name: 'FUNCTIONS_WORKER_RUNTIME'
-          value: 'node'
+          value: 'dotnet'
         }
         {
           name: 'AzureWebJobsStorage'
@@ -77,6 +77,8 @@ resource logicAppStandard 'Microsoft.Web/sites@2025-03-01' = {
 ## API Connection
 
 ```bicep
+// Managed-identity connection: no connection string or key is read or embedded in the deployment.
+// Grant the identity the accepted least-privilege Service Bus data role; verify the connector schema with accepted evidence.
 resource serviceBusConnection 'Microsoft.Web/connections@2016-06-01' = {
   name: 'servicebus-connection'
   location: location
@@ -85,8 +87,13 @@ resource serviceBusConnection 'Microsoft.Web/connections@2016-06-01' = {
     api: {
       id: subscriptionResourceId('Microsoft.Web/locations/managedApis', location, 'servicebus')
     }
-    parameterValues: {
-      connectionString: serviceBus.listKeys().primaryConnectionString
+    parameterValueSet: {
+      name: 'managedIdentityAuth'
+      values: {
+        namespaceEndpoint: {
+          value: 'sb://${serviceBus.name}.servicebus.windows.net/'
+        }
+      }
     }
   }
 }

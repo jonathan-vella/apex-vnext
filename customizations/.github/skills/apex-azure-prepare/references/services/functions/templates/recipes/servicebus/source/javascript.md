@@ -20,7 +20,7 @@ app.serviceBusQueue("serviceBusTrigger", {
   connection: "ServiceBusConnection",
   queueName: "%SERVICEBUS_QUEUE_NAME%",
   handler: (message, context) => {
-    context.log("Service Bus trigger processed message:", message);
+    context.log("Service Bus trigger processed a message (body not logged)");
     context.log("MessageId =", context.triggerMetadata.messageId);
     context.log("DeliveryCount =", context.triggerMetadata.deliveryCount);
     context.log("EnqueuedTimeUtc =", context.triggerMetadata.enqueuedTimeUtc);
@@ -49,7 +49,7 @@ app.http("sendMessage", {
       const messageContent = JSON.stringify(body);
 
       context.extraOutputs.set(serviceBusOutput, messageContent);
-      context.log(`Sent message to Service Bus: ${messageContent}`);
+      context.log("Sent a message to Service Bus (body not logged)");
 
       return {
         status: 200,

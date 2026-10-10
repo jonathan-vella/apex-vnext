@@ -67,12 +67,12 @@ Manual Dockerfile creation required.
 
 | Artifact    | Path                       |
 | ----------- | -------------------------- |
-| Main config | `./main.tf`                |
-| Variables   | `./variables.tf`           |
-| Outputs     | `./outputs.tf`             |
-| Values      | `./terraform.tfvars`       |
-| Backend     | `./backend.tf`             |
-| Modules     | `./modules/`               |
+| Main config | `./infra/main.tf`          |
+| Variables   | `./infra/variables.tf`     |
+| Outputs     | `./infra/outputs.tf`       |
+| Values      | `./infra/terraform.tfvars` |
+| Backend     | `./infra/backend.tf`       |
+| Modules     | `./infra/modules/`         |
 | Dockerfiles | `src/<service>/Dockerfile` |
 
 ## References

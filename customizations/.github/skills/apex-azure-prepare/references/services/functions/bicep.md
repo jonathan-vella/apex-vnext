@@ -143,7 +143,9 @@ resource storageRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-
 > **ALWAYS use Flex Consumption (FC1)** for all new Azure Functions.
 > The Y1 example below is only for reference when migrating legacy apps.
 
-**⚠️ Not recommended for new deployments. Use Flex Consumption instead.**
+**⚠️ Not recommended for new deployments. Use Flex Consumption instead.** The key-based storage setting below
+(`listKeys()` embeds an account key in deployment history) describes existing-app migration only; new work uses the
+identity-based `AzureWebJobsStorage__blobServiceUri` pattern above.
 
 ```bicep
 resource storageAccount 'Microsoft.Storage/storageAccounts@2026-04-01' = {

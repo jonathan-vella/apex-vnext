@@ -33,12 +33,13 @@ app.eventHub("eventHubTrigger", {
   consumerGroup: "%EVENTHUB_CONSUMER_GROUP%",
   handler: async (messages, context) => {
     if (Array.isArray(messages)) {
+      // Default telemetry is counts and metadata only; log payloads only under an accepted redaction policy.
       context.log(`Event Hub trigger processed ${messages.length} messages`);
       for (const message of messages) {
-        context.log(`Message: ${JSON.stringify(message)}`);
+        context.log("Event Hub message received (payload not logged)");
       }
     } else {
-      context.log(`Event Hub trigger processed message: ${JSON.stringify(messages)}`);
+      context.log("Event Hub trigger processed one message (payload not logged)");
     }
   },
 });

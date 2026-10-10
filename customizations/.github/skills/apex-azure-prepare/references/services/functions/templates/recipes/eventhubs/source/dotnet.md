@@ -40,7 +40,7 @@ public class EventHubFunctions
     {
         foreach (var eventData in events)
         {
-            _logger.LogInformation("Event Hub trigger processed event: {EventData}", eventData);
+            _logger.LogInformation("Event Hub trigger processed an event (payload not logged)");
         }
     }
 
@@ -69,7 +69,7 @@ public class EventHubFunctions
         }
 
         var eventData = JsonSerializer.Serialize(body);
-        _logger.LogInformation("Sent event to Event Hub: {EventData}", eventData);
+        _logger.LogInformation("Sent an event to Event Hub (payload not logged)");
 
         return eventData;
     }

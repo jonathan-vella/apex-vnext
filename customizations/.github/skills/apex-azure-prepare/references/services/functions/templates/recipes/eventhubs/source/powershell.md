@@ -15,7 +15,7 @@ Create `EventHubTrigger/run.ps1`:
 param($events, $TriggerMetadata)
 
 foreach ($event in $events) {
-    Write-Host "Event Hub trigger processed event: $event"
+    Write-Host "Event Hub trigger processed an event (payload not logged)"
     Write-Host "  EnqueuedTimeUtc: $($TriggerMetadata.EnqueuedTimeUtcArray)"
     Write-Host "  SequenceNumber: $($TriggerMetadata.SequenceNumberArray)"
 }
@@ -55,7 +55,7 @@ $eventData = $body | ConvertTo-Json -Compress
 
 Push-OutputBinding -Name outputEvent -Value $eventData
 
-Write-Host "Sent event to Event Hub: $eventData"
+Write-Host "Sent an event to Event Hub (payload not logged)"
 
 Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
     StatusCode = [HttpStatusCode]::OK

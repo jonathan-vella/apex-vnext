@@ -26,7 +26,7 @@ const eventHubTrigger: EventHubHandler = async (messages, context) => {
   const events = Array.isArray(messages) ? messages : [messages];
 
   for (const event of events) {
-    context.log(`Event Hub trigger processed event: ${JSON.stringify(event)}`);
+    context.log("Event Hub trigger processed an event (payload not logged)");
     context.log(`  EnqueuedTimeUtc: ${context.triggerMetadata?.enqueuedTimeUtcArray}`);
     context.log(`  SequenceNumber: ${context.triggerMetadata?.sequenceNumberArray}`);
   }
@@ -57,7 +57,7 @@ app.http("sendEvent", {
     const eventData = JSON.stringify(body);
     context.extraOutputs.set(eventHubOutput, eventData);
 
-    context.log(`Sent event to Event Hub: ${eventData}`);
+    context.log("Sent an event to Event Hub (payload not logged)");
 
     return {
       status: 200,

@@ -99,7 +99,7 @@ template: {
   containers: [
     {
       name: 'api'
-      image: '${acrName}.azurecr.io/api:latest'
+      image: '${acrName}.azurecr.io/api@${imageDigest}'  // accepted immutable digest, not a mutable tag
       env: [
         { name: 'DB_HOST', value: dbHost }
         { name: 'DB_PASSWORD', secretRef: 'db-password' }

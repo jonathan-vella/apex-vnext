@@ -25,7 +25,7 @@ spec:
     spec:
       containers:
         - name: my-service
-          image: myacr.azurecr.io/my-service:latest
+          image: myacr.azurecr.io/my-service@sha256:<accepted-image-digest>  # immutable digest, never :latest
           ports:
             - containerPort: 8080
           resources:

@@ -57,9 +57,9 @@ Manual Dockerfile creation required.
 
 | Artifact    | Path                       |
 | ----------- | -------------------------- |
-| Main Bicep  | `./main.bicep`             |
-| Parameters  | `./main.parameters.json`   |
-| Modules     | `./modules/*.bicep`        |
+| Main Bicep  | `./infra/main.bicep`       |
+| Parameters  | `./infra/main.parameters.json` |
+| Modules     | `./infra/modules/*.bicep`  |
 | Dockerfiles | `src/<service>/Dockerfile` |
 
 ## References

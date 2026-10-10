@@ -6,12 +6,13 @@
 
 # Static Web Apps - Deployment
 
-## azd Deploy (Default)
+## azd Deploy (Planned Design)
 
-Standard deployment via Azure Developer CLI:
+Application deployment through Azure Developer CLI is planned CP-26 behavior (Bicep only, #443) and is not enabled
+today; provisioning and application deployment stay separate operations. Design syntax only:
 
 ```bash
-# Changes Azure/state: provider syntax only; use apex preview, local Gate 4 and apex deploy. Never run directly.
+# Planned CP-26 operation; not available today. Never run directly.
 azd deploy
 ```
 
@@ -36,16 +37,10 @@ properties: {
 > ⚠️ **Security Warning:** Do NOT expose deployment tokens in ARM/Bicep outputs. Deployment outputs are visible in Azure
 > portal deployment history and logs.
 
-**Recommended approach** - retrieve token via Azure CLI and store directly in secret store:
-
-```bash
-# Capture token to variable (never echo or log)
-DEPLOYMENT_TOKEN=$(az staticwebapp secrets list --name <app-name> --query "properties.apiKey" -o tsv)
-
-# Store directly in Key Vault
-# Changes Azure/state: provider syntax only; use apex preview, local Gate 4 and apex deploy. Never run directly.
-az keyvault secret set --vault-name <vault-name> --name swa-deployment-token --value "$DEPLOYMENT_TOKEN" --output none
-```
+**Recommended approach** - the token is never read by the agent or placed in a shell variable, command argument, log
+or output. Transfer it into the secret store only through an authorized secret-handling capability projected by the
+active task; if none is available, report a blocker. Reference the stored secret (for example a Key Vault reference)
+from the pipeline instead of copying the value.
 
 **Do NOT do this** (exposes token in deployment history):
 

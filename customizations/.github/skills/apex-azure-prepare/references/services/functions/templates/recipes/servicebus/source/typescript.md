@@ -19,7 +19,7 @@ Replace the contents of `src/functions/` with these files.
 import { app, InvocationContext } from "@azure/functions";
 
 export async function serviceBusTrigger(message: unknown, context: InvocationContext): Promise<void> {
-  context.log("Service Bus trigger processed message:", message);
+  context.log("Service Bus trigger processed a message (body not logged)");
   context.log("MessageId =", context.triggerMetadata.messageId);
   context.log("DeliveryCount =", context.triggerMetadata.deliveryCount);
   context.log("EnqueuedTimeUtc =", context.triggerMetadata.enqueuedTimeUtc);
@@ -48,7 +48,7 @@ export async function sendMessage(request: HttpRequest, context: InvocationConte
     const messageContent = JSON.stringify(body);
 
     context.extraOutputs.set(serviceBusOutput, messageContent);
-    context.log(`Sent message to Service Bus: ${messageContent}`);
+    context.log("Sent a message to Service Bus (body not logged)");
 
     return {
       status: 200,

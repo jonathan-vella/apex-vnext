@@ -36,7 +36,7 @@ public class EventHubFunctions {
             final ExecutionContext context) {
 
         for (String event : events) {
-            context.getLogger().info("Event Hub trigger processed event: " + event);
+            context.getLogger().info("Event Hub trigger processed an event (payload not logged)");
         }
     }
 
@@ -61,7 +61,7 @@ public class EventHubFunctions {
         String body = request.getBody().orElse("{\"message\": \"Hello Event Hub!\"}");
 
         outputEvent.setValue(body);
-        context.getLogger().info("Sent event to Event Hub: " + body);
+        context.getLogger().info("Sent an event to Event Hub (payload not logged)");
 
         return request.createResponseBuilder(HttpStatus.OK)
             .header("Content-Type", "application/json")

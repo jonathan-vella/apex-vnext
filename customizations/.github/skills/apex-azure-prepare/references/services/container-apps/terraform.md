@@ -56,7 +56,8 @@ resource "azurerm_container_app" "api" {
 
     container {
       name   = "api"
-      image  = "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
+      # Placeholder image for first provision; real deployments use an accepted immutable digest or exact release tag.
+      image  = "mcr.microsoft.com/azuredocs/containerapps-helloworld:<accepted-tag>"
       cpu    = 0.25
       memory = "0.5Gi"
     }
@@ -112,8 +113,8 @@ ACR_SERVER=$(terraform output -raw acr_login_server)
 APP_NAME=$(terraform output -raw container_app_name)
 RG_NAME=$(terraform output -raw resource_group_name)
 
-# 1. Build and push the application image to ACR
-az acr build --registry $ACR_NAME --image myapp:latest ./src/api
+# 1. Build and push the application image to ACR with an exact release tag (accepted immutable digest preferred)
+az acr build --registry $ACR_NAME --image myapp:$IMAGE_TAG ./src/api
 
 # 2. Configure the registry/identity link (managed identity, no passwords)
 # Changes Azure/state: provider syntax only; use apex preview, local Gate 4 and apex deploy. Never run directly.
@@ -128,7 +129,7 @@ az containerapp registry set \
 az containerapp update \
   --name $APP_NAME \
   --resource-group $RG_NAME \
-  --image $ACR_SERVER/myapp:latest
+  --image $ACR_SERVER/myapp:$IMAGE_TAG
 ```
 
 **PowerShell:**
@@ -139,8 +140,8 @@ $AcrServer = terraform output -raw acr_login_server
 $AppName = terraform output -raw container_app_name
 $RgName = terraform output -raw resource_group_name
 
-# 1. Build and push the application image to ACR
-az acr build --registry $AcrName --image myapp:latest ./src/api
+# 1. Build and push the application image to ACR with an exact release tag (accepted immutable digest preferred)
+az acr build --registry $AcrName --image myapp:$ImageTag ./src/api
 
 # 2. Configure the registry/identity link (managed identity, no passwords)
 # Changes Azure/state: provider syntax only; use apex preview, local Gate 4 and apex deploy. Never run directly.
@@ -155,7 +156,7 @@ az containerapp registry set `
 az containerapp update `
   --name $AppName `
   --resource-group $RgName `
-  --image "$AcrServer/myapp:latest"
+  --image "$AcrServer/myapp:$ImageTag"
 ```
 
 > ⚠️ **Warning:** Step 2 requires the `AcrPull` role assignment to have propagated (1–5 minutes after `terraform apply`

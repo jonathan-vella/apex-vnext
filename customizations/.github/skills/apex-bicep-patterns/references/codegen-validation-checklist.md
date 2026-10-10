@@ -62,14 +62,15 @@ Verify ALL items before marking Step 5 complete.
     ).
   - `Microsoft.CostManagement/scheduledActions` (`InsightAlert`) has `notification.to[]` + `notification.subject` ,
     sub-scope `viewId` , `displayName` ≤ 25 chars, and lives in a `targetScope = 'subscription'` module
-    ([`cost-alerts-bicep.md`
-    §6](https://github.com/jonathan-vella/apex/blob/c209d8bb765681aa21dce5d3cd2a3b080dad8d5e/.github/skills/apex-azure-defaults/references/cost-alerts-bicep.md#6-cost-anomaly-alert-subscription-scoped)).
+    (see [cost monitoring](../../apex-azure-defaults/references/cost-monitoring.md); confirm the schema with current
+    accepted provider evidence).
   - Every `entra-object-id` shaped param in `04-environment-manifest.json` is declared as **required,
     deploy-time-resolved** (not baked into the bicepparam) ([`avm-pitfalls.md` § SQL Entra admin object ID
     resolution](avm-pitfalls.md#sql-entra-admin-object-id-resolution)).
   - Budget / Action Group emit conditions do not silently no-op when `costAlertEmails == []` unless
-    `cost_monitoring_mode ∈ {minimal, deferred}` is recorded in governance ([`cost-alerts-baseline.md` § Empty-array
-    silent-skip](https://github.com/jonathan-vella/apex/blob/c209d8bb765681aa21dce5d3cd2a3b080dad8d5e/.github/skills/apex-azure-defaults/references/cost-alerts-baseline.md#empty-array-silent-skip-deploy-time-hazard)).
+    `cost_monitoring_mode ∈ {minimal, deferred}` is recorded in governance (see
+    [cost monitoring](../../apex-azure-defaults/references/cost-monitoring.md): an empty recipient list is a blocker,
+    not a silent skip).
 
 ## Deployment Artifacts
 

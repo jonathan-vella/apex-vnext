@@ -44,7 +44,7 @@ ACR_NAME=$(az deployment group show \
 
 # Build and push containers
 az acr login --name "$ACR_NAME"
-az acr build --registry "$ACR_NAME" --image api:latest ./src/api
+az acr build --registry "$ACR_NAME" --image "api:$IMAGE_TAG" ./src/api
 
 echo "Deployment complete!"
 ```
@@ -85,7 +85,7 @@ $AcrName = az deployment group show `
 
 # Build and push containers
 az acr login --name $AcrName
-az acr build --registry $AcrName --image api:latest ./src/api
+az acr build --registry $AcrName --image "api:$ImageTag" ./src/api
 
 Write-Host "Deployment complete!"
 ```

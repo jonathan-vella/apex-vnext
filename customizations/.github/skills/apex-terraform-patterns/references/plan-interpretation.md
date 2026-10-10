@@ -25,13 +25,16 @@ terraform show -json plan.tfplan > plan.json
 
 ## Change Type Symbols
 
-| Symbol | Meaning         | Action                                           |
-| ------ | --------------- | ------------------------------------------------ |
-| `+`    | Create          | New resource — safe                              |
-| `-`    | Destroy         | Resource deleted — REVIEW before applying        |
-| `~`    | Update in-place | Attribute change — usually safe                  |
-| `-/+`  | Destroy/Create  | Replace — causes downtime for stateful resources |
-| `<=`   | Read            | Data source refresh — non-destructive            |
+| Symbol | Meaning         | Action                                                                       |
+| ------ | --------------- | ---------------------------------------------------------------------------- |
+| `+`    | Create          | New resource — assess changed attributes (exposure, cost, identity, policy)  |
+| `-`    | Destroy         | Resource deleted — REVIEW before applying                                    |
+| `~`    | Update in-place | Attribute change — assess the attributes (network, access, SKU, identity)    |
+| `-/+`  | Destroy/Create  | Replace — causes downtime for stateful resources                             |
+| `<=`   | Read            | Data source refresh — non-destructive                                        |
+
+The action symbol alone never establishes safety; approval requires reviewing the actual changed attributes against
+the accepted policy and intent.
 
 ## Red Flags in Plan Output
 

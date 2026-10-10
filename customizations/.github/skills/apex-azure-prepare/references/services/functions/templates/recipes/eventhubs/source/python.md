@@ -31,7 +31,7 @@ def eventhub_trigger(events: List[func.EventHubEvent]):
     """Process batch of events from Event Hub."""
     for event in events:
         body = event.get_body().decode('utf-8')
-        logging.info(f"Event Hub trigger processed event: {body}")
+        logging.info("Event Hub trigger processed an event (payload not logged)")
         logging.info(f"  Partition: {event.partition_key}")
         logging.info(f"  EnqueuedTime: {event.enqueued_time}")
         logging.info(f"  SequenceNumber: {event.sequence_number}")
@@ -54,7 +54,7 @@ def send_event(req: func.HttpRequest, outputEvent: func.Out[str]) -> func.HttpRe
     event_data = json.dumps(body)
     outputEvent.set(event_data)
 
-    logging.info(f"Sent event to Event Hub: {event_data}")
+    logging.info("Sent an event to Event Hub (payload not logged)")
     return func.HttpResponse(
         json.dumps({"status": "sent", "data": body}),
         mimetype="application/json",

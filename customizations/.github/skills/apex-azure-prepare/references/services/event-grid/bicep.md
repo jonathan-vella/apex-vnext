@@ -51,13 +51,17 @@ resource eventDomain 'Microsoft.EventGrid/domains@2025-02-15' = {
 
 ### Node.js
 
+Authenticate with managed identity and the accepted Event Grid data-plane role (for example
+`EventGrid Data Sender`); do not use topic access keys for new work.
+
 ```javascript
-const { EventGridPublisherClient, AzureKeyCredential } = require("@azure/eventgrid");
+const { EventGridPublisherClient } = require("@azure/eventgrid");
+const { DefaultAzureCredential } = require("@azure/identity");
 
 const client = new EventGridPublisherClient(
   process.env.EVENTGRID_TOPIC_ENDPOINT,
   "EventGrid",
-  new AzureKeyCredential(process.env.EVENTGRID_TOPIC_KEY),
+  new DefaultAzureCredential(),
 );
 
 await client.send([
@@ -73,12 +77,14 @@ await client.send([
 ### Python
 
 ```python
+import os
+
 from azure.eventgrid import EventGridPublisherClient, EventGridEvent
-from azure.core.credentials import AzureKeyCredential
+from azure.identity import DefaultAzureCredential
 
 client = EventGridPublisherClient(
     os.environ["EVENTGRID_TOPIC_ENDPOINT"],
-    AzureKeyCredential(os.environ["EVENTGRID_TOPIC_KEY"])
+    DefaultAzureCredential()
 )
 
 client.send([EventGridEvent(

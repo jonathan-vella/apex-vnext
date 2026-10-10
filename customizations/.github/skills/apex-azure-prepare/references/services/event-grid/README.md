@@ -40,10 +40,12 @@ Serverless event routing for event-driven architectures.
 
 ## Environment Variables
 
-| Variable                   | Value                        |
-| -------------------------- | ---------------------------- |
-| `EVENTGRID_TOPIC_ENDPOINT` | Topic endpoint URL           |
-| `EVENTGRID_TOPIC_KEY`      | Topic access key (Key Vault) |
+| Variable                   | Value              |
+| -------------------------- | ------------------ |
+| `EVENTGRID_TOPIC_ENDPOINT` | Topic endpoint URL |
+
+Publishers authenticate with managed identity and the accepted Event Grid data-plane role (for example
+`EventGrid Data Sender`); no topic access key is stored. A key-based client is existing-app migration only.
 
 ## References
 

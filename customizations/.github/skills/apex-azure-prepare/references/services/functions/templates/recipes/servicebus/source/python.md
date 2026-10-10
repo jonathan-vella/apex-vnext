@@ -29,7 +29,7 @@ app = func.FunctionApp()
 def servicebus_trigger(msg: func.ServiceBusMessage) -> None:
     """Process messages from Service Bus queue."""
     message_body = msg.get_body().decode('utf-8')
-    logging.info(f"Service Bus trigger processed message: {message_body}")
+    logging.info("Service Bus trigger processed a message (body not logged)")
 
     # Log message metadata
     logging.info(f"Message ID: {msg.message_id}")
@@ -50,7 +50,7 @@ def send_message(req: func.HttpRequest, message: func.Out[str]) -> func.HttpResp
         body = req.get_json()
         message_content = json.dumps(body)
         message.set(message_content)
-        logging.info(f"Sent message to Service Bus: {message_content}")
+        logging.info("Sent a message to Service Bus (body not logged)")
         return func.HttpResponse(
             json.dumps({"status": "sent", "data": body}),
             mimetype="application/json",

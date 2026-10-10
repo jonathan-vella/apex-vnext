@@ -32,17 +32,25 @@ const pool = await sql.connect(config);
 > for production patterns.
 
 ```python
+import os
+import struct
+
 import pyodbc
 from azure.identity import DefaultAzureCredential
 
-credential = DefaultAzureCredential()
-token = credential.get_token("https://database.windows.net/.default")
+SQL_COPT_SS_ACCESS_TOKEN = 1256  # ODBC pre-connect attribute for an Entra access token
 
+credential = DefaultAzureCredential()
+token = credential.get_token("https://database.windows.net/.default").token.encode("utf-16-le")
+token_struct = struct.pack(f"<I{len(token)}s", len(token), token)
+
+# Do not also set an Authentication= keyword; the token carries the identity (local developer or managed identity).
 conn = pyodbc.connect(
     f"Driver={{ODBC Driver 18 for SQL Server}};"
     f"Server={os.environ['SQL_SERVER']};"
     f"Database={os.environ['SQL_DATABASE']};"
-    f"Authentication=ActiveDirectoryMsi"
+    f"Encrypt=yes",
+    attrs_before={SQL_COPT_SS_ACCESS_TOKEN: token_struct},
 )
 ```
 

@@ -10,7 +10,7 @@
 | --------------------------- | ------------------------------- |
 | `Backend init failed`       | Check storage account access    |
 | `Provider version conflict` | Update required_providers       |
-| `State lock failed`         | Wait or force unlock            |
+| `State lock failed`         | Wait; diagnose lease/owner. Never force-unlock; recover through the authorized ownership/recovery path |
 | `Validation failed`         | Check terraform validate output |
 
 ## Debug

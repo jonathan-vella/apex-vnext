@@ -27,7 +27,7 @@
 const { app } = require("@azure/functions");
 
 app.cosmosDB("cosmosDBTrigger", {
-  connectionStringSetting: "COSMOS_CONNECTION",
+  connection: "COSMOS_CONNECTION",
   databaseName: "%COSMOS_DATABASE_NAME%",
   containerName: "%COSMOS_CONTAINER_NAME%",
   createLeaseContainerIfNotExists: true,
@@ -36,7 +36,6 @@ app.cosmosDB("cosmosDBTrigger", {
 
     for (const doc of documents) {
       context.log(`Document ID: ${doc.id}`);
-      context.log(`Document content: ${JSON.stringify(doc)}`);
     }
   },
 });

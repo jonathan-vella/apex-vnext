@@ -105,14 +105,15 @@ output resourceId string = storageAccount.id
 @description('Name of the storage account')
 output resourceName string = storageAccount.name
 
-@description('Principal ID of the managed identity (empty if none)')
-output principalId string = storageAccount.identity.?principalId ?? ''
+@description('Principal ID of the managed identity (null when the resource has none)')
+output principalId string? = storageAccount.identity.?principalId
 ```
 
 Module conventions:
 
 - Every module accepts `name`, `location`, `tags`, `logAnalyticsWorkspaceName`
-- Every module outputs `resourceId`, `resourceName`, `principalId`
+- Every module outputs `resourceId`, `resourceName`, and a nullable `principalId`; an absent principal stays null and
+  consumers must guard RBAC assignments on it rather than receive a synthesized value
 - Use `@description` on all parameters and outputs
 - Use AVM modules when available — wrap with project-specific defaults if needed
 
