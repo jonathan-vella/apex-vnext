@@ -32,6 +32,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   described as planned work (CP-26 to CP-30), not shipped behavior; OIDC identity is not human approval. Mermaid
   renderer availability is unchanged; standalone diagrams remain Python-owned. Per-file upstream coverage, pins,
   manifest and guidance catalog are updated.
+- The seven IaC/content skills (`apex-bicep-patterns`, `apex-terraform-patterns`, `apex-terraform-test`,
+  `apex-terraform-import`, `apex-azure-validate`, `apex-azure-prepare` and `apex-artifacts`) are re-ported from
+  `jonathan-vella/apex@c209d8bb765681aa21dce5d3cd2a3b080dad8d5e` (CP-18/CP-21). Progressive-disclosure references
+  retain service, Functions, CLI, azd, SDK, provider/test/import and full document-outline guidance.
+  Current typed artifacts, accepted evidence, freshness, writer ownership and kernel gates remain authoritative;
+  obsolete upstream plan/status/recall formats and direct mutation scripts do not become runtime interfaces.
+  Read diagnostics are allowed; mutations still require exact preview plus the current Gate 4 and bounded deployment.
+  Per DECISION-036 and ADR-0007, azd is documented as the planned Bicep-only executor (CP-26) and native Terraform CLI
+  as the Terraform path; APEX never runs `azd up`. The purpose-bound lab flow (CP-27) and CI-owned production runs
+  (CP-28/CP-29) are described only as planned, and OIDC job identity is not human approval.
+  Invocation metadata, current delivery mappings, upstream pins and the generated catalog are updated.
+  Retired root guidance stays archived; its hash-bound draft mappings are preserved in the upstream pins.
+  Other skill groups remain unchanged for later batches.
 - The shipped Azure design skills (`apex-azure-defaults`, `apex-azure-adr`, `apex-azure-compute`, `apex-azure-storage`,
   `apex-azure-rbac`, `apex-azure-quotas`, `apex-azure-cost-optimization`, `apex-azure-governance`,
   `apex-azure-compliance`, `apex-azure-resources`, `apex-entra-app-registration` and `apex-microsoft-docs`) are
