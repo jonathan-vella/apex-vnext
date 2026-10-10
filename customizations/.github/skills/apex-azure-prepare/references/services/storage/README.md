@@ -52,11 +52,12 @@ Scalable cloud storage for blobs, files, queues, and tables.
 
 ## Environment Variables
 
-| Variable                          | Value                         |
-| --------------------------------- | ----------------------------- |
-| `AZURE_STORAGE_CONNECTION_STRING` | Connection string (Key Vault) |
-| `AZURE_STORAGE_ACCOUNT`           | Account name                  |
-| `AZURE_STORAGE_CONTAINER`         | Container name                |
+| Variable                  | Value          |
+| ------------------------- | -------------- |
+| `AZURE_STORAGE_ACCOUNT`   | Account name   |
+| `AZURE_STORAGE_CONTAINER` | Container name |
+
+Clients use Microsoft Entra ID and managed identity; no connection string or account key is part of the contract.
 
 ## References
 

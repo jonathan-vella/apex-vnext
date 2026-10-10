@@ -61,22 +61,32 @@ resource storageRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-
 
 ## SDK Connection Patterns
 
+The baseline disables shared-key access, so clients authenticate with Microsoft Entra ID and the accepted Storage
+data-plane roles. Do not use account keys or `AZURE_STORAGE_CONNECTION_STRING` for new work.
+
 ### Node.js
 
 ```javascript
+const { DefaultAzureCredential } = require("@azure/identity");
 const { BlobServiceClient } = require("@azure/storage-blob");
 
-const blobServiceClient = BlobServiceClient.fromConnectionString(process.env.AZURE_STORAGE_CONNECTION_STRING);
+const blobServiceClient = new BlobServiceClient(
+  `https://${process.env.AZURE_STORAGE_ACCOUNT}.blob.core.windows.net`,
+  new DefaultAzureCredential()
+);
 const containerClient = blobServiceClient.getContainerClient("uploads");
 ```
 
 ### Python
 
 ```python
+import os
+from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient
 
-blob_service_client = BlobServiceClient.from_connection_string(
-    os.environ["AZURE_STORAGE_CONNECTION_STRING"]
+blob_service_client = BlobServiceClient(
+    account_url=f"https://{os.environ['AZURE_STORAGE_ACCOUNT']}.blob.core.windows.net",
+    credential=DefaultAzureCredential(),
 )
 container_client = blob_service_client.get_container_client("uploads")
 ```
@@ -85,7 +95,8 @@ container_client = blob_service_client.get_container_client("uploads")
 
 ```csharp
 var blobServiceClient = new BlobServiceClient(
-    Environment.GetEnvironmentVariable("AZURE_STORAGE_CONNECTION_STRING")
+    new Uri($"https://{Environment.GetEnvironmentVariable("AZURE_STORAGE_ACCOUNT")}.blob.core.windows.net"),
+    new DefaultAzureCredential()
 );
 var containerClient = blobServiceClient.GetBlobContainerClient("uploads");
 ```
