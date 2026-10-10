@@ -16,7 +16,12 @@ async function fixture(repositoryOptions = {}) {
     defaultIacTool: "bicep",
     riskOwner: "partner",
   });
-  await projects.createRun("demo", { environment: "dev", targetScope: "scope", runtimeLockHash: "a".repeat(64) });
+  await projects.createRun("demo", {
+    environment: "dev",
+    purpose: "lab",
+    targetScope: "scope",
+    runtimeLockHash: "a".repeat(64),
+  });
   const transfers = new WriterTransferStore(projects.runDirectory("demo", "run-1"), clock, repositoryOptions);
   await transfers.leaseStore().acquire("alice", 10_000);
   return {

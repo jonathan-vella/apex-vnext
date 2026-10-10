@@ -1,6 +1,7 @@
 import { Type, type Static } from "@sinclair/typebox";
 import {
   ContractVersionSchema,
+  DeploymentPurposeSchema,
   EnvironmentSchema,
   IacToolSchema,
   IsoDateTimeSchema,
@@ -66,6 +67,7 @@ export const RunConfigV1Schema = Type.Object(
     projectId: ProjectIdSchema,
     runId: RunIdSchema,
     environment: EnvironmentSchema,
+    purpose: DeploymentPurposeSchema,
     targetScope: NonEmptyStringSchema,
     iacTool: IacToolSchema,
     createdAt: IsoDateTimeSchema,

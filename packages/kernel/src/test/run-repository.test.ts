@@ -20,7 +20,12 @@ test("run repository CAS permits one mutation and rejects a racing stale hash", 
     defaultIacTool: "bicep",
     riskOwner: "partner",
   });
-  await store.createRun("demo", { environment: "dev", targetScope: "scope", runtimeLockHash: "a".repeat(64) });
+  await store.createRun("demo", {
+    environment: "dev",
+    purpose: "lab",
+    targetScope: "scope",
+    runtimeLockHash: "a".repeat(64),
+  });
   const repository = new RunRepository(store.runDirectory("demo", "run-1"));
   const expectedRunHash = await repository.hash();
   const mutation = (eventId: string) =>
@@ -57,7 +62,12 @@ test("run repository never exposes partial lock metadata under contention", asyn
     defaultIacTool: "bicep",
     riskOwner: "partner",
   });
-  await store.createRun("demo", { environment: "dev", targetScope: "scope", runtimeLockHash: "a".repeat(64) });
+  await store.createRun("demo", {
+    environment: "dev",
+    purpose: "lab",
+    targetScope: "scope",
+    runtimeLockHash: "a".repeat(64),
+  });
   const repository = new RunRepository(store.runDirectory("demo", "run-1"));
   const results = await Promise.allSettled(Array.from({ length: 64 }, () => repository.read()));
   assert.ok(results.some(({ status }) => status === "fulfilled"));
@@ -80,7 +90,12 @@ test("run repository reclaims an expired dead-owner generation into a permanent 
     defaultIacTool: "bicep",
     riskOwner: "partner",
   });
-  await store.createRun("demo", { environment: "dev", targetScope: "scope", runtimeLockHash: "a".repeat(64) });
+  await store.createRun("demo", {
+    environment: "dev",
+    purpose: "lab",
+    targetScope: "scope",
+    runtimeLockHash: "a".repeat(64),
+  });
   const directory = store.runDirectory("demo", "run-1");
   const lockPath = join(directory, ".run-mutation.lock");
   await mkdir(lockPath);
@@ -125,7 +140,12 @@ test("run repository never reclaims an expired lock owned by a live local proces
     defaultIacTool: "bicep",
     riskOwner: "partner",
   });
-  await store.createRun("demo", { environment: "dev", targetScope: "scope", runtimeLockHash: "a".repeat(64) });
+  await store.createRun("demo", {
+    environment: "dev",
+    purpose: "lab",
+    targetScope: "scope",
+    runtimeLockHash: "a".repeat(64),
+  });
   const directory = store.runDirectory("demo", "run-1");
   const lockPath = join(directory, ".run-mutation.lock");
   await mkdir(lockPath);
@@ -159,7 +179,12 @@ test("run repository rejects missing metadata in a stable lock generation", asyn
     defaultIacTool: "bicep",
     riskOwner: "partner",
   });
-  await store.createRun("demo", { environment: "dev", targetScope: "scope", runtimeLockHash: "a".repeat(64) });
+  await store.createRun("demo", {
+    environment: "dev",
+    purpose: "lab",
+    targetScope: "scope",
+    runtimeLockHash: "a".repeat(64),
+  });
   const directory = store.runDirectory("demo", "run-1");
   await mkdir(join(directory, ".run-mutation.lock"));
   await assert.rejects(new RunRepository(directory).read(), /Run mutation lock metadata is unreadable/u);
@@ -178,7 +203,12 @@ test("run repository rejects a mutation when the validated journal head changed"
     defaultIacTool: "bicep",
     riskOwner: "partner",
   });
-  await store.createRun("demo", { environment: "dev", targetScope: "scope", runtimeLockHash: "a".repeat(64) });
+  await store.createRun("demo", {
+    environment: "dev",
+    purpose: "lab",
+    targetScope: "scope",
+    runtimeLockHash: "a".repeat(64),
+  });
   const repository = new RunRepository(store.runDirectory("demo", "run-1"));
   const validatedHead = await repository.journal.head();
   await repository.journal.append({
@@ -225,7 +255,12 @@ for (const stage of ["intent", "journal", "run", "cleanup"] as const) {
       defaultIacTool: "bicep",
       riskOwner: "partner",
     });
-    await store.createRun("demo", { environment: "dev", targetScope: "scope", runtimeLockHash: "a".repeat(64) });
+    await store.createRun("demo", {
+      environment: "dev",
+      purpose: "lab",
+      targetScope: "scope",
+      runtimeLockHash: "a".repeat(64),
+    });
     const directory = store.runDirectory("demo", "run-1");
     const repository = new RunRepository(directory, {
       faultInjector: (current) => {
@@ -270,7 +305,12 @@ async function writerLeaseFixture(now: { value: Date }) {
     defaultIacTool: "bicep",
     riskOwner: "partner",
   });
-  await store.createRun("demo", { environment: "dev", targetScope: "scope", runtimeLockHash: "a".repeat(64) });
+  await store.createRun("demo", {
+    environment: "dev",
+    purpose: "lab",
+    targetScope: "scope",
+    runtimeLockHash: "a".repeat(64),
+  });
   const directory = store.runDirectory("demo", "run-1");
   return { directory, repository: new RunRepository(directory, { clock: () => now.value, writerLeaseTtlMs: 1_000 }) };
 }

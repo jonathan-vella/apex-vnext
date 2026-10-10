@@ -39,6 +39,7 @@ import {
   LiveQualificationV1Schema,
   LIVE_QUALIFICATION_SCENARIO_IDS,
   OnboardingConfigV1Schema,
+  RunConfigV1Schema,
   BootstrapPlanV1Schema,
   GovernanceSetupConfigV1Schema,
   GovernanceSetupPlanV1Schema,
@@ -834,6 +835,32 @@ describe("Wave 1 contracts", () => {
     for (const client of ["github-copilot-vscode", "both", "unsupported"])
       assert.equal(Value.Check(OnboardingConfigV1Schema, { ...config, client }), false);
     assert.equal(Value.Check(OnboardingConfigV1Schema, { ...config, unexpected: true }), false);
+    for (const purpose of ["lab", "production"])
+      assert.equal(Value.Check(OnboardingConfigV1Schema, { ...config, purpose }), true);
+    for (const purpose of ["dev", "non-production", "", 1])
+      assert.equal(Value.Check(OnboardingConfigV1Schema, { ...config, purpose }), false);
+  });
+
+  it("requires a lab or production purpose on run configuration", () => {
+    const run = {
+      schemaVersion: CONTRACT_VERSION,
+      projectId: "payments",
+      runId: "run-1",
+      environment: "dev",
+      purpose: "lab",
+      targetScope: "local",
+      iacTool: "bicep",
+      createdAt: "2026-10-10T00:00:00.000Z",
+      runtimeLockHash: "a".repeat(64),
+      ownerEpoch: 1,
+      gates: [1, 2, 3, 4].map((gate) => ({ gate, state: "closed", dependencyHash: "a".repeat(64) })),
+    };
+    for (const purpose of ["lab", "production"])
+      assert.equal(Value.Check(RunConfigV1Schema, { ...run, purpose }), true, purpose);
+    const { purpose: _purpose, ...withoutPurpose } = run;
+    assert.equal(Value.Check(RunConfigV1Schema, withoutPurpose), false);
+    for (const purpose of ["dev", "test", "non-production", "Lab", ""])
+      assert.equal(Value.Check(RunConfigV1Schema, { ...run, purpose }), false, purpose);
   });
 
   it("binds live qualification evidence to an exact candidate", () => {

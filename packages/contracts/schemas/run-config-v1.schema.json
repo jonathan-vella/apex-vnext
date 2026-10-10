@@ -100,6 +100,18 @@
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
       "type": "string"
     },
+    "purpose": {
+      "anyOf": [
+        {
+          "const": "lab",
+          "type": "string"
+        },
+        {
+          "const": "production",
+          "type": "string"
+        }
+      ]
+    },
     "runId": {
       "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$",
       "type": "string"
@@ -122,6 +134,7 @@
     "projectId",
     "runId",
     "environment",
+    "purpose",
     "targetScope",
     "iacTool",
     "createdAt",

@@ -6,6 +6,7 @@ import { dependencyRevision } from "../dependency-revision.js";
 const run = {
   projectId: "demo",
   runId: "run-1",
+  purpose: "lab",
   targetScope: "scope-a",
   iacTool: "bicep",
   runtimeLockHash: "a".repeat(64),
@@ -63,6 +64,7 @@ test("dependency revision ignores ownership but binds target, runtime, and artif
   const transferredRun: RunConfigV1 = { ...run, ownerEpoch: 2 };
   assert.equal(dependencyRevision(transferredRun, [artifactEvent]), original);
   assert.notEqual(dependencyRevision({ ...run, targetScope: "scope-b" }, [artifactEvent]), original);
+  assert.notEqual(dependencyRevision({ ...run, purpose: "production" }, [artifactEvent]), original);
   assert.notEqual(dependencyRevision({ ...run, runtimeLockHash: "c".repeat(64) }, [artifactEvent]), original);
   assert.notEqual(
     dependencyRevision(run, [{ ...artifactEvent, payload: { artifactHashes: { requirements: "d".repeat(64) } } }]),

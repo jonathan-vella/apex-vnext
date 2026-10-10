@@ -471,6 +471,7 @@ const projectCreateInput = z
     projectId: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
     displayName: z.string().min(1).max(256),
     environment: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+    purpose: z.enum(["lab", "production"]).optional(),
     targetScope: z.string().max(1024).regex(TARGET_SCOPE_PATTERN, `Use ${TARGET_SCOPE_HINT}`),
     iacTool: z.enum(["bicep", "terraform"]),
     riskOwner: z.enum(["partner", "customer"]),
@@ -881,7 +882,7 @@ export function createMcpServerFactory(
     "projectCreate",
     {
       description:
-        "Create and select a new project with its initial environment run. targetScope is the user's explicit choice: local, or a full /subscriptions/<id>/resourceGroups/<name> path.",
+        "Create and select a new project with its initial environment run. targetScope is the user's explicit choice: local, or a full /subscriptions/<id>/resourceGroups/<name> path. purpose is lab (default) or production; production is unavailable until CP-28/CP-29 ship and is rejected.",
       inputSchema: projectCreateInput,
     },
     async (input) => result(await service.createProject(input as Parameters<typeof service.createProject>[0])),
@@ -1202,10 +1203,10 @@ export function createMcpServerFactory(
     "promote",
     {
       description:
-        "Promote the selected run to a target environment through kernel checks; does not approve or execute deployment.",
-      inputSchema: { environment: z.string(), target: z.string() },
+        "Promote the selected run to a target environment through kernel checks; does not approve or execute deployment. The run's purpose is kept; a different purpose needs a new project.",
+      inputSchema: { environment: z.string(), target: z.string(), purpose: z.enum(["lab", "production"]).optional() },
     },
-    async ({ environment, target }) => result(await service.promote(environment, target)),
+    async ({ environment, target, purpose }) => result(await service.promote(environment, target, purpose)),
   );
   registerTool(
     "doctor",

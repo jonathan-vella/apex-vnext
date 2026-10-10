@@ -3188,6 +3188,7 @@ test("promotion inherits neutral progression and restarts at the first environme
   const codegen = await reachCodegen(service, runId, "bicep");
   await service.cancelTask(codegen.taskId);
   const sameScope = await service.promote("stage", "local");
+  assert.equal(sameScope.purpose, "lab");
   assert.deepEqual(
     sameScope.gates.map(({ state }) => state),
     ["inherited", "inherited", "inherited", "closed"],
@@ -3197,6 +3198,7 @@ test("promotion inherits neutral progression and restarts at the first environme
 
   await service.use("demo", runId);
   const changedScope = await service.promote("prod", "subscription/prod");
+  assert.equal(changedScope.purpose, "lab");
   assert.deepEqual(
     changedScope.gates.map(({ state }) => state),
     ["inherited", "closed", "closed", "closed"],

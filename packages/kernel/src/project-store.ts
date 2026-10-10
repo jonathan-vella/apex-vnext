@@ -1,9 +1,18 @@
-import type { IacTool, ProjectConfigV1, ProjectId, RiskOwner, RunConfigV1, RunId } from "@apexops/contracts";
+import type {
+  DeploymentPurpose,
+  IacTool,
+  ProjectConfigV1,
+  ProjectId,
+  RiskOwner,
+  RunConfigV1,
+  RunId,
+} from "@apexops/contracts";
 import { CONTRACT_VERSION } from "@apexops/contracts";
 import { mkdir, readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { atomicWriteJson } from "./files.js";
 import type { Clock } from "./lease-store.js";
+import { parseRunConfig } from "./run-config.js";
 
 export type IdSource = () => string;
 
@@ -16,6 +25,7 @@ export interface InitializeProjectInput {
 
 export interface CreateRunInput {
   environment: string;
+  purpose: DeploymentPurpose;
   targetScope: string;
   runtimeLockHash: string;
   iacTool?: IacTool;
@@ -56,6 +66,7 @@ export class ProjectStore {
       projectId,
       runId,
       environment: input.environment,
+      purpose: input.purpose,
       targetScope: input.targetScope,
       iacTool: input.iacTool ?? project.defaultIacTool,
       createdAt: this.clock().toISOString(),
@@ -76,7 +87,7 @@ export class ProjectStore {
   }
 
   async getRun(projectId: ProjectId, runId: RunId): Promise<RunConfigV1> {
-    return this.readJson(join(this.runDirectory(projectId, runId), "run.json"));
+    return parseRunConfig(await readFile(join(this.runDirectory(projectId, runId), "run.json"), "utf8"));
   }
 
   projectDirectory(projectId: ProjectId): string {

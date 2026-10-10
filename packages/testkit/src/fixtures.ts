@@ -56,6 +56,7 @@ export function runFixture(overrides: Partial<RunConfigV1> = {}): RunConfigV1 {
     projectId: "test-project",
     runId: "run-0001",
     environment: "test",
+    purpose: "lab",
     targetScope: "/subscriptions/00000000-0000-0000-0000-000000000000",
     iacTool: "bicep",
     createdAt: FIXTURE_TIME,

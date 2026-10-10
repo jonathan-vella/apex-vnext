@@ -45,7 +45,7 @@ test("workflow manifest validates and routes both tracks deterministically", () 
   assert.equal(bicep.nextTask, "codegen-bicep");
   assert.equal(bicep.ownerRole, "bicep-codegen");
   const discovery = engine.route({
-    run: { iacTool: "bicep", targetScope: "scope" },
+    run: { iacTool: "bicep", purpose: "lab", targetScope: "scope" },
     artifacts: { "governance-capability-lock": {} },
     completedNodes: ["requirements", "gate-1", "architecture"],
     gateStates: { "gate-1": "approved" },
@@ -114,7 +114,7 @@ test("manifest order and dependencies are runtime routing authority", () => {
   changed.nodes.splice(changed.nodes.indexOf(governance), 1);
   changed.nodes.splice(changed.nodes.indexOf(architecture), 0, governance);
   const route = new WorkflowEngine(changed).route({
-    run: { iacTool: "bicep", targetScope: "scope" },
+    run: { iacTool: "bicep", purpose: "lab", targetScope: "scope" },
     artifacts: { "governance-capability-lock": {} },
     completedNodes: ["requirements", "gate-1"],
     gateStates: { "gate-1": "approved" },

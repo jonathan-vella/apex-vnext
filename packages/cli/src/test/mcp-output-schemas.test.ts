@@ -306,6 +306,7 @@ test("actual MCP handlers wrap service fixtures and sanitize failures for every 
     projectId: "demo",
     displayName: "Demo",
     environment: "dev",
+    purpose: "lab",
     targetScope: "local",
     iacTool: "bicep",
     riskOwner: "partner",
@@ -372,7 +373,11 @@ test("actual MCP handlers wrap service fixtures and sanitize failures for every 
     improvementObservations: { method: "improvementObservations", input: {}, args: [] },
     improvementProposals: { method: "improvementProposals", input: {}, args: [] },
     render: { method: "render", input: { kind: "status" }, args: ["status"] },
-    promote: { method: "promote", input: { environment: "prod", target: "local" }, args: ["prod", "local"] },
+    promote: {
+      method: "promote",
+      input: { environment: "prod", target: "local", purpose: "lab" },
+      args: ["prod", "local", "lab"],
+    },
     doctor: { method: "doctor", input: {}, args: [undefined, undefined] },
     doctorChecks: { method: "doctor", input: {}, args: [] },
     submitEvidence: {

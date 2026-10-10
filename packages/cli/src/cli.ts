@@ -4,6 +4,7 @@ import { NativeBicepProvider, NativeTerraformProvider, ProcessRunner, type IacPr
 import {
   CONTRACT_VERSION,
   OnboardingConfigV1Schema,
+  type DeploymentPurpose,
   QualityMeasurementsV1Schema,
   type OnboardingConfigV1,
   type QualityMeasurementsV1,
@@ -24,6 +25,7 @@ import {
 import { join, resolve } from "node:path";
 import { ApexError, EXIT_CODES, normalizeError } from "./errors.js";
 import { dependencyRevision as calculateDependencyRevision } from "./dependency-revision.js";
+import { isDeploymentPurpose } from "./purpose.js";
 import { resolveBundledAssets } from "./assets.js";
 import { assertTargetScope } from "./target-scope.js";
 import { serveMcp, type McpServiceResolver } from "./mcp.js";
@@ -89,6 +91,13 @@ function riskOwner(flags: Flags): "partner" | "customer" {
   return value;
 }
 
+function purposeFlag(flags: Flags): { purpose?: DeploymentPurpose } {
+  if (flags.purpose === undefined) return {};
+  if (!isDeploymentPurpose(flags.purpose))
+    throw new ApexError("APEX_USAGE", "--purpose must be lab or production", EXIT_CODES.usage);
+  return { purpose: flags.purpose };
+}
+
 async function inputJson(flags: Flags): Promise<unknown> {
   return JSON.parse(await readFile(required(flags, "file"), "utf8")) as unknown;
 }
@@ -103,6 +112,7 @@ async function onboardingConfig(flags: Flags, _root: string): Promise<Onboarding
           ...(typeof flags.name === "string" ? { displayName: flags.name } : {}),
           ...(typeof flags.client === "string" ? { client: flags.client } : {}),
           ...(typeof flags.environment === "string" ? { environment: flags.environment } : {}),
+          ...purposeFlag(flags),
           ...(typeof flags.target === "string" ? { targetScope: flags.target } : {}),
           ...(flags.iac === "terraform" ? { iacTool: "terraform" } : {}),
           ...(typeof flags["risk-owner"] === "string" ? { riskOwner: flags["risk-owner"] } : {}),
@@ -180,6 +190,7 @@ async function configuredProviders(
     const run = JSON.parse(await readFile(join(runDirectory, "run.json"), "utf8")) as {
       projectId: string;
       runId: string;
+      purpose: DeploymentPurpose;
       targetScope: string;
       iacTool: "bicep" | "terraform";
       runtimeLockHash: string;
@@ -538,6 +549,7 @@ async function dispatch(
         projectId: required(flags, "project") as never,
         ...(typeof flags.name === "string" ? { displayName: flags.name } : {}),
         ...(typeof flags.environment === "string" ? { environment: flags.environment } : {}),
+        ...purposeFlag(flags),
         targetScope: assertTargetScope(required(flags, "target")),
         iacTool: flags.iac === "terraform" ? "terraform" : "bicep",
         riskOwner: riskOwner(flags),
@@ -596,6 +608,7 @@ async function dispatch(
         ...(config.projectId === undefined ? {} : { projectId: config.projectId }),
         ...(config.displayName === undefined ? {} : { displayName: config.displayName }),
         ...(config.environment === undefined ? {} : { environment: config.environment }),
+        ...(config.purpose === undefined ? {} : { purpose: config.purpose }),
         ...(config.targetScope === undefined ? {} : { targetScope: config.targetScope }),
         ...(config.iacTool === undefined ? {} : { iacTool: config.iacTool }),
         ...(config.riskOwner === undefined ? {} : { riskOwner: config.riskOwner }),
@@ -656,6 +669,7 @@ async function dispatch(
         projectId: required(flags, "project") as never,
         ...(typeof flags.name === "string" ? { displayName: flags.name } : {}),
         ...(typeof flags.environment === "string" ? { environment: flags.environment } : {}),
+        ...purposeFlag(flags),
         targetScope: assertTargetScope(required(flags, "target")),
         iacTool: flags.iac === "terraform" ? "terraform" : "bicep",
         riskOwner: riskOwner(flags),
@@ -675,7 +689,7 @@ async function dispatch(
     case "project history":
       return service.history(typeof flags.limit === "string" ? Number(flags.limit) : undefined);
     case "project promote":
-      return service.promote(required(flags, "environment"), required(flags, "target"));
+      return service.promote(required(flags, "environment"), required(flags, "target"), purposeFlag(flags).purpose);
     case "state transfer-export": {
       confirmed(flags, "state transfer-export");
       const ttlSeconds = Number(required(flags, "ttl-seconds"));

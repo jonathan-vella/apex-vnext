@@ -1,5 +1,5 @@
 import { GovernanceBaselineError } from "@apexops/capabilities";
-import { RunWriterConflictError } from "@apexops/kernel";
+import { RunConfigInvalidError, RunWriterConflictError } from "@apexops/kernel";
 import { APEX_VERSION } from "./version.js";
 
 export const EXIT_CODES = {
@@ -88,6 +88,15 @@ export function remediationForApexError(error: ApexError): string {
 export function normalizeError(error: unknown): ApexError {
   if (error instanceof ApexError) return error;
   if (error instanceof GovernanceBaselineError) return governanceBaselineApexError(error);
+  if (error instanceof RunConfigInvalidError) {
+    return new ApexError(
+      "APEX_VALIDATION",
+      error.message,
+      EXIT_CODES.validation,
+      { issues: error.issues },
+      { cause: error },
+    );
+  }
   if (error instanceof RunWriterConflictError) {
     return new ApexError(
       "APEX_WRITER_CONFLICT",

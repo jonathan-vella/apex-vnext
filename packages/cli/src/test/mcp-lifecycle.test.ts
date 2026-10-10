@@ -304,6 +304,7 @@ test("oversize non-pageable results fail with a stable remediation error", async
         projectId: "demo",
         runId: "run-1",
         environment: "dev",
+        purpose: "lab",
         targetScope: "local",
         iacTool: "bicep",
         createdAt: "2026-09-18T00:00:00.000Z",

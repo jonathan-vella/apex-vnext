@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -10,6 +10,7 @@ import {
   inheritGate,
   needsInput,
   ProjectStore,
+  RunConfigInvalidError,
   validateInputAnswers,
   ValidatorRegistry,
 } from "../index.js";
@@ -28,6 +29,7 @@ test("project store creates deterministic project and run layouts with four clos
   });
   const run = await store.createRun("demo", {
     environment: "dev",
+    purpose: "lab",
     targetScope: "/subscriptions/test",
     runtimeLockHash: hash,
   });
@@ -42,6 +44,44 @@ test("project store creates deterministic project and run layouts with four clos
     ],
   );
   assert.deepEqual(await store.getRun("demo", "run-fixed"), run);
+  assert.equal(run.purpose, "lab");
+  const path = join(store.runDirectory("demo", "run-fixed"), "run.json");
+  assert.equal(JSON.parse(await readFile(path, "utf8")).purpose, "lab");
+  const production = await new ProjectStore(root, clock, () => "run-production").createRun("demo", {
+    environment: "dev",
+    purpose: "production",
+    targetScope: "local",
+    runtimeLockHash: hash,
+  });
+  assert.equal(production.purpose, "production");
+});
+
+test("project store rejects run configurations without a current purpose", async () => {
+  const root = await mkdtemp(join(tmpdir(), "apex-project-"));
+  const store = new ProjectStore(
+    root,
+    () => new Date("2026-01-01T00:00:00.000Z"),
+    () => "run-old",
+  );
+  await store.initializeProject({
+    projectId: "demo",
+    displayName: "Demo",
+    defaultIacTool: "bicep",
+    riskOwner: "partner",
+  });
+  const run = await store.createRun("demo", {
+    environment: "dev",
+    purpose: "lab",
+    targetScope: "local",
+    runtimeLockHash: hash,
+  });
+  const path = join(store.runDirectory("demo", "run-old"), "run.json");
+  const { purpose: _purpose, ...old } = run;
+  await writeFile(path, JSON.stringify(old));
+  await assert.rejects(store.getRun("demo", "run-old"), RunConfigInvalidError);
+  await assert.rejects(store.getRun("demo", "run-old"), /\/purpose.*start a new run with apex project create/);
+  await writeFile(path, JSON.stringify({ ...run, purpose: "staging" }));
+  await assert.rejects(store.getRun("demo", "run-old"), RunConfigInvalidError);
 });
 
 test("Gate 4 inheritance is always denied", () => {

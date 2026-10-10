@@ -12,6 +12,7 @@ export * from "./project-store.js";
 export * from "./repeat-files.js";
 export * from "./repeat-guard.js";
 export * from "./review-capture.js";
+export * from "./run-config.js";
 export * from "./run-repository.js";
 export * from "./tasks.js";
 export * from "./validator-registry.js";
