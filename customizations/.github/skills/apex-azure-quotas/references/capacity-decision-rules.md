@@ -67,5 +67,5 @@ Coverage is specific to resource type, region, subscription, and API version. Un
 Record provider support, extension or command failure, invalid scope, unavailable quota surface, and service hard-limit
 signals as evidence gaps or blockers. Read-only `az quota` checks may run directly, following
 [quota CLI commands](quota-cli-commands.md); their output is an observation until accepted as evidence. Quota increases,
-provider registration and monitoring configuration change Azure and are routed through `apex deploy` (Gate 4) or the
-approved pipeline. A troubleshooting note must not turn into a direct change.
+provider registration and monitoring configuration change Azure and are routed through `apex deploy` (Gate 4). A
+troubleshooting note must not turn into a direct change.

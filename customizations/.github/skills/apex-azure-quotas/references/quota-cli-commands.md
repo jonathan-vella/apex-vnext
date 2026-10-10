@@ -9,7 +9,7 @@ Every scope below is illustrative: substitute the approved subscription, provide
 | --- | --- | --- |
 | Local client setup | `az extension add --name quota`, `az login`, `az account set` | Directly; changes only the local CLI |
 | Read and diagnostic | `az quota list`, `az quota show`, `az quota usage list`, `az quota usage show`, `az quota request status list`, `az quota request status show`, `az quota operation list`, `az vm list-usage` | Directly, against the approved scope |
-| Changes Azure | `az quota update`, `az quota create`, `az provider register` | Never by the agent. Deliver as a reviewed `Microsoft.Quota/quotas` change through `apex preview`, Gate 4 and `apex deploy`, or through the approved GitHub Actions pipeline, which runs only the preview that local Gate 4 bound to its CI recipient (production CI apply stays blocked until that transport is qualified) |
+| Changes Azure | `az quota update`, `az quota create`, `az provider register` | Never by the agent. Deliver as a reviewed `Microsoft.Quota/quotas` change through `apex preview`, the current runtime's Gate 4 and `apex deploy` (a CI-owned production run with human approval verified before apply is a planned target, DECISION-036) |
 
 Read-command output is an observation. A typed capacity decision still cites accepted quota evidence from
 `apex/taskContext`.
@@ -217,7 +217,7 @@ az quota operation list --output table
 ## az quota update
 
 Request a quota increase. This changes the subscription's quota. The agent proposes the target scope, quota name, new
-limit and buffer; the human approves it, and it is delivered through `apex deploy` (Gate 4) or the approved pipeline.
+limit and buffer; the human approves it, and it is delivered through `apex deploy` (Gate 4).
 
 ```bash
 az quota update --resource-name NAME --scope SCOPE --limit-object value=N [--resource-type TYPE] [--no-wait]

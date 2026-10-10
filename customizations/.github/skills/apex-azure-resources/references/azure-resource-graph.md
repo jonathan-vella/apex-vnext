@@ -47,8 +47,8 @@ Lookup constraints:
 - Use `=~` for case-insensitive type matching; resource types are lowercase.
 - Scope every query with `--subscriptions`; `--first` limits rows, not authorization scope.
 - Never use ARG for real-time monitoring; the index lags behind changes.
-- ARG cannot change resources. Any remediation it suggests changes Azure and routes through `apex deploy` (Gate 4) or
-  the approved pipeline.
+- ARG cannot change resources. Any remediation it suggests changes Azure and routes through `apex deploy` (Gate 4);
+  CI-owned production runs are a planned target, not available today.
 
 | Error | Cause | Fix |
 | --- | --- | --- |

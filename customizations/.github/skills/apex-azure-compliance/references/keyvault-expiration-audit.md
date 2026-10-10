@@ -66,7 +66,7 @@ All timestamps are UTC.
 | Low | Active for more than 30 days | Monitor on the regular schedule |
 
 Rotation, expiration policies and item removal change Azure. The agent never runs them; they ship through
-`apex preview`, Gate 4 and `apex deploy`, or through the approved GitHub Actions pipeline.
+`apex preview`, the current runtime's Gate 4 and `apex deploy`.
 
 ## Practices
 

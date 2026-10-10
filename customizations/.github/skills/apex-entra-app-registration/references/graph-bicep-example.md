@@ -2,9 +2,8 @@
 
 App registration and service principal as Microsoft Graph Bicep, ported from the upstream `BICEP-EXAMPLE.bicep`. This is
 the routed form of the `az ad app create` and `az ad sp create` commands in [CLI commands](cli-commands.md): the
-registration ships as IaC through `apex preview`, Gate 4 and `apex deploy`, or through the approved GitHub Actions
-pipeline that runs only the preview local Gate 4 bound to its CI recipient. The agent never creates a registration
-directly.
+registration ships as IaC through `apex preview`, the current runtime's Gate 4 and `apex deploy`. The agent never
+creates a registration directly.
 
 It requires Bicep 0.21.1 or later with the Microsoft Graph extension, and a deploying identity with Microsoft Graph
 `Application.ReadWrite.All` (check it with the Graph permission preflight in `apex-azure-defaults`).

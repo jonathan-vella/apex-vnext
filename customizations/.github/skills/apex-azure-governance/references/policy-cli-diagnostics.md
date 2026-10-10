@@ -9,7 +9,7 @@ and `apex governance import` (or the reference baseline); these commands help ex
 | Class | Commands | How it runs |
 | --- | --- | --- |
 | Read and diagnostic | `az account show`, `az rest --method GET` on policy assignments, `az policy assignment list`, `az policy assignment show`, `az policy definition show`, `az policy set-definition show`, `az policy state list`, `az graph query` on `PolicyResources` | Directly, against the approved subscription and management-group ancestry |
-| Changes Azure | `az policy assignment create`, `az policy assignment delete`, `az policy exemption create`, `az policy remediation create` | Never by the agent. There is no override path in APEX; a policy or exemption change is a governance owner's routed change through `apex preview`, Gate 4 and `apex deploy`, or through the approved GitHub Actions pipeline, which runs only the preview that local Gate 4 bound to its CI recipient (production CI apply stays blocked until that transport is qualified) |
+| Changes Azure | `az policy assignment create`, `az policy assignment delete`, `az policy exemption create`, `az policy remediation create` | Never by the agent. There is no override path in APEX; a policy or exemption change is a governance owner's routed change through `apex preview`, the current runtime's Gate 4 and `apex deploy` (a CI-owned production run with human approval verified before apply is a planned target, DECISION-036) |
 
 A diagnostic result is an observation. It never replaces, refreshes or renews accepted governance evidence; collection
 age is measured from the accepted snapshot.

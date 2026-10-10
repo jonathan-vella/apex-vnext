@@ -6,9 +6,8 @@ Remediation templates for frequently identified compliance findings, ported in f
 ## Routing
 
 Every remediation here changes Azure. The agent never runs these commands. A fix ships as an IaC change through
-`apex preview`, a Gate 4 decision and `apex deploy` (Bicep, Terraform, or `azd provision` for labs), or through the
-approved GitHub Actions pipeline, which runs only the preview that local Gate 4 bound to its CI recipient and returns
-its run evidence through `apex/submitEvidence`. Production CI apply stays blocked until that transport is qualified.
+`apex preview`, the current runtime's Gate 4 decision and `apex deploy` (Bicep or Terraform). A CI-owned production
+run with human approval verified before apply is a planned target (DECISION-036), not available today.
 The Azure CLI blocks document the equivalent operation and are marked `# Changes Azure`. The Bicep snippets show the
 target setting; generated IaC sets the same property through the AVM module input where one exists.
 `$(az ... show ... --query id -o tsv)` lookups inside a command are reads, but the surrounding command is not.
@@ -387,8 +386,8 @@ az webapp config set \
 
 ## Bulk Remediation Script
 
-For multiple resources of the same type, the upstream loop is shown below. In APEX, a bulk change is a reviewed IaC or
-approved pipeline change like any other; the loop documents the operation and is never run by the agent.
+For multiple resources of the same type, the upstream loop is shown below. In APEX, a bulk change is a reviewed IaC
+change routed through `apex deploy` like any other; the loop documents the operation and is never run by the agent.
 
 ```powershell
 # Changes Azure: route through apex deploy (Gate 4) or the approved pipeline. Never run directly.

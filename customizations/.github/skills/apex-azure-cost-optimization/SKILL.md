@@ -67,10 +67,9 @@ blocker for findings that need it, never permission to estimate from memory.
   `az rest --method post` as a fallback) may run directly against the approved scope. Their output is an observation;
   a finding still carries a labeled evidence class.
 - **Commands that change Azure** (deletes, resizes, stops, tier or SKU changes, purchases, budgets) are never run by
-  the agent. They reach Azure only through `apex preview`, a Gate 4 decision and `apex deploy` (Bicep, Terraform, or
-  `azd provision` and `azd deploy` for labs), or through the approved GitHub Actions workflow, which runs only the
-  preview that local Gate 4 bound to its CI recipient. Production CI apply stays blocked until recipient-bound
-  transport is qualified.
+  the agent. They reach Azure only through `apex preview`, the current runtime's Gate 4 decision and `apex deploy`
+  (Bicep or Terraform). A CI-owned production run with human approval verified before apply is a planned target
+  (DECISION-036), not available today.
 
 Prerequisites for the CLI path: `az login` for the intended tenant, the `costmanagement` and `resource-graph`
 extensions, azqr for orphan discovery, and Cost Management Reader, Monitoring Reader and Reader on the scope.

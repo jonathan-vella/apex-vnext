@@ -10,7 +10,7 @@ Reference for managing Microsoft Entra app registrations with the Azure CLI, por
 | --- | --- | --- |
 | Local client setup | `az version`, `az login`, `az account set` | Directly; changes only the local CLI |
 | Read and diagnostic | `az ad app list`, `az ad app show`, `az ad app credential list`, `az ad app permission list`, `az ad app owner list`, `az ad sp list`, `az ad sp show`, `az ad user show`, `az ad user list`, `az ad signed-in-user show`, `az account show` | Directly, for the intended tenant. Never print credential values, tokens or `--debug` output |
-| Changes Entra ID | `az ad app create`, `az ad app update`, `az ad app delete`, `az ad app credential reset`, `az ad app credential delete`, `az ad app permission add`, `az ad app permission admin-consent`, `az ad app permission delete`, `az ad sp create`, `az ad sp delete`, `az ad app owner add`, `az ad app owner remove` | Never by the agent. The registration ships as Microsoft Graph Bicep through `apex preview`, Gate 4 and `apex deploy` (see [Graph Bicep example](graph-bicep-example.md)), or through the approved GitHub Actions pipeline, which runs only the preview that local Gate 4 bound to its CI recipient (production CI apply stays blocked until that transport is qualified). Admin consent stays an authorized owner's decision |
+| Changes Entra ID | `az ad app create`, `az ad app update`, `az ad app delete`, `az ad app credential reset`, `az ad app credential delete`, `az ad app permission add`, `az ad app permission admin-consent`, `az ad app permission delete`, `az ad sp create`, `az ad sp delete`, `az ad app owner add`, `az ad app owner remove` | Never by the agent. The registration ships as Microsoft Graph Bicep through `apex preview`, the current runtime's Gate 4 and `apex deploy` (see [Graph Bicep example](graph-bicep-example.md); a CI-owned production run with human approval verified before apply is a planned target, DECISION-036). Admin consent stays an authorized owner's decision |
 
 Read output is an observation; identity design still cites accepted capability receipts. Commands that change Entra ID
 are marked `# Changes Azure`; the CLI forms document the operation and the shape of an approved pipeline step.
@@ -164,9 +164,8 @@ az ad app update --id $APP_ID \
 
 Require explicit approval for the intended tenant, application ID, credential type and expiry. Prefer federated identity
 or certificates; they avoid this command entirely. The agent never runs it and never sees the value. Upstream frames it
-as a user-run private-terminal operation; APEX does not use that path. In APEX it runs only as a reviewed step of the
-approved pipeline that stores the value directly in Key Vault, after its own Gate 4 decision, and is unavailable while
-production CI apply is blocked:
+as a user-run private-terminal operation; APEX does not use that path. In APEX it would run only as a reviewed step
+that stores the value directly in Key Vault, after its own approval, and no supported route exists today:
 
 ```bash
 # Changes Azure: route through apex deploy (Gate 4) or the approved pipeline. Never run directly.
