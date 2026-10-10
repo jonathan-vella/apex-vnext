@@ -208,7 +208,7 @@ for (const track of ["bicep", "terraform"]) {
   });
 }
 
-test("preparation creates a validated run with Gates 1-3 approved and Gate 4 closed", async () => {
+test("preparation creates a validated run with Gate 1 approved, Gates 2 and 3 ready and Gate 4 closed", async () => {
   const stateRoot = await mkdtemp(join(tmpdir(), "apex-vnext-live-prepare-"));
   try {
     await mkdir(join(stateRoot, ".github"), { recursive: true });
@@ -230,8 +230,8 @@ test("preparation creates a validated run with Gates 1-3 approved and Gate 4 clo
       result.gates.map(({ gate, state }) => [gate, state]),
       [
         [1, "approved"],
-        [2, "approved"],
-        [3, "approved"],
+        [2, "ready"],
+        [3, "ready"],
         [4, "closed"],
       ],
     );
