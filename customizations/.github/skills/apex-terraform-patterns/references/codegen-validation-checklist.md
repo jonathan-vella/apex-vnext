@@ -21,7 +21,7 @@ Evaluate these criteria through the current CodeGen task; only the kernel accept
 - [ ] Module versions match exact semver pins in the approved plan/contract; no implicit upgrades
 - [ ] One root random suffix is passed to children; effective policy tag keys, casing and values are preserved
 - [ ] `project_name` is a required variable with no default value
-- [ ] Zero hardcoded project-specific values (see `iac-terraform-best-practices.instructions.md`)
+- [ ] Zero hardcoded project-specific values (see `apex-terraform.instructions.md`)
 
 ## Security Baseline
 

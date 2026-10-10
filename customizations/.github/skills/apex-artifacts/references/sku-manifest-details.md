@@ -8,9 +8,7 @@
 
 # SKU Manifest — Tooling Details
 
-Validator, renderer and projection mechanics for
-[`sku-manifest.instructions.md`](https://github.com/jonathan-vella/apex/blob/c209d8bb765681aa21dce5d3cd2a3b080dad8d5e/.github/instructions/sku-manifest.instructions.md)
-, which owns
+Validator, renderer and projection mechanics for the `workload-decision-manifest-v1` contract, which owns
 the authoring rules. Agents write `workload-decision-manifest-v1`; these tools derive, render and check it.
 
 ## Coverage Rules

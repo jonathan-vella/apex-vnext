@@ -43,8 +43,7 @@
 Cosmos, AKS pools, Redis, APIM, App Gateway, Storage replication tiers.
 
 **Out of scope** (do not add to `services[]`): bandwidth, Log Analytics,
-vnet, subnet, NSG, route table, public IP, diagnostics. See
-[`.github/instructions/sku-manifest.instructions.md`](https://github.com/jonathan-vella/apex/blob/c209d8bb765681aa21dce5d3cd2a3b080dad8d5e/.github/instructions/sku-manifest.instructions.md).
+vnet, subnet, NSG, route table, public IP, diagnostics. See the `workload-decision-manifest-v1` contract.
 
 ## Environments
 

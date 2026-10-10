@@ -29,7 +29,7 @@ Verify ALL items before marking Step 5 complete.
 - [ ] `uniqueSuffix` generated once, passed to all modules
 - [ ] Length constraints respected (KV≤24, Storage≤24)
 - [ ] `projectName` is a required parameter with no default value
-- [ ] Zero hardcoded project-specific values (see `iac-bicep-best-practices.instructions.md`)
+- [ ] Zero hardcoded project-specific values (see `apex-bicep.instructions.md`)
 
 ## Security Baseline
 

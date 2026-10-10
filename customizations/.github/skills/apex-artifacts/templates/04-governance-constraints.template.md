@@ -281,7 +281,7 @@ flowchart TD
 ---
 
 _Governance constraints discovered from Azure Resource Graph._
-_See [governance-discovery.instructions.md](https://github.com/jonathan-vella/apex/blob/c209d8bb765681aa21dce5d3cd2a3b080dad8d5e/.github/skills/apex-azure-artifacts) for discovery methodology._
+_See the `apex-azure-governance` skill for discovery methodology._
 
 ---
 

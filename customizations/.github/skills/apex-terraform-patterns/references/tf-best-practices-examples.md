@@ -9,7 +9,7 @@
 # Terraform Best Practices — HCL Examples
 
 Detailed HCL code examples for rules in
-`iac-terraform-best-practices.instructions.md`.
+`apex-terraform.instructions.md`.
 Rules and enforcement live in the instruction file; this file is copy-paste code.
 
 ## Unique Suffix Pattern
@@ -208,7 +208,7 @@ output "resource_group_name" {
 ## Code Formatting & Ordering
 
 > Naming conventions and file organization are in
-> `iac-terraform-best-practices.instructions.md`. Below covers
+> `apex-terraform.instructions.md`. Below covers
 > formatting and block-internal ordering only.
 
 ### Indentation and Alignment
@@ -261,7 +261,7 @@ resource "azurerm_linux_virtual_machine" "example" {
 ### Dynamic Resource Creation
 
 Prefer `for_each` over `count` for named resources
-(see `iac-terraform-best-practices.instructions.md` for the rule;
+(see `apex-terraform.instructions.md` for the rule;
 this shows the pattern):
 
 ```hcl

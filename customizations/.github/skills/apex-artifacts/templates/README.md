@@ -57,8 +57,7 @@ Templates and generated artifacts are validated by:
 - **Script**: `tools/scripts/validate-artifacts.mjs`
 - **npm script**: `npm run lint:artifact-templates` *(invoked by the lefthook
   `artifact-validation` pre-commit hook and CI \u2014 agents do not invoke this
-  directly; see
-  [`agent-authoring.instructions.md`](https://github.com/jonathan-vella/apex/blob/c209d8bb765681aa21dce5d3cd2a3b080dad8d5e/.github/instructions/agent-authoring.instructions.md#no-direct-markdownlint-on-agent-output-rule))*
+  directly)*
 
 All 16 templates use `standard` strictness (missing/out-of-order headings
 are errors, not warnings).
