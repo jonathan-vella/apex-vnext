@@ -714,10 +714,13 @@ test("concurrent shares run in one window and none returns before it closed", as
         return "slow";
       })
       .then((value) => (returned.push(value), value));
+    // Starting a share takes lock-file I/O, so wait for both operations instead of sleeping a fixed time.
+    const deadline = Date.now() + 10_000;
+    while (started.length < 2 && Date.now() < deadline) await new Promise((done) => setTimeout(done, 5));
     await new Promise((done) => setTimeout(done, 50));
     // Both operations run at once, but the settled one does not return into a holder that could write while the
     // other keeps the window open.
-    assert.deepEqual(started.sort(), ["fast", "slow"]);
+    assert.deepEqual([...started].sort(), ["fast", "slow"]);
     assert.deepEqual(returned, []);
     assert.equal(await read(), "snapshot");
     finishSlow();
