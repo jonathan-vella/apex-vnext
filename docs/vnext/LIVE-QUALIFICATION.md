@@ -49,7 +49,7 @@ Cover both profiles with separately authorized scenarios. In ALZ-backed cases, r
 and monitoring and prove they survive cleanup. In labs, create only the supporting resources owned by that workload.
 Include at least one adapted archetype with fresh consumer governance and no inherited deployment authority.
 
-1. create the run and complete Gates 1 through 3 through production APIs;
+1. create the run and complete Gate 1 and the lab readiness checkpoints for Gates 2 and 3 through production APIs;
 2. configure only nonsecret provider settings;
 3. validate generated IaC and native provider readiness;
 4. create the exact apply preview for the intended recipient;

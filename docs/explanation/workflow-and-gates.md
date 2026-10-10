@@ -21,20 +21,44 @@ business rules. Human-owned gates authorize progression.
 |    3 | Implementation intent, IaC binding, environment inputs, and review are acceptable. |
 |    4 | The exact current preview is approved for its bound recipient and operation.       |
 
-This table describes the current runtime. Gate 4 is currently local runtime authority. The existing qualification
-workflow transports and proves an approved candidate; it does not silently recreate or inherit approval.
+Gate 4 is currently local runtime authority. The existing qualification workflow transports and proves an approved
+candidate; it does not silently recreate or inherit approval.
 
-### Accepted Purpose-Bound Target
+### Lab Runs: Intent Confirmation, Readiness Checkpoints And Final Approval
 
 [DECISION-036](../vnext/DECISIONS.md#decision-036-deliver-non-production-first-with-purpose-bound-approval) selects a
-lighter non-production ceremony: confirm workload intent once, then approve the final deployment preview. Gates 1
-through 3 become readiness checkpoints, not fictitious human approvals; required reviews and deterministic checks stay
-blocking. Changed intent, risks and destructive operations still need relevant confirmation.
+lighter non-production ceremony, and the kernel now implements it for the `lab` purpose. Every run binds a typed
+`purpose` (`lab` or `production`); `production` fails closed until the CI-owned flow exists.
+
+| Gate | Lab run                                                                                                    |
+| ---: | ---------------------------------------------------------------------------------------------------------- |
+|    1 | One human intent confirmation after requirements are accepted and reviewed. It binds purpose and target.   |
+|    2 | Kernel readiness checkpoint, recorded automatically. No prompt, actor or approval evidence.                |
+|    3 | Kernel readiness checkpoint, recorded automatically. No prompt, actor or approval evidence.                |
+|    4 | The final human approval of the exact current preview. It shows the architecture, cost estimate and risks. |
+
+A readiness checkpoint is the new `ready` gate state plus a journaled, hash-chained `gate.readiness-recorded` event
+carrying the gate, its dependency hash and the validators that passed. It is never approval evidence: there is no actor,
+no approval object and no `gate.decided` event, and `ready` can only be recorded for Gates 2 and 3 of a lab run.
+The kernel records it when the gate opens and its required review has no open finding and its gate validators pass.
+A missing review, an unresolved blocking finding (including a risk nobody has accepted), or a failing validator leaves
+the gate unrecorded, and `nextTask` reports it like any other unmet gate. Deciding Gate 2 or 3 on a lab run is
+refused because no human decision exists.
+
+Changed requirements, and therefore changed intent, invalidate Gate 1 and the downstream readiness checkpoints, which
+are recomputed after the new confirmation. Promotion inherits the Gate 1 confirmation but never inherits readiness; the
+promoted run records its own. A new human confirmation is needed only for changed requirements, purpose or target, each
+new risk acceptance, and each apply and destroy, which keep their own current preview and Gate 4 approval.
+
+Still planned: the CLI and MCP prompts and `nextTask` wording, managed agent and skill guidance, and the client
+qualification scenarios still describe three human gate decisions and are updated separately (CP-27 PR 3).
+
+### Accepted Production Target
 
 Production is opt-in. CI owns the execution run and preview from the start, and the kernel verifies an actual
 candidate-bound human review receipt before apply. OIDC job identity or an environment pause alone is not approval.
-This target is not implemented by a prose update: current prompts/transfer checks remain enforced until tested
-replacements land. See [ADR-0007](../vnext/adrs/03-des-adr-0007-use-purpose-bound-approval-and-ci-owned-production-runs.md).
+This target is not implemented yet: production is refused until it lands. See
+[ADR-0007](../vnext/adrs/03-des-adr-0007-use-purpose-bound-approval-and-ci-owned-production-runs.md).
 
 ## Invalidation
 

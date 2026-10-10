@@ -14,6 +14,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Record lab Gates 2 and 3 as kernel readiness checkpoints (CP-27, part 2). A new `ready` gate state and a journaled
+  `gate.readiness-recorded` event (gate, dependency hash, passed validators; no actor or approval evidence) are recorded
+  automatically once the gate's required review has no open finding and its validators pass, for `lab` runs only.
+  Gate 1 stays the single human intent confirmation (it now binds `run-config.purpose` and `run-config.targetScope`)
+  and Gate 4 the final human preview approval, which now shows the purpose, target, architecture, cost estimate and
+  accepted risks. `gateDecide` on lab Gate 2 or 3 is refused, `ready` cannot satisfy Gate 1, Gate 4, deploy or destroy,
+  changed requirements invalidate it, and promotion recomputes it instead of inheriting it. `apex render status` lists
+  the purpose and readiness time. CLI/MCP prompts, managed guidance and qualification scenarios still describe three
+  human gate decisions until part 3.
+
 - Bind a typed deployment `purpose` (`lab` or `production`) to every run (CP-27, part 1). `apex init`, `bootstrap` and
   `project create` accept `--purpose` (MCP `projectCreate` and `promote` accept `purpose`) and default to `lab`;
   `purpose` joins the dependency revision and the workflow source dependencies, so a change invalidates affected

@@ -69,13 +69,19 @@ visibility. An ALZ-backed workload may be non-production, and a standalone found
 | Production     | Explicit opt-in, verified setup, CI-owned execution and bound human approval before apply          | Deferred until the new path is implemented and qualified |
 
 Changing purpose or target creates a new purpose-bound run and invalidates affected preview/approval authority.
-Lab approval cannot promote to production. Existing four-gate prompts remain current behavior until the
-purpose-bound workflow is implemented; this plan does not synthesize approvals or bypass current controls.
+Lab approval cannot promote to production. This plan does not synthesize approvals or bypass current controls.
 
 Current implementation: `purpose` is a required run field, project and run creation default it to `lab`, and it is part
 of the dependency revision. `production` is a valid contract value but fails closed with a stable error until
-`REQ-PRODUCTION-001` (CP-28/CP-29) ships. A run's purpose cannot change; promotion keeps it. Confirming purpose at
-Gate 1 and the lab approval flow are planned.
+`REQ-PRODUCTION-001` (CP-28/CP-29) ships. A run's purpose cannot change; promotion keeps it. Gate 1 binds purpose and
+target.
+
+Current lab gate flow (kernel): Gate 1 is the one human intent confirmation and Gate 4 the final preview approval.
+Gates 2 and 3 are kernel-recorded `ready` checkpoints with no actor, approval evidence or `gate.decided` event; they
+record only after their required reviews and gate validators pass, `ready` can never satisfy Gate 1, Gate 4, deploy or
+destroy, and promotion recomputes it. Gate 4 material shows the purpose, target, architecture, cost estimate and
+accepted risks. Not yet updated: CLI/MCP prompts and `nextTask` wording, managed agent and skill guidance, and client
+qualification scenarios, which still describe three human gate decisions (CP-27 PR 3).
 
 ## Functional Requirements
 
