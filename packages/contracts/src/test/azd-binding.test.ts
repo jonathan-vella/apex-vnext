@@ -56,11 +56,33 @@ function binding(change: (body: Omit<AzdBindingV1, "bindingHash">) => void = () 
         source: "script",
         path: "hooks/pre.sh",
         contentHash: digest("1"),
+        commandHash: digest("7"),
+        dependencies: [{ path: "hooks/lib.sh", hash: digest("8") }],
         continueOnError: false,
         interactive: false,
       },
     ],
-    extensions: [{ id: "microsoft.azd.demo", version: "1.2.3", source: "azd" }],
+    extensions: [{ id: "microsoft.azd.demo", version: "1.2.3", source: "azd", installedDigest: digest("9") }],
+    remoteModules: [
+      {
+        root: "default",
+        file: "infra/main.bicep",
+        kind: "br",
+        reference: "br/public:avm/res/storage/storage-account:0.14.0",
+        registry: "mcr.microsoft.com",
+        path: "bicep/avm/res/storage/storage-account",
+        pin: { type: "tag", value: "0.14.0" },
+      },
+    ],
+    executionEnvelope: {
+      workingDirectory: "project-root",
+      environmentName: "lab",
+      prompts: "disabled",
+      inheritedEnvironment: ["HOME", "PATH"],
+      fixedEnvironment: { AZD_SKIP_UPDATE_CHECK: "true", AZURE_DEV_COLLECT_TELEMETRY: "no" },
+      azdConfigDirectory: "isolated",
+      azureCliConfigDirectory: "unset",
+    },
   };
   change(body);
   return { ...body, bindingHash: calculateAzdBindingHash(body) };
@@ -70,7 +92,7 @@ describe("azd-binding-v1", () => {
   it("accepts a bound inventory and registers metadata", () => {
     assert.equal(hasValidAzdBinding(binding()), true);
     assert.deepEqual(contractMetadata["https://schemas.apexops.dev/azd-binding-v1.json"], {
-      maxBytes: 262_144,
+      maxBytes: 524_288,
       sensitivity: "confidential",
       compatibility: "strict-v1",
     });
@@ -113,6 +135,7 @@ describe("azd-binding-v1", () => {
     const layered = (body: Omit<AzdBindingV1, "bindingHash">): void => {
       const [root] = body.infra.roots;
       body.infra.layered = true;
+      body.remoteModules[0]!.root = "network";
       body.infra.roots = [
         { ...root!, name: "network", path: "infra/network", parametersPath: "infra/network/main.parameters.json" },
         { ...root!, name: "workload", path: "infra/workload", parametersPath: "infra/workload/main.parameters.json" },
@@ -151,6 +174,56 @@ describe("azd-binding-v1", () => {
       ),
       false,
     );
+  });
+
+  it("rejects mutable remote modules, unsafe envelopes and unapproved environment keys", () => {
+    type Body = Omit<AzdBindingV1, "bindingHash">;
+    const valid = binding((body) => {
+      body.remoteModules.push({
+        root: "default",
+        file: "infra/main.bicep",
+        kind: "br",
+        reference: "br:example.azurecr.io/modules/net@sha256:" + digest("a"),
+        registry: "example.azurecr.io",
+        path: "modules/net",
+        pin: { type: "digest", value: digest("a") },
+      });
+    });
+    assert.equal(hasValidAzdBinding(valid), true);
+    const invalid: Array<(body: Body) => void> = [
+      (body) => (body.remoteModules[0]!.root = "missing"),
+      (body) => (body.remoteModules[0]!.registry = "example.azurecr.io"),
+      (body) => (body.remoteModules[0]!.path = "avm/res/x"),
+      (body) => (body.remoteModules[0]!.pin = { type: "tag", value: "latest" }),
+      (body) => (body.remoteModules[0]!.pin = { type: "tag", value: "1.2" }),
+      (body) => (body.remoteModules[0]!.pin = { type: "version", value: "1.0" }),
+      (body) => (body.remoteModules[0]!.kind = "ts"),
+      (body) => body.remoteModules.push({ ...body.remoteModules[0]! }),
+      (body) => (body.executionEnvelope.environmentName = "other"),
+      (body) => body.executionEnvelope.inheritedEnvironment.push("AZURE_CONFIG_DIR"),
+      (body) => body.executionEnvelope.inheritedEnvironment.push("azd_config_dir"),
+      (body) => {
+        body.hooks[0]!.source = "inline";
+        delete body.hooks[0]!.path;
+        body.hooks[0]!.interpreter = "bash";
+      },
+      (body) => body.hooks[0]!.dependencies.push({ path: "hooks/lib.sh", hash: digest("b") }),
+    ];
+    for (const edit of invalid) assert.equal(hasValidAzdBinding(binding(edit)), false);
+    const schemaInvalid: Array<(body: Body) => void> = [
+      (body) => ((body.environment.keys as string[]) = ["CUSTOM_SETTING"]),
+      (body) => delete (body.extensions[0] as { installedDigest?: string }).installedDigest,
+      (body) => delete (body.hooks[0] as { commandHash?: string }).commandHash,
+      (body) => ((body.executionEnvelope as { azdConfigDirectory: string }).azdConfigDirectory = "user"),
+      (body) => ((body.executionEnvelope as { prompts: string }).prompts = "enabled"),
+      (body) =>
+        ((body.executionEnvelope.fixedEnvironment as Record<string, string>).AZURE_CONFIG_DIR = "/home/user/.azure"),
+    ];
+    for (const edit of schemaInvalid) assert.equal(Value.Check(AzdBindingV1Schema, binding(edit)), false);
+    const interpreted = binding((body) => {
+      body.hooks[0]!.interpreter = "bash";
+    });
+    assert.equal(hasValidAzdBinding(interpreted), true);
   });
 
   it("only describes Bicep through azd with exact versions and safe relative paths", () => {

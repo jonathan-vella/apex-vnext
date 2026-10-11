@@ -24,15 +24,47 @@
         },
         "keys": {
           "items": {
-            "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$",
-            "type": "string"
+            "anyOf": [
+              {
+                "const": "AZURE_ENV_NAME",
+                "type": "string"
+              },
+              {
+                "const": "AZURE_LOCATION",
+                "type": "string"
+              },
+              {
+                "const": "AZURE_PRINCIPAL_ID",
+                "type": "string"
+              },
+              {
+                "const": "AZURE_PRINCIPAL_TYPE",
+                "type": "string"
+              },
+              {
+                "const": "AZURE_RESOURCE_GROUP",
+                "type": "string"
+              },
+              {
+                "const": "AZURE_SUBSCRIPTION_ID",
+                "type": "string"
+              },
+              {
+                "const": "AZURE_TENANT_ID",
+                "type": "string"
+              }
+            ]
           },
-          "maxItems": 256,
+          "maxItems": 7,
           "type": "array",
           "uniqueItems": true
         },
         "name": {
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "projectConfigHash": {
+          "pattern": "^[0-9a-f]{64}$",
           "type": "string"
         },
         "target": {
@@ -75,6 +107,76 @@
       ],
       "type": "object"
     },
+    "executionEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "azdConfigDirectory": {
+          "const": "isolated",
+          "type": "string"
+        },
+        "azureCliConfigDirectory": {
+          "anyOf": [
+            {
+              "const": "explicit",
+              "type": "string"
+            },
+            {
+              "const": "unset",
+              "type": "string"
+            }
+          ]
+        },
+        "environmentName": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "fixedEnvironment": {
+          "additionalProperties": false,
+          "properties": {
+            "AZD_SKIP_UPDATE_CHECK": {
+              "const": "true",
+              "type": "string"
+            },
+            "AZURE_DEV_COLLECT_TELEMETRY": {
+              "const": "no",
+              "type": "string"
+            }
+          },
+          "required": [
+            "AZD_SKIP_UPDATE_CHECK",
+            "AZURE_DEV_COLLECT_TELEMETRY"
+          ],
+          "type": "object"
+        },
+        "inheritedEnvironment": {
+          "items": {
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$",
+            "type": "string"
+          },
+          "maxItems": 24,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "prompts": {
+          "const": "disabled",
+          "type": "string"
+        },
+        "workingDirectory": {
+          "const": "project-root",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workingDirectory",
+        "environmentName",
+        "prompts",
+        "inheritedEnvironment",
+        "fixedEnvironment",
+        "azdConfigDirectory",
+        "azureCliConfigDirectory"
+      ],
+      "type": "object"
+    },
     "executor": {
       "const": "azd",
       "type": "string"
@@ -85,6 +187,10 @@
         "properties": {
           "id": {
             "pattern": "^[a-z0-9][a-z0-9._-]{0,127}$",
+            "type": "string"
+          },
+          "installedDigest": {
+            "pattern": "^[0-9a-f]{64}$",
             "type": "string"
           },
           "source": {
@@ -99,7 +205,8 @@
         "required": [
           "id",
           "version",
-          "source"
+          "source",
+          "installedDigest"
         ],
         "type": "object"
       },
@@ -110,6 +217,10 @@
       "items": {
         "additionalProperties": false,
         "properties": {
+          "commandHash": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
           "contentHash": {
             "pattern": "^[0-9a-f]{64}$",
             "type": "string"
@@ -117,12 +228,64 @@
           "continueOnError": {
             "type": "boolean"
           },
+          "dependencies": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "hash": {
+                  "pattern": "^[0-9a-f]{64}$",
+                  "type": "string"
+                },
+                "path": {
+                  "maxLength": 512,
+                  "minLength": 1,
+                  "pattern": "^(?!(?:.*/)?\\.{1,2}(?:/|$))[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path",
+                "hash"
+              ],
+              "type": "object"
+            },
+            "maxItems": 16,
+            "type": "array"
+          },
           "event": {
             "pattern": "^(?:pre|post)[a-z]{2,16}$",
             "type": "string"
           },
           "interactive": {
             "type": "boolean"
+          },
+          "interpreter": {
+            "anyOf": [
+              {
+                "const": "sh",
+                "type": "string"
+              },
+              {
+                "const": "bash",
+                "type": "string"
+              },
+              {
+                "const": "zsh",
+                "type": "string"
+              },
+              {
+                "const": "pwsh",
+                "type": "string"
+              },
+              {
+                "const": "powershell",
+                "type": "string"
+              },
+              {
+                "const": "cmd",
+                "type": "string"
+              }
+            ]
           },
           "order": {
             "maximum": 31,
@@ -194,6 +357,8 @@
           "shell",
           "source",
           "contentHash",
+          "commandHash",
+          "dependencies",
           "continueOnError",
           "interactive"
         ],
@@ -297,6 +462,121 @@
       "minLength": 1,
       "type": "string"
     },
+    "remoteModules": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "file": {
+            "maxLength": 512,
+            "minLength": 1,
+            "pattern": "^(?!(?:.*/)?\\.{1,2}(?:/|$))[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$",
+            "type": "string"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "const": "br",
+                "type": "string"
+              },
+              {
+                "const": "ts",
+                "type": "string"
+              }
+            ]
+          },
+          "path": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "pin": {
+            "anyOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "tag",
+                    "type": "string"
+                  },
+                  "value": {
+                    "pattern": "^(?:0|[1-9]\\d*)\\.(?:0|[1-9]\\d*)\\.(?:0|[1-9]\\d*)(?:-[0-9A-Za-z][0-9A-Za-z.-]{0,63})?$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "value"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "digest",
+                    "type": "string"
+                  },
+                  "value": {
+                    "pattern": "^[0-9a-f]{64}$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "value"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "version",
+                    "type": "string"
+                  },
+                  "value": {
+                    "maxLength": 64,
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "value"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "reference": {
+            "maxLength": 512,
+            "minLength": 1,
+            "type": "string"
+          },
+          "registry": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "root": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "root",
+          "file",
+          "kind",
+          "reference",
+          "registry",
+          "path",
+          "pin"
+        ],
+        "type": "object"
+      },
+      "maxItems": 256,
+      "type": "array"
+    },
     "runId": {
       "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$",
       "type": "string"
@@ -324,6 +604,8 @@
     "parametersHash",
     "hooks",
     "extensions",
+    "remoteModules",
+    "executionEnvelope",
     "bindingHash"
   ],
   "type": "object"

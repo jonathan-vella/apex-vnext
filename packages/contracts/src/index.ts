@@ -199,7 +199,7 @@ export const contractMetadata: Readonly<Record<string, ContractMetadata>> = {
   "https://schemas.apexops.dev/requirements-change-proposal-v1.json": metadata(524_288, "confidential"),
   "https://schemas.apexops.dev/implementation-intent-v1.json": metadata(524_288),
   "https://schemas.apexops.dev/iac-binding-v1.json": metadata(524_288, "confidential"),
-  "https://schemas.apexops.dev/azd-binding-v1.json": metadata(262_144, "confidential"),
+  "https://schemas.apexops.dev/azd-binding-v1.json": metadata(524_288, "confidential"),
   "https://schemas.apexops.dev/approval-evidence-v1.json": metadata(32_768, "confidential"),
   "https://schemas.apexops.dev/deployment-preview-v1.json": metadata(2_097_152, "confidential"),
   "https://schemas.apexops.dev/operation-record-v1.json": metadata(65_536, "confidential"),

@@ -8,13 +8,20 @@ import {
   AzdVersionSchema,
   hasValidAzdBinding,
   SECRET_FIELD_PATTERN,
+  AZD_BINDING_LIMITS,
+  AZD_ENVIRONMENT_KEYS,
   SECRET_VALUE_PATTERN,
   type AzdBindingV1,
   type AzdEnvironmentV1,
   type AzdHookV1,
+  type AzdExtensionV1,
   type AzdInfraRootV1,
+  type AzdRemoteModuleV1,
 } from "@apexops/contracts";
 import { Value } from "@sinclair/typebox/value";
+import { inventoryBicepReferences } from "./azd-bicep-references.js";
+import { buildAzdExecutionEnvelope } from "./azd-execution-envelope.js";
+import { isLiteralOperand, parseInterpreterCommand, scanHookText, type HookInterpreter } from "./azd-hook-scan.js";
 import { satisfiesAzdVersionConstraint } from "./azd-prerequisites.js";
 import {
   AZD_FILE_LIMITS,
@@ -37,6 +44,14 @@ export interface AzdBindingTarget {
 }
 
 export interface AzdBindingRequest {
+  /**
+   * Digest of each required extension as installed in the executor's isolated azd configuration directory, keyed by
+   * extension id. Empty when azure.yaml requires none.
+   */
+  readonly extensionDigests: Readonly<Record<string, string>>;
+  readonly platform?: NodeJS.Platform;
+  /** `explicit` when azd must see the Azure CLI configuration directory the signed-in session lives in. */
+  readonly azureCliConfigDirectory?: "explicit" | "unset";
   readonly projectId: string;
   readonly runId: string;
   /** Absolute directory containing `azure.yaml` and `.azure/<environmentName>/`. */
@@ -288,26 +303,57 @@ function parseDotenv(source: string): DotenvResult {
   return { values };
 }
 
-function assertNoSecrets(values: ReadonlyMap<string, string>): void {
-  for (const [key, value] of values)
-    if (SECRET_FIELD_PATTERN.test(key) || SECRET_VALUE_PATTERN.test(value))
+/**
+ * Only azd-managed, non-secret keys may live in the azd environment. Custom values would otherwise be hashed into the
+ * persisted binding, and an unsalted digest of a low-entropy value is enumerable offline.
+ */
+function assertApprovedEnvironment(values: ReadonlyMap<string, string>): void {
+  for (const [key, value] of values) {
+    if (!(AZD_ENVIRONMENT_KEYS as readonly string[]).includes(key))
       fail(
-        "AZD_ENV_SECRET",
-        `The azd environment holds a secret-like entry (${key}); secrets cannot be bound or persisted, so keep them in Key Vault`,
+        "AZD_ENV_UNAPPROVED_KEY",
+        `The azd environment holds ${key}, which is not an azd-managed key; move custom values into the reviewed main.parameters.json or the typed environment inputs, and keep secrets in Key Vault references`,
       );
+    if (SECRET_VALUE_PATTERN.test(value))
+      fail("AZD_ENV_SECRET", `The azd environment value of ${key} looks like a secret`);
+  }
 }
 
-function assertConfigHasNoSecrets(value: unknown, depth = 0): void {
-  if (depth > 16) fail("AZD_ENV_INVALID", "The azd environment config is nested too deeply");
-  if (typeof value === "string" && SECRET_VALUE_PATTERN.test(value))
-    fail("AZD_ENV_SECRET", "The azd environment config holds a secret-like value");
-  if (Array.isArray(value)) for (const item of value) assertConfigHasNoSecrets(item, depth + 1);
-  else if (value !== null && typeof value === "object")
-    for (const [key, child] of Object.entries(value)) {
-      if (SECRET_FIELD_PATTERN.test(key))
-        fail("AZD_ENV_SECRET", `The azd environment config holds a secret-like entry (${safeKey(key)})`);
-      assertConfigHasNoSecrets(child, depth + 1);
+/** `.azure/<env>/config.json` and `.azure/config.json`: only inert content that cannot carry custom values. */
+async function inventoryAzdConfigFiles(
+  files: AzdProjectFiles,
+  directory: string,
+): Promise<{ configHash?: string; projectConfigHash?: string }> {
+  const result: { configHash?: string; projectConfigHash?: string } = {};
+  const parse = (bytes: Buffer, context: string): Record<string, unknown> => {
+    try {
+      return plain(JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)), context, "AZD_ENV_INVALID");
+    } catch (error) {
+      if (error instanceof AzdBindingError) throw error;
+      return fail("AZD_ENV_INVALID", `${context} is not valid JSON`);
     }
+  };
+  if ((await files.stat(`${directory}/config.json`)) !== undefined) {
+    const bytes = await files.read(`${directory}/config.json`, AZD_FILE_LIMITS.fileBytes, "AZD_ENV_MISSING");
+    if (Object.keys(parse(bytes, "The azd environment config")).length > 0)
+      fail(
+        "AZD_ENV_UNAPPROVED_KEY",
+        "The azd environment config must be empty; stored parameter values belong in the reviewed main.parameters.json",
+      );
+    result.configHash = sha256Hex(bytes);
+  }
+  if ((await files.stat(".azure/config.json")) !== undefined) {
+    const bytes = await files.read(".azure/config.json", AZD_FILE_LIMITS.fileBytes, "AZD_ENV_MISSING");
+    const project = parse(bytes, ".azure/config.json");
+    onlyKeys(project, ["version", "defaultEnvironment"], ".azure/config.json", "AZD_ENV_INVALID");
+    if (
+      (project.version !== undefined && !Number.isInteger(project.version)) ||
+      (project.defaultEnvironment !== undefined && typeof project.defaultEnvironment !== "string")
+    )
+      fail("AZD_ENV_INVALID", ".azure/config.json has unexpected value types");
+    result.projectConfigHash = sha256Hex(bytes);
+  }
+  return result;
 }
 
 function sameText(left: string | undefined, right: string | undefined): boolean {
@@ -352,19 +398,9 @@ async function inventoryEnvironment(
     return fail("AZD_ENV_INVALID", "The azd environment file is not valid UTF-8");
   }
   const { values } = parseDotenv(source);
-  assertNoSecrets(values);
+  assertApprovedEnvironment(values);
   assertTarget(values, request);
-  let configHash: string | undefined;
-  if ((await files.stat(`${directory}/config.json`)) !== undefined) {
-    const config = await files.read(`${directory}/config.json`, AZD_FILE_LIMITS.fileBytes, "AZD_ENV_MISSING");
-    try {
-      assertConfigHasNoSecrets(JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(config)));
-    } catch (error) {
-      if (error instanceof AzdBindingError) throw error;
-      fail("AZD_ENV_INVALID", "The azd environment config is not valid JSON");
-    }
-    configHash = sha256Hex(config);
-  }
+  const { configHash, projectConfigHash } = await inventoryAzdConfigFiles(files, directory);
   const entries = [...values.entries()].sort(([left], [right]) => compare(left, right));
   return {
     values,
@@ -376,9 +412,10 @@ async function inventoryEnvironment(
         ...(request.target.tenantId === undefined ? {} : { tenantId: request.target.tenantId }),
         ...(request.target.resourceGroup === undefined ? {} : { resourceGroup: request.target.resourceGroup }),
       },
-      keys: entries.map(([key]) => key),
+      keys: entries.map(([key]) => key) as AzdEnvironmentV1["keys"],
       valuesHash: calculatePolicyValidationDigest(entries),
       ...(configHash === undefined ? {} : { configHash }),
+      ...(projectConfigHash === undefined ? {} : { projectConfigHash }),
     },
   };
 }
@@ -402,7 +439,10 @@ function resolveParameters(bytes: Buffer, values: ReadonlyMap<string, string>): 
   const resolved = source.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/gu, (_match, name: string) => {
     const value = values.get(name);
     if (value === undefined)
-      fail("AZD_PARAMETERS_UNRESOLVED", `Bicep parameter substitution ${name} is not defined in the azd environment`);
+      fail(
+        "AZD_PARAMETERS_UNRESOLVED",
+        `Bicep parameter substitution ${name} is not an approved azd-managed value; put reviewed values directly in the parameter file or the typed environment inputs`,
+      );
     if (/["\\]/u.test(value))
       fail(
         "AZD_PARAMETERS_UNSUPPORTED",
@@ -532,30 +572,11 @@ function declareRoots(infra: Record<string, unknown>): { layered: boolean; roots
   return { layered: true, roots };
 }
 
-const LOCAL_REFERENCE =
-  /\b(?:module\s+[A-Za-z_]\w*\s+|(?:loadTextContent|loadFileAsBase64|loadJsonContent|loadYamlContent)\(\s*|from\s+)(['"])([^'"\r\n]*)\1/gu;
-
-/** Local module and file references must stay inside the hashed tree; remote registry references are not bound. */
-function assertLocalReferences(root: string, path: string, content: Buffer): void {
-  let source: string;
-  try {
-    source = new TextDecoder("utf-8", { fatal: true }).decode(content);
-  } catch {
-    return fail("AZD_INFRA_MISSING", `Infra ${root} file ${path} is not valid UTF-8`);
-  }
-  for (const match of source.matchAll(LOCAL_REFERENCE)) {
-    const reference = match[2]!;
-    if (/^(?:br|ts)[:/]/iu.test(reference) || /^[a-z][a-z0-9+.-]*:\/\//iu.test(reference)) continue;
-    if (/^(?:[\\/]|[A-Za-z]:)/u.test(reference) || reference.split(/[\\/]/u).includes(".."))
-      fail("AZD_PATH_UNSAFE", `Infra ${root} file ${path} references a file outside its bound tree`);
-  }
-}
-
 async function inventoryRoot(
   files: AzdProjectFiles,
   root: RootDeclaration,
   values: ReadonlyMap<string, string>,
-): Promise<AzdInfraRootV1> {
+): Promise<{ root: AzdInfraRootV1; remoteModules: AzdRemoteModuleV1[] }> {
   const template = await files.stat(`${root.path}/${root.module}.bicep`);
   if (template === undefined || !template.isFile())
     fail("AZD_INFRA_MISSING", `Infra ${root.name} has no ${root.module}.bicep under ${root.path}`);
@@ -574,17 +595,22 @@ async function inventoryRoot(
     (await files.stat(parametersPath)) === undefined
       ? undefined
       : resolveParameters(await files.read(parametersPath, AZD_FILE_LIMITS.fileBytes, "AZD_INFRA_MISSING"), values);
+  const sources = new Map<string, Buffer>();
+  const treeHash = await files.hashTree(root.path, (path, content) => {
+    if (path.endsWith(".bicep") || path.endsWith("bicepconfig.json")) sources.set(path, content);
+  });
   return {
-    name: root.name,
-    path: root.path,
-    module: root.module,
-    provider: "bicep",
-    dependsOn: [...root.dependsOn],
-    treeHash: await files.hashTree(root.path, (path, content) => {
-      if (path.endsWith(".bicep")) assertLocalReferences(root.name, path, content);
-    }),
-    ...(parameters === undefined ? {} : { parametersPath, parametersFileHash: parameters.fileHash }),
-    resolvedParametersHash: parameters?.resolvedHash ?? calculatePolicyValidationDigest([]),
+    root: {
+      name: root.name,
+      path: root.path,
+      module: root.module,
+      provider: "bicep",
+      dependsOn: [...root.dependsOn],
+      treeHash,
+      ...(parameters === undefined ? {} : { parametersPath, parametersFileHash: parameters.fileHash }),
+      resolvedParametersHash: parameters?.resolvedHash ?? calculatePolicyValidationDigest([]),
+    },
+    remoteModules: inventoryBicepReferences({ name: root.name, path: root.path }, sources),
   };
 }
 
@@ -666,50 +692,114 @@ async function inventoryHook(
       fail("AZD_HOOK_SCRIPT_INVALID", `${context} dir is not a project directory`);
   }
 
+  const read = (bytes: Buffer): string => {
+    try {
+      return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    } catch {
+      return fail("AZD_HOOK_SCRIPT_INVALID", `${context} loads a file that is not valid UTF-8`);
+    }
+  };
+  /** Finds a project file by token in the given bases; absent returns undefined, a second match is ambiguous. */
+  const locate = async (token: string, bases: readonly string[]): Promise<string | undefined> => {
+    const candidate = relativePath(token);
+    if (candidate === undefined)
+      fail("AZD_HOOK_SCRIPT_INVALID", `${context} runs or loads ${safeKey(token)}, which is outside the project`);
+    const found: string[] = [];
+    for (const base of bases) {
+      const full = base.length === 0 ? candidate : `${base}/${candidate}`;
+      if ((await files.stat(full)) !== undefined) found.push(full);
+    }
+    if (found.length > 1)
+      fail(
+        "AZD_HOOK_SCRIPT_INVALID",
+        `${context} script ${candidate} is ambiguous between project and service folders`,
+      );
+    return found[0];
+  };
+  const readScript = async (full: string): Promise<Buffer> => {
+    const metadata = await files.stat(full);
+    if (metadata === undefined || !metadata.isFile())
+      fail("AZD_HOOK_SCRIPT_INVALID", `${context} script ${full} is not a regular file`);
+    return await files.readFile(full, metadata, AZD_FILE_LIMITS.fileBytes);
+  };
+
   let source: "script" | "inline" = "inline";
+  let interpreter: HookInterpreter | undefined;
   let path: string | undefined;
   let content: Buffer = Buffer.from(run, "utf8");
+  const singleLine = !/[\r\n]/u.test(run);
   if (!/\s/u.test(run)) {
     const pathLike = /[\\/]/u.test(run) || /\.(?:sh|ps1)$/iu.test(run);
-    const candidate = relativePath(run);
-    const found: string[] = [];
-    if (candidate !== undefined)
-      for (const base of site.bases) {
-        const full = base.length === 0 ? candidate : `${base}/${candidate}`;
-        if ((await files.stat(full)) !== undefined) found.push(full);
-      }
-    if (found.length > 1)
-      fail("AZD_HOOK_SCRIPT_INVALID", `${context} script is ambiguous between project and service folders`);
-    if (found.length === 1) {
-      const full = found[0]!;
-      const metadata = await files.stat(full);
-      if (metadata === undefined || !metadata.isFile())
-        fail("AZD_HOOK_SCRIPT_INVALID", `${context} script is not a regular file`);
+    const found = relativePath(run) === undefined ? undefined : await locate(run, site.bases);
+    if (found !== undefined) {
       source = "script";
-      path = full;
-      content = await files.readFile(full, metadata, AZD_FILE_LIMITS.fileBytes);
+      path = found;
+      content = await readScript(found);
     } else if (pathLike)
       fail("AZD_HOOK_SCRIPT_INVALID", `${context} script path is missing, absolute or outside the project`);
+  } else if (singleLine && /^\s*(?:sh|bash|zsh|pwsh|powershell|cmd)(?:\.exe)?\s/iu.test(run)) {
+    const command = parseInterpreterCommand(run);
+    if (command !== undefined && command !== "inline") {
+      if (!isLiteralOperand(command.operand))
+        fail(
+          "AZD_HOOK_UNBOUND_CONTENT",
+          `${context} runs a script whose path is resolved at run time; use a literal project-relative path`,
+        );
+      const found = await locate(command.operand, site.bases);
+      if (found === undefined)
+        fail("AZD_HOOK_SCRIPT_INVALID", `${context} script ${safeKey(command.operand)} does not exist in the project`);
+      source = "script";
+      interpreter = command.interpreter as HookInterpreter;
+      path = found;
+      content = await readScript(found);
+    }
   }
 
   const extension = path === undefined ? undefined : /\.([A-Za-z0-9]+)$/u.exec(path)?.[1]?.toLowerCase();
   const inferred = extension === "sh" ? "sh" : extension === "ps1" ? "pwsh" : undefined;
-  if (source === "script" && declared === undefined && inferred === undefined)
-    fail("AZD_HOOK_UNSUPPORTED", `${context} script has no sh or ps1 extension and no declared shell`);
-  if (declared !== undefined && inferred !== undefined && declared !== inferred)
-    fail("AZD_HOOK_UNSUPPORTED", `${context} declares a shell that conflicts with its script extension`);
-  let body: string;
-  try {
-    body = new TextDecoder("utf-8", { fatal: true }).decode(content);
-  } catch {
-    return fail("AZD_HOOK_SCRIPT_INVALID", `${context} script is not valid UTF-8`);
+  if (source === "script" && interpreter === undefined) {
+    if (declared === undefined && inferred === undefined)
+      fail("AZD_HOOK_UNSUPPORTED", `${context} script has no sh or ps1 extension and no declared shell`);
+    if (declared !== undefined && inferred !== undefined && declared !== inferred)
+      fail("AZD_HOOK_UNSUPPORTED", `${context} declares a shell that conflicts with its script extension`);
   }
-  for (const [pattern, reason] of UNBOUND_MUTATIONS)
-    if (pattern.test(body))
+
+  // Everything the hook loads from the project is hashed; anything it loads from elsewhere is refused.
+  const bodies = [read(content), ...(source === "script" ? [run] : [])];
+  const bases = workingDirectory === undefined ? site.bases : [workingDirectory];
+  const dependencies: Array<{ path: string; hash: string }> = [];
+  const visited = new Set<string>(path === undefined ? [] : [path]);
+  for (let index = 0; index < bodies.length; index++) {
+    const body = bodies[index]!;
+    for (const [pattern, reason] of UNBOUND_MUTATIONS)
+      if (pattern.test(body))
+        fail(
+          "AZD_HOOK_UNBOUND_MUTATION",
+          `${context} ${reason}, which the bound preview cannot cover; remove it or run that work as its own approved operation`,
+        );
+    const scan = scanHookText(body);
+    if (scan.violations.length > 0)
       fail(
-        "AZD_HOOK_UNBOUND_MUTATION",
-        `${context} ${reason}, which the bound preview cannot cover; remove it or run that work as its own approved operation`,
+        "AZD_HOOK_UNBOUND_CONTENT",
+        `${context} uses ${scan.violations.join(", ")}, which loads content the binding cannot hash; commit that content as a project file or remove it`,
       );
+    for (const reference of scan.references) {
+      const found = await locate(reference.token, bases);
+      if (found === undefined)
+        fail(
+          "AZD_HOOK_SCRIPT_INVALID",
+          `${context} ${reference.via === "source" ? "sources" : reference.via === "import-module" ? "imports" : "runs"} ${safeKey(reference.token)}, which does not exist in the project`,
+        );
+      if (visited.has(found)) continue;
+      visited.add(found);
+      if (dependencies.length >= AZD_BINDING_LIMITS.hookDependencies)
+        fail("AZD_HOOK_UNSUPPORTED", `${context} loads more than ${AZD_BINDING_LIMITS.hookDependencies} project files`);
+      const dependency = await readScript(found);
+      dependencies.push({ path: found, hash: sha256Hex(dependency) });
+      bodies.push(read(dependency));
+    }
+  }
+  dependencies.sort((left, right) => compare(left.path, right.path));
   return {
     scope: site.scope,
     event,
@@ -717,16 +807,38 @@ async function inventoryHook(
     platform,
     shell: declared ?? inferred ?? "sh",
     source,
+    ...(interpreter === undefined ? {} : { interpreter }),
     ...(path === undefined ? {} : { path }),
     ...(workingDirectory === undefined ? {} : { workingDirectory }),
     contentHash: sha256Hex(content),
+    commandHash: sha256Hex(run),
+    dependencies,
     continueOnError: bool(definition.continueOnError, false, `${context} continueOnError`, "AZD_HOOK_UNSUPPORTED"),
     interactive: bool(definition.interactive, false, `${context} interactive`, "AZD_HOOK_UNSUPPORTED"),
   };
 }
 
-function inventoryExtensions(required: unknown, azdVersion: string): AzdBindingV1["extensions"] {
-  if (required === undefined) return [];
+function inventoryExtensions(
+  required: unknown,
+  azdVersion: string,
+  digests: Readonly<Record<string, string>>,
+): AzdBindingV1["extensions"] {
+  const declared = required === undefined ? [] : declaredExtensions(required, azdVersion);
+  const unverified = (message: string): never => fail("AZD_EXTENSION_UNVERIFIED", message);
+  for (const id of Object.keys(digests))
+    if (!declared.some((extension) => extension.id === id))
+      unverified(`An installed digest was supplied for ${safeKey(id)}, which azure.yaml does not require`);
+  return declared.map((extension) => {
+    const installedDigest = Object.hasOwn(digests, extension.id) ? digests[extension.id] : undefined;
+    if (installedDigest === undefined || !/^[0-9a-f]{64}$/u.test(installedDigest))
+      unverified(
+        `azd extension ${extension.id} has no verified installed digest; install the pinned version in the isolated azd directory and supply its digest`,
+      );
+    return { ...extension, installedDigest: installedDigest! };
+  });
+}
+
+function declaredExtensions(required: unknown, azdVersion: string): Array<Omit<AzdExtensionV1, "installedDigest">> {
   const declaration = plain(required, "requiredVersions", "AZD_PROJECT_UNSUPPORTED");
   onlyKeys(declaration, ["azd", "extensions"], "requiredVersions", "AZD_PROJECT_UNSUPPORTED");
   if (declaration.azd !== undefined) {
@@ -742,7 +854,7 @@ function inventoryExtensions(required: unknown, azdVersion: string): AzdBindingV
   }
   if (declaration.extensions === undefined) return [];
   const extensions = plain(declaration.extensions, "requiredVersions.extensions", "AZD_PROJECT_UNSUPPORTED");
-  const result: Array<AzdBindingV1["extensions"][number]> = [];
+  const result: Array<Omit<AzdExtensionV1, "installedDigest">> = [];
   for (const [id, constraint] of Object.entries(extensions)) {
     const version = typeof constraint === "string" ? EXACT_VERSION.exec(constraint.trim())?.[1] : undefined;
     if (!/^[a-z0-9][a-z0-9._-]{0,127}$/u.test(id) || version === undefined)
@@ -798,7 +910,12 @@ export async function inspectAzdBicepProject(input: AzdBindingRequest): Promise<
     project.infra === undefined ? {} : plain(project.infra, "infra", "AZD_PROJECT_UNSUPPORTED"),
   );
   const roots: AzdInfraRootV1[] = [];
-  for (const declaration of declarations) roots.push(await inventoryRoot(files, declaration, values));
+  const remoteModules: AzdRemoteModuleV1[] = [];
+  for (const declaration of declarations) {
+    const inventoried = await inventoryRoot(files, declaration, values);
+    roots.push(inventoried.root);
+    remoteModules.push(...inventoried.remoteModules);
+  }
 
   const sites: HookSite[] = [];
   if (project.hooks !== undefined)
@@ -833,6 +950,10 @@ export async function inspectAzdBicepProject(input: AzdBindingRequest): Promise<
   }
   const hooks: AzdHookV1[] = [];
   for (const site of sites) hooks.push(...(await inventoryHooks(files, site)));
+  remoteModules.sort(
+    (left, right) =>
+      compare(left.root, right.root) || compare(left.file, right.file) || compare(left.reference, right.reference),
+  );
   hooks.sort(
     (left, right) =>
       compare(left.scope, right.scope) ||
@@ -856,7 +977,15 @@ export async function inspectAzdBicepProject(input: AzdBindingRequest): Promise<
       roots.map(({ name, resolvedParametersHash }) => [name, resolvedParametersHash]),
     ),
     hooks,
-    extensions: inventoryExtensions(project.requiredVersions, request.azdVersion),
+    extensions: inventoryExtensions(project.requiredVersions, request.azdVersion, request.extensionDigests),
+    remoteModules,
+    executionEnvelope: buildAzdExecutionEnvelope({
+      environmentName: request.environmentName,
+      ...(request.platform === undefined ? {} : { platform: request.platform }),
+      ...(request.azureCliConfigDirectory === undefined
+        ? {}
+        : { azureCliConfigDirectory: request.azureCliConfigDirectory }),
+    }),
   };
   const binding = { ...body, bindingHash: calculateAzdBindingHash(body) };
   if (!hasValidAzdBinding(binding))
@@ -916,6 +1045,14 @@ export function describeAzdBinding(binding: AzdBindingV1): AzdApprovalMaterial {
     warnings.push(
       `${binding.extensions.length} azd extension(s) are required and can extend azd behavior beyond the what-if.`,
     );
+  if (binding.hooks.some((hook) => hook.dependencies.length > 0))
+    warnings.push(
+      "Some hooks load further project files; those files are listed and hashed, but anything a hook downloads or loads by other means is outside this review.",
+    );
+  if (binding.remoteModules.length > 0)
+    warnings.push(
+      `${binding.remoteModules.length} remote Bicep module reference(s) are pinned by exact tag or digest; the executor must verify the resolved artifact matches before provisioning.`,
+    );
   if (binding.infra.layered)
     warnings.push(
       `Provisioning runs ${binding.infra.roots.length} layers in dependency order; each layer is previewed on its own.`,
@@ -927,9 +1064,16 @@ export function describeAzdBinding(binding: AzdBindingV1): AzdApprovalMaterial {
     ),
     ...binding.hooks.map(
       (hook) =>
-        `hook ${hook.scope} ${hook.event} #${hook.order} (${hook.platform}, ${hook.shell}, ${hook.source === "script" ? hook.path : "inline"}) content ${hook.contentHash.slice(0, 12)}${hook.continueOnError ? ", continues on error" : ""}${hook.interactive ? ", interactive" : ""}`,
+        `hook ${hook.scope} ${hook.event} #${hook.order} (${hook.platform}, ${hook.shell}, ${hook.source === "script" ? `${hook.interpreter === undefined ? "" : `${hook.interpreter} `}${hook.path}` : "inline"}) content ${hook.contentHash.slice(0, 12)}${hook.dependencies.length === 0 ? "" : `, loads ${hook.dependencies.map((dependency) => `${dependency.path} ${dependency.hash.slice(0, 12)}`).join(", ")}`}${hook.continueOnError ? ", continues on error" : ""}${hook.interactive ? ", interactive" : ""}`,
     ),
-    ...binding.extensions.map((extension) => `extension ${extension.id} ${extension.version} (${extension.source})`),
+    ...binding.remoteModules.map(
+      (module) =>
+        `module ${module.root} ${module.file}: ${module.reference} (${module.pin.type} ${module.pin.type === "digest" ? module.pin.value.slice(0, 12) : module.pin.value})`,
+    ),
+    ...binding.extensions.map(
+      (extension) =>
+        `extension ${extension.id} ${extension.version} (${extension.source}) digest ${extension.installedDigest.slice(0, 12)}`,
+    ),
   ];
   return { bindingHash: binding.bindingHash, warnings, inventory };
 }

@@ -44,37 +44,80 @@ not accept this Bicep-only field. Plan review displays the scope reference; it i
 
 Implemented, offline and not yet used to run anything. A Bicep azd project is described by the typed `azd-binding-v1`
 artifact, produced by `inspectAzdBicepProject` from a project directory that holds `azure.yaml` and
-`.azure/<environment>/`. azd recompiles Bicep and re-resolves parameters whenever it provisions, so the binding covers
-every input that recompilation or execution reads, and any change to any of them changes its `bindingHash`:
+`.azure/<environment>/`. azd recompiles Bicep and re-resolves parameters whenever it provisions, and hooks and
+extensions run code, so the binding covers every input that execution reads. Any change to any of them changes its
+`bindingHash`:
 
 - the exact `azure.yaml` bytes, the infrastructure tree of each root (one `default` root or each declared layer, with
-  its dependencies) and the parameters after substitution from the azd environment;
-- the azd environment: non-secret key names and a hash of the values (values are never stored), the approved target
-  (subscription, location, optional tenant and resource group) and the stored `config.json` azd consults;
-- the exact azd version, and every hook (project, layer and service scope; event, order, platform variant, shell,
-  script path, content hash, working directory), plus every extension pinned to an exact version.
+  its dependencies) and the parameters after substitution;
+- the azd environment: only azd-managed, non-secret keys (`AZURE_ENV_NAME`, `AZURE_LOCATION`,
+  `AZURE_SUBSCRIPTION_ID`, `AZURE_TENANT_ID`, `AZURE_RESOURCE_GROUP`, `AZURE_PRINCIPAL_ID`, `AZURE_PRINCIPAL_TYPE`)
+  are accepted, hashed together with the approved target, and any other key fails closed. Custom values belong in the
+  reviewed `main.parameters.json` or the typed environment inputs and secrets in Key Vault references, because a digest
+  of a low-entropy value would be enumerable offline. `${NAME}` in the parameter file may only name an allowlisted key.
+  The per-environment `config.json` must be empty and `.azure/config.json` (the default-environment pointer) may only
+  hold `version` and `defaultEnvironment`; both are hashed;
+- the exact azd version, the **execution envelope**, and every hook: project, layer and service scope; event, order,
+  platform variant, shell, interpreter, script path, working directory, a hash of the script (or inline text), a hash of
+  the exact command and a hash of every project file the hook loads;
+- every extension, pinned to an exact version from azd's default registry, with the digest of the installed extension;
+- every remote Bicep module and template spec in the infrastructure trees, with its reference, registry, path and pin.
 
-Hooks, extensions and layers are allowed but always inventoried, listed in approval material and hashed, so adding,
-removing, reordering or editing any of them invalidates the preview. The approval material warns that hooks run
-arbitrary scripts and can act beyond the what-if, and that the what-if is a prediction against current Azure state, not
-an immutable plan like a Terraform saved plan. The preview does not run hooks, so a hook that changes an input the
-preview already read (a parameter file or an environment value) is an accepted risk of approving that hook.
+### Hooks
 
-Unsupported surfaces fail closed with stable error codes: Terraform or extension `infra.provider`, `resources`,
-`platform`, `state` and `cloud` in `azure.yaml`, `.bicepparam` and parameter substitution other than `${NAME}`,
-parameters or environment entries that look like secrets, non-`sh`/`pwsh` hook runners, hook `secrets`, missing or
-ambiguous hook scripts, hooks that run `azd up`, `azd deploy`, `azd provision` or other azd operations, write the azd
-environment (`azd env set`, `.azure/` files) or retarget the subscription, extension versions that are not exact, an
+Hooks are allowed but inventoried, listed in approval material and hashed. A hook command is a bare script path, an
+`<interpreter> [flags] <script> [args]` command (`sh`, `bash`, `zsh`, `pwsh`, `powershell`, `cmd`), or inline text. The
+script file is read with the same link-, escape- and size-safe rules as every project file and hashed, and so are the
+project files it sources (`.`/`source`), dot-sources, imports (`Import-Module` of a path) or runs (`./x.sh`, `bash x.sh`),
+followed to a bounded depth. A hook fails closed, naming the construct, when it uses `eval`, `Invoke-Expression`/`iex`,
+`Invoke-WebRequest`/`iwr`, an encoded PowerShell command, a download piped into a shell or run through command
+substitution, a script path resolved at run time (`$VAR`, globs, `~`, URLs) or a script that is missing or outside the
+project; it also fails closed on hooks that run further azd operations, write the azd environment or retarget the
+subscription. The preview does not run hooks, so a hook that changes an input the preview already read (a parameter
+file or an environment value) is an accepted risk of approving that hook.
+
+This is a line-oriented text scan, not a shell parser. It cannot see what an interpreter loads internally (Python
+imports, `node` requires, PowerShell module autoloading, shell aliases or functions assembled at run time) or what a
+hook downloads without piping it to a shell. The approved content, the listed dependencies and the warning in the
+approval material are the controls, and the future executor must run hooks from an immutable snapshot of the bound
+project (not the live working tree) so a file cannot change between the hash and the run.
+
+### Remote modules
+
+Remote references are inventoried in every `.bicep` file (`module`, `extension`, `import`, `using`), resolving aliases
+from the nearest `bicepconfig.json` in the bound tree. Only exact, immutable references are accepted: an exact `x.y.z`
+tag on the Microsoft public registry (`br/public:` or `br:mcr.microsoft.com/bicep/...`, whose tags are immutable) or an
+`@sha256:` digest on any registry. Floating or partial tags, a missing tag, a tag on any other registry, a template
+spec without a version, URLs and undefined or redefined aliases fail with `AZD_MODULE_UNPINNED`. A template spec version
+is not content-addressed, so the executor must verify the resolved artifact (digest) at preflight; the binding records
+the reference, not the artifact, and does not verify it.
+
+### Execution envelope
+
+The binding carries a required `executionEnvelope`, and `buildAzdExecutionEnvelope` is the only builder for it. It
+fixes the project root as working directory, passes the environment explicitly with `--environment` (the
+default-environment pointer is never consulted) and disables prompts. `resolveAzdProcessEnvironment` rebuilds the
+process environment from a small allowlist (a fixed set of variables a process needs to start, plus `PATH`) with no
+inherited `AZURE_*` or `AZD_*`, so a redirect such as `AZURE_SUBSCRIPTION_ID` or `AZD_CONFIG_DIR` cannot reach azd. It
+points `AZD_CONFIG_DIR` at a run-scoped directory, which isolates user-level azd configuration, extension sources and
+globally installed extensions, and sets `AZURE_CONFIG_DIR` only to an explicitly supplied directory when the Azure CLI
+session lives elsewhere. `buildAzdArguments` can express only `provision` and `provision --preview`; `azd up` cannot be
+built. `assertAzdExtensionsVerified` is the preflight the executor must pass: exactly the bound extensions, from the
+default registry, with the bound versions and installed digests. `PATH` is still inherited and decides which tools a hook
+finds.
+
+### Unsupported surfaces
+
+These fail closed with stable error codes: Terraform or extension `infra.provider`, `resources`, `platform`, `state`
+and `cloud` in `azure.yaml`, `.bicepparam` and parameter substitution other than `${NAME}`, secret-like parameters,
+non-`sh`/`pwsh` hook runners, hook `secrets`, ambiguous hook scripts, extension versions that are not exact, an
 `azure.yaml` `requiredVersions.azd` the bound azd does not meet or that uses more than simple comparators, environment
-values that redirect the subscription, location, tenant, environment name or resource group, links, path traversal, YAML
-aliases and merge keys, local Bicep module or
-file references that leave the bound tree, a root without its own `bicepconfig.json` (so module aliases and linter
-settings cannot be inherited from outside the tree) and oversize input. The hook scan is a best-effort text check, not a
-sandbox; the approved hook content and the warning are the controls. Remote registry modules (`br:` and `ts:`) are not
-pinned by this binding, and a hook can load further files it does not declare.
+values that redirect the subscription, location, tenant, environment name or resource group, links, path traversal,
+YAML aliases and merge keys, local Bicep references that leave the bound tree, a root without its own
+`bicepconfig.json` (so aliases and linter settings are never inherited from outside the tree) and oversize input.
 
-Only azd's pre-configured official extension registry is representable. Checking the user's azd extension sources and
-running azd with a scrubbed environment belong to execution preflight and are not part of this contract.
+Only azd's pre-configured official extension registry is representable. Preparing the isolated directory, installing
+the pinned extensions into it and observing their digests belong to the executor.
 
 ### azd Prerequisite
 

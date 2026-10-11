@@ -20,18 +20,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Dispatch still requires the human Gate 4 approval of the exact preview.
 
 - Add the offline foundation for the Bicep azd executor (CP-26, PR A). The typed `azd-binding-v1` contract binds the
-  exact `azure.yaml`, infrastructure trees, resolved Bicep parameters, azd environment (non-secret key names plus a
-  values hash; secret-like entries fail closed and nothing secret is persisted), azd version and the inventory of hooks
-  (scope, event, order, shell, script path, content hash), exact-pinned extensions and layers, with a derived
-  `bindingHash`. `inspectAzdBicepProject` produces it deterministically from a project directory and refuses links,
-  traversal, oversize input, YAML aliases and unsupported surfaces (Terraform or extension providers, `resources`,
-  `platform`, `state`, `cloud`, `.bicepparam`, non-shell hook runners, hook secrets, unpinned extensions, target or
-  environment redirects, hooks that run further azd operations) with stable `AZD_*` codes. Any change to a bound
-  input, including hook content, order, addition or removal, changes the hash, and the approval material warns that
-  hooks can act beyond the what-if. `doctor` now reports an `executable:azd` check for Bicep runs that requires the
-  exact azd release pinned in `config/toolchain.v1.json` (1.35.1) and names the install remedy; Terraform runs do not
-  need azd. Execution still uses the native `az deployment` path: azd does not provision anything until PR B replaces
-  it, and `azd deploy` application packages follow in PR C.
+  exact `azure.yaml`, infrastructure trees, resolved Bicep parameters, the azd version, an execution envelope, every
+  hook with its script, command and the project files it loads, exact-pinned extensions with their installed digests,
+  every remote Bicep module and template spec (exact tag on the Microsoft public registry or an `@sha256` digest only),
+  and the azd environment, with a derived `bindingHash`. Only azd-managed non-secret environment keys are accepted and
+  hashed; any custom key fails closed, so no value-derived digest of custom or secret input is ever persisted.
+  `inspectAzdBicepProject` produces the binding deterministically and refuses links, traversal, oversize input, YAML
+  aliases and merge keys, unsupported surfaces and unbound content (`eval`, `iex`, downloads piped into a shell,
+  dynamic script paths, local references that leave the tree, floating module tags) with stable `AZD_*` codes.
+  `buildAzdExecutionEnvelope`, `resolveAzdProcessEnvironment`, `buildAzdArguments` and
+  `assertAzdExtensionsVerified` define how the future executor must run azd (explicit environment, no prompts, an
+  allowlisted process environment, an isolated azd configuration and extension directory, provision only). Any change to
+  a bound input changes the hash, and the approval material warns that hooks can act beyond the what-if. `doctor` now
+  reports an `executable:azd` check for Bicep runs that requires the exact azd release pinned in
+  `config/toolchain.v1.json` (1.35.1); Terraform runs do not need azd. Execution still uses the native
+  `az deployment` path: azd does not provision anything until PR B replaces it, and `azd deploy` application packages
+  follow in PR C.
 
 - Record lab Gates 2 and 3 as kernel readiness checkpoints (CP-27, part 2). A new `ready` gate state and a journaled
   `gate.readiness-recorded` event (gate, dependency hash, passed validators; no actor or approval evidence) are recorded

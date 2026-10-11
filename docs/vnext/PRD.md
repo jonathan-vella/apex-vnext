@@ -315,8 +315,10 @@ The target Bicep execution path uses a bounded azd executor, not a third IaC lan
 environment, azd version and allowed hooks/extensions/layers to the approved what-if. Unsupported mutation surfaces
 fail closed; what-if remains a prediction against mutable Azure state, not an immutable Terraform plan. Provisioning
 and approved application-package deployment are separate operations; do not run `azd up`. The azd binding contract
-(`azd-binding-v1`), its deterministic project inspection and the exact-version azd prerequisite exist; the native Bicep
-path remains current behavior until azd execution is implemented and qualified.
+(`azd-binding-v1`: hooks with their loaded files, pinned extensions and remote modules, allowlisted environment, execution
+envelope), its deterministic project inspection and the exact-version azd prerequisite exist. The executor must run
+hooks from an immutable snapshot and verify extension and module artifacts at preflight. The native Bicep path remains
+current behavior until azd execution is implemented and qualified.
 
 ### REQ-TERRAFORM-001: Terraform Lifecycle
 
