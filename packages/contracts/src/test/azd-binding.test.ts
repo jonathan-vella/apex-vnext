@@ -57,16 +57,14 @@ function binding(change: (body: Omit<AzdBindingV1, "bindingHash">) => void = () 
         order: 0,
         platform: "all",
         shell: "sh",
-        source: "script",
+        run: "hooks/pre.sh",
         path: "hooks/pre.sh",
         contentHash: digest("1"),
-        commandHash: digest("7"),
-        dependencies: [{ path: "hooks/lib.sh", hash: digest("8") }],
         continueOnError: false,
         interactive: false,
       },
     ],
-    extensions: [{ id: "microsoft.azd.demo", version: "1.2.3", source: "azd", installedDigest: digest("9") }],
+    extensions: [{ id: "microsoft.azd.demo", version: "1.2.3", source: "azd" }],
     remoteModules: [
       {
         root: "default",
@@ -82,11 +80,6 @@ function binding(change: (body: Omit<AzdBindingV1, "bindingHash">) => void = () 
       workingDirectory: "project-root",
       environmentName: "lab",
       prompts: "disabled",
-      inheritedEnvironment: ["HOME", "PATH"],
-      fixedEnvironment: { AZD_SKIP_UPDATE_CHECK: "true", AZURE_DEV_COLLECT_TELEMETRY: "no" },
-      azdConfigDirectory: "isolated",
-      azureCliState: "inherited-user-default",
-      userHome: "inherited",
       identityPreflight: {
         cloud: "AzureCloud",
         tenantId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
@@ -100,24 +93,19 @@ function binding(change: (body: Omit<AzdBindingV1, "bindingHash">) => void = () 
 }
 
 describe("azd-binding-v1", () => {
-  it("requires the envelope to agree with the target and the Azure CLI mode", () => {
+  it("requires the envelope to agree with the target and the identity preflight", () => {
     const edits: Array<(body: Omit<AzdBindingV1, "bindingHash">) => void> = [
-      (body) => (body.executionEnvelope.userHome = "withheld"),
-      (body) => (body.executionEnvelope.azureCliState = "isolated-directory"),
+      (body) => (body.executionEnvelope.environmentName = "other"),
       (body) => (body.executionEnvelope.identityPreflight.tenantId = "bbbbbbbb-bbbb-cccc-dddd-eeeeeeeeeeee"),
       (body) => (body.executionEnvelope.identityPreflight.subscriptionId = "22222222-2222-3333-4444-555555555555"),
-      (body) => (body.executionEnvelope.identityPreflight.cloud = "Other" as never),
-      (body) => ((body.executionEnvelope.identityPreflight as { onMismatch: string }).onMismatch = "warn"),
-      (body) => (body.executionEnvelope.inheritedEnvironment = ["PATH"]),
     ];
     for (const edit of edits) assert.equal(hasValidAzdBinding(binding(edit)), false);
-    const isolated = binding((body) => {
-      body.executionEnvelope.azureCliState = "isolated-directory";
-      body.executionEnvelope.userHome = "withheld";
-      body.executionEnvelope.inheritedEnvironment = ["PATH"];
-    });
-    assert.equal(hasValidAzdBinding(isolated), true);
-    assert.notEqual(isolated.bindingHash, binding().bindingHash);
+    const schemaInvalid: Array<(body: Omit<AzdBindingV1, "bindingHash">) => void> = [
+      (body) => (body.executionEnvelope.identityPreflight.cloud = "Other" as never),
+      (body) => ((body.executionEnvelope.identityPreflight as { onMismatch: string }).onMismatch = "warn"),
+      (body) => ((body.executionEnvelope as { prompts: string }).prompts = "enabled"),
+    ];
+    for (const edit of schemaInvalid) assert.equal(Value.Check(AzdBindingV1Schema, binding(edit)), false);
   });
 
   it("accepts a bound inventory and registers metadata", () => {
@@ -133,6 +121,7 @@ describe("azd-binding-v1", () => {
     const base = binding().bindingHash;
     const edits: Array<(body: Omit<AzdBindingV1, "bindingHash">) => void> = [
       (body) => (body.hooks[0]!.contentHash = digest("2")),
+      (body) => (body.hooks[0]!.run = "hooks/other.sh"),
       (body) => (body.hooks[0]!.order = 1),
       (body) => body.hooks.pop(),
       (body) => (body.extensions[0]!.version = "1.2.4"),
@@ -156,7 +145,7 @@ describe("azd-binding-v1", () => {
       (body) => body.hooks.push({ ...body.hooks[0]! }),
       (body) => body.extensions.push({ ...body.extensions[0]! }),
       (body) => delete body.hooks[0]!.path,
-      (body) => (body.hooks[0]!.source = "inline"),
+      (body) => delete body.hooks[0]!.contentHash,
       (body) => body.environment.keys.push("AZURE_ENV_NAME"),
     ];
     for (const edit of invalid) assert.equal(hasValidAzdBinding(binding(edit)), false);
@@ -231,30 +220,20 @@ describe("azd-binding-v1", () => {
       (body) => (body.remoteModules[0]!.kind = "ts"),
       (body) => body.remoteModules.push({ ...body.remoteModules[0]! }),
       (body) => (body.executionEnvelope.environmentName = "other"),
-      (body) => body.executionEnvelope.inheritedEnvironment.push("AZURE_CONFIG_DIR"),
-      (body) => body.executionEnvelope.inheritedEnvironment.push("azd_config_dir"),
-      (body) => {
-        body.hooks[0]!.source = "inline";
-        delete body.hooks[0]!.path;
-        body.hooks[0]!.interpreter = "bash";
-      },
-      (body) => body.hooks[0]!.dependencies.push({ path: "hooks/lib.sh", hash: digest("b") }),
     ];
     for (const edit of invalid) assert.equal(hasValidAzdBinding(binding(edit)), false);
     const schemaInvalid: Array<(body: Body) => void> = [
       (body) => ((body.environment.keys as string[]) = ["CUSTOM_SETTING"]),
-      (body) => delete (body.extensions[0] as { installedDigest?: string }).installedDigest,
-      (body) => delete (body.hooks[0] as { commandHash?: string }).commandHash,
-      (body) => ((body.executionEnvelope as { azdConfigDirectory: string }).azdConfigDirectory = "user"),
-      (body) => ((body.executionEnvelope as { prompts: string }).prompts = "enabled"),
-      (body) =>
-        ((body.executionEnvelope.fixedEnvironment as Record<string, string>).AZURE_CONFIG_DIR = "/home/user/.azure"),
+      (body) => ((body.hooks[0] as { run: string }).run = ""),
+      (body) => ((body.hooks[0] as { run: string }).run = "x".repeat(4097)),
     ];
     for (const edit of schemaInvalid) assert.equal(Value.Check(AzdBindingV1Schema, binding(edit)), false);
-    const interpreted = binding((body) => {
-      body.hooks[0]!.interpreter = "bash";
+    const inline = binding((body) => {
+      body.hooks[0] = { ...body.hooks[0]!, run: "az account show" };
+      delete body.hooks[0]!.path;
+      delete body.hooks[0]!.contentHash;
     });
-    assert.equal(hasValidAzdBinding(interpreted), true);
+    assert.equal(hasValidAzdBinding(inline), true);
   });
 
   it("only describes Bicep through azd with exact versions and safe relative paths", () => {

@@ -15,7 +15,7 @@ export const AZD_BINDING_LIMITS = {
   hooks: 128,
   extensions: 32,
   remoteModules: 256,
-  hookDependencies: 16,
+  hookRunLength: 4096,
 } as const;
 
 /**
@@ -50,11 +50,10 @@ export const AzdRelativePathSchema = Type.String({
 
 const AzdNameSchema = Type.String({ pattern: "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" });
 
-const AzdFileDigestSchema = Type.Object(
-  { path: AzdRelativePathSchema, hash: Sha256Schema },
-  { additionalProperties: false },
-);
-
+/**
+ * A hook exactly as azure.yaml declares it, listed so the approver can see it. Hooks are trusted (DECISION-037): the
+ * binding does not parse or follow script bodies, only hashes the file a plain script path names.
+ */
 export const AzdHookV1Schema = Type.Object(
   {
     scope: Type.String({ pattern: "^(?:project|(?:service|layer):[A-Za-z0-9][A-Za-z0-9._-]{0,63})$" }),
@@ -62,44 +61,27 @@ export const AzdHookV1Schema = Type.Object(
     /** Zero-based position among the hooks declared for the same scope and event. */
     order: Type.Integer({ minimum: 0, maximum: 31 }),
     platform: Type.Union([Type.Literal("all"), Type.Literal("windows"), Type.Literal("posix")]),
-    shell: Type.Union([Type.Literal("sh"), Type.Literal("pwsh")]),
-    source: Type.Union([Type.Literal("script"), Type.Literal("inline")]),
-    /** Interpreter of a `<interpreter> <script> [args]` command; absent for a bare script path or inline text. */
-    interpreter: Type.Optional(
-      Type.Union([
-        Type.Literal("sh"),
-        Type.Literal("bash"),
-        Type.Literal("zsh"),
-        Type.Literal("pwsh"),
-        Type.Literal("powershell"),
-        Type.Literal("cmd"),
-      ]),
-    ),
-    path: Type.Optional(AzdRelativePathSchema),
+    shell: Type.Optional(Type.Union([Type.Literal("sh"), Type.Literal("pwsh")])),
+    /** The declared `run` text. */
+    run: Type.String({ minLength: 1, maxLength: AZD_BINDING_LIMITS.hookRunLength }),
     workingDirectory: Type.Optional(AzdRelativePathSchema),
-    /** SHA-256 of the script file bytes, or of the UTF-8 inline script text. */
-    contentHash: Sha256Schema,
-    /** SHA-256 of the exact `run` text, so changed arguments or interpreters invalidate the binding. */
-    commandHash: Sha256Schema,
-    /** Project-contained files the hook loads (sourced, dot-sourced, imported or run), each hashed. */
-    dependencies: Type.Array(AzdFileDigestSchema, { maxItems: AZD_BINDING_LIMITS.hookDependencies }),
+    /** Set when `run` is a plain project-relative script path. */
+    path: Type.Optional(AzdRelativePathSchema),
+    /** SHA-256 of the file `path` names; present exactly when `path` is. */
+    contentHash: Type.Optional(Sha256Schema),
     continueOnError: Type.Boolean(),
     interactive: Type.Boolean(),
   },
   { additionalProperties: false },
 );
 
+/** An extension exactly as azure.yaml `requiredVersions.extensions` declares it (trusted, not verified). */
 export const AzdExtensionV1Schema = Type.Object(
   {
     id: Type.String({ pattern: "^[a-z0-9][a-z0-9._-]{0,127}$" }),
-    version: AzdVersionSchema,
-    /** Only azd's pre-configured official registry is accepted; custom registries are unsupported. */
+    /** The declared version or constraint, unparsed. */
+    version: Type.String({ minLength: 1, maxLength: 64 }),
     source: Type.Literal("azd"),
-    /**
-     * Digest of the installed extension that the executor observed in its isolated azd configuration directory. The
-     * binding is only valid when the installed extension still matches it at preflight.
-     */
-    installedDigest: Sha256Schema,
   },
   { additionalProperties: false },
 );
@@ -125,8 +107,6 @@ export const AzdInfraRootV1Schema = Type.Object(
 const AzdEnvironmentKeySchema = Type.Union(AZD_ENVIRONMENT_KEYS.map((key) => Type.Literal(key)));
 
 export const AZD_AZURE_CLOUDS = ["AzureCloud", "AzureUSGovernment", "AzureChinaCloud"] as const;
-
-const AZD_HOME_VARIABLES = ["HOME", "HOMEDRIVE", "HOMEPATH", "USERPROFILE"] as const;
 
 export const AzdEnvironmentV1Schema = Type.Object(
   {
@@ -182,8 +162,8 @@ export const AzdRemoteModuleV1Schema = Type.Object(
 );
 
 /**
- * How the executor must run azd so that nothing outside the binding changes what it does. Policy only: the executor
- * supplies the concrete run-scoped directories and parent environment to `buildAzdExecutionEnvelope`'s helpers.
+ * How the executor must run azd: an explicit environment from the project root without prompts, after an identity
+ * preflight. azd's own configuration, extensions and the user's Azure CLI sign-in are left alone.
  */
 export const AzdExecutionEnvelopeV1Schema = Type.Object(
   {
@@ -191,26 +171,6 @@ export const AzdExecutionEnvelopeV1Schema = Type.Object(
     /** Passed explicitly with `--environment`; the default-environment pointer is never consulted. */
     environmentName: EnvironmentSchema,
     prompts: Type.Literal("disabled"),
-    /** The only variables copied from the parent process; never `AZURE_*` or `AZD_*`. */
-    inheritedEnvironment: Type.Array(Type.String({ pattern: "^[A-Za-z_][A-Za-z0-9_]{0,63}$" }), {
-      uniqueItems: true,
-      maxItems: 24,
-    }),
-    fixedEnvironment: Type.Object(
-      { AZD_SKIP_UPDATE_CHECK: Type.Literal("true"), AZURE_DEV_COLLECT_TELEMETRY: Type.Literal("no") },
-      { additionalProperties: false },
-    ),
-    /** `AZD_CONFIG_DIR` is a run-scoped directory, so user-level azd config, sources and extensions are never read. */
-    azdConfigDirectory: Type.Literal("isolated"),
-    /**
-     * `inherited-user-default`: Azure CLI state (cloud, accounts, default subscription, extensions) comes from the
-     * user's own configuration, so it is ambient and only checked by `identityPreflight`. `isolated-directory`: the
-     * executor supplies a run-scoped `AZURE_CONFIG_DIR` holding exactly the sign-in the run needs; CI and production
-     * executors must use it.
-     */
-    azureCliState: Type.Union([Type.Literal("inherited-user-default"), Type.Literal("isolated-directory")]),
-    /** Whether the user's home directory variables (HOME, USERPROFILE, ...) reach azd and its hooks. */
-    userHome: Type.Union([Type.Literal("inherited"), Type.Literal("withheld")]),
     /** The executor must observe exactly this identity before provisioning and stop on any difference. */
     identityPreflight: Type.Object(
       {
@@ -322,15 +282,9 @@ function hasValidRemoteModules(binding: Omit<AzdBindingV1, "bindingHash">): bool
 
 function hasValidEnvelope(binding: Omit<AzdBindingV1, "bindingHash">): boolean {
   const envelope = binding.executionEnvelope;
-  const homeInherited = envelope.inheritedEnvironment.some((name) =>
-    AZD_HOME_VARIABLES.some((home) => home.toLowerCase() === name.toLowerCase()),
-  );
   const target = binding.environment.target;
   return (
     envelope.environmentName === binding.environment.name &&
-    !envelope.inheritedEnvironment.some((name) => /^(?:AZURE|AZD)_/iu.test(name)) &&
-    (envelope.azureCliState === "inherited-user-default") === (envelope.userHome === "inherited") &&
-    (envelope.userHome === "inherited") === homeInherited &&
     envelope.identityPreflight.subscriptionId === target.subscriptionId &&
     envelope.identityPreflight.tenantId === target.tenantId
   );
@@ -343,13 +297,11 @@ export function hasValidAzdBinding(value: unknown): value is AzdBindingV1 {
     const { bindingHash, ...binding } = value;
     if (!hasValidInfra(binding.infra, binding.hooks)) return false;
     if (!hasValidRemoteModules(binding) || !hasValidEnvelope(binding)) return false;
-    if (binding.hooks.some((hook) => !unique(hook.dependencies.map(({ path }) => path)))) return false;
-    if (binding.hooks.some((hook) => hook.interpreter !== undefined && hook.source !== "script")) return false;
     if (!unique(binding.extensions.map(({ id }) => id))) return false;
     if (!unique(binding.environment.keys)) return false;
     if (!unique(binding.hooks.map((hook) => `${hook.scope}\n${hook.event}\n${hook.platform}\n${hook.order}`)))
       return false;
-    if (binding.hooks.some((hook) => (hook.source === "script") !== (hook.path !== undefined))) return false;
+    if (binding.hooks.some((hook) => (hook.path === undefined) !== (hook.contentHash === undefined))) return false;
     return bindingHash === calculateAzdBindingHash(binding);
   } catch {
     return false;

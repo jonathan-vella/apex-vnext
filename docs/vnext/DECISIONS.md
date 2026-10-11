@@ -372,7 +372,7 @@ Maintainer direction accepted on 2026-10-09, with lab prompt scope confirmed on 
 - **Executors.** Use azd for Bicep and native Terraform CLI for Terraform. Keep two IaC languages; do not add an azd
   Terraform adapter. Preserve source/parameter/environment binding for Bicep and exact saved plans with normal
   backend locking and unchanged dependencies for Terraform. Provisioning and application deployment stay separate;
-  APEX does not run `azd up`.
+  APEX does not run `azd up`. DECISION-037 supersedes binding and hashing of azd hooks and extensions.
 - **Production.** GitHub Actions owns the execution run and preview from the start. A supported human approval
   adapter supplies a candidate-bound review receipt the kernel verifies before apply. No developer-to-CI plan, key
   or writer transfer is mandatory. Retain execution ownership, anti-replay, artifact confidentiality and audit.
@@ -385,6 +385,32 @@ Maintainer direction accepted on 2026-10-09, with lab prompt scope confirmed on 
 
 [ADR-0007](adrs/03-des-adr-0007-use-purpose-bound-approval-and-ci-owned-production-runs.md) owns the detailed boundary,
 supersession and acceptance rules. CP-26 through CP-30 track implementation and qualification.
+
+## DECISION-037: Trust azd Hooks And Extensions Under ALZ Guardrails; Show Them In The Preview
+
+Maintainer decision on 2026-10-11. It supersedes the earlier direction (DECISION-036 Executors, ADR-0007) that hooks,
+extensions and layers be inventoried, bound and hashed so that any change invalidates the approval.
+
+- **Decision.** APEX trusts azd, including the hooks and extensions a project declares. They are not scanned, followed,
+  hashed or verified. The binding and the preview list each declared hook (event, scope, shell, the declared `run` text
+  and, for a plain project-relative script path, that file's content hash) and each declared extension (id, version,
+  source) so the approver can see them. The approval material must show: "This project declares hooks/extensions. They
+  run with your Azure credentials and are not described by the what-if preview." Layered provisioning stays supported.
+- **Rationale.** Azure Landing Zones are assumed, so Azure Policy, RBAC and deny assignments are the compensating
+  controls for what a hook or extension can do. Delivery is non-production first. azd is a pinned, mainstream tool, and
+  APEX-generated projects declare no hooks or extensions. A hook is arbitrary code, so scanning it cannot be made
+  complete and only adds a fail-closed surface that real projects hit.
+- **Still bound.** `azure.yaml` (which contains every hook and extension declaration), the infrastructure Bicep tree
+  with its parameters and `bicepconfig.json`, `.azure/config.json`, the azd environment name, a digest of the
+  allowlisted non-secret environment values (any other key fails closed so secrets are never hashed or persisted),
+  remote Bicep module pins (exact Microsoft public registry tag or `@sha256` digest), the azd version, the approved
+  cloud, tenant and subscription (checked by the identity preflight), explicit `--environment`, the project root as
+  working directory, `--no-prompt`, and provision-only commands (never `azd up`).
+- **Not bound.** Hook script contents beyond the one file a plain script path names, anything a hook or extension
+  reaches or runs at run time, extension binaries and their sources, azd's own configuration and the user's Azure CLI
+  sign-in state.
+- **Scope.** This decision covers non-production only. CP-28 and CP-29 must re-evaluate hook and extension controls
+  before production is unblocked.
 
 Historical archive entries are indexed in the [catalog](../../.archive/CATALOG.json);
 the [restore guide](../../.archive/RESTORE.md) grants no runtime, release or deployment authority.

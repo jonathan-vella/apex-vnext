@@ -48,6 +48,9 @@ locking, exact Terraform saved-plan execution or audit evidence.
   not a Terraform-style saved execution plan.
 - Terraform uses the native Terraform CLI, with secured Azure Storage backend, normal state locking, pinned
   dependencies and exact saved-plan application. Do not replan or upgrade dependencies after approval.
+- Update 2026-10-11 ([DECISION-037](../DECISIONS.md#decision-037-trust-azd-hooks-and-extensions-under-alz-guardrails-show-them-in-the-preview)):
+  hooks and extensions are trusted and listed in the preview rather than bound, scanned or hashed; the earlier
+  "allowed hooks, extensions or layers" binding wording above no longer applies to them.
 - Keep `IacTool` as Bicep or Terraform; azd is an executor, not a third IaC language.
 - Provisioning and application-package deployment remain distinct operations. APEX does not run `azd up`; any
   `azd deploy` requires its own bound service/package preview and approval. Application development remains out of scope.

@@ -3,7 +3,6 @@ export * from "./archetype-source.js";
 export * from "./azd-binding.js";
 export * from "./azd-bicep-references.js";
 export * from "./azd-execution-envelope.js";
-export * from "./azd-hook-scan.js";
 export * from "./azd-prerequisites.js";
 export * from "./azd-project-files.js";
 export * from "./bound-envelope-transport.js";

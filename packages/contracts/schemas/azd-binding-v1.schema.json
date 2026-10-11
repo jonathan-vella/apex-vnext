@@ -111,43 +111,9 @@
     "executionEnvelope": {
       "additionalProperties": false,
       "properties": {
-        "azdConfigDirectory": {
-          "const": "isolated",
-          "type": "string"
-        },
-        "azureCliState": {
-          "anyOf": [
-            {
-              "const": "inherited-user-default",
-              "type": "string"
-            },
-            {
-              "const": "isolated-directory",
-              "type": "string"
-            }
-          ]
-        },
         "environmentName": {
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
-        },
-        "fixedEnvironment": {
-          "additionalProperties": false,
-          "properties": {
-            "AZD_SKIP_UPDATE_CHECK": {
-              "const": "true",
-              "type": "string"
-            },
-            "AZURE_DEV_COLLECT_TELEMETRY": {
-              "const": "no",
-              "type": "string"
-            }
-          },
-          "required": [
-            "AZD_SKIP_UPDATE_CHECK",
-            "AZURE_DEV_COLLECT_TELEMETRY"
-          ],
-          "type": "object"
         },
         "identityPreflight": {
           "additionalProperties": false,
@@ -189,30 +155,9 @@
           ],
           "type": "object"
         },
-        "inheritedEnvironment": {
-          "items": {
-            "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$",
-            "type": "string"
-          },
-          "maxItems": 24,
-          "type": "array",
-          "uniqueItems": true
-        },
         "prompts": {
           "const": "disabled",
           "type": "string"
-        },
-        "userHome": {
-          "anyOf": [
-            {
-              "const": "inherited",
-              "type": "string"
-            },
-            {
-              "const": "withheld",
-              "type": "string"
-            }
-          ]
         },
         "workingDirectory": {
           "const": "project-root",
@@ -223,11 +168,6 @@
         "workingDirectory",
         "environmentName",
         "prompts",
-        "inheritedEnvironment",
-        "fixedEnvironment",
-        "azdConfigDirectory",
-        "azureCliState",
-        "userHome",
         "identityPreflight"
       ],
       "type": "object"
@@ -244,24 +184,20 @@
             "pattern": "^[a-z0-9][a-z0-9._-]{0,127}$",
             "type": "string"
           },
-          "installedDigest": {
-            "pattern": "^[0-9a-f]{64}$",
-            "type": "string"
-          },
           "source": {
             "const": "azd",
             "type": "string"
           },
           "version": {
-            "pattern": "^(?:0|[1-9]\\d*)\\.(?:0|[1-9]\\d*)\\.(?:0|[1-9]\\d*)$",
+            "maxLength": 64,
+            "minLength": 1,
             "type": "string"
           }
         },
         "required": [
           "id",
           "version",
-          "source",
-          "installedDigest"
+          "source"
         ],
         "type": "object"
       },
@@ -272,10 +208,6 @@
       "items": {
         "additionalProperties": false,
         "properties": {
-          "commandHash": {
-            "pattern": "^[0-9a-f]{64}$",
-            "type": "string"
-          },
           "contentHash": {
             "pattern": "^[0-9a-f]{64}$",
             "type": "string"
@@ -283,64 +215,12 @@
           "continueOnError": {
             "type": "boolean"
           },
-          "dependencies": {
-            "items": {
-              "additionalProperties": false,
-              "properties": {
-                "hash": {
-                  "pattern": "^[0-9a-f]{64}$",
-                  "type": "string"
-                },
-                "path": {
-                  "maxLength": 512,
-                  "minLength": 1,
-                  "pattern": "^(?!(?:.*/)?\\.{1,2}(?:/|$))[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$",
-                  "type": "string"
-                }
-              },
-              "required": [
-                "path",
-                "hash"
-              ],
-              "type": "object"
-            },
-            "maxItems": 16,
-            "type": "array"
-          },
           "event": {
             "pattern": "^(?:pre|post)[a-z]{2,16}$",
             "type": "string"
           },
           "interactive": {
             "type": "boolean"
-          },
-          "interpreter": {
-            "anyOf": [
-              {
-                "const": "sh",
-                "type": "string"
-              },
-              {
-                "const": "bash",
-                "type": "string"
-              },
-              {
-                "const": "zsh",
-                "type": "string"
-              },
-              {
-                "const": "pwsh",
-                "type": "string"
-              },
-              {
-                "const": "powershell",
-                "type": "string"
-              },
-              {
-                "const": "cmd",
-                "type": "string"
-              }
-            ]
           },
           "order": {
             "maximum": 31,
@@ -369,6 +249,11 @@
               }
             ]
           },
+          "run": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
           "scope": {
             "pattern": "^(?:project|(?:service|layer):[A-Za-z0-9][A-Za-z0-9._-]{0,63})$",
             "type": "string"
@@ -385,18 +270,6 @@
               }
             ]
           },
-          "source": {
-            "anyOf": [
-              {
-                "const": "script",
-                "type": "string"
-              },
-              {
-                "const": "inline",
-                "type": "string"
-              }
-            ]
-          },
           "workingDirectory": {
             "maxLength": 512,
             "minLength": 1,
@@ -409,11 +282,7 @@
           "event",
           "order",
           "platform",
-          "shell",
-          "source",
-          "contentHash",
-          "commandHash",
-          "dependencies",
+          "run",
           "continueOnError",
           "interactive"
         ],

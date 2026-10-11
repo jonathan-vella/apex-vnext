@@ -7,6 +7,7 @@ import { AZD_ENVIRONMENT_KEYS, hasValidAzdBinding } from "@apexops/contracts";
 import {
   assertAzdBindingUnchanged,
   AzdBindingError,
+  AZD_HOOKS_EXTENSIONS_WARNING,
   describeAzdBinding,
   inspectAzdBicepProject,
   type AzdBindingErrorCode,
@@ -55,7 +56,6 @@ async function fixture(
       environmentName: "lab",
       azdVersion: "1.35.1",
       target: { subscriptionId: SUBSCRIPTION, location: "swedencentral", tenantId: TENANT },
-      extensionDigests: {},
     },
   };
 }
@@ -83,17 +83,6 @@ async function rejects(
     `expected ${code}`,
   );
 }
-
-const DIGESTS = {
-  "microsoft.azd.demo": "d".repeat(64),
-  "other.ext": "e".repeat(64),
-};
-const withDigests =
-  (...ids: Array<keyof typeof DIGESTS>) =>
-  (request: AzdBindingRequest): AzdBindingRequest => ({
-    ...request,
-    extensionDigests: Object.fromEntries(ids.map((id) => [id, DIGESTS[id]])),
-  });
 
 const withHooks = (yaml: string): string => `name: demo\n${yaml}`;
 const PRE = "hooks:\n  preprovision:\n    run: hooks/pre.sh\n    shell: sh\n";
@@ -139,10 +128,7 @@ test("every bound input changes the binding hash", async () => {
     "added hook": { "azure.yaml": withHooks(`infra:\n  provider: bicep\n${PRE}`) },
   };
   const extension = (
-    await inspect(
-      { "azure.yaml": withHooks("requiredVersions:\n  extensions:\n    microsoft.azd.demo: 1.2.3\n") },
-      withDigests("microsoft.azd.demo"),
-    )
+    await inspect({ "azure.yaml": withHooks("requiredVersions:\n  extensions:\n    microsoft.azd.demo: 1.2.3\n") })
   ).bindingHash;
   assert.notEqual(extension, baseline);
   variants["project config"] = { ".azure/config.json": '{"version":1,"defaultEnvironment":"lab"}' };
@@ -183,7 +169,7 @@ test("a resolved parameter change is detected even when the parameter file is un
   assert.notEqual(before.parametersHash, after.parametersHash);
 });
 
-test("hooks are inventoried with content hashes and deterministic ordering", async () => {
+test("hooks are listed as declared, with a hash only for a plain script path", async () => {
   const yaml = withHooks(
     [
       "infra:",
@@ -198,29 +184,23 @@ test("hooks are inventoried with content hashes and deterministic ordering", asy
       "    - windows:",
       "        run: hooks/second.ps1",
       "      posix:",
-      "        run: hooks/post.sh",
+      "        run: sh hooks/post.sh",
       "",
     ].join("\n"),
   );
   const binding = await inspect({ "azure.yaml": yaml, "hooks/second.ps1": "Write-Host second\n" });
   assert.deepEqual(
-    binding.hooks.map(({ event, order, platform, shell, source, path }) => [
-      event,
-      order,
-      platform,
-      shell,
-      source,
-      path,
-    ]),
+    binding.hooks.map(({ event, order, platform, shell, run, path }) => [event, order, platform, shell, run, path]),
     [
-      ["postprovision", 0, "all", "sh", "inline", undefined],
-      ["preprovision", 0, "all", "sh", "script", "hooks/pre.sh"],
-      ["preprovision", 1, "posix", "sh", "script", "hooks/post.sh"],
-      ["preprovision", 1, "windows", "pwsh", "script", "hooks/second.ps1"],
+      ["postprovision", 0, "all", undefined, "echo finished", undefined],
+      ["preprovision", 0, "all", "sh", "hooks/pre.sh", "hooks/pre.sh"],
+      ["preprovision", 1, "posix", undefined, "sh hooks/post.sh", undefined],
+      ["preprovision", 1, "windows", undefined, "hooks/second.ps1", "hooks/second.ps1"],
     ],
   );
   assert.equal(binding.hooks[1]!.continueOnError, true);
-  assert.equal(binding.hooks[0]!.contentHash.length, 64);
+  assert.equal(binding.hooks[1]!.contentHash?.length, 64);
+  assert.equal(binding.hooks[0]!.contentHash, undefined);
 });
 
 test("hook content, ordering, addition and removal each invalidate the binding", async () => {
@@ -241,12 +221,16 @@ test("hook content, ordering, addition and removal each invalidate the binding",
   assert.equal(edited.hooks[0]!.path, "hooks/pre.sh");
 });
 
-test("inline hook text is bound as content", async () => {
+test("inline hook text is listed as declared and only the script a plain path names is read", async () => {
   const inline = (text: string): string => withHooks(`hooks:\n  postprovision:\n    run: |\n      ${text}\n`);
   const first = await inspect({ "azure.yaml": inline("echo one") });
   const second = await inspect({ "azure.yaml": inline("echo two") });
-  assert.equal(first.hooks[0]!.source, "inline");
-  assert.notEqual(first.hooks[0]!.contentHash, second.hooks[0]!.contentHash);
+  assert.equal(first.hooks[0]!.run, "echo one\n");
+  assert.equal(first.hooks[0]!.contentHash, undefined);
+  assert.notEqual(first.bindingHash, second.bindingHash);
+  // A command that merely mentions a script is not parsed: only the declared text is recorded.
+  const command = await inspect({ "azure.yaml": inline("sh hooks/pre.sh") });
+  assert.deepEqual([command.hooks[0]!.path, command.hooks[0]!.contentHash], [undefined, undefined]);
 });
 
 test("layered provisioning is inventoried per layer with layer hooks", async () => {
@@ -298,42 +282,23 @@ test("layered provisioning is inventoried per layer with layer hooks", async () 
   assert.notEqual(reordered.bindingHash, binding.bindingHash);
 });
 
-test("exact extension versions are bound and unpinned or non-default sources fail closed", async () => {
+test("extensions are listed exactly as declared", async () => {
   const requirement = (versions: string): string => withHooks(`requiredVersions:\n  extensions:\n${versions}`);
-  const both = withDigests("microsoft.azd.demo", "other.ext");
-  const binding = await inspect(
-    { "azure.yaml": requirement("    microsoft.azd.demo: =1.2.3\n    other.ext: 2.0.0\n") },
-    both,
-  );
+  const binding = await inspect({
+    "azure.yaml": requirement("    microsoft.azd.demo: =1.2.3\n    other.ext: '>=2.0.0'\n"),
+  });
   assert.deepEqual(binding.extensions, [
-    { id: "microsoft.azd.demo", version: "1.2.3", source: "azd", installedDigest: DIGESTS["microsoft.azd.demo"] },
-    { id: "other.ext", version: "2.0.0", source: "azd", installedDigest: DIGESTS["other.ext"] },
+    { id: "microsoft.azd.demo", version: "=1.2.3", source: "azd" },
+    { id: "other.ext", version: ">=2.0.0", source: "azd" },
   ]);
-  const bumped = await inspect(
-    { "azure.yaml": requirement("    microsoft.azd.demo: 1.2.4\n    other.ext: 2.0.0\n") },
-    both,
-  );
+  const bumped = await inspect({
+    "azure.yaml": requirement("    microsoft.azd.demo: 1.2.4\n    other.ext: '>=2.0.0'\n"),
+  });
   assert.notEqual(bumped.bindingHash, binding.bindingHash);
-  const redigested = await inspect(
-    { "azure.yaml": requirement("    microsoft.azd.demo: =1.2.3\n    other.ext: 2.0.0\n") },
-    (request) => ({
-      ...both(request),
-      extensionDigests: { ...both(request).extensionDigests, "other.ext": "f".repeat(64) },
-    }),
-  );
-  assert.notEqual(redigested.bindingHash, binding.bindingHash);
-  // The installed digest is a required, well-formed observation for every required extension and only those.
-  const declared = { "azure.yaml": requirement("    microsoft.azd.demo: 1.2.3\n") };
-  await rejects("AZD_EXTENSION_UNVERIFIED", declared);
-  await rejects("AZD_EXTENSION_UNVERIFIED", declared, (request) => ({
-    ...request,
-    extensionDigests: { "microsoft.azd.demo": "not-a-digest" },
-  }));
-  await rejects("AZD_EXTENSION_UNVERIFIED", declared, withDigests("microsoft.azd.demo", "other.ext"));
-  await rejects("AZD_EXTENSION_UNVERIFIED", {}, withDigests("other.ext"));
-  for (const constraint of ["latest", '">=1.0.0"', '"~1.2.0"', "1.2", "1.2.3-beta.1", '""', "null"])
-    await rejects("AZD_EXTENSION_UNPINNED", { "azure.yaml": requirement(`    microsoft.azd.demo: ${constraint}\n`) });
-  await rejects("AZD_EXTENSION_UNPINNED", { "azure.yaml": requirement("    https://example.com/ext: 1.2.3\n") });
+  await rejects("AZD_PROJECT_UNSUPPORTED", {
+    "azure.yaml": requirement("    microsoft.azd.demo: 1\n    Bad Id: 1.0.0\n"),
+  });
+  await rejects("AZD_PROJECT_UNSUPPORTED", { "azure.yaml": requirement("    microsoft.azd.demo: null\n") });
 });
 
 test("unsupported project surfaces fail closed with stable codes", async () => {
@@ -369,38 +334,25 @@ test("unsupported project surfaces fail closed with stable codes", async () => {
   });
 });
 
-test("unsupported hook surfaces fail closed", async () => {
+test("malformed hooks and unsafe script paths fail closed", async () => {
   const hook = (body: string): string => withHooks(`hooks:\n  preprovision:\n${body}`);
-  const cases: Array<[AzdBindingErrorCode, string, Record<string, string | null>?]> = [
-    ["AZD_HOOK_UNSUPPORTED", hook("    run: hooks/pre.sh\n    kind: python\n")],
-    ["AZD_HOOK_UNSUPPORTED", hook("    run: hooks/pre.sh\n    kind: js\n")],
-    ["AZD_HOOK_UNSUPPORTED", hook("    run: hooks/pre.sh\n    shell: zsh\n")],
-    ["AZD_HOOK_UNSUPPORTED", hook("    run: hooks/pre.sh\n    shell: sh\n    kind: pwsh\n")],
-    ["AZD_HOOK_UNSUPPORTED", hook("    run: hooks/pre.sh\n    secrets:\n      TOKEN: akvs://vault/secret\n")],
-    ["AZD_HOOK_UNSUPPORTED", hook("    run: hooks/pre.sh\n    config:\n      x: 1\n")],
-    ["AZD_HOOK_UNSUPPORTED", hook("    shell: sh\n")],
-    ["AZD_HOOK_UNSUPPORTED", hook("    run: hooks/pre.sh\n    shell: pwsh\n")],
-    ["AZD_HOOK_UNSUPPORTED", hook("    run: hooks/tool.bin\n"), { "hooks/tool.bin": "x" }],
-    ["AZD_HOOK_UNSUPPORTED", withHooks("hooks:\n  postbuild:\n    run: echo hi\n")],
+  const cases: Array<[AzdBindingErrorCode, string]> = [
+    ["AZD_PROJECT_UNSUPPORTED", hook("    run: hooks/pre.sh\n    kind: python\n")],
+    ["AZD_PROJECT_UNSUPPORTED", hook("    shell: sh\n")],
+    ["AZD_PROJECT_UNSUPPORTED", withHooks("hooks:\n  notanevent:\n    run: echo hi\n")],
+    ["AZD_PROJECT_UNSUPPORTED", hook("    run: ''\n")],
     ["AZD_HOOK_SCRIPT_INVALID", hook("    run: hooks/missing.sh\n")],
     ["AZD_HOOK_SCRIPT_INVALID", hook("    run: /usr/bin/true.sh\n")],
     ["AZD_HOOK_SCRIPT_INVALID", hook("    run: ../outside.sh\n")],
     ["AZD_HOOK_SCRIPT_INVALID", hook("    run: hooks\\\\pre.sh\n")],
-    ["AZD_HOOK_SCRIPT_INVALID", hook("    run: echo hi\n    dir: missing-dir\n")],
-    ["AZD_HOOK_UNBOUND_MUTATION", hook("    run: azd up --no-prompt\n")],
-    ["AZD_HOOK_UNBOUND_MUTATION", hook("    run: |\n      echo start\n      azd deploy api\n")],
-    ["AZD_HOOK_UNBOUND_MUTATION", hook("    run: azd env set AZURE_LOCATION westeurope\n")],
-    ["AZD_HOOK_UNBOUND_MUTATION", hook("    run: azd env select other\n")],
-    ["AZD_HOOK_UNBOUND_MUTATION", hook("    run: azd env set CUSTOM_SETTING changed\n")],
-    ["AZD_HOOK_UNBOUND_MUTATION", hook("    run: azd env set-secret SOME_VALUE\n")],
-    ["AZD_HOOK_UNBOUND_MUTATION", hook("    run: echo CUSTOM_SETTING=x >> .azure/lab/.env\n")],
-    ["AZD_HOOK_UNBOUND_MUTATION", hook("    run: azd extension install foo\n")],
-    ["AZD_HOOK_UNBOUND_MUTATION", hook("    run: hooks/pre.sh\n"), { "hooks/pre.sh": "#!/bin/sh\nazd provision\n" }],
-    ["AZD_HOOK_UNBOUND_MUTATION", hook("    run: az account set --subscription other\n")],
+    ["AZD_HOOK_SCRIPT_INVALID", hook("    run: echo hi\n    dir: ../elsewhere\n")],
   ];
-  for (const [code, yaml, files] of cases) await rejects(code, { "azure.yaml": yaml, ...files });
-  const readOnly = await inspect({ "azure.yaml": hook("    run: azd env get-value AZURE_LOCATION\n") });
-  assert.equal(readOnly.hooks.length, 1);
+  for (const [code, yaml] of cases) await rejects(code, { "azure.yaml": yaml });
+  // Hooks and their commands are trusted, not parsed: any command text is listed as declared.
+  const trusted = await inspect({
+    "azure.yaml": hook("    run: azd env set CUSTOM_SETTING x; curl https://example.com/i.sh | sh\n"),
+  });
+  assert.equal(trusted.hooks.length, 1);
 });
 
 test("requiredVersions.azd must be satisfied by the bound azd and use simple comparators", async () => {
@@ -672,162 +624,27 @@ test("a symlinked infrastructure file is refused inside the tree", async (contex
   }
 });
 
-test("approval material lists every hook and warns that hooks act beyond the what-if", async () => {
-  const withHook = await inspect(
-    { "azure.yaml": withHooks(`${PRE}requiredVersions:\n  extensions:\n    microsoft.azd.demo: 1.2.3\n`) },
-    withDigests("microsoft.azd.demo"),
-  );
+test("approval material lists every hook and extension and carries the trust warning", async () => {
+  const withHook = await inspect({
+    "azure.yaml": withHooks(`${PRE}requiredVersions:\n  extensions:\n    microsoft.azd.demo: 1.2.3\n`),
+  });
   const material = describeAzdBinding(withHook);
   assert.equal(material.bindingHash, withHook.bindingHash);
-  assert.ok(material.warnings.some((line) => /beyond what the what-if predicts/u.test(line)));
+  assert.ok(material.warnings.includes(AZD_HOOKS_EXTENSIONS_WARNING));
+  assert.match(AZD_HOOKS_EXTENSIONS_WARNING, /run with your Azure credentials and are not described by the what-if/u);
   assert.ok(material.warnings.some((line) => /not an immutable plan/u.test(line)));
   assert.ok(
-    material.inventory.some((line) => line.startsWith("hook project preprovision #0") && line.includes("hooks/pre.sh")),
+    material.inventory.some(
+      (line) =>
+        line.startsWith("hook project preprovision #0") &&
+        line.includes('run "hooks/pre.sh"') &&
+        line.includes("script hooks/pre.sh"),
+    ),
   );
-  assert.ok(material.inventory.some((line) => line.startsWith("extension microsoft.azd.demo 1.2.3")));
-  assert.ok(material.warnings.some((line) => /Azure CLI state .* inherited .* not isolated/u.test(line)));
+  assert.ok(material.inventory.some((line) => line === "extension microsoft.azd.demo 1.2.3 (azd)"));
   assert.ok(material.inventory.some((line) => line.startsWith("identity preflight: cloud AzureCloud")));
-  const isolatedMaterial = describeAzdBinding(
-    await inspect({}, (request) => ({ ...request, azureCliState: "isolated-directory" })),
-  );
-  assert.equal(
-    isolatedMaterial.warnings.some((line) => /not isolated/u.test(line)),
-    false,
-  );
   const plain = describeAzdBinding(await inspect());
-  assert.equal(
-    plain.warnings.some((line) => /hook/u.test(line)),
-    false,
-  );
-});
-
-const hookYaml = (run: string): string =>
-  withHooks(`hooks:\n  preprovision:\n    run: ${JSON.stringify(run)}\n    shell: sh\n`);
-
-test("an interpreter command binds the script it runs and the arguments it passes", async () => {
-  const run = "sh hooks/pre.sh --flag";
-  const first = await inspect({ "azure.yaml": hookYaml(run) });
-  const [hook] = first.hooks;
-  assert.deepEqual([hook!.source, hook!.interpreter, hook!.path], ["script", "sh", "hooks/pre.sh"]);
-  const edited = await inspect({ "azure.yaml": hookYaml(run), "hooks/pre.sh": "#!/bin/sh\necho changed\n" });
-  assert.notEqual(edited.hooks[0]!.contentHash, hook!.contentHash);
-  assert.notEqual(edited.bindingHash, first.bindingHash);
-  const otherArgs = await inspect({ "azure.yaml": hookYaml("sh hooks/pre.sh --other") });
-  assert.notEqual(otherArgs.hooks[0]!.commandHash, hook!.commandHash);
-  assert.equal(otherArgs.hooks[0]!.contentHash, hook!.contentHash);
-  const forms: Array<[string, string, string]> = [
-    ["bash -e hooks/pre.sh one two", "bash", "hooks/pre.sh"],
-    ["bash.exe hooks/pre.sh", "bash", "hooks/pre.sh"],
-    ["zsh ./hooks/pre.sh", "zsh", "hooks/pre.sh"],
-    ["pwsh -NoProfile -ExecutionPolicy Bypass -File hooks/x.ps1", "pwsh", "hooks/x.ps1"],
-    ["powershell hooks/x.ps1 -Arg 1", "powershell", "hooks/x.ps1"],
-  ];
-  for (const [command, interpreter, path] of forms) {
-    const binding = await inspect({
-      "azure.yaml": hookYaml(command),
-      "hooks/x.ps1": "Write-Host x\n",
-      "hooks/x.cmd": "@echo off\n",
-    });
-    assert.deepEqual([binding.hooks[0]!.interpreter, binding.hooks[0]!.path], [interpreter, path], command);
-  }
-  await rejects("AZD_HOOK_SCRIPT_INVALID", { "azure.yaml": hookYaml("sh hooks/missing.sh") });
-  await rejects("AZD_HOOK_SCRIPT_INVALID", { "azure.yaml": hookYaml("sh ../outside.sh") });
-  await rejects("AZD_HOOK_SCRIPT_INVALID", { "azure.yaml": hookYaml("bash /usr/local/bin/tool.sh") });
-  await rejects("AZD_HOOK_UNBOUND_CONTENT", { "azure.yaml": hookYaml('sh "$SCRIPT_DIR/pre.sh"') });
-  await rejects("AZD_HOOK_UNBOUND_CONTENT", { "azure.yaml": hookYaml("sh hooks/*.sh") });
-});
-
-test("files a hook sources, imports or runs are hashed and nested loads are followed", async () => {
-  const body = (text: string): Record<string, string> => ({
-    "azure.yaml": hookYaml("sh hooks/pre.sh"),
-    "hooks/pre.sh": `#!/bin/sh\n${text}\n`,
-    "hooks/lib.sh": "echo lib\n",
-  });
-  const sourced = await inspect(body(". ./hooks/lib.sh"));
-  assert.deepEqual(
-    sourced.hooks[0]!.dependencies.map(({ path }) => path),
-    ["hooks/lib.sh"],
-  );
-  const material = describeAzdBinding(sourced);
-  assert.ok(material.inventory.some((line) => line.includes("loads hooks/lib.sh")));
-  assert.ok(material.warnings.some((line) => /load further project files/u.test(line)));
-  const changed = await inspect({ ...body(". ./hooks/lib.sh"), "hooks/lib.sh": "echo changed\n" });
-  assert.notEqual(changed.bindingHash, sourced.bindingHash);
-  assert.notEqual(changed.hooks[0]!.dependencies[0]!.hash, sourced.hooks[0]!.dependencies[0]!.hash);
-  for (const line of [
-    "source hooks/lib.sh",
-    "echo start; . hooks/lib.sh",
-    "./hooks/lib.sh",
-    "bash hooks/lib.sh arg",
-    "exec bash hooks/lib.sh",
-    "env FOO=1 sh hooks/lib.sh",
-    "sudo ./hooks/lib.sh",
-    "& ./hooks/lib.sh",
-    "FOO=1 BAR=2 bash -e hooks/lib.sh",
-  ]) {
-    const binding = await inspect(body(line));
-    assert.equal(binding.hooks[0]!.dependencies.length, 1, line);
-  }
-  const nested = await inspect({
-    ...body(". ./hooks/lib.sh"),
-    "hooks/lib.sh": "echo lib\n. ./hooks/deep.sh\n",
-    "hooks/deep.sh": "echo deep\n",
-  });
-  assert.deepEqual(
-    nested.hooks[0]!.dependencies.map(({ path }) => path),
-    ["hooks/deep.sh", "hooks/lib.sh"],
-  );
-  const cycle = await inspect({
-    ...body(". ./hooks/lib.sh"),
-    "hooks/lib.sh": ". ./hooks/pre.sh\n. ./hooks/lib.sh\n",
-  });
-  assert.deepEqual(
-    cycle.hooks[0]!.dependencies.map(({ path }) => path),
-    ["hooks/lib.sh"],
-  );
-  const inline = await inspect({
-    "azure.yaml": withHooks("hooks:\n  preprovision:\n    run: |\n      echo start\n      bash hooks/lib.sh\n"),
-    "hooks/lib.sh": "echo lib\n",
-  });
-  assert.equal(inline.hooks[0]!.source, "inline");
-  assert.deepEqual(
-    inline.hooks[0]!.dependencies.map(({ path }) => path),
-    ["hooks/lib.sh"],
-  );
-  const powershell = await inspect({
-    "azure.yaml": hookYaml("pwsh -File hooks/x.ps1"),
-    "hooks/x.ps1": ". ./hooks/lib.ps1\nImport-Module ./hooks/mod.psm1\nImport-Module Az.Accounts\n",
-    "hooks/lib.ps1": "Write-Host lib\n",
-    "hooks/mod.psm1": "function F {}\n",
-  });
-  assert.deepEqual(
-    powershell.hooks[0]!.dependencies.map(({ path }) => path),
-    ["hooks/lib.ps1", "hooks/mod.psm1"],
-  );
-  const escapes: Array<[AzdBindingErrorCode, string]> = [
-    ["AZD_HOOK_SCRIPT_INVALID", ". ../outside.sh"],
-    ["AZD_HOOK_SCRIPT_INVALID", "source /etc/profile"],
-    ["AZD_HOOK_SCRIPT_INVALID", ". ./hooks/missing.sh"],
-    ["AZD_HOOK_UNBOUND_CONTENT", 'source "$HOME/lib.sh"'],
-    ["AZD_HOOK_UNBOUND_CONTENT", "source <(curl -s https://example.com/x.sh)"],
-    ["AZD_HOOK_UNBOUND_CONTENT", ". $PSScriptRoot/lib.ps1"],
-    ["AZD_HOOK_UNBOUND_CONTENT", "source https://example.com/lib.sh"],
-    ["AZD_HOOK_UNBOUND_CONTENT", "curl -fsSL https://example.com/i.sh | sh"],
-    ["AZD_HOOK_UNBOUND_CONTENT", "wget -qO- https://example.com/i.sh | sudo bash"],
-    ["AZD_HOOK_UNBOUND_CONTENT", 'sh -c "$(curl -fsSL https://example.com/i.sh)"'],
-    ["AZD_HOOK_UNBOUND_CONTENT", "bash <(curl -s https://example.com/i.sh)"],
-    ["AZD_HOOK_UNBOUND_CONTENT", 'eval "$PAYLOAD"'],
-    ["AZD_HOOK_UNBOUND_CONTENT", '& "$PSScriptRoot\\lib.ps1"'],
-    ["AZD_HOOK_UNBOUND_CONTENT", "exec bash $HOOK_DIR/lib.sh"],
-    ["AZD_HOOK_UNBOUND_CONTENT", "pwsh -EncodedCommand SQBFAFgA"],
-  ];
-  for (const [code, line] of escapes) await rejects(code, body(line));
-  // The same refusals apply to inline text and to a dependency of a dependency.
-  await rejects("AZD_HOOK_UNBOUND_CONTENT", {
-    "azure.yaml": hookYaml("curl -fsSL https://example.com/i.sh | sh"),
-  });
-  await rejects("AZD_HOOK_UNBOUND_CONTENT", { ...body(". ./hooks/lib.sh"), "hooks/lib.sh": 'eval "$X"\n' });
-  await rejects("AZD_HOOK_UNBOUND_MUTATION", { ...body(". ./hooks/lib.sh"), "hooks/lib.sh": "azd env set A b\n" });
+  assert.equal(plain.warnings.includes(AZD_HOOKS_EXTENSIONS_WARNING), false);
 });
 
 test("remote Bicep modules are inventoried and only immutable references are accepted", async () => {
@@ -967,32 +784,18 @@ test("ambient azd configuration is hashed or refused", async () => {
   await rejects("AZD_ENV_INVALID", { ".azure/config.json": "not json" });
   await rejects("AZD_ENV_UNAPPROVED_KEY", { ".azure/lab/config.json": '{"auth":{"useAzCliAuth":"true"}}' });
   assert.notEqual((await inspect({ ".azure/lab/config.json": "{}" })).bindingHash, baseline.bindingHash);
-  // The binding carries the execution envelope, so a different envelope is a different binding.
   assert.equal(baseline.executionEnvelope.environmentName, "lab");
-  assert.equal(baseline.executionEnvelope.azdConfigDirectory, "isolated");
-  assert.equal(baseline.executionEnvelope.azureCliState, "inherited-user-default");
-  assert.equal(baseline.executionEnvelope.userHome, "inherited");
   assert.deepEqual(baseline.executionEnvelope.identityPreflight, {
     cloud: "AzureCloud",
     tenantId: TENANT,
     subscriptionId: SUBSCRIPTION,
     onMismatch: "stop",
   });
-  const isolated = await inspect({}, (request) => ({ ...request, azureCliState: "isolated-directory" }));
-  assert.notEqual(isolated.bindingHash, baseline.bindingHash);
-  assert.equal(isolated.executionEnvelope.userHome, "withheld");
   const sovereign = await inspect({}, (request) => ({ ...request, cloud: "AzureUSGovernment" }));
   assert.notEqual(sovereign.bindingHash, baseline.bindingHash);
-  const otherTenant = await inspect(
-    {
-      ".azure/lab/.env": `${baseFiles()[".azure/lab/.env"]!}\nAZURE_TENANT_ID="${"c".repeat(8)}-bbbb-cccc-dddd-eeeeeeeeeeee"`,
-    },
-    undefined,
-  ).catch((error: unknown) => error);
-  assert.ok(otherTenant instanceof AzdBindingError && otherTenant.code === "AZD_ENV_TARGET_MISMATCH");
-  const otherPlatform = process.platform === "win32" ? "linux" : "win32";
-  const windows = await inspect({}, (request) => ({ ...request, platform: otherPlatform }));
-  assert.notEqual(windows.bindingHash, baseline.bindingHash);
+  await rejects("AZD_ENV_TARGET_MISMATCH", {
+    ".azure/lab/.env": `${baseFiles()[".azure/lab/.env"]!}\nAZURE_TENANT_ID="cccccccc-bbbb-cccc-dddd-eeeeeeeeeeee"`,
+  });
 });
 
 test("an accepted binding is re-verified and a change names the changed sections", async () => {

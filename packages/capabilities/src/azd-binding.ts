@@ -22,7 +22,6 @@ import {
 import { Value } from "@sinclair/typebox/value";
 import { inventoryBicepReferences } from "./azd-bicep-references.js";
 import { buildAzdExecutionEnvelope } from "./azd-execution-envelope.js";
-import { analyzeHookText, type HookAnalysis, type HookFlavour, type HookInterpreter } from "./azd-hook-scan.js";
 import { satisfiesAzdVersionConstraint } from "./azd-prerequisites.js";
 import {
   AZD_FILE_LIMITS,
@@ -45,14 +44,6 @@ export interface AzdBindingTarget {
 }
 
 export interface AzdBindingRequest {
-  /**
-   * Digest of each required extension as installed in the executor's isolated azd configuration directory, keyed by
-   * extension id. Empty when azure.yaml requires none.
-   */
-  readonly extensionDigests: Readonly<Record<string, string>>;
-  readonly platform?: NodeJS.Platform;
-  /** Where Azure CLI state comes from; defaults to the user's own, which is ambient and identity-checked. */
-  readonly azureCliState?: AzdExecutionEnvelopeV1["azureCliState"];
   /** Azure cloud the target lives in; defaults to the public cloud. */
   readonly cloud?: AzdExecutionEnvelopeV1["identityPreflight"]["cloud"];
   readonly projectId: string;
@@ -98,7 +89,6 @@ const SERVICE_HOOK_EVENTS: ReadonlySet<string> = new Set([
   "postpublish",
 ]);
 const LAYER_HOOK_EVENTS: ReadonlySet<string> = new Set(["preprovision", "postprovision"]);
-const HOOK_FIELDS = ["shell", "kind", "dir", "run", "continueOnError", "interactive", "secrets", "config"] as const;
 const TOP_LEVEL_KEYS = [
   "name",
   "metadata",
@@ -114,7 +104,6 @@ const NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/u;
 const RELATIVE_SEGMENT = /^[A-Za-z0-9._-]+$/u;
 const RESERVED_SEGMENTS: ReadonlySet<string> = new Set([".", "..", ".azure", ".git"]);
 const PARAMETER_NAME = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/u;
-const EXACT_VERSION = /^=?((?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*))$/u;
 // eslint-disable-next-line no-control-regex
 const CONTROL = /[\u0000-\u001f\u007f]/u;
 // Hook scripts may span lines; only characters that no shell treats as text are rejected.
@@ -123,24 +112,6 @@ const SCRIPT_CONTROL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u;
 const MAX_ENV_ENTRIES = 256;
 const MAX_ENV_VALUE = 4096;
 const MAX_HOOKS_PER_EVENT = 32;
-
-/**
- * Best-effort detection of hooks that run further azd operations or move the target. A hook is arbitrary code, so this
- * is not a sandbox: approval material still warns that hooks can act beyond the what-if.
- */
-const UNBOUND_MUTATIONS: ReadonlyArray<readonly [RegExp, string]> = [
-  [
-    /\bazd(?:\.exe)?["']?\s+(?:up|deploy|provision|down|package|publish|restore|init|pipeline|extension|ext|config|auth|add|infra|hooks|template|mcp|x)\b/iu,
-    "runs another azd operation",
-  ],
-  // Any environment write can change a value the binding hashed or a ${NAME} parameter after the preview.
-  [
-    /\bazd(?:\.exe)?["']?\s+env\s+(?:set|set-secret|new|select|remove|rm|refresh|config)\b/iu,
-    "changes the azd environment",
-  ],
-  [/\.azure[\\/]/u, "touches the azd environment files directly (read values with azd env get-value)"],
-  [/\baz(?:\.cmd)?\s+account\s+set\b/iu, "redirects the Azure subscription"],
-];
 
 function fail(code: AzdBindingErrorCode, message: string): never {
   throw new AzdBindingError(code, message);
@@ -621,80 +592,40 @@ interface HookSite {
   readonly scope: string;
   readonly events: ReadonlySet<string>;
   readonly declaration: unknown;
-  /** Project-relative directories scripts are looked up in; a script found in two of them is ambiguous. */
+  /** Project-relative directories a plain script path is looked up in (the project root, then a service folder). */
   readonly bases: readonly string[];
 }
 
-/** Everything the hooks of one project run or write, checked together once every hook is inventoried. */
-interface HookAudit {
-  /** Lower-cased project-relative paths of files hooks run, source or import. */
-  readonly loaded: Set<string>;
-  readonly writes: Array<{ readonly hook: string; readonly keys: readonly string[]; readonly dynamic: boolean }>;
-}
+const SCRIPT_TOKEN = /^[A-Za-z0-9._/\\-]+$/u;
 
-/** Lexically normalizes a hook path token to a lower-cased project-relative key; undefined when outside the project. */
-function writeKey(token: string, rootPath: string): string | undefined {
-  let value = token.replaceAll("\\", "/");
-  const root = rootPath.replaceAll("\\", "/").replace(/\/+$/u, "");
-  if (value.toLowerCase().startsWith(`${root.toLowerCase()}/`)) value = value.slice(root.length + 1);
-  else if (value.startsWith("/") || /^[A-Za-z]:\//u.test(value) || value.startsWith("~")) return undefined;
-  const segments: string[] = [];
-  for (const segment of value.split("/")) {
-    if (segment === "" || segment === ".") continue;
-    if (segment === "..") {
-      if (segments.pop() === undefined) return undefined;
-    } else segments.push(segment);
-  }
-  return segments.length === 0 ? "" : segments.join("/").toLowerCase();
-}
-
-function assertHooksPreserveBoundFiles(audit: HookAudit, bound: readonly string[]): void {
-  const protectedKeys = [...audit.loaded, ...bound.map((item) => item.toLowerCase())];
-  for (const write of audit.writes) {
-    if (write.dynamic)
-      fail(
-        "AZD_HOOK_UNBOUND_CONTENT",
-        `${write.hook} writes files whose target is resolved at run time (a variable, glob, archive, checkout or download), which can change bound files; write to a fixed path outside the bound infra and script files`,
-      );
-    for (const key of write.keys)
-      if (protectedKeys.some((item) => item === key || item.startsWith(`${key}/`) || key.startsWith(`${item}/`)))
-        fail(
-          "AZD_HOOK_UNBOUND_CONTENT",
-          `${write.hook} writes a file it, another hook or the infra tree runs or reads at provision time (${safeKey(key)}); bound files must not change while azd runs`,
-        );
-  }
-}
-
-async function inventoryHooks(files: AzdProjectFiles, site: HookSite, audit: HookAudit): Promise<AzdHookV1[]> {
+async function inventoryHooks(files: AzdProjectFiles, site: HookSite): Promise<AzdHookV1[]> {
   const result: AzdHookV1[] = [];
-  const hooks = plain(site.declaration, `${site.scope} hooks`, "AZD_HOOK_UNSUPPORTED");
+  const hooks = plain(site.declaration, `${site.scope} hooks`, "AZD_PROJECT_UNSUPPORTED");
   for (const [event, declared] of Object.entries(hooks)) {
     if (!site.events.has(event))
-      fail("AZD_HOOK_UNSUPPORTED", `${site.scope} declares unsupported hook event ${safeKey(event)}`);
+      fail("AZD_PROJECT_UNSUPPORTED", `${site.scope} declares unsupported hook event ${safeKey(event)}`);
     const list = Array.isArray(declared) ? (declared as unknown[]) : [declared];
     if (list.length > MAX_HOOKS_PER_EVENT)
-      fail("AZD_HOOK_UNSUPPORTED", `${site.scope} ${event} declares too many hooks`);
+      fail("AZD_PROJECT_UNSUPPORTED", `${site.scope} ${event} declares too many hooks`);
     for (const [order, candidate] of list.entries()) {
-      const entry = plain(candidate, `${site.scope} ${event} hook`, "AZD_HOOK_UNSUPPORTED");
-      onlyKeys(entry, [...HOOK_FIELDS, "windows", "posix"], `${site.scope} ${event} hook`, "AZD_HOOK_UNSUPPORTED");
+      const entry = plain(candidate, `${site.scope} ${event} hook`, "AZD_PROJECT_UNSUPPORTED");
       const variants: Array<["all" | "windows" | "posix", Record<string, unknown>]> = [];
       if (entry.run !== undefined) variants.push(["all", entry]);
-      else if (HOOK_FIELDS.some((field) => entry[field] !== undefined))
-        fail("AZD_HOOK_UNSUPPORTED", `${site.scope} ${event} hook configures a runner without a run command`);
-      for (const platform of ["windows", "posix"] as const) {
-        if (entry[platform] === undefined) continue;
-        const override = plain(entry[platform], `${site.scope} ${event} ${platform} hook`, "AZD_HOOK_UNSUPPORTED");
-        onlyKeys(override, HOOK_FIELDS, `${site.scope} ${event} ${platform} hook`, "AZD_HOOK_UNSUPPORTED");
-        variants.push([platform, override]);
-      }
-      if (variants.length === 0) fail("AZD_HOOK_UNSUPPORTED", `${site.scope} ${event} hook has no run command`);
+      for (const platform of ["windows", "posix"] as const)
+        if (entry[platform] !== undefined)
+          variants.push([
+            platform,
+            plain(entry[platform], `${site.scope} ${event} ${platform} hook`, "AZD_PROJECT_UNSUPPORTED"),
+          ]);
+      if (variants.length === 0) fail("AZD_PROJECT_UNSUPPORTED", `${site.scope} ${event} hook has no run command`);
       for (const [platform, definition] of variants)
-        result.push(await inventoryHook(files, site, event, order, platform, definition, audit));
+        result.push(await inventoryHook(files, site, event, order, platform, definition));
     }
   }
   return result;
 }
 
+/** Lists a hook as declared. Only a plain project-relative script path is read, to hash that one file. */
 async function inventoryHook(
   files: AzdProjectFiles,
   site: HookSite,
@@ -702,263 +633,62 @@ async function inventoryHook(
   order: number,
   platform: "all" | "windows" | "posix",
   definition: Record<string, unknown>,
-  audit: HookAudit,
 ): Promise<AzdHookV1> {
   const context = `${site.scope} ${event} hook`;
   const run = definition.run;
   if (
     typeof run !== "string" ||
     run.trim().length === 0 ||
-    run.length > AZD_FILE_LIMITS.fileBytes ||
+    run.length > AZD_BINDING_LIMITS.hookRunLength ||
     SCRIPT_CONTROL.test(run)
   )
-    fail("AZD_HOOK_UNSUPPORTED", `${context} run must be a non-empty script or script path`);
-  for (const field of ["shell", "kind"] as const)
-    if (definition[field] !== undefined && definition[field] !== "sh" && definition[field] !== "pwsh")
-      fail("AZD_HOOK_UNSUPPORTED", `${context} uses an unsupported runner; only sh and pwsh hooks are supported`);
-  if (definition.shell !== undefined && definition.kind !== undefined && definition.shell !== definition.kind)
-    fail("AZD_HOOK_UNSUPPORTED", `${context} declares conflicting shell and kind`);
-  const declared = (definition.shell ?? definition.kind) as "sh" | "pwsh" | undefined;
-  for (const field of ["secrets", "config"] as const)
-    if (
-      definition[field] !== undefined &&
-      Object.keys(plain(definition[field], `${context} ${field}`, "AZD_HOOK_UNSUPPORTED")).length > 0
-    )
-      fail(
-        "AZD_HOOK_UNSUPPORTED",
-        `${context} ${field} are not supported because they resolve values outside the binding`,
-      );
-  let workingDirectory: string | undefined;
-  if (definition.dir !== undefined && definition.dir !== ".") {
-    workingDirectory = projectPath(definition.dir, `${context} dir`, "AZD_HOOK_SCRIPT_INVALID");
-    const directory = await files.stat(workingDirectory);
-    if (directory === undefined || !directory.isDirectory())
-      fail("AZD_HOOK_SCRIPT_INVALID", `${context} dir is not a project directory`);
-  }
+    fail("AZD_PROJECT_UNSUPPORTED", `${context} run must be a non-empty command or script path`);
+  const declared = definition.shell ?? definition.kind;
+  if (declared !== undefined && declared !== "sh" && declared !== "pwsh")
+    fail("AZD_PROJECT_UNSUPPORTED", `${context} uses a runner azd does not support; only sh and pwsh exist`);
+  const workingDirectory =
+    definition.dir === undefined || definition.dir === "."
+      ? undefined
+      : projectPath(definition.dir, `${context} dir`, "AZD_HOOK_SCRIPT_INVALID");
 
-  const decode = (bytes: Buffer): string => {
-    try {
-      return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-    } catch {
-      return fail("AZD_HOOK_SCRIPT_INVALID", `${context} loads a file that is not valid UTF-8`);
-    }
-  };
-  /** Finds a project file by token in the given bases; absent returns undefined, a second match is ambiguous. */
-  const locate = async (token: string, bases: readonly string[]): Promise<string | undefined> => {
-    // Windows-style separators are common in pwsh and cmd hooks; they name the same project path.
+  let path: string | undefined;
+  let contentHash: string | undefined;
+  const token = run.trim();
+  if (SCRIPT_TOKEN.test(token) && (/[\\/]/u.test(token) || /\.(?:sh|ps1)$/iu.test(token))) {
     const candidate = relativePath(token.replaceAll("\\", "/"));
     if (candidate === undefined)
-      fail("AZD_HOOK_SCRIPT_INVALID", `${context} runs or loads ${safeKey(token)}, which is outside the project`);
+      fail("AZD_HOOK_SCRIPT_INVALID", `${context} script path is absolute, uses links or leaves the project`);
     const found: string[] = [];
-    for (const base of bases) {
+    for (const base of site.bases) {
       const full = base.length === 0 ? candidate : `${base}/${candidate}`;
       if ((await files.stat(full)) !== undefined) found.push(full);
     }
-    if (found.length > 1)
+    if (found.length !== 1)
       fail(
         "AZD_HOOK_SCRIPT_INVALID",
-        `${context} script ${candidate} is ambiguous between project and service folders`,
+        `${context} script ${safeKey(token)} ${found.length === 0 ? "does not exist in the project" : "is ambiguous between project and service folders"}`,
       );
-    return found[0];
-  };
-  const readScript = async (full: string): Promise<Buffer> => {
-    const metadata = await files.stat(full);
+    const metadata = await files.stat(found[0]!);
     if (metadata === undefined || !metadata.isFile())
-      fail("AZD_HOOK_SCRIPT_INVALID", `${context} script ${full} is not a regular file`);
-    return await files.readFile(full, metadata, AZD_FILE_LIMITS.fileBytes);
-  };
-  /** Shell flavour of a project file, or undefined when it is another language (hashed but not followed). */
-  const flavourOfFile = (file: string, body: string, fallback: HookFlavour): HookFlavour | undefined => {
-    if (/\.(?:ps1|psm1)$/iu.test(file)) return "powershell";
-    if (/\.(?:cmd|bat)$/iu.test(file)) return "cmd";
-    if (/\.(?:sh|bash|zsh|ksh)$/iu.test(file)) return "posix";
-    if (/\.[A-Za-z0-9]+$/u.test(file)) return undefined;
-    const shebang = /^#!([^\n]*)/u.exec(body)?.[1];
-    if (shebang === undefined) return fallback;
-    if (/\b(?:pwsh|powershell)\b/u.test(shebang)) return "powershell";
-    return /\b(?:sh|bash|zsh|dash|ksh)\b/u.test(shebang) ? "posix" : undefined;
-  };
-
-  const runFlavour: HookFlavour = declared === "pwsh" ? "powershell" : "posix";
-  let source: "script" | "inline" = "inline";
-  let interpreter: HookInterpreter | undefined;
-  let path: string | undefined;
-  let content: Buffer = Buffer.from(run, "utf8");
-  let runAnalysis: HookAnalysis | undefined;
-  const singleToken = /^[A-Za-z0-9._/\\-]+$/u.test(run);
-  const pathLike = /[\\/]/u.test(run) || /\.(?:sh|ps1)$/iu.test(run);
-  const found =
-    singleToken && relativePath(run.replaceAll("\\", "/")) !== undefined ? await locate(run, site.bases) : undefined;
-  if (found !== undefined) {
-    source = "script";
-    path = found;
-    content = await readScript(found);
-  } else if (singleToken && pathLike) {
-    fail("AZD_HOOK_SCRIPT_INVALID", `${context} script path is missing, absolute or outside the project`);
-  } else {
-    runAnalysis = analyzeHookText(run, runFlavour);
-    if (runAnalysis.sole !== undefined && runAnalysis.unsupported.length === 0 && runAnalysis.violations.length === 0) {
-      const found = await locate(runAnalysis.sole.operand, site.bases);
-      if (found === undefined)
-        fail(
-          "AZD_HOOK_SCRIPT_INVALID",
-          `${context} script ${safeKey(runAnalysis.sole.operand)} does not exist in the project`,
-        );
-      source = "script";
-      interpreter = runAnalysis.sole.interpreter;
-      path = found;
-      content = await readScript(found);
-    }
+      fail("AZD_HOOK_SCRIPT_INVALID", `${context} script is not a regular file`);
+    path = found[0]!;
+    contentHash = sha256Hex(await files.readFile(path, metadata, AZD_FILE_LIMITS.fileBytes));
   }
-
-  const extension = path === undefined ? undefined : /\.([A-Za-z0-9]+)$/u.exec(path)?.[1]?.toLowerCase();
-  const inferred = extension === "sh" ? "sh" : extension === "ps1" ? "pwsh" : undefined;
-  if (source === "script" && interpreter === undefined) {
-    if (declared === undefined && inferred === undefined)
-      fail("AZD_HOOK_UNSUPPORTED", `${context} script has no sh or ps1 extension and no declared shell`);
-    if (declared !== undefined && inferred !== undefined && declared !== inferred)
-      fail("AZD_HOOK_UNSUPPORTED", `${context} declares a shell that conflicts with its script extension`);
-  }
-
-  // Everything the hook runs, sources or imports from the project is hashed and analyzed in turn; anything it loads
-  // from elsewhere, or by a path resolved at run time, is refused.
-  const bases = workingDirectory === undefined ? site.bases : [workingDirectory];
-  const dependencies: Array<{ path: string; hash: string }> = [];
-  const visited = new Set<string>(path === undefined ? [] : [path]);
-  const changesDirectory = new Map<string, boolean>();
-  const analyze = async (
-    body: string,
-    flavour: HookFlavour,
-    known: HookAnalysis | undefined,
-    level: number,
-  ): Promise<boolean> => {
-    if (level > 8) fail("AZD_HOOK_UNSUPPORTED", `${context} loads files nested more than 8 levels deep`);
-    for (const [pattern, reason] of UNBOUND_MUTATIONS)
-      if (pattern.test(body))
-        fail(
-          "AZD_HOOK_UNBOUND_MUTATION",
-          `${context} ${reason}, which the bound preview cannot cover; remove it or run that work as its own approved operation`,
-        );
-    const result = known ?? analyzeHookText(body, flavour);
-    if (result.unsupported.length > 0)
-      fail(
-        "AZD_HOOK_UNSUPPORTED",
-        `${context} uses syntax the hook scanner cannot tokenize unambiguously (${result.unsupported.join("; ")}); simplify it or move the logic into a project script`,
-      );
-    if (result.violations.length > 0)
-      fail(
-        "AZD_HOOK_UNBOUND_CONTENT",
-        `${context} uses ${result.violations.join(", ")}, which loads content the binding cannot hash; commit that content as a project file or remove it`,
-      );
-    for (const write of result.writes) {
-      const key = write.dynamic ? undefined : writeKey(write.token, files.rootPath);
-      if (!write.dynamic && key === undefined) continue;
-      audit.writes.push({
-        hook: context,
-        dynamic: write.dynamic,
-        keys: write.dynamic ? [] : bases.map((base) => (base.length === 0 ? key! : `${base.toLowerCase()}/${key!}`)),
-      });
-    }
-    let changed = false;
-    for (const load of result.loads) {
-      for (const base of bases)
-        for (const suffix of load.extensions.length === 0 ? [""] : load.extensions) {
-          const key = writeKey(`${load.token}${suffix}`, files.rootPath);
-          if (key !== undefined && key !== "")
-            audit.loaded.add(base.length === 0 ? key : `${base.toLowerCase()}/${key}`);
-        }
-      if (changed && load.relative && !load.optional)
-        fail(
-          "AZD_HOOK_UNBOUND_CONTENT",
-          `${context} uses a relative path (${safeKey(load.token)}) after a sourced file changed the working directory`,
-        );
-      let found: string | undefined;
-      if (load.optional) {
-        // Counts only when a matching project file exists; anything else is a builtin, a PATH command or plain data.
-        for (const suffix of load.extensions.length === 0 ? [""] : load.extensions) {
-          const candidate = `${load.token}${suffix}`;
-          if (relativePath(candidate.replaceAll("\\", "/")) !== undefined) found ??= await locate(candidate, bases);
-        }
-      } else {
-        found = await locate(load.token, bases);
-        if (found === undefined)
-          fail(
-            "AZD_HOOK_SCRIPT_INVALID",
-            `${context} runs or loads ${safeKey(load.token)}, which does not exist in the project`,
-          );
-      }
-      if (found === undefined) continue;
-      if (!visited.has(found)) {
-        visited.add(found);
-        if (dependencies.length >= AZD_BINDING_LIMITS.hookDependencies)
-          fail(
-            "AZD_HOOK_UNSUPPORTED",
-            `${context} loads more than ${AZD_BINDING_LIMITS.hookDependencies} project files`,
-          );
-        const bytes = await readScript(found);
-        dependencies.push({ path: found, hash: sha256Hex(bytes) });
-        const text = decode(bytes);
-        const kind = flavourOfFile(found, text, flavour);
-        changesDirectory.set(found, kind === undefined ? false : await analyze(text, kind, undefined, level + 1));
-      }
-      if ((load.via === "source" || load.via === "import-module") && changesDirectory.get(found) === true)
-        changed = true;
-    }
-    return result.changesDirectory;
-  };
-  if (runAnalysis !== undefined) await analyze(run, runFlavour, runAnalysis, 0);
-  if (source === "script") {
-    const text = decode(content);
-    const mainFlavour: HookFlavour | undefined =
-      interpreter === undefined
-        ? flavourOfFile(path!, text, runFlavour)
-        : interpreter === "pwsh" || interpreter === "powershell"
-          ? "powershell"
-          : interpreter === "cmd"
-            ? "cmd"
-            : "posix";
-    if (mainFlavour !== undefined) await analyze(text, mainFlavour, undefined, 0);
-  }
-  dependencies.sort((left, right) => compare(left.path, right.path));
   return {
     scope: site.scope,
     event,
     order,
     platform,
-    shell: declared ?? inferred ?? "sh",
-    source,
-    ...(interpreter === undefined ? {} : { interpreter }),
-    ...(path === undefined ? {} : { path }),
+    ...(declared === undefined ? {} : { shell: declared as "sh" | "pwsh" }),
+    run,
     ...(workingDirectory === undefined ? {} : { workingDirectory }),
-    contentHash: sha256Hex(content),
-    commandHash: sha256Hex(run),
-    dependencies,
-    continueOnError: bool(definition.continueOnError, false, `${context} continueOnError`, "AZD_HOOK_UNSUPPORTED"),
-    interactive: bool(definition.interactive, false, `${context} interactive`, "AZD_HOOK_UNSUPPORTED"),
+    ...(path === undefined || contentHash === undefined ? {} : { path, contentHash }),
+    continueOnError: bool(definition.continueOnError, false, `${context} continueOnError`, "AZD_PROJECT_UNSUPPORTED"),
+    interactive: bool(definition.interactive, false, `${context} interactive`, "AZD_PROJECT_UNSUPPORTED"),
   };
 }
 
-function inventoryExtensions(
-  required: unknown,
-  azdVersion: string,
-  digests: Readonly<Record<string, string>>,
-): AzdBindingV1["extensions"] {
-  const declared = required === undefined ? [] : declaredExtensions(required, azdVersion);
-  const unverified = (message: string): never => fail("AZD_EXTENSION_UNVERIFIED", message);
-  for (const id of Object.keys(digests))
-    if (!declared.some((extension) => extension.id === id))
-      unverified(`An installed digest was supplied for ${safeKey(id)}, which azure.yaml does not require`);
-  return declared.map((extension) => {
-    const installedDigest = Object.hasOwn(digests, extension.id) ? digests[extension.id] : undefined;
-    if (installedDigest === undefined || !/^[0-9a-f]{64}$/u.test(installedDigest))
-      unverified(
-        `azd extension ${extension.id} has no verified installed digest; install the pinned version in the isolated azd directory and supply its digest`,
-      );
-    return { ...extension, installedDigest: installedDigest! };
-  });
-}
-
-function declaredExtensions(required: unknown, azdVersion: string): Array<Omit<AzdExtensionV1, "installedDigest">> {
+function declaredExtensions(required: unknown, azdVersion: string): AzdExtensionV1[] {
   const declaration = plain(required, "requiredVersions", "AZD_PROJECT_UNSUPPORTED");
   onlyKeys(declaration, ["azd", "extensions"], "requiredVersions", "AZD_PROJECT_UNSUPPORTED");
   if (declaration.azd !== undefined) {
@@ -974,15 +704,15 @@ function declaredExtensions(required: unknown, azdVersion: string): Array<Omit<A
   }
   if (declaration.extensions === undefined) return [];
   const extensions = plain(declaration.extensions, "requiredVersions.extensions", "AZD_PROJECT_UNSUPPORTED");
-  const result: Array<Omit<AzdExtensionV1, "installedDigest">> = [];
+  const result: AzdExtensionV1[] = [];
   for (const [id, constraint] of Object.entries(extensions)) {
-    const version = typeof constraint === "string" ? EXACT_VERSION.exec(constraint.trim())?.[1] : undefined;
-    if (!/^[a-z0-9][a-z0-9._-]{0,127}$/u.test(id) || version === undefined)
-      fail(
-        "AZD_EXTENSION_UNPINNED",
-        `azd extension ${safeKey(id)} must declare an exact x.y.z version; latest, ranges and omitted versions are not allowed`,
-      );
-    result.push({ id, version, source: "azd" });
+    if (!/^[a-z0-9][a-z0-9._-]{0,127}$/u.test(id))
+      fail("AZD_PROJECT_UNSUPPORTED", `azd extension id ${safeKey(id)} is not supported`);
+    result.push({
+      id,
+      version: text(constraint, `extension ${safeKey(id)} version`, "AZD_PROJECT_UNSUPPORTED", 64),
+      source: "azd",
+    });
   }
   return result.sort((left, right) => compare(left.id, right.id));
 }
@@ -1069,13 +799,7 @@ export async function inspectAzdBicepProject(input: AzdBindingRequest): Promise<
     }
   }
   const hooks: AzdHookV1[] = [];
-  const audit: HookAudit = { loaded: new Set(), writes: [] };
-  for (const site of sites) hooks.push(...(await inventoryHooks(files, site, audit)));
-  for (const hook of hooks) {
-    if (hook.path !== undefined) audit.loaded.add(hook.path.toLowerCase());
-    for (const dependency of hook.dependencies) audit.loaded.add(dependency.path.toLowerCase());
-  }
-  assertHooksPreserveBoundFiles(audit, ["azure.yaml", ...roots.map((root) => root.path)]);
+  for (const site of sites) hooks.push(...(await inventoryHooks(files, site)));
   remoteModules.sort(
     (left, right) =>
       compare(left.root, right.root) || compare(left.file, right.file) || compare(left.reference, right.reference),
@@ -1103,12 +827,11 @@ export async function inspectAzdBicepProject(input: AzdBindingRequest): Promise<
       roots.map(({ name, resolvedParametersHash }) => [name, resolvedParametersHash]),
     ),
     hooks,
-    extensions: inventoryExtensions(project.requiredVersions, request.azdVersion, request.extensionDigests),
+    extensions:
+      project.requiredVersions === undefined ? [] : declaredExtensions(project.requiredVersions, request.azdVersion),
     remoteModules,
     executionEnvelope: buildAzdExecutionEnvelope({
       environmentName: request.environmentName,
-      ...(request.platform === undefined ? {} : { platform: request.platform }),
-      ...(request.azureCliState === undefined ? {} : { azureCliState: request.azureCliState }),
       ...(request.cloud === undefined ? {} : { cloud: request.cloud }),
       target: request.target,
     }),
@@ -1158,27 +881,21 @@ export interface AzdApprovalMaterial {
   readonly inventory: readonly string[];
 }
 
-/** Reviewer-facing inventory and warnings; hooks, extensions and layers are always listed, never summarized away. */
+/** The warning the approval material must show whenever a project declares hooks or extensions. */
+export const AZD_HOOKS_EXTENSIONS_WARNING =
+  "This project declares hooks/extensions. They run with your Azure credentials and are not described by the what-if preview.";
+
+const display = (value: string, max = 200): string => {
+  const line = JSON.stringify(value);
+  return line.length > max ? `${line.slice(0, max)}...` : line;
+};
+
+/** Reviewer-facing inventory and warnings; every declared hook and extension is listed, never summarized away. */
 export function describeAzdBinding(binding: AzdBindingV1): AzdApprovalMaterial {
   const warnings = [
     `azd ${binding.azdVersion} recompiles the Bicep source and re-resolves parameters when it provisions; the what-if is a prediction against current Azure state, not an immutable plan.`,
   ];
-  if (binding.hooks.length > 0)
-    warnings.push(
-      `${binding.hooks.length} hook(s) will run arbitrary scripts during azd operations and can change resources, settings or data beyond what the what-if predicts. Review each hook listed below.`,
-    );
-  if (binding.extensions.length > 0)
-    warnings.push(
-      `${binding.extensions.length} azd extension(s) are required and can extend azd behavior beyond the what-if.`,
-    );
-  if (binding.executionEnvelope.azureCliState === "inherited-user-default")
-    warnings.push(
-      "Azure CLI state (cloud, accounts, default subscription, extensions) and the user home directory are inherited from the running user, so they are not isolated; the executor only verifies that the signed-in cloud, tenant and subscription equal the approved target.",
-    );
-  if (binding.hooks.some((hook) => hook.dependencies.length > 0))
-    warnings.push(
-      "Some hooks load further project files; those files are listed and hashed, but anything a hook downloads or loads by other means is outside this review.",
-    );
+  if (binding.hooks.length > 0 || binding.extensions.length > 0) warnings.push(AZD_HOOKS_EXTENSIONS_WARNING);
   if (binding.remoteModules.length > 0)
     warnings.push(
       `${binding.remoteModules.length} remote Bicep module reference(s) are pinned by exact tag or digest; the executor must verify the resolved artifact matches before provisioning.`,
@@ -1194,17 +911,14 @@ export function describeAzdBinding(binding: AzdBindingV1): AzdApprovalMaterial {
     ),
     ...binding.hooks.map(
       (hook) =>
-        `hook ${hook.scope} ${hook.event} #${hook.order} (${hook.platform}, ${hook.shell}, ${hook.source === "script" ? `${hook.interpreter === undefined ? "" : `${hook.interpreter} `}${hook.path}` : "inline"}) content ${hook.contentHash.slice(0, 12)}${hook.dependencies.length === 0 ? "" : `, loads ${hook.dependencies.map((dependency) => `${dependency.path} ${dependency.hash.slice(0, 12)}`).join(", ")}`}${hook.continueOnError ? ", continues on error" : ""}${hook.interactive ? ", interactive" : ""}`,
+        `hook ${hook.scope} ${hook.event} #${hook.order} (${hook.platform}${hook.shell === undefined ? "" : `, ${hook.shell}`}${hook.workingDirectory === undefined ? "" : `, dir ${hook.workingDirectory}`}): run ${display(hook.run)}${hook.path === undefined ? "" : `, script ${hook.path} ${hook.contentHash!.slice(0, 12)}`}${hook.continueOnError ? ", continues on error" : ""}${hook.interactive ? ", interactive" : ""}`,
     ),
+    ...binding.extensions.map((extension) => `extension ${extension.id} ${extension.version} (${extension.source})`),
     ...binding.remoteModules.map(
       (module) =>
         `module ${module.root} ${module.file}: ${module.reference} (${module.pin.type} ${module.pin.type === "digest" ? module.pin.value.slice(0, 12) : module.pin.value})`,
     ),
-    `identity preflight: cloud ${binding.executionEnvelope.identityPreflight.cloud}, tenant ${binding.executionEnvelope.identityPreflight.tenantId}, subscription ${binding.executionEnvelope.identityPreflight.subscriptionId} (azure cli ${binding.executionEnvelope.azureCliState})`,
-    ...binding.extensions.map(
-      (extension) =>
-        `extension ${extension.id} ${extension.version} (${extension.source}) digest ${extension.installedDigest.slice(0, 12)}`,
-    ),
+    `identity preflight: cloud ${binding.executionEnvelope.identityPreflight.cloud}, tenant ${binding.executionEnvelope.identityPreflight.tenantId}, subscription ${binding.executionEnvelope.identityPreflight.subscriptionId}`,
   ];
   return { bindingHash: binding.bindingHash, warnings, inventory };
 }
