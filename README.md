@@ -17,15 +17,17 @@ A deterministic runtime, not the model, owns the state, the gates and the eviden
 - **A guided workflow.** One APEX agent in your Copilot client walks you through requirements, governance discovery,
   architecture, implementation planning, IaC generation, validation, preview, deployment, inventory and a quality
   review.
-- **Design that starts from policy.** Azure Policy is read before the architecture is drawn, so the design starts from
-  the constraints that will apply: a reviewed subscription baseline, or the shipped ALZ Corp reference baseline when
-  none exists.
+- **Design that starts from policy.** Governance discovery runs before the architecture, so the design starts from known
+  constraints. APEX uses a reviewed baseline of your subscription's Azure Policy when one exists. Otherwise it uses
+  the shipped ALZ Corp reference baseline, which is an assumption about policy, not evidence of yours.
 - **Rich, traceable output.** Requirements, architecture and cost decisions, implementation intent, validation results
   and operational documents are typed artifacts with a recorded lineage, not chat history.
 - **Bicep or Terraform.** One IaC track per run, with the same governed outcome. Terraform applies the exact saved plan
   under native state locking.
-- **Human approval before any change.** Nothing changes Azure until you approve the exact preview. The agent
-  guides, the kernel decides what is allowed next, and changed or stale inputs invalidate earlier approvals.
+- **Human approval before any change.** A deployment changes Azure only after you approve its exact preview. The agent
+  guides, the kernel decides what is allowed next, and changed or stale inputs invalidate earlier approvals. The
+  optional interactive bootstrap is separate: it can create a missing federation and Reader assignment for governance
+  collection, but only after you confirm its own provisioning plan.
 - **Both ALZ-backed workloads and standalone labs.** The deployment purpose (`lab` today) is separate from the
   foundation you build on.
 
@@ -73,7 +75,7 @@ APEX has two parts: the `apex` Agent Plugin, which carries the agent, skills and
 npm package, which sets up and checks your workspace. Install both at the same version.
 
 1. **Prepare the host.** On Windows, follow [Prepare Windows 11](docs/how-to/prepare-windows-11.md). Turn on your
-   client's sandbox. You need Node.js 24 LTS or newer and Git.
+   client's sandbox. You need Node.js 24.21.0 or newer and Git.
 2. **Install the plugin.**
 
    ```bash
@@ -95,7 +97,9 @@ The full steps, including updating and resetting, are in
 [Windows 11](docs/tutorials/windows-11-first-run.md) and
 [Copilot CLI on WSL2](docs/tutorials/wsl2-vscode-consumer-runbook.md).
 
-Installing and bootstrapping APEX does not need Azure sign-in. Every change to Azure goes through an approved preview.
+The `bootstrap` command above needs no Azure sign-in. The optional interactive governance setup is separate and does
+need an authenticated Azure session, because it can check your account and provision the identity access that
+governance collection uses. Deployments to Azure always go through an approved preview.
 
 ## Project Status
 
