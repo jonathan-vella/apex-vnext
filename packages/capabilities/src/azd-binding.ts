@@ -701,7 +701,8 @@ async function inventoryHook(
   };
   /** Finds a project file by token in the given bases; absent returns undefined, a second match is ambiguous. */
   const locate = async (token: string, bases: readonly string[]): Promise<string | undefined> => {
-    const candidate = relativePath(token);
+    // Windows-style separators are common in pwsh and cmd hooks; they name the same project path.
+    const candidate = relativePath(token.replaceAll("\\", "/"));
     if (candidate === undefined)
       fail("AZD_HOOK_SCRIPT_INVALID", `${context} runs or loads ${safeKey(token)}, which is outside the project`);
     const found: string[] = [];

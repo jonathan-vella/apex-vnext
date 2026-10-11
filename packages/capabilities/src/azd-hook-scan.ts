@@ -39,9 +39,12 @@ const CONSTRUCTS: ReadonlyArray<readonly [RegExp, string]> = [
 
 const SOURCE = /(?:^|[;&|(]|\bthen\b|\bdo\b|\belse\b)\s*(?:source|\.)\s+(\S+)/u;
 const IMPORT_MODULE = /\bImport-Module\s+(?:-(?:Name|Force|Global)\s+)*(\S+)/iu;
-const EXEC = /(?:^|[;&|(]\s*|&&\s*)(\.{1,2}\/[^\s;&|]+)/u;
+// Words that run the next command, so `exec bash x.sh`, `sudo ./x.sh` and `FOO=1 sh x.sh` are still command positions.
+const WRAPPERS = String.raw`(?:(?:exec|sudo|env|nohup|time|command|call|start)\s+|[A-Za-z_]\w*=\S*\s+)*`;
+const EXEC = new RegExp(String.raw`(?:^|[;&|(]\s*|&&\s*)${WRAPPERS}(\.{1,2}\/[^\s;&|]+)`, "u");
+const CALL_OPERATOR = /(?:^|[;|(])\s*&\s+(\S+)|(?:^|[;&|(]\s*)call\s+(\S+)/iu;
 const INTERPRETER_LINE = new RegExp(
-  String.raw`(?:^|[;&|(]\s*|&&\s*)(sh|bash|zsh|dash|ksh|pwsh|powershell|cmd)(?:\.exe)?\s+(.+)$`,
+  String.raw`(?:^|[;&|(]\s*|&&\s*)${WRAPPERS}(sh|bash|zsh|dash|ksh|pwsh|powershell|cmd)(?:\.exe)?\s+(.+)$`,
   "iu",
 );
 const VALUE_FLAGS = new Set(["-executionpolicy", "-workingdirectory", "-configurationname", "-o", "-windowstyle"]);
@@ -114,6 +117,9 @@ export function scanHookText(text: string): HookScan {
     if (source !== null) reference("source", source[1]!);
     const imported = IMPORT_MODULE.exec(line);
     if (imported !== null) reference("import-module", imported[1]!);
+    const called = CALL_OPERATOR.exec(line);
+    const callee = called === null ? undefined : unquote(called[1] ?? called[2]!);
+    if (callee !== undefined && (callee.includes("$") || isPathLike(callee))) reference("exec", callee);
     const direct = EXEC.exec(line);
     if (direct !== null) reference("exec", direct[1]!);
     const interpreted = parseInterpreterCommand(line);

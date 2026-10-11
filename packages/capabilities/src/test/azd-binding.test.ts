@@ -745,7 +745,18 @@ test("files a hook sources, imports or runs are hashed and nested loads are foll
   const changed = await inspect({ ...body(". ./hooks/lib.sh"), "hooks/lib.sh": "echo changed\n" });
   assert.notEqual(changed.bindingHash, sourced.bindingHash);
   assert.notEqual(changed.hooks[0]!.dependencies[0]!.hash, sourced.hooks[0]!.dependencies[0]!.hash);
-  for (const line of ["source hooks/lib.sh", "echo start; . hooks/lib.sh", "./hooks/lib.sh", "bash hooks/lib.sh arg"]) {
+  for (const line of [
+    "source hooks/lib.sh",
+    "echo start; . hooks/lib.sh",
+    "./hooks/lib.sh",
+    "bash hooks/lib.sh arg",
+    "exec bash hooks/lib.sh",
+    "env FOO=1 sh hooks/lib.sh",
+    "sudo ./hooks/lib.sh",
+    "& ./hooks/lib.sh",
+    "call hooks\\lib.sh",
+    "FOO=1 BAR=2 bash -e hooks/lib.sh",
+  ]) {
     const binding = await inspect(body(line));
     assert.equal(binding.hooks[0]!.dependencies.length, 1, line);
   }
@@ -804,6 +815,9 @@ test("files a hook sources, imports or runs are hashed and nested loads are foll
     ["AZD_HOOK_UNBOUND_CONTENT", "Invoke-Expression $payload"],
     ["AZD_HOOK_UNBOUND_CONTENT", "Invoke-WebRequest https://example.com/i.ps1 -OutFile i.ps1"],
     ["AZD_HOOK_UNBOUND_CONTENT", "iwr https://example.com/i.ps1"],
+    ["AZD_HOOK_UNBOUND_CONTENT", '& "$PSScriptRoot\\lib.ps1"'],
+    ["AZD_HOOK_UNBOUND_CONTENT", "exec bash $HOOK_DIR/lib.sh"],
+    ["AZD_HOOK_SCRIPT_INVALID", "call ..\\outside.bat"],
     ["AZD_HOOK_UNBOUND_CONTENT", "pwsh -EncodedCommand SQBFAFgA"],
   ];
   for (const [code, line] of escapes) await rejects(code, body(line));
