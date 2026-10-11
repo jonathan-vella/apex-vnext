@@ -4414,6 +4414,15 @@ export class ApexService {
         });
       }
     } else {
+      // Detect every conflicting staged file before staging any, so a refused generation leaves nothing partial.
+      for (const file of tree.files) {
+        const staged = join(sourceRoot, file.path);
+        if (
+          (await this.exists(staged)) &&
+          sha256Bytes(await readFile(staged)) !== sha256Bytes(Buffer.from(file.content, "utf8"))
+        )
+          throw new ApexError("APEX_CONFLICT", `Refusing to overwrite staged file: ${file.path}`, EXIT_CODES.conflict);
+      }
       for (const file of tree.files) files.push(await this.stageFile(taskId, file.path, file.content));
     }
     try {

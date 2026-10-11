@@ -3444,7 +3444,7 @@ test("restricted staging and generateIac produce a real accepted tree", async ()
   assert.deepEqual((await service.status()).run, before);
   assert.equal(await readFile(first.path, "utf8"), "bounded\n");
   await assert.rejects(readFile(join(first.path, "..", "..", "escape.tf")), { code: "ENOENT" });
-  const config = await service.stageFile(taskId, "bicepconfig.json", "{}\n");
+  const config = await service.stageFile(taskId, "infra/bicepconfig.json", "{}\n");
   const configHead = await journal.head();
   await assert.rejects(service.generateIac(taskId), /Refusing to overwrite staged file/);
   assert.equal(await journal.head(), configHead);
