@@ -82,28 +82,26 @@ const binding: Pick<AzdBindingV1, "executionEnvelope"> = {
 const observed = {
   cloud: "AzureCloud",
   tenantId: TARGET.tenantId,
-  subscriptionId: TARGET.subscriptionId,
   azureCliDefaultSubscriptionId: TARGET.subscriptionId,
 };
 
-test("the identity preflight accepts only the approved cloud, tenant and subscription", () => {
+test("the identity preflight accepts only the approved cloud, tenant and Azure CLI subscription", () => {
   assertAzdIdentityMatchesBinding(observed, binding);
   assertAzdIdentityMatchesBinding(
-    { ...observed, tenantId: TARGET.tenantId.toUpperCase(), subscriptionId: TARGET.subscriptionId.toUpperCase() },
+    {
+      ...observed,
+      tenantId: TARGET.tenantId.toUpperCase(),
+      azureCliDefaultSubscriptionId: TARGET.subscriptionId.toUpperCase(),
+    },
     binding,
   );
   const mismatches: Array<[Record<string, string | undefined>, RegExp]> = [
     [{ cloud: "AzureUSGovernment" }, /cloud does not match/u],
     [{ tenantId: "bbbbbbbb-bbbb-cccc-dddd-eeeeeeeeeeee" }, /tenant does not match/u],
-    [{ subscriptionId: "22222222-2222-3333-4444-555555555555" }, /subscription does not match/u],
-    [
-      { azureCliDefaultSubscriptionId: "22222222-2222-3333-4444-555555555555" },
-      /CLI default subscription does not match/u,
-    ],
+    [{ azureCliDefaultSubscriptionId: "22222222-2222-3333-4444-555555555555" }, /CLI subscription does not match/u],
     [{ cloud: undefined }, /cloud was not reported/u],
     [{ tenantId: undefined }, /tenant was not reported/u],
-    [{ subscriptionId: "" }, /subscription was not reported/u],
-    [{ azureCliDefaultSubscriptionId: undefined }, /CLI default subscription was not reported/u],
+    [{ azureCliDefaultSubscriptionId: undefined }, /CLI subscription was not reported/u],
   ];
   for (const [change, message] of mismatches)
     assert.throws(

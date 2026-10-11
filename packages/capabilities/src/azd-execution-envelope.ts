@@ -68,21 +68,25 @@ export function buildAzdArguments(
   ];
 }
 
-/** Identity the executor observed from the Azure CLI and azd immediately before running azd. */
+/**
+ * Identity the executor observed from the Azure CLI (`az account show`) immediately before running azd. azd keeps its own
+ * credential store and reports no account that can be read cheaply, so nothing here claims to be azd's login. azd's
+ * target subscription and tenant are the values of the bound azd environment, which the binding already covers.
+ */
 export interface ObservedAzdIdentity {
-  /** Active cloud name, for example `az cloud show`. */
+  /** Active cloud name of the Azure CLI session. */
   readonly cloud?: string;
-  /** Tenant of the signed-in session azd will use. */
+  /** Tenant of the Azure CLI session. */
   readonly tenantId?: string;
-  /** Subscription azd will use (the environment's `AZURE_SUBSCRIPTION_ID` as resolved by azd). */
-  readonly subscriptionId?: string;
   /** Default subscription of the Azure CLI session. */
   readonly azureCliDefaultSubscriptionId?: string;
 }
 
 /**
- * Identity preflight the executor must pass before every provision: the cloud, tenant and subscription azd and the
- * Azure CLI report must equal the approved target. A missing or different value stops the run; values are never echoed.
+ * Identity preflight the executor must pass before every preview, apply and destroy: the cloud, tenant and default
+ * subscription the Azure CLI reports must equal the approved target. A missing or different value stops the run; values
+ * are never echoed. It verifies the Azure CLI identity only; a different azd login can still act on the bound
+ * subscription with that principal's permissions, which Azure RBAC governs.
  */
 export function assertAzdIdentityMatchesBinding(
   observed: ObservedAzdIdentity,
@@ -100,6 +104,5 @@ export function assertAzdIdentityMatchesBinding(
   };
   check("cloud", observed.cloud, expected.cloud, false);
   check("tenant", observed.tenantId, expected.tenantId, true);
-  check("subscription", observed.subscriptionId, expected.subscriptionId, true);
-  check("CLI default subscription", observed.azureCliDefaultSubscriptionId, expected.subscriptionId, true);
+  check("CLI subscription", observed.azureCliDefaultSubscriptionId, expected.subscriptionId, true);
 }

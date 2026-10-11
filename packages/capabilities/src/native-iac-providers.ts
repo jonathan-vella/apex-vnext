@@ -1099,7 +1099,7 @@ export class AzdBicepProvider extends NativeProviderBase implements IacProvider 
     }
   }
 
-  /** The cloud, tenant and subscription the Azure CLI reports must equal the approved target before any run. */
+  /** The cloud, tenant and default subscription the Azure CLI reports must equal the approved target before any run. */
   async #assertIdentity(binding: AzdBindingV1): Promise<void> {
     let account: Record<string, unknown> = {};
     try {
@@ -1112,8 +1112,6 @@ export class AzdBicepProvider extends NativeProviderBase implements IacProvider 
       {
         ...(text(account.environmentName) === undefined ? {} : { cloud: text(account.environmentName)! }),
         ...(text(account.tenantId) === undefined ? {} : { tenantId: text(account.tenantId)! }),
-        // azd resolves the subscription from the environment file the binding was just inspected from.
-        subscriptionId: binding.environment.target.subscriptionId,
         ...(text(account.id) === undefined ? {} : { azureCliDefaultSubscriptionId: text(account.id)! }),
       },
       binding,

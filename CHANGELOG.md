@@ -26,12 +26,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   accepted resource IDs by ARM type and name. Without stacks, resources belong to the azd environment through the
   `azd-env-name` tag of the approved resource group plus the logical-resource manifest; `azd down` deletes that whole
   group (never with `--purge`), so the destroy preview lists the resources Azure reports in it (child resources the
-  listing omits are deleted with their parents, which the approval states) and the approval binds that list.
-  Deny settings and unmanage cleanup no longer exist. Generated Bicep trees are azd projects (`azure.yaml`,
+  listing omits are deleted with their parents, which the approval states) and the approval binds that list. Deny
+  settings and unmanage cleanup no longer exist. Generated Bicep trees are azd projects (`azure.yaml`,
   `infra/main.bicep`, `infra/bicepconfig.json`). The `executable:azd` doctor check is again a failing prerequisite.
   Bicep live runs, including the live qualification handoff, are unavailable until CP-30 qualifies the executor, and
-  `azd deploy` application packages (PR C) are not available.
->>>>>>> 40d1a712 (docs: keep the azd executor entry under Unreleased)
+  `azd deploy` application packages (PR C) are not available. The identity preflight verifies the Azure CLI identity
+  (azd keeps its own credential store), and the accepted residual limits are recorded in DECISION-037. >>>>>>>
+  40d1a712 (docs: keep the azd executor entry under Unreleased)
 
 ## [0.11.0-next.4] — Preview
 

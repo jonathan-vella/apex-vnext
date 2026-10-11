@@ -103,9 +103,12 @@ instead of being skipped when azd's stored deployment state hash is unchanged. T
 `down` passes `--force` because the Gate 4 approval of the destroy preview replaces azd's prompt. The executor runs azd
 from the project root. azd's own configuration and
 extensions and the user's `az login` are left alone. `assertAzdIdentityMatchesBinding` is the preflight the executor
-must pass before every provision: the active cloud, tenant, subscription and Azure CLI default subscription must equal
-the approved target, and a missing or different value stops the run with `AZD_IDENTITY_MISMATCH` (identifiers are never
-echoed). The approved target therefore requires `tenantId`.
+must pass before every preview, apply and destroy: the cloud, tenant and default subscription the Azure CLI reports
+(`az account show`) must equal the approved target, and a missing or different value stops the run with
+`AZD_IDENTITY_MISMATCH` (identifiers are never echoed). The approved target therefore requires `tenantId`. The
+preflight verifies the Azure CLI identity only: azd uses its own credential store and offers no cheap, machine-readable
+account to compare, so a different azd login can act on the bound subscription with that principal's permissions, which
+Azure RBAC governs. azd's own target is the bound `AZURE_SUBSCRIPTION_ID` and `AZURE_TENANT_ID` of the azd environment.
 
 ### Unsupported surfaces
 
@@ -144,7 +147,7 @@ resource group in `AZURE_RESOURCE_GROUP` (`AZD_ENV_TARGET_MISMATCH` otherwise), 
 | Destroy   | `azd down`                | Needs its own current destroy preview and approval; never `--purge`  |
 
 Before every preview, apply and destroy the executor verifies the pinned azd version, re-inspects the azd binding and
-runs the identity preflight (cloud, tenant and subscription from `az account show` and the bound azd environment). At
+runs the identity preflight (cloud, tenant and default subscription from `az account show`). At
 apply and destroy it additionally requires that the binding is unchanged, that the azd version equals the one bound at
 preview, and that the owned state below is unchanged. Layered projects fail with `AZD_LAYER_UNSUPPORTED`, because azd
 previews one layer at a time. The preview hash binds the azd binding hash, the owned-state hash and the policy
@@ -183,6 +186,17 @@ resources are managed, protected (`existing`) or unaccepted.
   their names reserved; the approval material says so.
 - **Not provided.** Deny settings, action-on-unmanage cleanup and stack-based unmanaged-resource detection do not exist.
   Azure Policy, RBAC and deny assignments from the landing zone are the compensating controls (DECISION-037).
+
+Accepted residual limits (DECISION-037, non-production; CP-28 and CP-29 must re-evaluate them):
+
+- `azd down` deletes the whole group. The preview lists the resources as Azure lists them; extension and child
+  resources Azure does not list are deleted with their parents and are not individually shown or hashed (the approval
+  warning says so). Resources Azure lists that are added to the group after approval change the owned-state hash and
+  block the run.
+- The bound azd binary is identified by its reported version, resolved through `PATH`. A substituted binary is a
+  compromised-host scenario outside the threat model, as it is for `az`.
+- Between the final binding re-check and spawning azd, a local writer could change project files. No immutable
+  execution snapshot is made.
 
 Parameter values that azd resolves at provision time, for example `$(secretOrRandomPassword ...)` Key Vault functions in
 `main.parameters.json`, are not part of the preview; the binding hashes the parameter file text only.
