@@ -27,13 +27,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hashed; any custom key fails closed, so no value-derived digest of custom or secret input is ever persisted.
   `inspectAzdBicepProject` produces the binding deterministically and refuses links, traversal, oversize input, YAML
   aliases and merge keys, unsupported surfaces and unbound content (`eval`, `iex`, downloads piped into a shell,
-  dynamic script paths, local references that leave the tree, floating module tags) with stable `AZD_*` codes.
-  `buildAzdExecutionEnvelope`, `resolveAzdProcessEnvironment`, `buildAzdArguments` and
-  `assertAzdExtensionsVerified` define how the future executor must run azd (explicit environment, no prompts, an
-  allowlisted process environment, an isolated azd configuration and extension directory, provision only). Any change to
-  a bound input changes the hash, and the approval material warns that hooks can act beyond the what-if. `doctor` now
-  reports an `executable:azd` check for Bicep runs that requires the exact azd release pinned in
-  `config/toolchain.v1.json` (1.35.1); Terraform runs do not need azd. Execution still uses the native
+  dynamic script paths, local references that leave the tree, floating module tags) with stable `AZD_*` codes. A
+  shell-aware lexer for POSIX shell, PowerShell and cmd inventories every command position in each hook and project
+  script (interpreters through wrappers, path-like commands, sourcing, inline code, here-documents), tracks working
+  directory changes, rejects writes to files that hooks or azd run or read, and fails closed on anything it cannot
+  tokenize unambiguously. `buildAzdExecutionEnvelope`, `resolveAzdProcessEnvironment`, `buildAzdArguments`,
+  `assertAzdExtensionsVerified` and `assertAzdIdentityMatchesBinding` define how the future executor must run azd
+  (explicit environment, no prompts, an allowlisted process environment, an isolated azd configuration and extension
+  directory, provision only, and a cloud, tenant and subscription identity preflight). Only `AZD_CONFIG_DIR` is
+  isolated by default: Azure CLI state is ambient (`inherited-user-default`) but identity-checked, and CI and
+  production executors must use `isolated-directory`. Bicep reference detection stays regex-based; a compiler-backed
+  inventory is a follow-up. Any change to a bound input changes the hash, and the approval material warns that hooks
+  can act beyond the what-if. `doctor` now reports an `executable:azd` check for Bicep runs that requires the exact azd
+  release pinned in `config/toolchain.v1.json` (1.35.1); Terraform runs do not need azd. Execution still uses the native
   `az deployment` path: azd does not provision anything until PR B replaces it, and `azd deploy` application packages
   follow in PR C.
 

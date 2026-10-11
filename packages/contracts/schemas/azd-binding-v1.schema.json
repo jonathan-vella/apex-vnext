@@ -90,7 +90,8 @@
           },
           "required": [
             "subscriptionId",
-            "location"
+            "location",
+            "tenantId"
           ],
           "type": "object"
         },
@@ -114,14 +115,14 @@
           "const": "isolated",
           "type": "string"
         },
-        "azureCliConfigDirectory": {
+        "azureCliState": {
           "anyOf": [
             {
-              "const": "explicit",
+              "const": "inherited-user-default",
               "type": "string"
             },
             {
-              "const": "unset",
+              "const": "isolated-directory",
               "type": "string"
             }
           ]
@@ -148,6 +149,46 @@
           ],
           "type": "object"
         },
+        "identityPreflight": {
+          "additionalProperties": false,
+          "properties": {
+            "cloud": {
+              "anyOf": [
+                {
+                  "const": "AzureCloud",
+                  "type": "string"
+                },
+                {
+                  "const": "AzureUSGovernment",
+                  "type": "string"
+                },
+                {
+                  "const": "AzureChinaCloud",
+                  "type": "string"
+                }
+              ]
+            },
+            "onMismatch": {
+              "const": "stop",
+              "type": "string"
+            },
+            "subscriptionId": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            },
+            "tenantId": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "cloud",
+            "tenantId",
+            "subscriptionId",
+            "onMismatch"
+          ],
+          "type": "object"
+        },
         "inheritedEnvironment": {
           "items": {
             "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$",
@@ -161,6 +202,18 @@
           "const": "disabled",
           "type": "string"
         },
+        "userHome": {
+          "anyOf": [
+            {
+              "const": "inherited",
+              "type": "string"
+            },
+            {
+              "const": "withheld",
+              "type": "string"
+            }
+          ]
+        },
         "workingDirectory": {
           "const": "project-root",
           "type": "string"
@@ -173,7 +226,9 @@
         "inheritedEnvironment",
         "fixedEnvironment",
         "azdConfigDirectory",
-        "azureCliConfigDirectory"
+        "azureCliState",
+        "userHome",
+        "identityPreflight"
       ],
       "type": "object"
     },

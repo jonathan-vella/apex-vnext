@@ -66,21 +66,41 @@ extensions run code, so the binding covers every input that execution reads. Any
 ### Hooks
 
 Hooks are allowed but inventoried, listed in approval material and hashed. A hook command is a bare script path, an
-`<interpreter> [flags] <script> [args]` command (`sh`, `bash`, `zsh`, `pwsh`, `powershell`, `cmd`), or inline text. The
-script file is read with the same link-, escape- and size-safe rules as every project file and hashed, and so are the
-project files it sources (`.`/`source`), dot-sources, imports (`Import-Module` of a path) or runs (`./x.sh`, `bash x.sh`),
-followed to a bounded depth. A hook fails closed, naming the construct, when it uses `eval`, `Invoke-Expression`/`iex`,
-`Invoke-WebRequest`/`iwr`, an encoded PowerShell command, a download piped into a shell or run through command
-substitution, a script path resolved at run time (`$VAR`, globs, `~`, URLs) or a script that is missing or outside the
-project; it also fails closed on hooks that run further azd operations, write the azd environment or retarget the
-subscription. The preview does not run hooks, so a hook that changes an input the preview already read (a parameter
-file or an environment value) is an accepted risk of approving that hook.
+`<interpreter> [flags] <script> [args]` command (`sh`, `bash`, `zsh`, `pwsh`, `powershell`, `cmd`), or inline text.
+Each hook `run` string and each project script it reaches is tokenized by a shell-aware lexer (POSIX sh/bash/zsh,
+PowerShell and cmd, chosen by the hook's shell, the interpreter or the file extension) into command segments, split on
+unquoted `;`, `&&`, `||`, `|`, `&`, newlines, grouping, backticks and `$(...)`, with quotes, escapes, line continuations,
+here-documents and CRLF handled. Every command position is classified, not only the first:
 
-This is a line-oriented text scan, not a shell parser. It cannot see what an interpreter loads internally (Python
-imports, `node` requires, PowerShell module autoloading, shell aliases or functions assembled at run time) or what a
-hook downloads without piping it to a shell. The approved content, the listed dependencies and the warning in the
-approval material are the controls, and the future executor must run hooks from an immutable snapshot of the bound
-project (not the live working tree) so a file cannot change between the hash and the run.
+- Known interpreters are recognized through directories, `.exe`, case and wrappers (`/usr/bin/env sh`, `exec`, `sudo`,
+  `env VAR=x`, `time`, `nohup`, `command`, `call`, `start`, `&`, `xargs`, `find -exec`); the script operand, an inline
+  `-c`/`-Command` string and a here-document are hashed or analyzed in turn.
+- A path-like command word (`hooks/x.sh`, `./x.sh`, `.\hooks\x.ps1`, `hooks\x.cmd`) executes a project file: it is
+  hashed and analyzed, or rejected when it leaves the project or is not a regular project file.
+- `source`/`.`, PowerShell dot-sourcing, `Import-Module <path>` and `using module` with a literal path are hashed and
+  analyzed; a dynamic operand is rejected. Hashing follows to a bounded depth (8) and file count (16).
+- Anything the lexer cannot tokenize unambiguously (unterminated quote or grouping, `case` statements, unsupported
+  syntax) or that exceeds the size and step limits fails closed with `AZD_HOOK_UNSUPPORTED`. The lexer is single-pass and
+  linear in the input.
+
+A hook fails closed with `AZD_HOOK_UNBOUND_CONTENT`, naming the construct, when it uses `eval`, aliases,
+`Invoke-Expression`/`iex`, `Invoke-WebRequest`/`iwr`, an encoded PowerShell command, an interpreter that reads its
+script from a pipe or file descriptor, a download piped into a shell or substituted into one, a command or script path
+resolved at run time (`$VAR`, globs, `~`, URLs), task runners and inline-code interpreters (`make`, `npm run`,
+`python -c`, `awk system(...)`), assignments that change command resolution (`PATH`, `BASH_ENV`, `IFS`,
+`PSModulePath` and similar), a working-directory change (`cd`, `pushd`, `Set-Location`) followed by any relative path
+load, or a write to a file that the hook, another hook or the infra tree runs or reads at provision time (including
+`azure.yaml` and the infra trees) or any write whose target is resolved at run time (variables, archives, checkouts,
+downloads). Relative loads resolve against the project root only. It also fails closed on hooks that run further azd
+operations, write the azd environment or retarget the subscription (`AZD_HOOK_UNBOUND_MUTATION`). The preview does not
+run hooks, so a hook that changes an input the preview already read is an accepted risk of approving that hook.
+
+What cannot be detected: what an interpreter loads internally (Python imports, `node` requires, PowerShell module
+autoloading, functions or aliases assembled at run time) and anything an allowlisted tool fetches by its own means.
+Interpreters outside the allowlist and non-shell scripts (`.py`, `.js`) are hashed but not followed. The approved
+content, the listed dependencies and the warning in the approval material are the controls. The future executor must run
+hooks from an immutable snapshot of the bound project (not the live working tree) so a file cannot change between the
+hash and the run, and should re-verify the bound hashes after each hook.
 
 ### Remote modules
 
@@ -98,13 +118,22 @@ The binding carries a required `executionEnvelope`, and `buildAzdExecutionEnvelo
 fixes the project root as working directory, passes the environment explicitly with `--environment` (the
 default-environment pointer is never consulted) and disables prompts. `resolveAzdProcessEnvironment` rebuilds the
 process environment from a small allowlist (a fixed set of variables a process needs to start, plus `PATH`) with no
-inherited `AZURE_*` or `AZD_*`, so a redirect such as `AZURE_SUBSCRIPTION_ID` or `AZD_CONFIG_DIR` cannot reach azd. It
-points `AZD_CONFIG_DIR` at a run-scoped directory, which isolates user-level azd configuration, extension sources and
-globally installed extensions, and sets `AZURE_CONFIG_DIR` only to an explicitly supplied directory when the Azure CLI
-session lives elsewhere. `buildAzdArguments` can express only `provision` and `provision --preview`; `azd up` cannot be
-built. `assertAzdExtensionsVerified` is the preflight the executor must pass: exactly the bound extensions, from the
-default registry, with the bound versions and installed digests. `PATH` is still inherited and decides which tools a hook
-finds.
+inherited `AZURE_*` or `AZD_*`, so a redirect such as `AZURE_SUBSCRIPTION_ID` or `AZD_CONFIG_DIR` cannot reach azd.
+`AZD_CONFIG_DIR` points at a run-scoped directory, which isolates user-level azd configuration, extension sources and
+globally installed extensions. `buildAzdArguments` can express only `provision` and `provision --preview`; `azd up`
+cannot be built. `assertAzdExtensionsVerified` is the preflight the executor must pass: exactly the bound extensions,
+from the default registry, with the bound versions and installed digests. `PATH` is still inherited and decides which
+tools a hook finds.
+
+**Azure CLI state is not isolated by default.** The envelope records `azureCliState`: `inherited-user-default` (the
+default, for a lab user who relies on their own `az login`) leaves `AZURE_CONFIG_DIR` unset and inherits `HOME` or
+`USERPROFILE` (`userHome: inherited`), so Azure CLI cloud, accounts, default subscription and extensions are ambient.
+`isolated-directory` withholds the home variables and requires a run-scoped `AZURE_CONFIG_DIR`; the CI and production
+executor (CP-28) must use it. In both modes the envelope carries a required `identityPreflight` (the approved cloud, tenant
+and subscription, taken from the bound target) and the executor must call `assertAzdIdentityMatchesBinding` with the
+cloud, tenant, subscription and Azure CLI default subscription it observes before every provision and stop on a missing
+or different value (`AZD_IDENTITY_MISMATCH`, which never echoes identifiers). The approval material says when Azure CLI
+state is inherited. The binding requires `tenantId` in the approved target for this reason.
 
 ### Unsupported surfaces
 
@@ -115,6 +144,9 @@ non-`sh`/`pwsh` hook runners, hook `secrets`, ambiguous hook scripts, extension 
 values that redirect the subscription, location, tenant, environment name or resource group, links, path traversal,
 YAML aliases and merge keys, local Bicep references that leave the bound tree, a root without its own
 `bicepconfig.json` (so aliases and linter settings are never inherited from outside the tree) and oversize input.
+
+Bicep reference detection is regex-based rather than compiler-backed and relies on the pinned Bicep and azd versions; a
+compiler-backed inventory (`bicep build`/AST) is tracked as a later hardening item in #472.
 
 Only azd's pre-configured official extension registry is representable. Preparing the isolated directory, installing
 the pinned extensions into it and observing their digests belong to the executor.

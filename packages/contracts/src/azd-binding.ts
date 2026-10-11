@@ -124,6 +124,10 @@ export const AzdInfraRootV1Schema = Type.Object(
 
 const AzdEnvironmentKeySchema = Type.Union(AZD_ENVIRONMENT_KEYS.map((key) => Type.Literal(key)));
 
+export const AZD_AZURE_CLOUDS = ["AzureCloud", "AzureUSGovernment", "AzureChinaCloud"] as const;
+
+const AZD_HOME_VARIABLES = ["HOME", "HOMEDRIVE", "HOMEPATH", "USERPROFILE"] as const;
+
 export const AzdEnvironmentV1Schema = Type.Object(
   {
     name: EnvironmentSchema,
@@ -133,9 +137,8 @@ export const AzdEnvironmentV1Schema = Type.Object(
           pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
         }),
         location: Type.String({ pattern: "^[a-z0-9]{2,64}$" }),
-        tenantId: Type.Optional(
-          Type.String({ pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" }),
-        ),
+        /** Required: the identity preflight compares the signed-in tenant with it. */
+        tenantId: Type.String({ pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" }),
         resourceGroup: Type.Optional(Type.String({ minLength: 1, maxLength: 90 })),
       },
       { additionalProperties: false },
@@ -199,8 +202,25 @@ export const AzdExecutionEnvelopeV1Schema = Type.Object(
     ),
     /** `AZD_CONFIG_DIR` is a run-scoped directory, so user-level azd config, sources and extensions are never read. */
     azdConfigDirectory: Type.Literal("isolated"),
-    /** `AZURE_CONFIG_DIR` is set only to the explicit directory the signed-in Azure CLI session lives in. */
-    azureCliConfigDirectory: Type.Union([Type.Literal("explicit"), Type.Literal("unset")]),
+    /**
+     * `inherited-user-default`: Azure CLI state (cloud, accounts, default subscription, extensions) comes from the
+     * user's own configuration, so it is ambient and only checked by `identityPreflight`. `isolated-directory`: the
+     * executor supplies a run-scoped `AZURE_CONFIG_DIR` holding exactly the sign-in the run needs; CI and production
+     * executors must use it.
+     */
+    azureCliState: Type.Union([Type.Literal("inherited-user-default"), Type.Literal("isolated-directory")]),
+    /** Whether the user's home directory variables (HOME, USERPROFILE, ...) reach azd and its hooks. */
+    userHome: Type.Union([Type.Literal("inherited"), Type.Literal("withheld")]),
+    /** The executor must observe exactly this identity before provisioning and stop on any difference. */
+    identityPreflight: Type.Object(
+      {
+        cloud: Type.Union(AZD_AZURE_CLOUDS.map((cloud) => Type.Literal(cloud))),
+        tenantId: Type.String({ pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" }),
+        subscriptionId: Type.String({ pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" }),
+        onMismatch: Type.Literal("stop"),
+      },
+      { additionalProperties: false },
+    ),
   },
   { additionalProperties: false },
 );
@@ -302,9 +322,17 @@ function hasValidRemoteModules(binding: Omit<AzdBindingV1, "bindingHash">): bool
 
 function hasValidEnvelope(binding: Omit<AzdBindingV1, "bindingHash">): boolean {
   const envelope = binding.executionEnvelope;
+  const homeInherited = envelope.inheritedEnvironment.some((name) =>
+    AZD_HOME_VARIABLES.some((home) => home.toLowerCase() === name.toLowerCase()),
+  );
+  const target = binding.environment.target;
   return (
     envelope.environmentName === binding.environment.name &&
-    !envelope.inheritedEnvironment.some((name) => /^(?:AZURE|AZD)_/iu.test(name))
+    !envelope.inheritedEnvironment.some((name) => /^(?:AZURE|AZD)_/iu.test(name)) &&
+    (envelope.azureCliState === "inherited-user-default") === (envelope.userHome === "inherited") &&
+    (envelope.userHome === "inherited") === homeInherited &&
+    envelope.identityPreflight.subscriptionId === target.subscriptionId &&
+    envelope.identityPreflight.tenantId === target.tenantId
   );
 }
 

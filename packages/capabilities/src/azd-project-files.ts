@@ -31,6 +31,7 @@ export type AzdBindingErrorCode =
   | "AZD_PROJECT_UNSUPPORTED"
   | "AZD_PROVIDER_UNSUPPORTED"
   | "AZD_VERSION_CONSTRAINT"
+  | "AZD_IDENTITY_MISMATCH"
   | "AZD_YAML_INVALID";
 
 export class AzdBindingError extends Error {

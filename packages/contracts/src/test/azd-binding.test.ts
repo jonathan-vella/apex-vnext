@@ -41,7 +41,11 @@ function binding(change: (body: Omit<AzdBindingV1, "bindingHash">) => void = () 
     },
     environment: {
       name: "lab",
-      target: { subscriptionId: "11111111-2222-3333-4444-555555555555", location: "swedencentral" },
+      target: {
+        subscriptionId: "11111111-2222-3333-4444-555555555555",
+        location: "swedencentral",
+        tenantId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+      },
       keys: ["AZURE_ENV_NAME", "AZURE_LOCATION"],
       valuesHash: digest("e"),
     },
@@ -81,7 +85,14 @@ function binding(change: (body: Omit<AzdBindingV1, "bindingHash">) => void = () 
       inheritedEnvironment: ["HOME", "PATH"],
       fixedEnvironment: { AZD_SKIP_UPDATE_CHECK: "true", AZURE_DEV_COLLECT_TELEMETRY: "no" },
       azdConfigDirectory: "isolated",
-      azureCliConfigDirectory: "unset",
+      azureCliState: "inherited-user-default",
+      userHome: "inherited",
+      identityPreflight: {
+        cloud: "AzureCloud",
+        tenantId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+        subscriptionId: "11111111-2222-3333-4444-555555555555",
+        onMismatch: "stop",
+      },
     },
   };
   change(body);
@@ -89,6 +100,26 @@ function binding(change: (body: Omit<AzdBindingV1, "bindingHash">) => void = () 
 }
 
 describe("azd-binding-v1", () => {
+  it("requires the envelope to agree with the target and the Azure CLI mode", () => {
+    const edits: Array<(body: Omit<AzdBindingV1, "bindingHash">) => void> = [
+      (body) => (body.executionEnvelope.userHome = "withheld"),
+      (body) => (body.executionEnvelope.azureCliState = "isolated-directory"),
+      (body) => (body.executionEnvelope.identityPreflight.tenantId = "bbbbbbbb-bbbb-cccc-dddd-eeeeeeeeeeee"),
+      (body) => (body.executionEnvelope.identityPreflight.subscriptionId = "22222222-2222-3333-4444-555555555555"),
+      (body) => (body.executionEnvelope.identityPreflight.cloud = "Other" as never),
+      (body) => ((body.executionEnvelope.identityPreflight as { onMismatch: string }).onMismatch = "warn"),
+      (body) => (body.executionEnvelope.inheritedEnvironment = ["PATH"]),
+    ];
+    for (const edit of edits) assert.equal(hasValidAzdBinding(binding(edit)), false);
+    const isolated = binding((body) => {
+      body.executionEnvelope.azureCliState = "isolated-directory";
+      body.executionEnvelope.userHome = "withheld";
+      body.executionEnvelope.inheritedEnvironment = ["PATH"];
+    });
+    assert.equal(hasValidAzdBinding(isolated), true);
+    assert.notEqual(isolated.bindingHash, binding().bindingHash);
+  });
+
   it("accepts a bound inventory and registers metadata", () => {
     assert.equal(hasValidAzdBinding(binding()), true);
     assert.deepEqual(contractMetadata["https://schemas.apexops.dev/azd-binding-v1.json"], {

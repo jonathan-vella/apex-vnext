@@ -316,9 +316,12 @@ environment, azd version and allowed hooks/extensions/layers to the approved wha
 fail closed; what-if remains a prediction against mutable Azure state, not an immutable Terraform plan. Provisioning
 and approved application-package deployment are separate operations; do not run `azd up`. The azd binding contract
 (`azd-binding-v1`: hooks with their loaded files, pinned extensions and remote modules, allowlisted environment, execution
-envelope), its deterministic project inspection and the exact-version azd prerequisite exist. The executor must run
-hooks from an immutable snapshot and verify extension and module artifacts at preflight. The native Bicep path remains
-current behavior until azd execution is implemented and qualified.
+envelope), its deterministic project inspection (a shell-aware hook lexer that inventories every command position) and the
+exact-version azd prerequisite exist. The executor must run hooks from an immutable snapshot, verify extension and module
+artifacts at preflight, and pass the identity preflight (`assertAzdIdentityMatchesBinding`): only `AZD_CONFIG_DIR` is
+isolated by default, while Azure CLI state is ambient but identity-checked, and CI and production executors use an
+isolated Azure CLI directory. The native Bicep path remains current behavior until azd execution is implemented and
+qualified.
 
 ### REQ-TERRAFORM-001: Terraform Lifecycle
 

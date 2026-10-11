@@ -4,17 +4,22 @@ import test from "node:test";
 import { hasValidAzdBinding, type AzdBindingV1 } from "@apexops/contracts";
 import {
   assertAzdExtensionsVerified,
+  assertAzdIdentityMatchesBinding,
   AzdBindingError,
   buildAzdArguments,
   buildAzdExecutionEnvelope,
   resolveAzdProcessEnvironment,
 } from "../index.js";
 
+const TARGET = {
+  tenantId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+  subscriptionId: "11111111-2222-3333-4444-555555555555",
+};
 const absolute = (...segments: string[]): string => join(process.cwd(), ...segments);
 
 test("the envelope is explicit, non-interactive and inherits nothing from AZURE_* or AZD_*", () => {
   for (const platform of ["linux", "win32"] as const) {
-    const envelope = buildAzdExecutionEnvelope({ environmentName: "lab", platform });
+    const envelope = buildAzdExecutionEnvelope({ environmentName: "lab", platform, target: TARGET });
     assert.deepEqual(
       [envelope.workingDirectory, envelope.environmentName, envelope.prompts, envelope.azdConfigDirectory],
       ["project-root", "lab", "disabled", "isolated"],
@@ -24,22 +29,27 @@ test("the envelope is explicit, non-interactive and inherits nothing from AZURE_
       false,
     );
     assert.ok(envelope.inheritedEnvironment.includes("PATH"));
-    assert.equal(envelope.azureCliConfigDirectory, "unset");
+    assert.equal(envelope.azureCliState, "inherited-user-default");
+    assert.equal(envelope.userHome, "inherited");
   }
   assert.ok(
-    buildAzdExecutionEnvelope({ environmentName: "lab", platform: "win32" }).inheritedEnvironment.includes(
-      "SystemRoot",
-    ),
+    buildAzdExecutionEnvelope({
+      environmentName: "lab",
+      platform: "win32",
+      target: TARGET,
+    }).inheritedEnvironment.includes("SystemRoot"),
   );
   assert.ok(
-    !buildAzdExecutionEnvelope({ environmentName: "lab", platform: "linux" }).inheritedEnvironment.includes(
-      "SystemRoot",
-    ),
+    !buildAzdExecutionEnvelope({
+      environmentName: "lab",
+      platform: "linux",
+      target: TARGET,
+    }).inheritedEnvironment.includes("SystemRoot"),
   );
 });
 
 test("the process environment is rebuilt from an allowlist and redirects never reach azd", () => {
-  const envelope = buildAzdExecutionEnvelope({ environmentName: "lab", platform: "linux" });
+  const envelope = buildAzdExecutionEnvelope({ environmentName: "lab", platform: "linux", target: TARGET });
   const parent = {
     PATH: "/usr/bin",
     HOME: "/home/user",
@@ -70,8 +80,14 @@ test("the process environment is rebuilt from an allowlist and redirects never r
   const explicit = buildAzdExecutionEnvelope({
     environmentName: "lab",
     platform: "linux",
-    azureCliConfigDirectory: "explicit",
+    azureCliState: "isolated-directory",
+    target: TARGET,
   });
+  assert.equal(explicit.userHome, "withheld");
+  assert.equal(
+    explicit.inheritedEnvironment.some((name) => ["HOME", "USERPROFILE"].includes(name)),
+    false,
+  );
   const withAzureCli = resolveAzdProcessEnvironment(
     explicit,
     parent,
@@ -82,7 +98,7 @@ test("the process environment is rebuilt from an allowlist and redirects never r
   assert.equal(withAzureCli.AZURE_SUBSCRIPTION_ID, undefined);
 
   const windows = resolveAzdProcessEnvironment(
-    buildAzdExecutionEnvelope({ environmentName: "lab", platform: "win32" }),
+    buildAzdExecutionEnvelope({ environmentName: "lab", platform: "win32", target: TARGET }),
     { Path: "C:\\Windows", SYSTEMROOT: "C:\\Windows", AZURE_SUBSCRIPTION_ID: "x" },
     { azdConfigDirectory: absolute("run", "azd") },
     "win32",
@@ -125,7 +141,7 @@ test("the process environment is rebuilt from an allowlist and redirects never r
 });
 
 test("azd arguments always name the environment, never prompt and cannot express azd up", () => {
-  const envelope = buildAzdExecutionEnvelope({ environmentName: "lab" });
+  const envelope = buildAzdExecutionEnvelope({ environmentName: "lab", target: TARGET });
   assert.deepEqual(buildAzdArguments(envelope, "provision-preview"), [
     "provision",
     "--preview",
@@ -168,4 +184,51 @@ test("extension preflight requires the exact installed set, source, version and 
     (error: unknown) => error instanceof AzdBindingError && error.code === "AZD_EXTENSION_UNVERIFIED",
   );
   assert.equal(hasValidAzdBinding(null), false);
+});
+
+const binding = (state?: "isolated-directory"): Pick<AzdBindingV1, "executionEnvelope"> => ({
+  executionEnvelope: buildAzdExecutionEnvelope({
+    environmentName: "lab",
+    target: TARGET,
+    ...(state === undefined ? {} : { azureCliState: state }),
+  }),
+});
+const observed = {
+  cloud: "AzureCloud",
+  tenantId: TARGET.tenantId,
+  subscriptionId: TARGET.subscriptionId,
+  azureCliDefaultSubscriptionId: TARGET.subscriptionId,
+};
+
+test("the identity preflight accepts only the approved cloud, tenant and subscription in both Azure CLI modes", () => {
+  for (const mode of [undefined, "isolated-directory"] as const) {
+    assertAzdIdentityMatchesBinding(observed, binding(mode));
+    assertAzdIdentityMatchesBinding(
+      { ...observed, tenantId: TARGET.tenantId.toUpperCase(), subscriptionId: TARGET.subscriptionId.toUpperCase() },
+      binding(mode),
+    );
+    const mismatches: Array<[Record<string, string | undefined>, RegExp]> = [
+      [{ cloud: "AzureUSGovernment" }, /cloud does not match/u],
+      [{ tenantId: "bbbbbbbb-bbbb-cccc-dddd-eeeeeeeeeeee" }, /tenant does not match/u],
+      [{ subscriptionId: "22222222-2222-3333-4444-555555555555" }, /subscription does not match/u],
+      [
+        { azureCliDefaultSubscriptionId: "22222222-2222-3333-4444-555555555555" },
+        /CLI default subscription does not match/u,
+      ],
+      [{ cloud: undefined }, /cloud was not reported/u],
+      [{ tenantId: undefined }, /tenant was not reported/u],
+      [{ subscriptionId: "" }, /subscription was not reported/u],
+      [{ azureCliDefaultSubscriptionId: undefined }, /CLI default subscription was not reported/u],
+    ];
+    for (const [change, message] of mismatches)
+      assert.throws(
+        () => assertAzdIdentityMatchesBinding({ ...observed, ...change }, binding(mode)),
+        (error: unknown) =>
+          error instanceof AzdBindingError &&
+          error.code === "AZD_IDENTITY_MISMATCH" &&
+          message.test(error.message) &&
+          !error.message.includes(TARGET.tenantId) &&
+          !error.message.includes(TARGET.subscriptionId),
+      );
+  }
 });

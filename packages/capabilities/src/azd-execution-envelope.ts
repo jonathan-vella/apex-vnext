@@ -18,37 +18,57 @@ const WINDOWS_INHERITED = [
   "windir",
 ] as const;
 
+const HOME_VARIABLES = new Set(["HOME", "HOMEDRIVE", "HOMEPATH", "USERPROFILE"]);
+
 export interface AzdEnvelopeRequest {
   readonly environmentName: string;
   /** Platform that will run azd; selects the small set of variables a process needs to start. */
   readonly platform?: NodeJS.Platform;
-  /** `explicit` when azd must see the Azure CLI configuration directory the signed-in session lives in. */
-  readonly azureCliConfigDirectory?: "explicit" | "unset";
+  /**
+   * `inherited-user-default` (the default) leaves Azure CLI state ambient: the user's home and `~/.azure` are used,
+   * so only the identity preflight constrains it. `isolated-directory` is for CI and production executors.
+   */
+  readonly azureCliState?: AzdExecutionEnvelopeV1["azureCliState"];
+  readonly cloud?: AzdExecutionEnvelopeV1["identityPreflight"]["cloud"];
+  /** The approved target the identity preflight compares against. */
+  readonly target: { readonly tenantId: string; readonly subscriptionId: string };
 }
 
 /**
  * The only way to run azd for a bound project: an explicit environment, the project root as working directory, no
  * prompts, a minimal allowlisted process environment and a run-scoped azd configuration directory (which also holds
  * extensions), so neither the user's azd state nor inherited `AZURE_*`/`AZD_*` variables can change what runs.
+ * Azure CLI state is isolated only in `isolated-directory` mode; by default it is ambient and the executor must pass
+ * the identity preflight (`assertAzdIdentityMatchesBinding`) before provisioning.
  */
 export function buildAzdExecutionEnvelope(request: AzdEnvelopeRequest): AzdExecutionEnvelopeV1 {
+  const azureCliState = request.azureCliState ?? "inherited-user-default";
+  const inherited = [...((request.platform ?? process.platform) === "win32" ? WINDOWS_INHERITED : POSIX_INHERITED)];
   return {
     workingDirectory: "project-root",
     environmentName: request.environmentName,
     prompts: "disabled",
-    inheritedEnvironment: [
-      ...((request.platform ?? process.platform) === "win32" ? WINDOWS_INHERITED : POSIX_INHERITED),
-    ],
+    inheritedEnvironment:
+      azureCliState === "isolated-directory"
+        ? inherited.filter((name) => !HOME_VARIABLES.has(name.toUpperCase()))
+        : inherited,
     fixedEnvironment: { AZD_SKIP_UPDATE_CHECK: "true", AZURE_DEV_COLLECT_TELEMETRY: "no" },
     azdConfigDirectory: "isolated",
-    azureCliConfigDirectory: request.azureCliConfigDirectory ?? "unset",
+    azureCliState,
+    userHome: azureCliState === "isolated-directory" ? "withheld" : "inherited",
+    identityPreflight: {
+      cloud: request.cloud ?? "AzureCloud",
+      tenantId: request.target.tenantId,
+      subscriptionId: request.target.subscriptionId,
+      onMismatch: "stop",
+    },
   };
 }
 
 export interface AzdProcessDirectories {
   /** Run-scoped `AZD_CONFIG_DIR`; never the user's own azd directory. */
   readonly azdConfigDirectory: string;
-  /** Required exactly when the envelope declares `explicit`. */
+  /** Required exactly when the envelope declares `isolated-directory`. */
   readonly azureCliConfigDirectory?: string;
 }
 
@@ -65,9 +85,9 @@ export function resolveAzdProcessEnvironment(
 ): Record<string, string> {
   if (!isAbsolute(directories.azdConfigDirectory))
     invalid("The azd configuration directory must be an absolute run-scoped path");
-  const explicit = envelope.azureCliConfigDirectory === "explicit";
-  if (explicit !== (directories.azureCliConfigDirectory !== undefined))
-    invalid("The Azure CLI configuration directory must be supplied exactly when the envelope declares it explicit");
+  const isolated = envelope.azureCliState === "isolated-directory";
+  if (isolated !== (directories.azureCliConfigDirectory !== undefined))
+    invalid("The Azure CLI configuration directory must be supplied exactly when the envelope declares it isolated");
   if (directories.azureCliConfigDirectory !== undefined && !isAbsolute(directories.azureCliConfigDirectory))
     invalid("The Azure CLI configuration directory must be an absolute path");
   const environment: Record<string, string> = {};
@@ -128,4 +148,40 @@ export function assertAzdExtensionsVerified(
   }
   const extra = observed.filter(({ id }) => !binding.extensions.some((bound) => bound.id === id));
   if (extra.length > 0) fail(`azd has ${extra.length} extension(s) installed that the binding does not list`);
+}
+
+/** Identity the executor observed from the Azure CLI and azd immediately before running azd. */
+export interface ObservedAzdIdentity {
+  /** Active cloud name, for example `az cloud show`. */
+  readonly cloud?: string;
+  /** Tenant of the signed-in session azd will use. */
+  readonly tenantId?: string;
+  /** Subscription azd will use (the environment's `AZURE_SUBSCRIPTION_ID` as resolved by azd). */
+  readonly subscriptionId?: string;
+  /** Default subscription of the Azure CLI session, which hooks calling `az` run against. */
+  readonly azureCliDefaultSubscriptionId?: string;
+}
+
+/**
+ * Identity preflight the executor must pass before every provision: the cloud, tenant and subscription azd and the
+ * Azure CLI report must equal the approved target. A missing or different value stops the run; values are never echoed.
+ */
+export function assertAzdIdentityMatchesBinding(
+  observed: ObservedAzdIdentity,
+  binding: Pick<AzdBindingV1, "executionEnvelope">,
+): void {
+  const expected = binding.executionEnvelope.identityPreflight;
+  const fail = (message: string): never => {
+    throw new AzdBindingError("AZD_IDENTITY_MISMATCH", message);
+  };
+  const check = (name: string, actual: string | undefined, wanted: string, fold: boolean): void => {
+    if (typeof actual !== "string" || actual.length === 0)
+      fail(`The active Azure ${name} was not reported; sign in to the approved target and run the preflight again`);
+    else if ((fold ? actual.toLowerCase() : actual) !== wanted)
+      fail(`The active Azure ${name} does not match the approved target; sign in to the approved target`);
+  };
+  check("cloud", observed.cloud, expected.cloud, false);
+  check("tenant", observed.tenantId, expected.tenantId, true);
+  check("subscription", observed.subscriptionId, expected.subscriptionId, true);
+  check("CLI default subscription", observed.azureCliDefaultSubscriptionId, expected.subscriptionId, true);
 }
