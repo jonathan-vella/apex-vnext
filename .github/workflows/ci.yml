@@ -3,8 +3,8 @@
 # Consolidates: lint, agent-validation, policy-compliance-check
 # Runs markdown linting + all Node.js validators + handoff validation, then installs the agent plugin
 # with a pinned Copilot CLI and smoke-tests the installed MCP server (no Copilot sign-in or secret)
-# Skips the "Qualify APEX vNext" and plugin install steps, and the Windows package tests, for PRs whose changes are
-# entirely under docs/ or are the root contributor documents (README, CONTRIBUTING, CONTRIBUTORS, SECURITY)
+# Skips the "Qualify APEX vNext" and plugin install steps, and the Windows package test shards, for PRs whose changes
+# are entirely under docs/ or are the root contributor documents (README, CONTRIBUTING, CONTRIBUTORS, SECURITY)
 # (push and workflow_dispatch runs always run the full qualification)
 
 name: ci
@@ -108,14 +108,39 @@ jobs:
         if: steps.scope.outputs.docs_only != 'true'
         run: npm run test:plugin-install -- --cli-version 1.0.93
 
-  windows-package-tests:
-    name: windows-2025 package tests
+  # The kernel, capabilities and CLI package tests (plus the plugin package tests) split across parallel Windows
+  # shards. `core` runs the kernel, capabilities and plugin suites whole. The `cli-<i>-of-8` shards each run the 1/8th
+  # of every CLI test file selected by APEX_TEST_SHARD (packages/cli/src/test/test-shard.ts), because a few CLI test
+  # files hold most of the runtime and cannot be split by file. The `windows-package-tests` job below aggregates them.
+  windows-package-shards:
+    name: windows-2025 shard (${{ matrix.suite }})
     needs: scope
     if: needs.scope.outputs.docs_only != 'true'
     runs-on: windows-2025
-    timeout-minutes: 90
+    timeout-minutes: 60
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - suite: core
+          - suite: cli-1-of-8
+            cli_shard: 1/8
+          - suite: cli-2-of-8
+            cli_shard: 2/8
+          - suite: cli-3-of-8
+            cli_shard: 3/8
+          - suite: cli-4-of-8
+            cli_shard: 4/8
+          - suite: cli-5-of-8
+            cli_shard: 5/8
+          - suite: cli-6-of-8
+            cli_shard: 6/8
+          - suite: cli-7-of-8
+            cli_shard: 7/8
+          - suite: cli-8-of-8
+            cli_shard: 8/8
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -136,13 +161,52 @@ jobs:
           npm run build --workspace @apexops/capabilities
           npm run build --workspace @apexops/cli
 
-      - name: Test kernel, capabilities and CLI
+      - name: Test kernel and capabilities
+        if: matrix.suite == 'core'
         shell: bash
         run: |
           (cd packages/kernel && node --test dist/test/*.test.js)
           (cd packages/capabilities && node --test dist/test/*.test.js)
-          (cd packages/cli && node --test dist/test/*.test.js)
+
+      - name: Test CLI shard
+        if: matrix.suite != 'core'
+        shell: bash
+        env:
+          APEX_TEST_SHARD: ${{ matrix.cli_shard }}
+        run: (cd packages/cli && node --test dist/test/*.test.js)
 
       - name: Build and test the agent plugin package
+        if: matrix.suite == 'core'
         shell: bash
         run: npm run test:plugin
+
+  # The stable `windows-2025 package tests` status check: passes for a docs-only pull request (the shards are
+  # skipped) or when the scope job and every shard succeeded; any failed or cancelled shard fails it.
+  windows-package-tests:
+    name: windows-2025 package tests
+    needs: [scope, windows-package-shards]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Require the scope decision and every Windows shard
+        env:
+          DOCS_ONLY: ${{ needs.scope.outputs.docs_only }}
+          SCOPE_RESULT: ${{ needs.scope.result }}
+          SHARDS_RESULT: ${{ needs.windows-package-shards.result }}
+        run: |
+          if [ "$SCOPE_RESULT" != "success" ]; then
+            echo "The scope job finished as '$SCOPE_RESULT'."
+            exit 1
+          fi
+          if [ "$DOCS_ONLY" = "true" ]; then
+            echo "Documentation-only change: the Windows shards were skipped."
+            exit 0
+          fi
+          if [ "$SHARDS_RESULT" != "success" ]; then
+            echo "The Windows shards finished as '$SHARDS_RESULT'."
+            exit 1
+          fi
+          echo "Every Windows shard passed."

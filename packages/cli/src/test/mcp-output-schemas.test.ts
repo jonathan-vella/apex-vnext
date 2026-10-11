@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "./test-shard.js";
 import { z } from "zod";
 import { ResourceInventoryV1Schema } from "@apexops/contracts";
 import { Ajv } from "ajv";

@@ -3,7 +3,7 @@ import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdir, readFile, readdir, realpath, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
-import test, { type TestContext } from "node:test";
+import { type TestContext } from "node:test";
 import { promisify } from "node:util";
 import type { Client } from "@modelcontextprotocol/client";
 import type { IacProvider } from "@apexops/capabilities";
@@ -30,6 +30,7 @@ import {
   tempRoot,
 } from "./helpers.js";
 import { connectMcp } from "./mcp-client.js";
+import { test } from "./test-shard.js";
 
 const execFileAsync = promisify(execFile);
 type CallResult = Awaited<ReturnType<Client["callTool"]>>;

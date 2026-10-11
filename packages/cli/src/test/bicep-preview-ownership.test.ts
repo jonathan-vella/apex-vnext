@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "./test-shard.js";
 import type { IacBindingV1, ImplementationIntentV1, LogicalResourceManifestV1 } from "@apexops/contracts";
 import { sha256Json, ValidatorRegistry } from "@apexops/kernel";
 import { registerWorkflowValidators, resolveNativeBicepResourceOwnership } from "../workflow-validators.js";
