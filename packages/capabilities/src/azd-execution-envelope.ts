@@ -1,4 +1,5 @@
 import type { AzdBindingV1, AzdExecutionEnvelopeV1 } from "@apexops/contracts";
+import { isAbsolute } from "node:path";
 import { AzdBindingError } from "./azd-project-files.js";
 
 export interface AzdEnvelopeRequest {
@@ -26,15 +27,45 @@ export function buildAzdExecutionEnvelope(request: AzdEnvelopeRequest): AzdExecu
   };
 }
 
-/** azd arguments for the operations a bound project supports; `azd up` and every other command are unrepresentable. */
+export type AzdOperation = "provision-preview" | "provision" | "down";
+
+/**
+ * azd arguments for the operations a bound project supports; `azd up`, `azd deploy`, `--purge` and every other command
+ * are unrepresentable. The project root is passed with `--cwd` so azd never depends on the process directory.
+ *
+ * - `--no-state` makes `provision` always deploy the approved Bicep instead of skipping when azd's stored deployment
+ *   state hash is unchanged, which would hide drift the approved what-if showed.
+ * - `down` needs `--force` to run without a prompt; the approval of the destroy preview replaces that prompt. It never
+ *   passes `--purge`, so soft-deleted resources such as Key Vaults stay recoverable.
+ * - The preview asks for `--output json`, the only machine-readable form azd offers for `--preview`.
+ */
 export function buildAzdArguments(
   envelope: AzdExecutionEnvelopeV1,
-  operation: "provision-preview" | "provision",
+  operation: AzdOperation,
+  projectRoot: string,
 ): string[] {
-  if (operation !== "provision-preview" && operation !== "provision")
-    throw new AzdBindingError("AZD_BINDING_INPUT_INVALID", "Only azd provision can be run for a bound project");
-  const command = operation === "provision-preview" ? ["provision", "--preview"] : ["provision"];
-  return [...command, "--environment", envelope.environmentName, "--no-prompt"];
+  if (operation !== "provision-preview" && operation !== "provision" && operation !== "down")
+    throw new AzdBindingError(
+      "AZD_BINDING_INPUT_INVALID",
+      "Only azd provision and azd down can be run for a bound project",
+    );
+  if (!isAbsolute(projectRoot) || projectRoot.startsWith("-"))
+    throw new AzdBindingError("AZD_BINDING_INPUT_INVALID", "The azd project root must be an absolute path");
+  const command =
+    operation === "provision-preview"
+      ? ["provision", "--preview", "--no-state"]
+      : operation === "provision"
+        ? ["provision", "--no-state"]
+        : ["down", "--force"];
+  return [
+    ...command,
+    "--environment",
+    envelope.environmentName,
+    "--cwd",
+    projectRoot,
+    "--no-prompt",
+    ...(operation === "provision-preview" ? ["--output", "json"] : []),
+  ];
 }
 
 /** Identity the executor observed from the Azure CLI and azd immediately before running azd. */

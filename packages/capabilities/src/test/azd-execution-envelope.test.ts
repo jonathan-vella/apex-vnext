@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { resolve } from "node:path";
 import test from "node:test";
 import { type AzdBindingV1 } from "@apexops/contracts";
 import {
@@ -28,21 +29,51 @@ test("the envelope names the environment, runs from the project root without pro
   );
 });
 
-test("azd arguments always name the environment, never prompt and cannot express azd up", () => {
+test("azd arguments name the environment and project root, never prompt and cannot express up, deploy or purge", () => {
   const envelope = buildAzdExecutionEnvelope({ environmentName: "lab", target: TARGET });
-  assert.deepEqual(buildAzdArguments(envelope, "provision-preview"), [
+  const root = resolve("/work/project");
+  assert.deepEqual(buildAzdArguments(envelope, "provision-preview", root), [
     "provision",
     "--preview",
+    "--no-state",
     "--environment",
     "lab",
+    "--cwd",
+    root,
+    "--no-prompt",
+    "--output",
+    "json",
+  ]);
+  assert.deepEqual(buildAzdArguments(envelope, "provision", root), [
+    "provision",
+    "--no-state",
+    "--environment",
+    "lab",
+    "--cwd",
+    root,
     "--no-prompt",
   ]);
-  assert.deepEqual(buildAzdArguments(envelope, "provision"), ["provision", "--environment", "lab", "--no-prompt"]);
-  for (const operation of ["up", "deploy", "down", ""])
+  assert.deepEqual(buildAzdArguments(envelope, "down", root), [
+    "down",
+    "--force",
+    "--environment",
+    "lab",
+    "--cwd",
+    root,
+    "--no-prompt",
+  ]);
+  for (const operation of ["up", "deploy", "pipeline", "env", ""])
     assert.throws(
-      () => buildAzdArguments(envelope, operation as never),
+      () => buildAzdArguments(envelope, operation as never, root),
       (error: unknown) => error instanceof AzdBindingError && error.code === "AZD_BINDING_INPUT_INVALID",
     );
+  for (const unsafe of ["", "relative/project", "--purge"])
+    assert.throws(
+      () => buildAzdArguments(envelope, "provision", unsafe),
+      (error: unknown) => error instanceof AzdBindingError && error.code === "AZD_BINDING_INPUT_INVALID",
+    );
+  for (const operation of ["provision-preview", "provision", "down"] as const)
+    assert.ok(!buildAzdArguments(envelope, operation, root).includes("--purge"));
 });
 
 const binding: Pick<AzdBindingV1, "executionEnvelope"> = {

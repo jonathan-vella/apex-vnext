@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { link, mkdir, mkdtemp, readFile, readdir, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import test, { type TestContext } from "node:test";
 import { sha256 } from "../iac.js";
 import { Value } from "@sinclair/typebox/value";
@@ -28,13 +28,16 @@ import {
   IacOutputParseError,
   IacProviderError,
   LocalEncryptedPlanTransport,
-  NativeBicepProvider,
+  AzdBicepProvider,
   NativeTerraformProvider,
   ProcessRunner,
   nativePolicyValidationBinding,
-  normalizeAzureWhatIf,
+  AZD_HOOKS_EXTENSIONS_WARNING,
+  AzdBindingError,
+  normalizeAzdGroupResources,
+  normalizeAzdPreview,
+  normalizeAzdTaggedGroups,
   normalizeTerraformPlan,
-  selectAzureDeploymentStack,
   type CurrentDeploymentAuthority,
   type NativeValidationRequest,
   type PreviewRequest,
@@ -45,6 +48,21 @@ import {
   type PersistedPreviewBinding,
   type TerraformNativeTarget,
 } from "../index.js";
+import {
+  AZD_ENVIRONMENT,
+  AZD_GROUP,
+  AZD_SCOPE,
+  AZD_SUBSCRIPTION,
+  AZD_TENANT,
+  AZD_VERSION,
+  azdPreviewStdout,
+  BICEP_CONFIG,
+  createFakeAzd,
+  handleFakeAzd,
+  resourceId,
+  writeAzdProject,
+  type FakeAzdState,
+} from "./azd-fake.js";
 
 const hashes = {
   head: "a".repeat(64),
@@ -156,10 +174,15 @@ class MemoryArtifactStore {
 async function nativePolicyFixture(context: TestContext, track: "bicep" | "terraform") {
   const root = await mkdtemp(join(tmpdir(), `apex-native-policy-${track}-`));
   context.after(async () => rm(root, { recursive: true, force: true }));
-  const sourceFile = track === "bicep" ? "main.bicep" : "main.tf";
-  const content = track === "bicep" ? "targetScope = 'resourceGroup'\n" : "terraform {}\n";
-  await writeFile(join(root, sourceFile), content);
-  const generatedSource = { rootPath: root, treeHash: sha256([{ path: sourceFile, content }]) };
+  const sourceFile = track === "bicep" ? "infra/main.bicep" : "main.tf";
+  let files: readonly { path: string; content: string }[];
+  if (track === "bicep") files = (await writeAzdProject(root)).files;
+  else {
+    await writeFile(join(root, sourceFile), "terraform {}\n");
+    files = [{ path: sourceFile, content: "terraform {}\n" }];
+  }
+  const generatedSource = { rootPath: root, treeHash: sha256(files) };
+  const azd = createFakeAzd();
   const source = {
     value: "native-value-must-not-leak",
     invalid: false,
@@ -213,15 +236,13 @@ async function nativePolicyFixture(context: TestContext, track: "bicep" | "terra
         assert.deepEqual(process.args, command?.args);
         return "";
       }
-      assert.deepEqual(process.args, ["build", "main.bicep", "--stdout"]);
+      assert.deepEqual(process.args, ["build", "infra/main.bicep", "--stdout"]);
       if (source.compileFailed) throw new Error("compiler diagnostic containing private source");
       return json();
     }
-    if (process.args.includes("what-if")) {
-      await source.duringPreview?.();
-      return JSON.stringify({ changes: [{ resourceId: "/storage", changeType: "Create" }] });
-    }
-    if (process.args[2] === "list") return "[]";
+    if (process.executable === "azd" && process.args.includes("--preview")) await source.duringPreview?.();
+    const handled = await handleFakeAzd(azd, process);
+    if (handled !== undefined) return handled;
     if (process.args[0] === "init") await source.duringInit?.();
     const outputArg = process.args.find((argument) => argument.startsWith("-out="));
     if (outputArg !== undefined) {
@@ -243,20 +264,16 @@ async function nativePolicyFixture(context: TestContext, track: "bicep" | "terra
     currentAuthority: async () => authority,
     now: () => clock.value,
   };
-  const makeProvider = (
-    options: { cwd?: string; templateFile?: string; parametersFile?: string; planPath?: string } = {},
-  ) =>
+  const makeProvider = (options: { cwd?: string; planPath?: string } = {}) =>
     track === "bicep"
-      ? new NativeBicepProvider({
+      ? new AzdBicepProvider({
           ...runtime,
           target: {
-            cwd: options.cwd ?? root,
-            resourceGroup: "rg",
-            deploymentName: "preview",
-            stackName: "workload",
-            templateFile: options.templateFile ?? "main.bicep",
-            ...(options.parametersFile === undefined ? {} : { parametersFile: options.parametersFile }),
-            denySettingsMode: "denyDelete",
+            projectRoot: options.cwd ?? root,
+            environmentName: AZD_ENVIRONMENT,
+            tenantId: AZD_TENANT,
+            location: "swedencentral",
+            azdVersion: AZD_VERSION,
           },
         })
       : new NativeTerraformProvider({
@@ -272,6 +289,7 @@ async function nativePolicyFixture(context: TestContext, track: "bicep" | "terra
           },
         });
   const policyRequest = request({
+    target: AZD_SCOPE,
     policyValidation: {
       policyMap: {
         schemaVersion: "1.0.0",
@@ -290,14 +308,21 @@ async function nativePolicyFixture(context: TestContext, track: "bicep" | "terra
       logicalResourceManifest: { storage: { codeSymbol: "storage", terraformAddress: "azurerm_storage_account.main" } },
     },
   });
-  const executed = () => runner.requests.some((entry) => entry.args[0] === "apply" || entry.args[2] === "create");
+  const executed = () =>
+    runner.requests.some(
+      (entry) =>
+        entry.args[0] === "apply" ||
+        (entry.executable === "azd" && entry.args[0] !== "version" && !entry.args.includes("--preview")),
+    );
   return {
     root,
     sourceFile,
+    files,
     generatedSource,
     source,
     json,
     runner,
+    azd,
     bindings,
     artifacts,
     makeProvider,
@@ -573,13 +598,13 @@ test("installed Bicep validates nested formatting and lint without changing acce
         "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-fixture/providers/Microsoft.OperationalInsights/workspaces/log-fixture";
       const files = [
         {
-          path: "main.bicep",
+          path: "infra/main.bicep",
           content: checkPolicy
             ? "resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' = {\n  name: 'apexpolicytest'\n  location: 'swedencentral'\n  kind: 'StorageV2'\n  sku: {\n    name: 'Standard_LRS'\n  }\n  properties: {\n    supportsHttpsTrafficOnly: true\n    minimumTlsVersion: 'TLS1_2'\n    allowBlobPublicAccess: false\n    allowSharedKeyAccess: false\n  }\n}\n"
             : "output result string = 'ok'\n",
         },
         {
-          path: "modules/nested.bicep",
+          path: "infra/modules/nested.bicep",
           content:
             scenario === "format-drift"
               ? "output result string='ok'\n"
@@ -588,7 +613,7 @@ test("installed Bicep validates nested formatting and lint without changing acce
                 : "output result string = 'nested'\n",
         },
         {
-          path: "bicepconfig.json",
+          path: "infra/bicepconfig.json",
           content: JSON.stringify({
             experimentalFeaturesEnabled: { symbolicNameCodegen: true },
             analyzers: { core: { rules: { "no-unused-params": { level: "error" } } } },
@@ -596,20 +621,20 @@ test("installed Bicep validates nested formatting and lint without changing acce
         },
       ].sort((left, right) => left.path.localeCompare(right.path));
       if (checkModule) {
-        const main = files.find(({ path }) => path === "main.bicep")!;
-        files.find(({ path }) => path === "modules/nested.bicep")!.content = main.content;
+        const main = files.find(({ path }) => path === "infra/main.bicep")!;
+        files.find(({ path }) => path === "infra/modules/nested.bicep")!.content = main.content;
         main.content = "module storageModule 'modules/nested.bicep' = {\n  name: 'storage-module'\n}\n";
       }
       if (checkDiagnostics) {
-        const main = files.find(({ path }) => path === "main.bicep")!;
+        const main = files.find(({ path }) => path === "infra/main.bicep")!;
         for (const service of ["blobServices", "fileServices", "queueServices", "tableServices"]) {
           main.content += `\nresource ${service} 'Microsoft.Storage/storageAccounts/${service}@2023-05-01' = {\n  parent: storage\n  name: 'default'\n}\n\nresource ${service}Diagnostic 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {\n  scope: ${service}\n  name: 'logs'\n  properties: {\n    workspaceId: '${workspaceResourceId}'\n    logs: [\n      {\n        categoryGroup: 'allLogs'\n        enabled: true\n      }\n    ]\n    metrics: [\n      {\n        category: 'Transaction'\n        enabled: true\n      }\n    ]\n  }\n}\n`;
         }
       }
-      await mkdir(join(root, "modules"));
+      await mkdir(join(root, "infra", "modules"), { recursive: true });
       for (const file of files) await writeFile(join(root, file.path), file.content);
       const calls: ProcessRequest[] = [];
-      const provider = new NativeBicepProvider({
+      const provider = new AzdBicepProvider({
         runner: {
           run: async (command) => {
             calls.push(command);
@@ -618,12 +643,11 @@ test("installed Bicep validates nested formatting and lint without changing acce
         },
         currentAuthority: async () => authority,
         target: {
-          cwd: root,
-          templateFile: "main.bicep",
-          resourceGroup: "rg",
-          deploymentName: "validation",
-          stackName: "workload",
-          denySettingsMode: "denyDelete",
+          projectRoot: root,
+          environmentName: AZD_ENVIRONMENT,
+          tenantId: AZD_TENANT,
+          location: "swedencentral",
+          azdVersion: AZD_VERSION,
         },
       });
       const policyValidation = checkPolicy
@@ -675,7 +699,7 @@ test("installed Bicep validates nested formatting and lint without changing acce
                     ownership: "managed" as const,
                     dependsOn: [],
                     generatedDependencies: [],
-                    sourcePath: "main.bicep",
+                    sourcePath: "infra/main.bicep",
                   },
                 ],
               },
@@ -781,7 +805,7 @@ test("native parity snapshots the accepted binding before compiler commands", as
         ownership: "managed",
         dependsOn: [],
         generatedDependencies: [],
-        sourcePath: "main.bicep",
+        sourcePath: "infra/main.bicep",
       },
     ],
   };
@@ -818,14 +842,21 @@ test("native parity snapshots the accepted binding before compiler commands", as
   assert.equal(fixture.runner.requests.length, 3);
 });
 
-test("native bicep validateSource requires the accepted main.bicep target", async (context) => {
+test("native bicep validateSource requires the accepted infra/main.bicep entry point", async (context) => {
   const fixture = await nativePolicyFixture(context, "bicep");
+  const other = await mkdtemp(join(tmpdir(), "apex-azd-other-"));
+  context.after(() => rm(other, { recursive: true, force: true }));
+  await mkdir(join(other, "infra"));
+  await writeFile(join(other, "infra", "other.bicep"), "targetScope = 'resourceGroup'\n");
   await assert.rejects(
-    fixture.makeProvider({ templateFile: "other.bicep" }).validateSource({
+    fixture.makeProvider({ cwd: other }).validateSource({
       projectId: "project",
       runId: "run",
       sourceHash: hashes.iac,
-      generatedSource: fixture.generatedSource,
+      generatedSource: {
+        rootPath: other,
+        treeHash: sha256([{ path: "infra/other.bicep", content: "targetScope = 'resourceGroup'\n" }]),
+      },
       policyHash: hashes.policy,
       inputHash: hashes.input,
     }),
@@ -977,18 +1008,20 @@ for (const track of ["bicep", "terraform"] as const) {
     const fixture = await nativePolicyFixture(context, track);
     const nestedPath = `modules/nested/${fixture.sourceFile}`;
     const nestedContent = "\uFEFFnested source\r\n";
-    await mkdir(join(fixture.root, "modules", "nested"), { recursive: true });
+    await mkdir(dirname(join(fixture.root, nestedPath)), { recursive: true });
     await writeFile(join(fixture.root, nestedPath), nestedContent);
     fixture.generatedSource.treeHash = sha256(
-      [
-        { path: fixture.sourceFile, content: await readFile(join(fixture.root, fixture.sourceFile), "utf8") },
-        { path: nestedPath, content: nestedContent },
-      ].sort((left, right) => left.path.localeCompare(right.path)),
+      [...fixture.files, { path: nestedPath, content: nestedContent }].sort((left, right) =>
+        left.path.localeCompare(right.path),
+      ),
     );
     fixture.source.duringCommand = async (process) => {
       assert.notEqual(process.cwd, fixture.root);
       assert.equal(await readFile(join(process.cwd!, nestedPath), "utf8"), nestedContent);
-      assert.deepEqual((await readdir(process.cwd!)).sort(), [fixture.sourceFile, "modules"].sort());
+      assert.deepEqual(
+        (await readdir(process.cwd!)).sort(),
+        [...new Set([...fixture.files.map(({ path }) => path), nestedPath].map((path) => path.split("/")[0]!))].sort(),
+      );
       await assertPosixMode(process.cwd!, 0o700);
       assert.equal((await stat(join(process.cwd!, nestedPath))).nlink, 1);
     };
@@ -1016,7 +1049,7 @@ for (const track of ["bicep", "terraform"] as const) {
       track === "bicep"
         ? [
             { validatorId: "bicep:format", executable: "bicep", args: ["format", "--pattern", "**/*.bicep"] },
-            { validatorId: "bicep:build", executable: "bicep", args: ["build", "main.bicep", "--stdout"] },
+            { validatorId: "bicep:build", executable: "bicep", args: ["build", "infra/main.bicep", "--stdout"] },
             {
               validatorId: "bicep:lint",
               executable: "bicep",
@@ -1331,20 +1364,17 @@ for (const track of ["bicep", "terraform"] as const) {
       for (const mutate of [false, true]) {
         const fixture = await nativePolicyFixture(context, track);
         const path = `modules/${fixture.sourceFile}`;
-        await mkdir(join(fixture.root, "modules"));
+        await mkdir(dirname(join(fixture.root, path)), { recursive: true });
         const content = "nested source\n";
         await writeFile(join(fixture.root, path), content);
         const generatedSource = {
           rootPath: fixture.root,
           treeHash: sha256(
-            [
-              { path, content },
-              { path: fixture.sourceFile, content: await readFile(join(fixture.root, fixture.sourceFile), "utf8") },
-            ].sort((left, right) => left.path.localeCompare(right.path)),
+            [...fixture.files, { path, content }].sort((left, right) => left.path.localeCompare(right.path)),
           ),
         };
         if (mutate) fixture.source.duringPreview = async () => writeFile(join(fixture.root, path), "changed module");
-        const previewRequest = withPolicy ? fixture.policyRequest : request();
+        const previewRequest = withPolicy ? fixture.policyRequest : request({ target: AZD_SCOPE });
         const provider = fixture.makeProvider();
         if (mutate) {
           await assert.rejects(
@@ -1531,9 +1561,15 @@ for (const track of ["bicep", "terraform"] as const) {
     fixture.source.value = "native-value-must-not-leak";
     fixture.source.configHash = hashes.iac;
     fixture.source.duringPreview = async () => {
-      if (track === "bicep") await writeFile(join(fixture.root, "main.bicep"), "changed-source");
+      if (track === "bicep") await writeFile(join(fixture.root, "infra", "main.bicep"), "changed-source");
       else fixture.source.configHash = "f".repeat(64);
     };
+    if (track === "bicep") {
+      // azd recompiles the source itself, so drift while it previews invalidates the preview outright.
+      await assert.rejects(provider.previewApply(fixture.policyRequest), { code: "PREVIEW_HASH_MISMATCH" });
+      assert.equal(fixture.executed(), false);
+      return;
+    }
     const drifted = await provider.previewApply(fixture.policyRequest);
     assert.match(drifted.blockers.join("\n"), /changed during policy validation preview/);
     assert.ok(provider.policyValidation(drifted.previewHash));
@@ -1545,37 +1581,21 @@ for (const track of ["bicep", "terraform"] as const) {
   });
 }
 
-test("native Bicep generated binding requires main.bicep and accepted parameters", async (context) => {
-  for (const mismatch of [
-    "compiled",
-    "other-entrypoint",
-    "outside-entrypoint",
-    "outside-parameters",
-    "none",
-  ] as const) {
+test("native Bicep generated binding requires the accepted azd project and ignores the azd environment", async (context) => {
+  for (const mismatch of ["extra-file", "missing-entrypoint", "changed-entrypoint", "none"] as const) {
     await context.test(mismatch, async (child) => {
       const fixture = await nativePolicyFixture(child, "bicep");
-      const files = [
-        { path: "main.bicep", content: await readFile(join(fixture.root, "main.bicep"), "utf8") },
-        { path: "main.json", content: "{}" },
-        { path: "other.bicep", content: "targetScope = 'resourceGroup'\n" },
-        { path: "parameters.json", content: "{}" },
-      ].sort((left, right) => left.path.localeCompare(right.path));
-      for (const file of files) await writeFile(join(fixture.root, file.path), file.content);
-      const generatedSource = { rootPath: fixture.root, treeHash: sha256(files) };
-      const provider = fixture.makeProvider({
-        templateFile:
-          mismatch === "compiled"
-            ? "main.json"
-            : mismatch === "other-entrypoint"
-              ? "other.bicep"
-              : mismatch === "outside-entrypoint"
-                ? "../main.bicep"
-                : "main.bicep",
-        parametersFile: mismatch === "outside-parameters" ? "../parameters.json" : "parameters.json",
-      });
+      const provider = fixture.makeProvider();
+      if (mismatch === "extra-file")
+        await writeFile(join(fixture.root, "extra.bicep"), "targetScope = 'resourceGroup'\n");
+      if (mismatch === "missing-entrypoint") await rm(join(fixture.root, "infra", "main.bicep"));
+      if (mismatch === "changed-entrypoint")
+        await writeFile(join(fixture.root, "infra", "main.bicep"), "targetScope = 'subscription'\n");
       if (mismatch === "none") {
-        assert.deepEqual((await provider.previewApply({ ...fixture.policyRequest, generatedSource })).blockers, []);
+        assert.deepEqual((await provider.previewApply(fixture.policyRequest)).blockers, []);
+        // The azd environment lives under .azure and is never generated source.
+        await stat(join(fixture.root, ".azure", AZD_ENVIRONMENT, ".env"));
+        assert.deepEqual((await provider.previewApply(fixture.policyRequest)).blockers, []);
         await provider.validate();
         assert.ok(
           fixture.runner.requests
@@ -1584,7 +1604,7 @@ test("native Bicep generated binding requires main.bicep and accepted parameters
         );
       } else {
         await assert.rejects(
-          provider.previewApply({ ...fixture.policyRequest, generatedSource }),
+          provider.previewApply({ ...fixture.policyRequest, generatedSource: fixture.generatedSource }),
           (error) => error instanceof IacProviderError && error.code === "PREVIEW_HASH_MISMATCH",
         );
         assert.equal(fixture.runner.requests.length, 0);
@@ -1709,22 +1729,7 @@ test("native Terraform detects saved-plan byte mutation during show-json", async
   assert.equal(fixture.executed(), false);
 });
 
-test("Azure and Terraform normalizers block unknown or unevaluated changes", () => {
-  const azure = normalizeAzureWhatIf({
-    properties: {
-      changes: [
-        { resourceId: "/created", changeType: "Create" },
-        { resourceId: "/ignored", changeType: "Ignore" },
-        { resourceId: "/unknown", changeType: "Unsupported" },
-      ],
-    },
-  });
-  assert.deepEqual(
-    azure.changes.map((change) => change.action),
-    ["create", "no-op", "unknown"],
-  );
-  assert.equal(azure.blockers.length, 1);
-
+test("Terraform normalizers block unknown or unevaluated changes", () => {
   const terraform = normalizeTerraformPlan({
     resource_changes: [
       { address: "azurerm_resource_group.main", change: { actions: ["no-op"] } },
@@ -1738,20 +1743,9 @@ test("Azure and Terraform normalizers block unknown or unevaluated changes", () 
     ["no-op", "replace", "unknown"],
   );
   assert.equal(terraform.blockers.length, 2);
-  assert.throws(() => normalizeAzureWhatIf({}), IacOutputParseError);
 });
 
-test("normalizers block missing, duplicate, and malformed material change identities", () => {
-  const azure = normalizeAzureWhatIf({
-    changes: [
-      { changeType: "Create" },
-      { resourceId: "/duplicate", changeType: "Delete" },
-      { resourceId: "/duplicate", changeType: "Modify" },
-      null,
-    ],
-  });
-  assert.match(azure.blockers.join("\n"), /no stable resource ID|duplicate material|not a JSON object/);
-
+test("Terraform normalizers block missing, duplicate, and malformed material change identities", () => {
   const terraform = normalizeTerraformPlan({
     resource_changes: [
       { change: { actions: ["create"] } },
@@ -1801,216 +1795,523 @@ test("native Terraform incomplete plans block apply even without policy mappings
   }
 });
 
-function stack(name: string, resourceGroup = "rg", resources: unknown[] = []) {
-  return {
-    id: `/subscriptions/sub/resourceGroups/${resourceGroup}/providers/Microsoft.Resources/deploymentStacks/${name}`,
-    name,
-    properties: { resources },
-  };
+const STORAGE = { type: "Microsoft.Storage/storageAccounts", name: "stlab" };
+const STORAGE_ID = resourceId(STORAGE.type, STORAGE.name);
+const BLOB = { type: "Microsoft.Storage/storageAccounts/blobServices", name: "stlab/default" };
+const BLOB_ID = resourceId(BLOB.type, BLOB.name);
+
+function managed(...entries: readonly { type: string; name: string }[]) {
+  return entries.map(({ type, name }) => ({
+    logicalId: name,
+    resourceId: resourceId(type, name),
+    type,
+    location: "swedencentral",
+    properties: {},
+  }));
 }
 
-test("Azure stack selection distinguishes absent, exact, malformed, duplicate, and wrong-scope results", () => {
-  const exact = stack("workload");
-  const failedStack = {
-    ...stack("failed"),
-    properties: { provisioningState: "failed" },
-    resources: [{ id: "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/example" }],
-  };
-  assert.equal(selectAzureDeploymentStack([stack("other")], "rg", "workload"), null);
-  assert.equal(selectAzureDeploymentStack([stack("other"), exact], "rg", "Workload"), exact);
-  assert.equal(selectAzureDeploymentStack([failedStack], "rg", "failed"), failedStack);
-  assert.throws(() => selectAzureDeploymentStack({}, "rg", "workload"), /must be a JSON array/);
-  assert.throws(() => selectAzureDeploymentStack([{}], "rg", "workload"), /entry 0 is malformed/);
-  assert.throws(() => selectAzureDeploymentStack([exact, stack("WORKLOAD")], "rg", "workload"), /duplicate name/);
-  assert.throws(() => selectAzureDeploymentStack([stack("workload", "other")], "rg", "workload"), /outside/);
-  assert.throws(
-    () => selectAzureDeploymentStack([{ ...exact, properties: {} }], "rg", "workload"),
-    /malformed managed resources/,
-  );
-});
-
-test("native Bicep first preview binds empty stack state and creates only after approval", async (context) => {
-  const root = await mkdtemp(join(tmpdir(), "apex-native-bicep-first-"));
+async function azdFixture(
+  context: TestContext,
+  options: { azdVersion?: string | undefined; azureYaml?: string; state?: Partial<FakeAzdState> } = {},
+) {
+  const root = await mkdtemp(join(tmpdir(), "apex-azd-provider-"));
   context.after(async () => rm(root, { recursive: true, force: true }));
-  await writeFile(join(root, "main.bicep"), "targetScope = 'resourceGroup'\n");
-  let created = false;
-  const runner = new FakeRunner((process) => {
-    if (process.args.includes("what-if")) {
-      return JSON.stringify({ properties: { changes: [{ resourceId: "/resource", changeType: "Create" }] } });
-    }
-    if (process.args[2] === "list") {
-      return JSON.stringify(
-        created ? [stack("workload", "rg", [{ id: "/resource", name: "resource", type: "Example/type" }])] : [],
-      );
-    }
-    if (process.args[2] === "create") {
-      created = true;
-      return JSON.stringify({ id: "/stack/workload" });
-    }
-    return "";
-  });
-  const provider = new NativeBicepProvider({
-    runner,
-    currentAuthority: async () => authority,
-    now: () => clock.value,
-    nextId: () => "operation",
-    bindingStore: new MemoryBindingStore(),
-    target: {
-      cwd: root,
-      resourceGroup: "rg",
-      deploymentName: "preview",
-      stackName: "workload",
-      templateFile: "main.bicep",
-      denySettingsMode: "denyDelete",
-    },
-  });
-  const preview = await provider.previewApply(request());
-  assert.equal(created, false);
-  assert.equal((await provider.apply(preview, approval(preview), authority)).state, "succeeded");
-  assert.equal(created, true);
-  assert.equal((await provider.inventory("project", "run")).resources.length, 1);
-  const listCommands = runner.requests.filter((entry) => entry.args[2] === "list");
-  assert.ok(listCommands.length >= 3);
-  assert.equal(
-    listCommands.some((entry) => entry.args.includes("--name")),
-    false,
-  );
-});
-
-test("native Bicep lifecycle binds fallback preview inputs/state and exact stack commands", async (context) => {
-  const root = await mkdtemp(join(tmpdir(), "apex-native-bicep-"));
-  context.after(async () => rm(root, { recursive: true, force: true }));
-  await writeFile(join(root, "main.bicep"), "targetScope = 'resourceGroup'\n");
-  await writeFile(join(root, "main.bicepparam"), "using './main.bicep'\n");
-  const runner = new FakeRunner((process) => {
-    if (process.args.includes("what-if")) {
-      return JSON.stringify({ properties: { changes: [{ resourceId: "/resource", changeType: "Create" }] } });
-    }
-    if (process.args[2] === "list") {
-      return JSON.stringify([stack("workload", "rg", [{ id: "/resource", name: "resource", type: "Example/type" }])]);
-    }
-    return JSON.stringify({ id: "/stack/workload" });
-  });
-  let current = authority;
+  const project = await writeAzdProject(root, undefined, options.azureYaml);
+  const state = createFakeAzd(options.state);
+  const runner = new FakeRunner(async (process) => (await handleFakeAzd(state, process)) ?? "");
   const bindings = new MemoryBindingStore();
-  const options = {
-    runner,
-    currentAuthority: async () => current,
-    now: () => clock.value,
-    nextId: () => "operation",
-    bindingStore: bindings,
-    target: {
-      cwd: root,
-      resourceGroup: "rg",
-      deploymentName: "preview",
-      stackName: "workload",
-      templateFile: "main.bicep",
-      parametersFile: "main.bicepparam",
-      actionOnUnmanage: "deleteResources",
-      ownershipAuthorizesDeleteResources: true,
-      denySettingsMode: "denyWriteAndDelete",
-    },
-  } as const;
-  const provider = new NativeBicepProvider(options);
-  const applyPreview = await provider.previewApply(request());
-  const restarted = new NativeBicepProvider(options);
-  const applyOperation = await restarted.apply(applyPreview, approval(applyPreview), authority);
-  assert.deepEqual(restarted.executionEvidence(applyOperation.operationId), {
-    mode: "native",
-    operationId: applyOperation.operationId,
-    previewHash: applyPreview.previewHash,
-    validatorIds: ["deploy:bicep-stack-ownership"],
-  });
-  assert.equal(
-    runner.requests.some((entry) => entry.args[2] === "create"),
-    true,
-  );
-  assert.equal(runner.requests.flatMap((entry) => entry.args).includes("--bypass-stack-out-of-sync-error"), false);
-  const previewCommand = runner.requests.find((entry) => entry.args.includes("what-if"))!;
-  const applyCommand = runner.requests.find((entry) => entry.args[2] === "create")!;
-  for (const flag of ["--resource-group", "--template-file", "--parameters"]) {
-    assert.equal(
-      applyCommand.args[applyCommand.args.indexOf(flag) + 1],
-      previewCommand.args[previewCommand.args.indexOf(flag) + 1],
+  const build = (target: Partial<ConstructorParameters<typeof AzdBicepProvider>[0]["target"]> = {}) =>
+    new AzdBicepProvider({
+      runner,
+      currentAuthority: async () => authority,
+      now: () => clock.value,
+      nextId: () => "operation",
+      bindingStore: bindings,
+      target: {
+        projectRoot: root,
+        environmentName: AZD_ENVIRONMENT,
+        tenantId: AZD_TENANT,
+        location: "swedencentral",
+        azdVersion: "azdVersion" in options ? options.azdVersion : AZD_VERSION,
+        ...target,
+      },
+    });
+  const preview = (overrides: Partial<PreviewRequest> = {}) =>
+    request({
+      target: AZD_SCOPE,
+      resources: managed(STORAGE, BLOB),
+      generatedSource: { rootPath: root, treeHash: project.treeHash },
+      ...overrides,
+    });
+  const executions = () =>
+    runner.requests.filter(
+      (entry) => entry.executable === "azd" && entry.args[0] !== "version" && !entry.args.includes("--preview"),
     );
-  }
-  assert.equal(applyCommand.args[applyCommand.args.indexOf("--name") + 1], "workload");
-  assert.equal(applyCommand.args[applyCommand.args.indexOf("--action-on-unmanage") + 1], "deleteResources");
-  assert.equal(applyCommand.args[applyCommand.args.indexOf("--deny-settings-mode") + 1], "denyWriteAndDelete");
-  assert.equal((await provider.inventory("project", "run")).resources.length, 1);
+  return { root, state, runner, bindings, build, preview, executions, provider: build() };
+}
 
-  const destroyPreview = await provider.previewDestroy(request());
-  await provider.destroy(destroyPreview, approval(destroyPreview), authority);
-  const deleteRequest = runner.requests.find((entry) => entry.args[2] === "delete");
-  assert.deepEqual(deleteRequest?.args.slice(0, 7), [
-    "stack",
-    "group",
-    "delete",
-    "--resource-group",
-    "rg",
-    "--name",
-    "workload",
-  ]);
-
-  const stalePreview = await provider.previewApply(request());
-  current = { ...authority, ownerEpoch: 4 };
-  await assert.rejects(
-    provider.apply(stalePreview, approval(stalePreview), authority),
-    (error) => error instanceof IacProviderError && error.code === "PREVIEW_OWNER_EPOCH_MISMATCH",
+test("azd preview normalization resolves azd's type and name to accepted resource IDs and blocks the rest", () => {
+  const accepted = managed(STORAGE, BLOB);
+  const diagnostic = `${STORAGE_ID}/providers/Microsoft.Insights/diagnosticSettings/logs`;
+  const preview = normalizeAzdPreview(
+    azdPreviewStdout([
+      { Operation: "Create", Type: STORAGE.type, Name: STORAGE.name },
+      { Operation: "Modify", Type: BLOB.type, Name: BLOB.name.toUpperCase() },
+      { Operation: "NoChange", Type: "Microsoft.Network/virtualNetworks", Name: "elsewhere" },
+      { Operation: "Ignore", Type: "Microsoft.Insights/diagnosticSettings", Name: "logs" },
+    ]),
+    [...accepted, { resourceId: diagnostic }],
   );
-
-  current = authority;
-
-  const superseded = await provider.previewApply(request({ runId: "superseded" }));
-  await provider.previewApply(
-    request({ runId: "superseded", commit: "e".repeat(64), dependencyRevision: "e".repeat(64) }),
+  assert.deepEqual(
+    preview.changes.map(({ resourceId: id, action }) => [id, action]),
+    [
+      [STORAGE_ID, "create"],
+      [BLOB_ID, "update"],
+      ["azd-unresolved:Microsoft.Network/virtualNetworks/elsewhere", "no-op"],
+      [diagnostic, "no-op"],
+    ],
   );
-  const supersededRestart = new NativeBicepProvider(options);
-  await assert.rejects(
-    supersededRestart.apply(superseded, approval(superseded), authority),
-    (error) => error instanceof IacProviderError && error.code === "PREVIEW_SUPERSEDED",
+  assert.deepEqual(preview.blockers, []);
+
+  const hostile = normalizeAzdPreview(
+    azdPreviewStdout([
+      { Operation: "Create", Type: "Microsoft.Network/virtualNetworks", Name: "foreign" },
+      { Operation: "Unsupported", Type: STORAGE.type, Name: STORAGE.name },
+      { Operation: "Create", Type: STORAGE.type, Name: STORAGE.name },
+      { Operation: "Delete", Type: STORAGE.type, Name: STORAGE.name },
+    ]),
+    accepted,
   );
-  const mutationPreview = await provider.previewApply(request({ runId: "mutated" }));
-  await writeFile(join(root, "main.bicep"), "targetScope = 'subscription'\n");
-  await assert.rejects(
-    restarted.apply(mutationPreview, approval(mutationPreview), authority),
-    (error) => error instanceof IacProviderError && error.code === "PREVIEW_HASH_MISMATCH",
+  assert.match(hostile.blockers.join("\n"), /does not resolve to exactly one accepted resource/);
+  assert.match(hostile.blockers.join("\n"), /unsupported or unevaluated change 'Unsupported'/);
+  assert.match(hostile.blockers.join("\n"), /duplicate material resource/);
+  const ambiguous = normalizeAzdPreview(
+    azdPreviewStdout([{ Operation: "Delete", Type: STORAGE.type, Name: STORAGE.name }]),
+    [...accepted, ...accepted],
+  );
+  assert.match(ambiguous.blockers.join("\n"), /does not resolve to exactly one/);
+});
+
+test("azd preview normalization reads only the single preview event and fails closed otherwise", () => {
+  assert.deepEqual(normalizeAzdPreview(azdPreviewStdout([]), []), { changes: [], blockers: [] });
+  assert.deepEqual(normalizeAzdPreview(`warning text\n${azdPreviewStdout([])}\n\n`, []).changes, []);
+  const event = (data: unknown) => JSON.stringify({ type: "consoleMessage", timestamp: "t", data });
+  for (const stdout of [
+    "",
+    "Previewing Azure resource changes\nCreate Microsoft.Storage/storageAccounts stlab",
+    event({ message: "no preview here" }),
+    `${event([])}\n${event(null)}`,
+    JSON.stringify({ type: "consoleMessage", data: "text" }),
+  ])
+    assert.throws(() => normalizeAzdPreview(stdout, []), IacOutputParseError, stdout);
+  const malformed = normalizeAzdPreview(event([{ Operation: "Create" }, null, "x"]), []);
+  assert.equal(malformed.blockers.filter((blocker) => /malformed/.test(blocker)).length, 3);
+});
+
+test("azd owned-state normalizers accept only the tagged environment and the approved group", () => {
+  assert.deepEqual(
+    normalizeAzdTaggedGroups(
+      JSON.stringify([
+        { name: "b", tags: { "azd-env-name": "dev" } },
+        { name: "a", tags: { "azd-env-name": "dev" } },
+        { name: "c", tags: { "azd-env-name": "prod" } },
+        { name: "d", tags: null },
+      ]),
+      "dev",
+    ),
+    { taggedGroups: ["a", "b"] },
+  );
+  assert.throws(() => normalizeAzdTaggedGroups("{}", "dev"), IacOutputParseError);
+  assert.throws(() => normalizeAzdTaggedGroups("[{}]", "dev"), /malformed/);
+  const listed = normalizeAzdGroupResources(
+    JSON.stringify([{ id: STORAGE_ID, type: STORAGE.type, name: "stlab", location: "swedencentral" }]),
+    AZD_SCOPE,
+  );
+  assert.equal(listed[0]!.resourceId, STORAGE_ID);
+  assert.throws(
+    () =>
+      normalizeAzdGroupResources(
+        JSON.stringify([{ id: resourceId(STORAGE.type, "x", "other"), type: STORAGE.type }]),
+        AZD_SCOPE,
+      ),
+    /outside the approved resource group/,
+  );
+  assert.throws(
+    () =>
+      normalizeAzdGroupResources(
+        JSON.stringify([
+          { id: STORAGE_ID, type: "t" },
+          { id: STORAGE_ID.toUpperCase(), type: "t" },
+        ]),
+        AZD_SCOPE,
+      ),
+    /outside the approved resource group/,
   );
 });
 
-test("Bicep fallback blocks unrepresented managed resources and enforces safe action defaults", async (context) => {
-  const root = await mkdtemp(join(tmpdir(), "apex-native-bicep-safety-"));
-  context.after(async () => rm(root, { recursive: true, force: true }));
-  await writeFile(join(root, "main.bicep"), "targetScope = 'resourceGroup'\n");
-  const runner = new FakeRunner((process) =>
-    process.args.includes("what-if")
-      ? JSON.stringify({ changes: [{ resourceId: "/represented", changeType: "Modify" }] })
-      : JSON.stringify([stack("workload", "rg", [{ id: "/removed", name: "removed", type: "Example/type" }])]),
+test("azd provisions only after approval of the exact preview and records its own execution evidence", async (context) => {
+  const fixture = await azdFixture(context, {
+    state: {
+      preview: [
+        { Operation: "Create", Type: STORAGE.type, Name: STORAGE.name },
+        { Operation: "Create", Type: BLOB.type, Name: BLOB.name },
+      ],
+    },
+  });
+  const preview = await fixture.provider.previewApply(fixture.preview());
+  assert.deepEqual(preview.blockers, []);
+  assert.deepEqual(preview.changes, [
+    { resourceId: STORAGE_ID, action: "create", material: true, details: "azd operation: Create" },
+    { resourceId: BLOB_ID, action: "create", material: true, details: "azd operation: Create" },
+  ]);
+  assert.equal(fixture.executions().length, 0);
+  const previewCommand = fixture.runner.requests.find((entry) => entry.args.includes("--preview"))!;
+  assert.deepEqual(previewCommand.args, [
+    "provision",
+    "--preview",
+    "--no-state",
+    "--environment",
+    AZD_ENVIRONMENT,
+    "--cwd",
+    fixture.root,
+    "--no-prompt",
+    "--output",
+    "json",
+  ]);
+  assert.equal(previewCommand.cwd, fixture.root);
+  const restarted = fixture.build();
+  const record = await restarted.apply(preview, approval(preview), authority);
+  assert.equal(record.state, "succeeded");
+  assert.deepEqual(restarted.executionEvidence(record.operationId)?.validatorIds, ["deploy:bicep-azd-execution"]);
+  const [execution, ...others] = fixture.executions();
+  assert.deepEqual(execution!.args, [
+    "provision",
+    "--no-state",
+    "--environment",
+    AZD_ENVIRONMENT,
+    "--cwd",
+    fixture.root,
+    "--no-prompt",
+  ]);
+  assert.equal(others.length, 0);
+  fixture.state.resources = [
+    { id: STORAGE_ID, type: STORAGE.type, name: "stlab", location: "swedencentral" },
+    { id: BLOB_ID, type: BLOB.type, name: "default", unlisted: true },
+  ];
+  const inventory = await restarted.inventory("project", "run");
+  assert.deepEqual(
+    inventory.resources.map(({ resourceId: id, type }) => [id, type]),
+    [
+      [STORAGE_ID, STORAGE.type],
+      [BLOB_ID, BLOB.type],
+    ],
   );
-  const base = {
-    runner,
-    currentAuthority: async () => authority,
-    now: () => clock.value,
-    target: {
-      cwd: root,
-      resourceGroup: "rg",
-      deploymentName: "preview",
-      stackName: "workload",
-      templateFile: "main.bicep",
-      denySettingsMode: "none" as const,
+  // A planned child Azure does not return stays out of the inventory so the coverage check can report it.
+  fixture.state.resources.pop();
+  assert.deepEqual(
+    (await restarted.inventory("project", "run")).resources.map(({ resourceId: id }) => id),
+    [STORAGE_ID],
+  );
+  for (const entry of fixture.runner.requests) {
+    assert.ok(["azd", "az", "bicep"].includes(entry.executable));
+    assert.ok(
+      !entry.args.some((argument) => ["up", "deploy", "--purge", "stack", "what-if", "create"].includes(argument)),
+    );
+    if (entry.executable === "az") assert.ok(["account", "group", "resource"].includes(entry.args[0]!));
+    if (entry.executable === "az" && entry.args[0] === "resource") assert.ok(["list", "show"].includes(entry.args[1]!));
+  }
+  assert.equal(
+    await readFile(join(fixture.root, ".azure", AZD_ENVIRONMENT, ".env"), "utf8"),
+    `AZURE_ENV_NAME="dev"\nAZURE_LOCATION="swedencentral"\nAZURE_RESOURCE_GROUP="rg"\nAZURE_SUBSCRIPTION_ID="${AZD_SUBSCRIPTION}"\nAZURE_TENANT_ID="${AZD_TENANT}"\n`,
+  );
+});
+
+test("azd apply is refused when anything bound at preview time has changed", async (context) => {
+  const cases: Record<string, (fixture: Awaited<ReturnType<typeof azdFixture>>) => Promise<void>> = {
+    "Bicep source": (fixture) => writeFile(join(fixture.root, "infra", "main.bicep"), "targetScope = 'subscription'\n"),
+    "azure.yaml": (fixture) => writeFile(join(fixture.root, "azure.yaml"), "name: other\ninfra:\n  provider: bicep\n"),
+    parameters: (fixture) => writeFile(join(fixture.root, "infra", "main.parameters.json"), "{}"),
+    "added hook": (fixture) =>
+      writeFile(
+        join(fixture.root, "azure.yaml"),
+        "name: project\ninfra:\n  provider: bicep\n  path: infra\n  module: main\nhooks:\n  postprovision:\n    shell: sh\n    run: echo hi\n",
+      ),
+    "environment value": (fixture) =>
+      writeFile(
+        join(fixture.root, ".azure", AZD_ENVIRONMENT, ".env"),
+        `AZURE_ENV_NAME="dev"\nAZURE_LOCATION="swedencentral"\nAZURE_RESOURCE_GROUP="rg"\nAZURE_SUBSCRIPTION_ID="${AZD_SUBSCRIPTION}"\nAZURE_TENANT_ID="${AZD_TENANT}"\nAZURE_PRINCIPAL_ID="added"\n`,
+      ),
+    "azd environment config": (fixture) =>
+      writeFile(join(fixture.root, ".azure", AZD_ENVIRONMENT, "config.json"), "{}"),
+    "resource group tagging": async (fixture) => {
+      fixture.state.groups = [];
+    },
+    "owned resources": async (fixture) => {
+      fixture.state.resources = [{ id: STORAGE_ID, type: STORAGE.type, name: "stlab" }];
     },
   };
-  const provider = new NativeBicepProvider(base);
-  const preview = await provider.previewApply(request());
-  assert.match(preview.blockers.join("\n"), /cannot prove action-on-unmanage.*\/removed/);
-  assert.throws(
-    () => new NativeBicepProvider({ ...base, target: { ...base.target, actionOnUnmanage: "deleteResources" } }),
-    /ownership authorization/,
+  for (const [name, change] of Object.entries(cases)) {
+    await context.test(name, async (child) => {
+      const fixture = await azdFixture(child);
+      const preview = await fixture.provider.previewApply(fixture.preview());
+      assert.deepEqual(preview.blockers, []);
+      await change(fixture);
+      await assert.rejects(
+        fixture.provider.apply(preview, approval(preview), authority),
+        (error) =>
+          error instanceof IacProviderError
+            ? error.code === "PREVIEW_HASH_MISMATCH"
+            : error instanceof AzdBindingError && error.code !== undefined,
+        name,
+      );
+      assert.equal(fixture.executions().length, 0);
+    });
+  }
+});
+
+test("azd stops before any run when azd is missing, unpinned, a different version or the identity differs", async (context) => {
+  const cases: [string, Partial<FakeAzdState>, Parameters<typeof azdFixture>[1], string][] = [
+    ["azd missing", { version: undefined }, {}, "AZD_NOT_FOUND"],
+    ["newer azd", { version: "azd version 1.36.0 (commit abc)" }, {}, "AZD_VERSION_MISMATCH"],
+    ["older azd", { version: "azd version 1.30.0" }, {}, "AZD_VERSION_MISMATCH"],
+    ["pre-release azd", { version: "azd version 1.35.1-beta.1" }, {}, "AZD_VERSION_UNAVAILABLE"],
+    ["unreadable azd", { version: "garbage" }, {}, "AZD_VERSION_UNAVAILABLE"],
+    ["bundle without pin", {}, { azdVersion: undefined }, "AZD_PIN_UNAVAILABLE"],
+    [
+      "wrong tenant",
+      {
+        account: {
+          environmentName: "AzureCloud",
+          tenantId: "99999999-9999-9999-9999-999999999999",
+          id: AZD_SUBSCRIPTION,
+        },
+      },
+      {},
+      "AZD_IDENTITY_MISMATCH",
+    ],
+    [
+      "wrong CLI subscription",
+      { account: { environmentName: "AzureCloud", tenantId: AZD_TENANT, id: "99999999-9999-9999-9999-999999999999" } },
+      {},
+      "AZD_IDENTITY_MISMATCH",
+    ],
+    [
+      "wrong cloud",
+      { account: { environmentName: "AzureUSGovernment", tenantId: AZD_TENANT, id: AZD_SUBSCRIPTION } },
+      {},
+      "AZD_IDENTITY_MISMATCH",
+    ],
+  ];
+  for (const [name, state, options, code] of cases) {
+    await context.test(name, async (child) => {
+      const fixture = await azdFixture(child, { ...options, state });
+      for (const operation of ["previewApply", "previewDestroy"] as const)
+        await assert.rejects(
+          fixture.provider[operation](fixture.preview()),
+          (error) => error instanceof AzdBindingError && error.code === code,
+        );
+      assert.equal(fixture.runner.requests.filter((entry) => entry.args.includes("--preview")).length, 0);
+      assert.equal(fixture.executions().length, 0);
+    });
+  }
+});
+
+test("azd apply re-checks the azd version and identity right before running", async (context) => {
+  const fixture = await azdFixture(context);
+  const preview = await fixture.provider.previewApply(fixture.preview());
+  fixture.state.version = "azd version 1.36.0";
+  await assert.rejects(
+    fixture.provider.apply(preview, approval(preview), authority),
+    (error) => error instanceof AzdBindingError && error.code === "AZD_VERSION_MISMATCH",
   );
-  assert.throws(
-    () => new NativeBicepProvider({ ...base, target: { ...base.target, actionOnUnmanage: "deleteAll" } }),
-    /dedicated sandbox/,
+  fixture.state.version = `azd version ${AZD_VERSION}`;
+  fixture.state.account = {
+    environmentName: "AzureCloud",
+    tenantId: AZD_TENANT,
+    id: "99999999-9999-9999-9999-999999999999",
+  };
+  await assert.rejects(
+    fixture.provider.apply(preview, approval(preview), authority),
+    (error) => error instanceof AzdBindingError && error.code === "AZD_IDENTITY_MISMATCH",
   );
+  assert.equal(fixture.executions().length, 0);
+  fixture.state.account = { environmentName: "AzureCloud", tenantId: AZD_TENANT, id: AZD_SUBSCRIPTION };
+  assert.equal((await fixture.provider.apply(preview, approval(preview), authority)).state, "succeeded");
+});
+
+test("azd fails closed for layered projects, non-group scopes, untagged groups and shared environments", async (context) => {
+  const layered = await azdFixture(context, {
+    azureYaml:
+      "name: project\ninfra:\n  layers:\n    - name: network\n      path: infra/network\n    - name: app\n      path: infra/app\n      dependsOn: [network]\n",
+  });
+  await mkdir(join(layered.root, "infra", "network"), { recursive: true });
+  await mkdir(join(layered.root, "infra", "app"), { recursive: true });
+  for (const layer of ["network", "app"])
+    await writeFile(join(layered.root, "infra", layer, "bicepconfig.json"), BICEP_CONFIG);
+  await writeFile(join(layered.root, "infra", "network", "main.bicep"), "targetScope = 'resourceGroup'\n");
+  await writeFile(join(layered.root, "infra", "app", "main.bicep"), "targetScope = 'resourceGroup'\n");
+  await assert.rejects(
+    layered.provider.previewApply({ ...layered.preview(), generatedSource: undefined as never }),
+    (error) => error instanceof AzdBindingError && /AZD_LAYER_UNSUPPORTED|layer/.test(`${error.code} ${error.message}`),
+  );
+
+  const plain = await azdFixture(context);
+  await assert.rejects(
+    plain.provider.previewApply(plain.preview({ target: `/subscriptions/${AZD_SUBSCRIPTION}` })),
+    (error) => error instanceof AzdBindingError && error.code === "AZD_PROJECT_UNSUPPORTED",
+  );
+
+  for (const [name, groups, expected] of [
+    ["untagged", [{ name: AZD_GROUP, tags: {} }], /not tagged azd-env-name=dev/],
+    ["other environment", [{ name: AZD_GROUP, tags: { "azd-env-name": "prod" } }], /not tagged azd-env-name=dev/],
+    [
+      "shared environment",
+      [
+        { name: AZD_GROUP, tags: { "azd-env-name": "dev" } },
+        { name: "rg-other", tags: { "azd-env-name": "dev" } },
+      ],
+      /Other resource groups carry azd-env-name=dev: rg-other/,
+    ],
+  ] as const) {
+    for (const operation of ["previewApply", "previewDestroy"] as const) {
+      const fixture = await azdFixture(context, { state: { groups: [...groups] } });
+      const preview = await fixture.provider[operation](fixture.preview());
+      assert.match(preview.blockers.join("\n"), expected, `${name} ${operation}`);
+      await assert.rejects(
+        fixture.provider[operation === "previewApply" ? "apply" : "destroy"](preview, approval(preview), authority),
+        { code: "PREVIEW_BLOCKED" },
+      );
+      assert.equal(fixture.executions().length, 0);
+    }
+  }
+});
+
+test("azd destroy previews every resource in the owned group, binds that list and never purges", async (context) => {
+  const fixture = await azdFixture(context, {
+    state: {
+      resources: [
+        { id: STORAGE_ID, type: STORAGE.type, name: "stlab", location: "swedencentral" },
+        {
+          id: resourceId("Microsoft.Network/virtualNetworks", "foreign"),
+          type: "Microsoft.Network/virtualNetworks",
+          name: "foreign",
+        },
+      ],
+    },
+  });
+  const preview = await fixture.provider.previewDestroy(fixture.preview());
+  assert.equal(preview.operation, "destroy");
+  assert.deepEqual(preview.blockers, []);
+  assert.deepEqual(
+    preview.changes.map(({ resourceId: id, action, material }) => [id.split("/").at(-1), action, material]),
+    [
+      ["foreign", "delete", true],
+      ["stlab", "delete", true],
+    ],
+  );
+  assert.equal(fixture.executions().length, 0);
+  assert.match(fixture.provider.approvalMaterial(preview.previewHash)!.warnings.join("\n"), /without --purge/);
+
+  fixture.state.resources.push({
+    id: resourceId("Microsoft.KeyVault/vaults", "kv"),
+    type: "Microsoft.KeyVault/vaults",
+    name: "kv",
+  });
+  await assert.rejects(fixture.provider.destroy(preview, approval(preview), authority), {
+    code: "PREVIEW_HASH_MISMATCH",
+  });
+  assert.equal(fixture.executions().length, 0);
+  fixture.state.resources.pop();
+  await assert.rejects(fixture.provider.apply(preview, approval(preview), authority), {
+    code: "PREVIEW_HASH_MISMATCH",
+  });
+  assert.equal(fixture.executions().length, 0);
+
+  const record = await fixture.provider.destroy(preview, approval(preview), authority);
+  assert.equal(record.operation, "destroy");
+  const [execution] = fixture.executions();
+  assert.deepEqual(execution!.args, [
+    "down",
+    "--force",
+    "--environment",
+    AZD_ENVIRONMENT,
+    "--cwd",
+    fixture.root,
+    "--no-prompt",
+  ]);
+  assert.equal(fixture.executions().length, 1);
+  fixture.state.groupMissing = true;
+  assert.deepEqual((await fixture.provider.inventory("project", "run")).resources, []);
+});
+
+test("azd preview reuse across operations, stale approvals and superseded previews are rejected", async (context) => {
+  const fixture = await azdFixture(context);
+  const apply = await fixture.provider.previewApply(fixture.preview());
+  const destroy = await fixture.provider.previewDestroy(fixture.preview());
+  await assert.rejects(fixture.provider.destroy(apply, approval(apply), authority), { code: "PREVIEW_HASH_MISMATCH" });
+  await assert.rejects(fixture.provider.apply(destroy, approval(destroy), authority), {
+    code: "PREVIEW_HASH_MISMATCH",
+  });
+  await assert.rejects(fixture.provider.apply(apply, approval(destroy), authority), { code: "APPROVAL_HASH_MISMATCH" });
+  await assert.rejects(fixture.provider.apply(apply, { ...approval(apply), decision: "rejected" }, authority), {
+    code: "APPROVAL_REJECTED",
+  });
+  await assert.rejects(
+    fixture.provider.apply(apply, approval(apply), { ...authority, ownerEpoch: authority.ownerEpoch + 1 }),
+    { code: "PREVIEW_OWNER_EPOCH_MISMATCH" },
+  );
+  await assert.rejects(
+    fixture.provider.apply(apply, approval(apply), { ...authority, recipientIdentity: "other@example.com" }),
+    { code: "PREVIEW_OWNER_EPOCH_MISMATCH" },
+  );
+  const newer = await fixture.provider.previewApply(fixture.preview({ ttlMs: 120_000 }));
+  await assert.rejects(fixture.provider.apply(apply, approval(apply), authority), { code: "PREVIEW_SUPERSEDED" });
+  const saved = clock.value;
+  try {
+    clock.value = new Date(saved.getTime() + 121_000);
+    await assert.rejects(fixture.provider.apply(newer, approval(newer), authority), { code: "PREVIEW_EXPIRED" });
+  } finally {
+    clock.value = saved;
+  }
+  assert.equal(fixture.executions().length, 0);
+  assert.equal((await fixture.provider.apply(newer, approval(newer), authority)).state, "succeeded");
+});
+
+test("azd previews list hooks and extensions for approval and bind the unchanged azure.yaml", async (context) => {
+  const fixture = await azdFixture(context, {
+    azureYaml:
+      "name: project\ninfra:\n  provider: bicep\n  path: infra\n  module: main\nhooks:\n  postprovision:\n    shell: sh\n    run: echo hi\n",
+  });
+  const preview = await fixture.provider.previewApply(fixture.preview({ generatedSource: undefined as never }));
+  const material = fixture.provider.approvalMaterial(preview.previewHash)!;
+  assert.ok(material.warnings.includes(AZD_HOOKS_EXTENSIONS_WARNING));
+  assert.ok(material.inventory.some((line) => line.startsWith("hook project postprovision")));
+  assert.equal(fixture.provider.approvalMaterial("0".repeat(64)), undefined);
+});
+
+test("azd never overwrites an existing environment file and refuses one that redirects the target", async (context) => {
+  const fixture = await azdFixture(context);
+  await mkdir(join(fixture.root, ".azure", AZD_ENVIRONMENT), { recursive: true });
+  await writeFile(
+    join(fixture.root, ".azure", AZD_ENVIRONMENT, ".env"),
+    `AZURE_ENV_NAME="dev"\nAZURE_LOCATION="westeurope"\nAZURE_SUBSCRIPTION_ID="${AZD_SUBSCRIPTION}"\n`,
+  );
+  await assert.rejects(
+    fixture.provider.previewApply(fixture.preview()),
+    (error) => error instanceof AzdBindingError && error.code === "AZD_ENV_TARGET_MISMATCH",
+  );
+  assert.match(await readFile(join(fixture.root, ".azure", AZD_ENVIRONMENT, ".env"), "utf8"), /westeurope/);
+  assert.equal(fixture.runner.requests.filter((entry) => entry.args.includes("--preview")).length, 0);
+});
+
+test("azd inputs changed while azd previews invalidate the preview", async (context) => {
+  const fixture = await azdFixture(context);
+  fixture.state.duringPreview = async () => {
+    await writeFile(join(fixture.root, "infra", "main.bicep"), "targetScope = 'subscription'\n");
+  };
+  await assert.rejects(fixture.provider.previewApply(fixture.preview({ generatedSource: undefined as never })), {
+    code: "PREVIEW_HASH_MISMATCH",
+  });
 });
 
 test("native Terraform encrypts immediately and restores exact-plan binding after restart", async (context) => {
