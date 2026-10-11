@@ -291,6 +291,39 @@ test("rejects an unpinned or missing Copilot CLI plugin install smoke after reba
   );
 });
 
+test("keeps the required ci job independent and gates only the Windows lane on the docs-only scope", () => {
+  const ciPath = ".github/workflows/ci.yml";
+  for (const [search, replacement, expected] of [
+    [
+      "  ci:\n    name: ci\n    runs-on: ubuntu-latest\n",
+      "  ci:\n    name: ci\n    needs: scope\n    runs-on: ubuntu-latest\n",
+      "required ci job must not depend on or be conditional on another job",
+    ],
+    [
+      "  ci:\n    name: ci\n    runs-on: ubuntu-latest\n",
+      "  ci:\n    name: ci\n    if: needs.scope.outputs.docs_only != 'true'\n    runs-on: ubuntu-latest\n",
+      "required ci job must not depend on or be conditional on another job",
+    ],
+    [
+      "    needs: scope\n    if: needs.scope.outputs.docs_only != 'true'\n    runs-on: windows-2025",
+      "    runs-on: windows-2025",
+      "unless the scope job reports a docs-only change",
+    ],
+    [
+      "    if: needs.scope.outputs.docs_only != 'true'\n    runs-on: windows-2025",
+      "    if: always()\n    runs-on: windows-2025",
+      "unless the scope job reports a docs-only change",
+    ],
+  ]) {
+    const texts = mutate(ciPath, search, replacement);
+    const errors = validate(texts, rebaseline(ciPath, texts));
+    assert.ok(
+      errors.some((error) => error.includes(expected)),
+      `expected ${expected} for ${search.trim().slice(0, 40)}`,
+    );
+  }
+});
+
 test("rejects Windows package-test lane weakening after rebaselining", () => {
   const ciPath = ".github/workflows/ci.yml";
   for (const [search, replacement, expected] of [
