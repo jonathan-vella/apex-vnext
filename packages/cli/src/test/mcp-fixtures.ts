@@ -92,7 +92,7 @@ export const capability = {
   requiredWorkflows: ["requirements"],
   action: "Install the pack",
 };
-export const status = { run, head: hash, events: 1, task: "requirements", blockers: [] };
+export const status = { run, head: hash, events: 1, task: "requirements", blockers: [], satisfiedGates: [1] };
 export const doctorCheck = { id: "node", ok: true, value: "24", remedy: "Install Node" };
 export const doctorReport = { healthy: true, checks: [doctorCheck], remedies: [], nextAction: "No action required" };
 export const doctor = {

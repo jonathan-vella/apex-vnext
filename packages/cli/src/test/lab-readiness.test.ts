@@ -577,6 +577,31 @@ test("a genuine readiness record satisfies its gate and nothing else does", asyn
   assert.equal(await satisfied(retimed, 2), false);
 });
 
+test("status reports the gates the kernel accepts, and not a restored stale readiness record", async () => {
+  const { root, service, runId, run } = await readyFixture();
+  const oldGate3 = structuredClone(run.gates[2]!);
+  const before = await service.status();
+  // Gate 1 is a human approval; Gates 2 and 3 count only through their proven readiness records.
+  assert.deepEqual(before.satisfiedGates, [1, 2, 3]);
+
+  const candidate = { ...requirements(), budgetAndOperations: "Monthly limit is EUR 500" };
+  const proposal = await service.previewRequirementsChange(candidate, "Change budget");
+  await service.reviseRequirements(candidate, {
+    reason: "Change budget",
+    expectedHash: proposal.proposalHash,
+    confirm: true,
+  });
+  const invalidated = await service["currentRun"]();
+  assert.deepEqual((await service.status()).satisfiedGates, []);
+
+  // Restoring the old `ready` Gate 3 in run.json shows `ready` in the raw run, but the kernel does not accept it.
+  const restored = { ...invalidated, gates: invalidated.gates.map((gate) => (gate.gate === 3 ? oldGate3 : gate)) };
+  await writeFile(join(root, ".apex", "projects", "demo", "runs", runId, "run.json"), `${JSON.stringify(restored)}\n`);
+  const status = await new ApexService(root).status();
+  assert.equal(status.run.gates[2]!.state, "ready");
+  assert.equal(status.satisfiedGates.includes(3), false);
+});
+
 test("an old readiness record cannot be restored after the gate was invalidated", async () => {
   const { root, service, runId, run, satisfied } = await readyFixture();
   const oldGate2 = structuredClone(run.gates[1]!);

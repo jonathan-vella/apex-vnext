@@ -2836,6 +2836,7 @@ export class ApexService {
     events: number;
     task: string | null;
     blockers: string[];
+    satisfiedGates: number[];
   }> {
     const selection = await this.selection();
     const run = await this.run(selection, { readOnly: true });
@@ -2847,6 +2848,7 @@ export class ApexService {
       events: events.length,
       task: route.task?.id ?? null,
       blockers: route.blockers,
+      satisfiedGates: run.gates.flatMap((gate) => (this.gateSatisfied(run, gate.gate, events) ? [gate.gate] : [])),
     };
   }
 

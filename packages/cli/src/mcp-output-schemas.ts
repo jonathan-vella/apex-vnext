@@ -111,6 +111,7 @@ const status = object({
   events: count,
   task: Type.Union([NonEmptyStringSchema, Type.Null()]),
   blockers: strings,
+  satisfiedGates: Type.Array(Type.Integer({ minimum: 1, maximum: 4 }), { uniqueItems: true, maxItems: 4 }),
 });
 /** Maximum checks listed in a doctor MCP summary; the doctorChecks tool pages the complete list. */
 export const MCP_DOCTOR_CHECK_LIMIT = 32;

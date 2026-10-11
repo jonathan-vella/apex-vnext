@@ -316,6 +316,7 @@ test("oversize non-pageable results fail with a stable remediation error", async
       events: 1,
       task: null,
       blockers: ["x".repeat(MCP_MAX_SERIALIZED_RESULT_BYTES + 1)],
+      satisfiedGates: [],
     }),
   });
   const error = assertError(
