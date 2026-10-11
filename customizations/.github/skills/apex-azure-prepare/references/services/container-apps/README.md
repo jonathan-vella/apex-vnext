@@ -27,14 +27,14 @@ services:
       path: ./Dockerfile
 ```
 
-## Required Supporting Resources
+## Supporting Resources
 
-| Resource                   | Purpose             |
-| -------------------------- | ------------------- |
-| Container Apps Environment | Hosting environment |
-| Container Registry         | Image storage       |
-| Log Analytics Workspace    | Logging             |
-| Application Insights       | Monitoring          |
+| Resource                   | Purpose             | Needed when                                                  |
+| -------------------------- | ------------------- | ------------------------------------------------------------ |
+| Container Apps Environment | Hosting environment | Always                                                       |
+| Container Registry         | Image storage       | Apps run private images; public images need no registry      |
+| Log Analytics Workspace    | Logging             | Optional; add it when the design sends logs to a workspace   |
+| Application Insights       | Monitoring          | Optional; add it for application telemetry                   |
 
 ## Common Configurations
 

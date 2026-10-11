@@ -17,7 +17,7 @@ Guide](https://github.com/Azure/azure-sdk-for-python/blob/main/sdk/servicebus/az
 | Exception | Cause | Fix |
 |-----------|-------|-----|
 | `ServiceBusAuthenticationError` | Invalid credentials | Check connection string, regenerate SAS key |
-| `ServiceBusAuthorizationError` | Missing Send/Listen claim | Assign `Azure Service Bus Data Owner/Sender/Receiver` RBAC role |
+| `ServiceBusAuthorizationError` | Missing Send/Listen claim | Assign the narrowest matching `Azure Service Bus Data Sender` or `Data Receiver` RBAC role (`Data Owner` only to manage entities) |
 | `ServiceBusConnectionError` | Network or firewall | Check AMQP port 5671, try `TransportType.AmqpOverWebsocket` |
 | `OperationTimeoutError` | Service didn't respond in time | Adjust retry config, verify network |
 | `MessageLockLostError` | Processing exceeded lock duration | Use `AutoLockRenewer`, reduce processing time |

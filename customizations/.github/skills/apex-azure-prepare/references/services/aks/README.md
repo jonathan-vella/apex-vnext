@@ -32,14 +32,16 @@ services:
       deploymentPath: ./k8s
 ```
 
-## Required Supporting Resources
+## Supporting Resources
 
-| Resource                | Purpose                      |
-| ----------------------- | ---------------------------- |
-| Container Registry      | Image storage                |
-| Log Analytics Workspace | Monitoring                   |
-| Virtual Network         | Network isolation (optional) |
-| Key Vault               | Secrets management           |
+The cluster needs no other resource to exist. Add each integration only when the accepted design calls for it.
+
+| Resource                | Purpose                | Add when                                                           |
+| ----------------------- | ---------------------- | ------------------------------------------------------------------ |
+| Container Registry      | Image storage          | Workloads pull private images; grant the kubelet identity AcrPull  |
+| Log Analytics Workspace | Container Insights     | The design enables Container Insights or other Azure Monitor logs  |
+| Virtual Network         | Network isolation      | Custom networking or private cluster requirements                  |
+| Key Vault               | Secrets management     | Workloads read secrets through the Key Vault CSI provider add-on   |
 
 ## Node Pool Types
 

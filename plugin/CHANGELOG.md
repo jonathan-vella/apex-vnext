@@ -10,6 +10,12 @@ When you prepare a release, rename `## [Unreleased]` to the new version.
 
 ## [Unreleased]
 
+- Skill guidance corrections from the 0.11.0-next.4 marketplace review (Refs #384): Terraform verification no longer
+  builds `https://https://` URLs from the shipped `api_url` output; supporting-resource tables show optional
+  integrations (AKS, Logic Apps, Container Apps and others) as conditional instead of required; permission-denied
+  recipes diagnose the denied action and scope and recommend the narrowest role instead of Contributor; the Learn CLI
+  fallback requires Node.js 22 or later. There is no runtime change.
+
 ## [0.11.0-next.4] - 2026-10-11
 
 This fix release corrects agent and skill guidance findings from the 0.11.0-next.3 marketplace review: wrong CLI command

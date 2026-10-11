@@ -31,8 +31,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `infra/main.bicep`, `infra/bicepconfig.json`). The `executable:azd` doctor check is again a failing prerequisite.
   Bicep live runs, including the live qualification handoff, are unavailable until CP-30 qualifies the executor, and
   `azd deploy` application packages (PR C) are not available. The identity preflight verifies the Azure CLI identity
-  (azd keeps its own credential store), and the accepted residual limits are recorded in DECISION-037. >>>>>>>
-  40d1a712 (docs: keep the azd executor entry under Unreleased)
+  (azd keeps its own credential store), and the accepted residual limits are recorded in DECISION-037.
+- Skill guidance corrections from the 0.11.0-next.4 marketplace review (Refs #384): Terraform and azd Terraform service
+  URL outputs now carry `https://` and the Terraform verify recipe uses `api_url` as the complete base URL instead of
+  building `https://https://`; AKS, Logic Apps, Container Apps, App Service, Functions, Foundry, SQL Database and
+  Storage references list optional integrations (Container Registry, Log Analytics, Key Vault, API Connections,
+  Application Insights) with the condition that needs them instead of calling them required; `AuthorizationFailed`
+  and permission-denied recipes and the Service Bus and Event Hubs troubleshooting steps diagnose the denied action and
+  scope and recommend the narrowest role instead of Contributor or Data Owner; the Learn CLI fallback states the
+  Node.js 22 floor that `@microsoft/learn-cli` declares. There is no runtime change.
 
 ## [0.11.0-next.4] — Preview
 

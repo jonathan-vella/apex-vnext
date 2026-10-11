@@ -13,7 +13,7 @@
 | Subscription not found | `az account list`                      |
 | Deployment failed      | `az deployment operation sub list --name <name> --query "[?properties.provisioningState=='Failed']"` |
 | Template error         | `az deployment sub validate`           |
-| Permission denied      | Verify RBAC roles                      |
+| Permission denied      | Read the denied action and scope, then verify the narrowest role that grants it |
 | Quota exceeded         | Request increase or change region      |
 
 ## Cleanup (DESTRUCTIVE)

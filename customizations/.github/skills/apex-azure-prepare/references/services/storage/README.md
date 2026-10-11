@@ -16,13 +16,13 @@ Scalable cloud storage for blobs, files, queues, and tables.
 - Table storage (NoSQL key-value)
 - Static website hosting
 
-## Required Supporting Resources
+## Supporting Resources
 
-| Resource         | Purpose                   |
-| ---------------- | ------------------------- |
-| None required    | Storage is self-contained |
-| Key Vault        | Store connection strings  |
-| Private Endpoint | Secure access (optional)  |
+| Resource         | Purpose                   | Needed when                                                       |
+| ---------------- | ------------------------- | ----------------------------------------------------------------- |
+| None required    | Storage is self-contained | Always                                                            |
+| Key Vault        | Store secrets             | Optional; only for secrets that cannot use managed identity auth  |
+| Private Endpoint | Secure access             | Optional; required when public network access is disabled         |
 
 ## SKU Selection
 

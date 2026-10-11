@@ -11,7 +11,10 @@ Use it when no qualified documentation capability (the Microsoft Learn MCP tools
 
 ## Prerequisites
 
-- Node.js 18 or later.
+- Node.js 22 or later. Every published `@microsoft/learn-cli` release (checked against `0.1.0` through `1.0.0`) declares
+  `engines.node >=22`, so Node 18 to 21 cannot run it. Recheck the `engines` field of the version you pin with
+  `npm view @microsoft/learn-cli@<version> engines`; the APEX CLI itself needs Node.js 24.21.0 or later, which also
+  satisfies this floor.
 - Outbound HTTPS to `learn.microsoft.com`.
 - The user allows `npx` to download `@microsoft/learn-cli` (published from
   [microsoftdocs/mcp](https://github.com/microsoftdocs/mcp)) on first use. Pin the version the user reviewed, for

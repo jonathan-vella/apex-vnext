@@ -42,6 +42,8 @@ resource aks 'Microsoft.ContainerService/managedClusters@2026-05-01' = {
 
 ## ACR Pull Role Assignment
 
+Optional: use only when the cluster pulls private images from an Azure Container Registry.
+
 ```bicep
 resource acrPullRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(aks.id, containerRegistry.id, 'acrpull')

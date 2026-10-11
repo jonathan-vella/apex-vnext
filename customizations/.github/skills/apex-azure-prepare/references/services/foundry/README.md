@@ -29,14 +29,14 @@ services:
     project: ./src/ai-service
 ```
 
-## Required Supporting Resources
+## Supporting Resources
 
-| Resource                 | Purpose                              |
-| ------------------------ | ------------------------------------ |
-| Azure AI Foundry account | Model hosting                        |
-| Model deployment         | Specific model (GPT-4o, GPT-4, etc.) |
-| Key Vault                | Store API keys securely              |
-| Application Insights     | Monitor usage and costs              |
+| Resource                 | Purpose                              | Needed when                                                      |
+| ------------------------ | ------------------------------------ | ---------------------------------------------------------------- |
+| Azure AI Foundry account | Model hosting                        | Always                                                           |
+| Model deployment         | Specific model (GPT-4o, GPT-4, etc.) | Always                                                           |
+| Key Vault                | Store secrets                        | Optional; only for secrets that cannot use managed identity auth |
+| Application Insights     | Monitor usage and costs              | Optional; add it for usage telemetry                             |
 
 ## Model Selection
 

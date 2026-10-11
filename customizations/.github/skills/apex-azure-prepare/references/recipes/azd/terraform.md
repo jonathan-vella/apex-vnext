@@ -161,15 +161,16 @@ output "AZURE_RESOURCE_GROUP" {
 
 # Service-specific outputs
 output "API_URL" {
-  value = azurerm_container_app.api.latest_revision_fqdn
+  value = "https://${azurerm_container_app.api.latest_revision_fqdn}"
 }
 
 output "WEB_URL" {
-  value = azurerm_static_web_app.web.default_host_name
+  value = "https://${azurerm_static_web_app.web.default_host_name}"
 }
 ```
 
-> 💡 **Tip:** Output names in UPPERCASE are automatically set as azd environment variables.
+> 💡 **Tip:** Output names in UPPERCASE are automatically set as azd environment variables. Service URL outputs
+> include `https://` so consumers use them as the complete base URL.
 
 ### 5. Required Tags for azd
 

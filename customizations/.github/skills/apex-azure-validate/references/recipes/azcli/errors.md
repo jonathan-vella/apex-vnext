@@ -11,7 +11,7 @@
 | `AADSTS700082: Token expired` | `az login`                   |
 | `Please run 'az login'`       | `az login`                   |
 | `AADSTS50076: MFA required`   | `az login --use-device-code` |
-| `AuthorizationFailed`         | Request Contributor role     |
+| `AuthorizationFailed`         | Read the denied action and scope in the error, then request the narrowest role that grants that action; see [least-privilege role selection](../../../../apex-azure-rbac/references/least-privilege-selection.md) |
 | `Template validation failed`  | Check Bicep syntax           |
 
 ## Debug
