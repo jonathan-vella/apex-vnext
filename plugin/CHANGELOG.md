@@ -10,6 +10,12 @@ When you prepare a release, rename `## [Unreleased]` to the new version.
 
 ## [Unreleased]
 
+## [0.11.0-next.3] - 2026-10-11
+
+Adds the purpose-bound lab approval flow guidance (Gate 1 intent confirmation and Gate 4 final preview approval;
+production is not available) and re-ported Azure design, IaC and operations skills. azd does not execute anything in
+this release.
+
 - Operations skills re-ported at the pinned upstream commit (CP-18/CP-21): full recipe/CLI/azd/SDK and service
   references, migration scenarios/runtime examples and inline Mermaid syntax. Script/workflow sources are
   non-executable references. Native-provider authority, task/evidence boundaries, the current runtime's Gate 4 and the

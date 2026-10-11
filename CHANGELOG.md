@@ -12,6 +12,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0-next.3] — Preview
+
+This preview adds the purpose-bound lab approval flow and re-ports the Azure design, IaC and operations skills. A run now
+carries a typed `purpose`. For `lab` runs, Gates 2 and 3 are kernel readiness checkpoints; the human confirms intent at
+Gate 1 and approves the final preview at Gate 4. `production` is refused until later work, so production deployment is
+not available. It also adds the offline azd binding foundation. azd does not execute anything yet: Bicep still deploys
+through the native `az deployment` path. Windows and client live qualification are still pending. CI changes are
+internal.
+
 ### Changed
 
 - `status` now returns `satisfiedGates`, the gate numbers the kernel accepts (approved, inherited, or a lab readiness
