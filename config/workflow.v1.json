@@ -513,11 +513,7 @@
         "owner-epoch"
       ],
       "outputs": ["operation-record-v1"],
-      "validators": [
-        "deploy:exact-approved-operation",
-        "deploy:bicep-stack-ownership",
-        "deploy:stale-writer-rejection"
-      ],
+      "validators": ["deploy:exact-approved-operation", "deploy:bicep-azd-execution", "deploy:stale-writer-rejection"],
       "invalidates": ["inventory", "diagnosis", "quality"]
     },
     {

@@ -334,6 +334,9 @@ function assertTrack(binding: IacBindingV1, expected: IacBindingV1["track"]): vo
   if (binding.track !== expected) throw new TypeError(`Binding track '${binding.track}' is not '${expected}'`);
 }
 
+/** Location of the generated Bicep entry point inside the generated azd project. */
+export const AZD_GENERATED_TEMPLATE = "infra/main.bicep";
+
 export function generateBicepTree(
   intent: ImplementationIntentV1,
   binding: IacBindingV1,
@@ -402,15 +405,21 @@ export function generateBicepTree(
     ["targetScope = 'resourceGroup'", descriptions, blocks.join("\n\n")]
       .filter((part) => part.length > 0)
       .join("\n\n") + "\n";
+  // The generated tree is an azd project: azd, the only Bicep executor, compiles `infra/main.bicep` itself. It declares
+  // no hooks, extensions, layers or services.
   return virtualTree(
     [
-      { path: "main.bicep", content },
       {
-        path: "bicepconfig.json",
+        path: "azure.yaml",
+        content: `name: ${intent.projectId}\ninfra:\n  provider: bicep\n  path: infra\n  module: main\n`,
+      },
+      { path: AZD_GENERATED_TEMPLATE, content },
+      {
+        path: "infra/bicepconfig.json",
         content: `${JSON.stringify({ experimentalFeaturesEnabled: { symbolicNameCodegen: true } }, null, 2)}\n`,
       },
     ],
-    manifest(intent, binding, contexts, "main.bicep", existing),
+    manifest(intent, binding, contexts, AZD_GENERATED_TEMPLATE, existing),
   );
 }
 
@@ -577,7 +586,7 @@ export function compareLogicalParity(
 
 function validationPlans(tree: GeneratedVirtualTree, cwd: string): CommandPlan[] {
   const paths = new Set(tree.files.map(({ path }) => path));
-  if (paths.has("main.bicep")) return [{ executable: "bicep", args: ["build", "main.bicep"], cwd }];
+  if (paths.has(AZD_GENERATED_TEMPLATE)) return [{ executable: "bicep", args: ["build", AZD_GENERATED_TEMPLATE], cwd }];
   if (paths.has("main.tf")) {
     return [
       { executable: "terraform", args: ["fmt", "-check"], cwd },

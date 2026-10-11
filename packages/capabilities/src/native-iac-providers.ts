@@ -14,10 +14,13 @@ import {
   hasValidNativeValidationReceipt,
   PolicyPropertyMapV1Schema,
   LogicalResourceManifestV1Schema,
+  EnvironmentSchema,
   IacBindingV1Schema,
 } from "@apexops/contracts";
 import type {
   ApprovalEvidenceV1,
+  AzdBindingV1,
+  AzdExecutionEnvelopeV1,
   DeploymentPreviewV1,
   ExecutionPlanAttestationV1,
   NativeValidationReceiptV1,
@@ -26,13 +29,18 @@ import type {
   PolicyValidationV1,
   ResourceInventoryV1,
 } from "@apexops/contracts";
+import { AzureCliReadAdapter, TerraformCommandAdapter, type CommandPlan } from "./command-plans.js";
 import {
-  BicepCommandAdapter,
-  TerraformCommandAdapter,
-  type BicepStackTarget,
-  type CommandPlan,
-  type ResolvedBicepStackTarget,
-} from "./command-plans.js";
+  assertAzdBindingUnchanged,
+  describeAzdBinding,
+  inspectAzdBicepProject,
+  type AzdApprovalMaterial,
+  type AzdBindingRequest,
+} from "./azd-binding.js";
+import { assertAzdIdentityMatchesBinding, buildAzdArguments } from "./azd-execution-envelope.js";
+import { evaluateAzdPrerequisite } from "./azd-prerequisites.js";
+import { AzdBindingError } from "./azd-project-files.js";
+import { AZD_GENERATED_TEMPLATE as BICEP_TEMPLATE } from "./iac-generation.js";
 import {
   authorizeDeploymentPreview,
   IacProviderError,
@@ -44,13 +52,15 @@ import {
   type PreviewRequest,
 } from "./iac.js";
 import {
-  normalizeAzureStackResources,
-  normalizeAzureWhatIf,
+  normalizeAzdGroupResources,
+  normalizeAzdPreview,
+  normalizeAzdTaggedGroups,
   normalizeTerraformPlan,
   parseJsonProcessOutput,
-  selectAzureDeploymentStack,
+  type AzdOwnedResource,
+  type NormalizedPreview,
 } from "./iac-normalizers.js";
-import type { ProcessRunnerLike } from "./process-runner.js";
+import { ProcessRunnerError, type ProcessRunnerLike } from "./process-runner.js";
 import { secretFreeProperties } from "./secret-redaction.js";
 import { LocalEncryptedPlanTransport, type LocalEncryptedPlan } from "./local-plan-transport.js";
 import {
@@ -88,8 +98,21 @@ export interface EncryptedPlanArtifactStore {
 
 export type PersistedPreviewBinding = BicepPreviewBinding | TerraformPreviewBinding;
 
-export interface NativeBicepProviderOptions extends NativeProviderRuntime {
-  readonly target: BicepStackTarget;
+/** The approved azd project and environment the Bicep executor runs; the Azure target comes from the run's scope. */
+export interface AzdBicepTarget {
+  /** Absolute azd project root; it must be the accepted generated source root. */
+  readonly projectRoot: string;
+  readonly environmentName: string;
+  /** The approved tenant; the identity preflight requires the signed-in tenant to equal it. */
+  readonly tenantId: string;
+  readonly location: string;
+  readonly cloud?: AzdExecutionEnvelopeV1["identityPreflight"]["cloud"];
+  /** Exact azd release bundled with APEX; undefined when the bundle carries none, which fails every run. */
+  readonly azdVersion: string | undefined;
+}
+
+export interface AzdBicepProviderOptions extends NativeProviderRuntime {
+  readonly target: AzdBicepTarget;
 }
 
 export interface TerraformNativeTarget {
@@ -132,9 +155,10 @@ export interface BicepPreviewBinding extends NativePolicyBinding {
   readonly kind: "bicep";
   readonly preview: DeploymentPreviewV1;
   readonly providerBindingHash: string;
-  readonly templateHash: string;
-  readonly parametersHash: string;
-  readonly stackStateHash: string;
+  /** Everything azd recompiles or reads when it runs, bound at preview time. */
+  readonly azdBinding: AzdBindingV1;
+  /** Digest of the azd environment's resource group tagging and resources at preview time. */
+  readonly ownedStateHash: string;
 }
 
 export interface TerraformPreviewBinding extends NativePolicyBinding {
@@ -203,6 +227,8 @@ async function readGeneratedSource(
       if (depth > 64) throw sourceBindingError();
       const handle = await opendir(directory);
       for await (const entry of handle) {
+        // azd keeps the environment under `.azure`; it is inspected by the azd binding and is never generated source.
+        if (depth === 0 && entry.name === ".azure") continue;
         if (++entries > 4096) throw sourceBindingError();
         const filePath = resolve(directory, entry.name);
         if (pathEscapes(rootPath, filePath) || pathEscapes(rootRealPath, await realpath(filePath))) {
@@ -276,7 +302,10 @@ async function bindGeneratedSource(
   if (request.generatedSource === undefined) return undefined;
   const source = await readGeneratedSource({ ...request.generatedSource }, accepted, outputs);
   if (resolve(cwd ?? process.cwd()) !== source.rootPath) throw sourceBindingError();
-  if (templateFile !== undefined && resolve(source.rootPath, templateFile) !== resolve(source.rootPath, "main.bicep")) {
+  if (
+    templateFile !== undefined &&
+    resolve(source.rootPath, templateFile) !== resolve(source.rootPath, BICEP_TEMPLATE)
+  ) {
     throw sourceBindingError();
   }
   for (const file of [templateFile, parametersFile]) {
@@ -314,6 +343,7 @@ abstract class NativeProviderBase {
       executable: plan.executable,
       args: plan.args,
       ...(plan.cwd === undefined ? {} : { cwd: plan.cwd }),
+      ...(plan.env === undefined ? {} : { env: { ...process.env, ...plan.env } }),
       timeoutMs: this.#timeoutMs,
       maxOutputBytes: this.#maxOutputBytes,
     });
@@ -711,7 +741,7 @@ abstract class NativeProviderBase {
     track: "bicep" | "terraform",
     operation: "apply" | "destroy",
     request: PreviewRequest,
-    normalized: ReturnType<typeof normalizeAzureWhatIf>,
+    normalized: NormalizedPreview,
     extra: Partial<Pick<DeploymentPreviewV1, "artifactHash" | "stateLineage" | "stateSerial">> = {},
   ): DeploymentPreviewV1 {
     const createdAt = this.now();
@@ -739,31 +769,42 @@ abstract class NativeProviderBase {
   }
 }
 
-export class NativeBicepProvider extends NativeProviderBase implements IacProvider {
-  readonly track = "bicep" as const;
-  readonly #target: ResolvedBicepStackTarget;
-  readonly #commands = new BicepCommandAdapter();
-  readonly #bindings = new Map<string, BicepPreviewBinding>();
+const AZD_GROUP_SCOPE =
+  /^\/subscriptions\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/resourceGroups\/([^/]+)$/iu;
+const AZD_PROCESS_ENV = { AZD_SKIP_UPDATE_CHECK: "true" } as const;
 
-  constructor(options: NativeBicepProviderOptions) {
+interface ApprovedAzdTarget {
+  readonly projectId: string;
+  readonly runId: string;
+  readonly subscriptionId: string;
+  readonly resourceGroup: string;
+  readonly scope: string;
+}
+
+interface AzdOwnedState {
+  readonly taggedGroups: readonly string[];
+  readonly resources: readonly AzdOwnedResource[];
+  readonly hash: string;
+}
+
+/**
+ * The only Bicep executor: azd previews with `azd provision --preview`, applies with `azd provision` and destroys with
+ * `azd down`, each bound to the azd binding, the pinned azd version and the approved Azure identity. Resources belong
+ * to the azd environment through the `azd-env-name` tag of the approved resource group, which is how azd itself finds
+ * them; `azd down` deletes that whole group, so the destroy preview lists everything in it.
+ */
+export class AzdBicepProvider extends NativeProviderBase implements IacProvider {
+  readonly track = "bicep" as const;
+  readonly #target: AzdBicepTarget;
+  readonly #reads = new AzureCliReadAdapter();
+  readonly #bindings = new Map<string, BicepPreviewBinding>();
+  readonly #targets = new Map<string, ApprovedAzdTarget>();
+
+  constructor(options: AzdBicepProviderOptions) {
     super(options);
-    const actionOnUnmanage = options.target.actionOnUnmanage ?? "detachAll";
-    this.#target = { ...options.target, actionOnUnmanage };
-    if (!(["deleteAll", "deleteResources", "detachAll"] as const).includes(this.#target.actionOnUnmanage)) {
-      throw new TypeError("Invalid Bicep stack action-on-unmanage");
-    }
-    if (!(["denyDelete", "denyWriteAndDelete", "none"] as const).includes(this.#target.denySettingsMode)) {
-      throw new TypeError("Invalid Bicep stack deny-settings-mode");
-    }
-    if (actionOnUnmanage === "deleteResources" && options.target.ownershipAuthorizesDeleteResources !== true) {
-      throw new TypeError("deleteResources requires an explicit ownership authorization");
-    }
-    if (
-      actionOnUnmanage === "deleteAll" &&
-      (options.target.dedicatedSandboxResourceGroup !== true || options.target.allowDeleteAll !== true)
-    ) {
-      throw new TypeError("deleteAll requires an explicitly authorized dedicated sandbox resource group");
-    }
+    if (!Value.Check(EnvironmentSchema, options.target.environmentName))
+      throw new AzdBindingError("AZD_BINDING_INPUT_INVALID", "The azd environment name is invalid");
+    this.#target = options.target;
   }
 
   async validate(): Promise<readonly string[]> {
@@ -772,7 +813,24 @@ export class NativeBicepProvider extends NativeProviderBase implements IacProvid
   }
 
   async validateSource(request: NativeValidationRequest): Promise<NativeValidationReceiptV1> {
-    return await this.validateBoundSource(request, this.track, () => this.#target.cwd, this.#target.templateFile);
+    return await this.validateBoundSource(request, this.track, () => this.#target.projectRoot, BICEP_TEMPLATE);
+  }
+
+  approvalMaterial(previewHash: string): AzdApprovalMaterial | undefined {
+    for (const binding of this.#bindings.values()) {
+      if (binding.preview.previewHash !== previewHash) continue;
+      const material = describeAzdBinding(binding.azdBinding);
+      return binding.preview.operation === "destroy"
+        ? {
+            ...material,
+            warnings: [
+              ...material.warnings,
+              "azd down deletes the entire approved resource group and everything in it, including child and extension resources that Azure does not list and so are not shown above. It runs without --purge, so soft-deleted resources such as Key Vaults are not purged and keep their names reserved.",
+            ],
+          }
+        : material;
+    }
+    return undefined;
   }
 
   async previewApply(request: PreviewRequest): Promise<DeploymentPreviewV1> {
@@ -784,29 +842,22 @@ export class NativeBicepProvider extends NativeProviderBase implements IacProvid
         throw new IacProviderError("PREVIEW_HASH_MISMATCH", "Bicep policy validation inputs are invalid");
       }
     }
-    const source = await bindGeneratedSource(
-      request,
-      this.#target.cwd,
-      this.#target.templateFile,
-      this.#target.parametersFile,
-    );
-    const policyInputs = request.policyValidation?.policyMap.mappings.length
-      ? await this.#inputHashes(source)
-      : undefined;
-    const [stdout, stackResources] = await Promise.all([
-      this.run(this.#commands.preview(this.#target)),
-      this.#currentStackResources(),
+    const target = this.#approvedTarget(request);
+    const source = await bindGeneratedSource(request, this.#target.projectRoot, BICEP_TEMPLATE);
+    const azdVersion = await this.#assertAzd();
+    await this.#ensureEnvironment(target);
+    const inspected = await this.#inspect(target, azdVersion);
+    await this.#assertIdentity(inspected);
+    const [stdout, owned] = await Promise.all([
+      this.run(this.#azdPlan("provision-preview", inspected)),
+      this.#ownedState(target),
     ]);
-    const normalized = normalizeAzureWhatIf(parseJsonProcessOutput("azure-what-if", stdout));
-    const previewIds = new Set(normalized.changes.map(({ resourceId }) => resourceId.toLowerCase()));
-    const unrepresented = stackResources.filter(({ resourceId }) => !previewIds.has(resourceId.toLowerCase()));
-    if (unrepresented.length > 0) {
-      normalized.blockers.push(
-        `Group what-if cannot prove action-on-unmanage behavior for current stack resources: ${unrepresented.map(({ resourceId }) => resourceId).join(", ")}`,
-      );
-    }
+    const normalized = normalizeAzdPreview(stdout, request.resources);
+    normalized.blockers.push(...this.#ownershipBlockers(target, owned));
+    await this.#assertInputsUnchanged(inspected, target, azdVersion);
+    if (source !== undefined) await readGeneratedSource(source, source);
     let policy: NativePolicyBinding = {};
-    if (policyInputs !== undefined) {
+    if (request.policyValidation?.policyMap.mappings.length) {
       let compiled = "";
       try {
         compiled = await this.#compiledTemplate();
@@ -815,29 +866,42 @@ export class NativeBicepProvider extends NativeProviderBase implements IacProvid
       }
       policy = this.evaluatePolicy(this.track, request, compiled, normalized.blockers);
     }
-    return await this.#bind(request, "apply", normalized, stackResources, policy, policyInputs, source);
+    return await this.#bind(request, "apply", target, normalized, inspected, owned, policy);
   }
 
   async previewDestroy(request: PreviewRequest): Promise<DeploymentPreviewV1> {
-    const source = await bindGeneratedSource(
-      request,
-      this.#target.cwd,
-      this.#target.templateFile,
-      this.#target.parametersFile,
-    );
-    const resources = await this.#currentStackResources();
-    return await this.#bind(
-      request,
-      "destroy",
-      {
-        changes: resources.map((resource) => ({ resourceId: resource.resourceId, action: "delete", material: true })),
-        blockers: [],
-      },
-      resources,
-      {},
-      undefined,
-      source,
-    );
+    const target = this.#approvedTarget(request);
+    const source = await bindGeneratedSource(request, this.#target.projectRoot, BICEP_TEMPLATE);
+    const azdVersion = await this.#assertAzd();
+    await this.#ensureEnvironment(target);
+    const inspected = await this.#inspect(target, azdVersion);
+    await this.#assertIdentity(inspected);
+    const listedState = await this.#ownedState(target);
+    // Accepted child resources that a group listing omits are shown too; unaccepted children of listed resources are
+    // deleted with them and cannot be enumerated, which the approval material states.
+    const owned: AzdOwnedState = {
+      ...listedState,
+      resources: [
+        ...listedState.resources,
+        ...(await this.#readUnlisted(
+          target,
+          listedState.resources,
+          request.resources.map(({ resourceId }) => resourceId),
+        )),
+      ],
+    };
+    const normalized: NormalizedPreview = {
+      changes: owned.resources.map(({ resourceId }) => ({
+        resourceId,
+        action: "delete" as const,
+        material: true,
+        details: "azd down deletes the whole resource group",
+      })),
+      blockers: this.#ownershipBlockers(target, owned),
+    };
+    await this.#assertInputsUnchanged(inspected, target, azdVersion);
+    if (source !== undefined) await readGeneratedSource(source, source);
+    return await this.#bind(request, "destroy", target, normalized, inspected, owned);
   }
 
   async apply(
@@ -857,36 +921,255 @@ export class NativeBicepProvider extends NativeProviderBase implements IacProvid
   }
 
   async inventory(projectId: string, runId: string): Promise<ResourceInventoryV1> {
-    const resources = await this.#currentStackResources();
+    const target = this.#targets.get(`${projectId}\u0000${runId}`);
+    if (target === undefined)
+      throw new IacProviderError("PREVIEW_HASH_MISMATCH", "No approved azd target is known for this run");
+    const owned = await this.#ownedState(target);
+    if (owned.resources.length > 0 && !this.#isTagged(target, owned))
+      throw new IacProviderError(
+        "PREVIEW_BLOCKED",
+        "The approved resource group is not tagged for the azd environment, so ownership cannot be proven",
+      );
+    const resources = [...owned.resources, ...(await this.#unlistedPlannedResources(target, owned.resources))];
     return {
       schemaVersion: "1.0.0",
       projectId,
       runId,
       deploymentHash: sha256(resources),
       collectedAt: this.now().toISOString(),
-      resources: [...resources],
+      resources: resources.map((resource) => ({ ...resource, properties: { ...resource.properties } })),
     };
+  }
+
+  /**
+   * A group listing omits child and extension resources, so the given IDs the listing lacks are read one by one.
+   * Anything Azure does not return is left out, which the inventory coverage check then reports.
+   */
+  async #readUnlisted(
+    target: ApprovedAzdTarget,
+    listed: readonly AzdOwnedResource[],
+    resourceIds: readonly string[],
+  ): Promise<readonly AzdOwnedResource[]> {
+    const known = new Set(listed.map(({ resourceId }) => resourceId.toLowerCase()));
+    const found: AzdOwnedResource[] = [];
+    for (const resourceId of resourceIds) {
+      if (known.has(resourceId.toLowerCase())) continue;
+      known.add(resourceId.toLowerCase());
+      let stdout: string;
+      try {
+        stdout = await this.run(this.#reads.resourceById(resourceId));
+      } catch (error) {
+        if (error instanceof ProcessRunnerError && /NotFound|could not be found/iu.test(error.result?.stderr ?? ""))
+          continue;
+        throw error;
+      }
+      found.push(...normalizeAzdGroupResources(`[${stdout}]`, target.scope));
+    }
+    return found;
+  }
+
+  /** The material resources of the latest approved apply preview, which a group listing may omit. */
+  async #unlistedPlannedResources(
+    target: ApprovedAzdTarget,
+    listed: readonly AzdOwnedResource[],
+  ): Promise<readonly AzdOwnedResource[]> {
+    const key = `${target.projectId}\u0000${target.runId}\u0000apply`;
+    const latest =
+      this.#bindings.get(key) ?? (await this.bindingStore?.loadLatest?.(target.projectId, target.runId, "apply"));
+    if (latest?.kind !== "bicep") return [];
+    return await this.#readUnlisted(
+      target,
+      listed,
+      latest.preview.changes
+        .filter(({ material, action }) => material && action !== "delete" && action !== "no-op")
+        .map(({ resourceId }) => resourceId),
+    );
+  }
+
+  #approvedTarget(request: Pick<PreviewRequest, "projectId" | "runId" | "target">): ApprovedAzdTarget {
+    const match = AZD_GROUP_SCOPE.exec(request.target);
+    if (match === null)
+      throw new AzdBindingError(
+        "AZD_PROJECT_UNSUPPORTED",
+        "The azd executor requires an exact resource-group target scope",
+      );
+    const target: ApprovedAzdTarget = {
+      projectId: request.projectId,
+      runId: request.runId,
+      subscriptionId: match[1]!.toLowerCase(),
+      resourceGroup: match[2]!,
+      scope: request.target,
+    };
+    this.#targets.set(`${request.projectId}\u0000${request.runId}`, target);
+    return target;
+  }
+
+  #azdPlan(operation: "provision-preview" | "provision" | "down", binding: AzdBindingV1): CommandPlan {
+    return {
+      executable: "azd",
+      args: buildAzdArguments(binding.executionEnvelope, operation, this.#target.projectRoot),
+      cwd: this.#target.projectRoot,
+      env: AZD_PROCESS_ENV,
+    };
+  }
+
+  /** Fails closed unless the installed azd is exactly the pinned release. */
+  async #assertAzd(): Promise<string> {
+    let found = true;
+    let installedVersion: string | undefined;
+    try {
+      const stdout = await this.run({ executable: "azd", args: ["version"], env: AZD_PROCESS_ENV });
+      installedVersion = /\bazd version (\d+\.\d+\.\d+)(?:\s|$)/u.exec(stdout)?.[1];
+    } catch (error) {
+      if (error instanceof ProcessRunnerError && error.code === "PROCESS_SPAWN_ERROR") found = false;
+    }
+    const result = evaluateAzdPrerequisite({ pinnedVersion: this.#target.azdVersion, found, installedVersion });
+    if (!result.ok || installedVersion === undefined)
+      throw new AzdBindingError(
+        result.code ?? "AZD_VERSION_UNAVAILABLE",
+        `${result.value}. ${result.remedy ?? ""}`.trim(),
+      );
+    return installedVersion;
+  }
+
+  /** Creates the allowlisted, non-secret azd environment file when the project has none; an existing one is bound as is. */
+  async #ensureEnvironment(target: ApprovedAzdTarget): Promise<void> {
+    const azure = resolve(this.#target.projectRoot, ".azure");
+    const directory = resolve(azure, this.#target.environmentName);
+    const existing = await lstat(azure).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return undefined;
+      throw error;
+    });
+    if (existing !== undefined && (!existing.isDirectory() || existing.isSymbolicLink()))
+      throw new AzdBindingError("AZD_PATH_UNSAFE", "The azd environment directory is not a plain directory");
+    const lines = [
+      ["AZURE_ENV_NAME", this.#target.environmentName],
+      ["AZURE_LOCATION", this.#target.location.toLowerCase()],
+      ["AZURE_RESOURCE_GROUP", target.resourceGroup],
+      ["AZURE_SUBSCRIPTION_ID", target.subscriptionId],
+      ["AZURE_TENANT_ID", this.#target.tenantId.toLowerCase()],
+    ].map(([key, value]) => `${key}="${value}"\n`);
+    await mkdir(directory, { recursive: true, mode: 0o700 });
+    if (!(await lstat(directory)).isDirectory())
+      throw new AzdBindingError("AZD_PATH_UNSAFE", "The azd environment directory is not a plain directory");
+    try {
+      await writeFile(resolve(directory, ".env"), lines.join(""), { flag: "wx", mode: 0o600 });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+    }
+  }
+
+  #bindingRequest(target: ApprovedAzdTarget, azdVersion: string): AzdBindingRequest {
+    return {
+      ...(this.#target.cloud === undefined ? {} : { cloud: this.#target.cloud }),
+      projectId: target.projectId,
+      runId: target.runId,
+      projectRoot: this.#target.projectRoot,
+      environmentName: this.#target.environmentName,
+      azdVersion,
+      target: {
+        subscriptionId: target.subscriptionId,
+        location: this.#target.location,
+        tenantId: this.#target.tenantId,
+        resourceGroup: target.resourceGroup,
+      },
+    };
+  }
+
+  async #inspect(target: ApprovedAzdTarget, azdVersion: string): Promise<AzdBindingV1> {
+    const binding = await inspectAzdBicepProject(this.#bindingRequest(target, azdVersion));
+    if (binding.infra.layered)
+      throw new AzdBindingError(
+        "AZD_LAYER_UNSUPPORTED",
+        "azd previews one layer at a time, so a layered project cannot be previewed as a whole; use a single infrastructure root",
+      );
+    return binding;
+  }
+
+  async #assertInputsUnchanged(
+    accepted: AzdBindingV1,
+    target: ApprovedAzdTarget,
+    azdVersion: string,
+  ): Promise<AzdBindingV1> {
+    try {
+      return await assertAzdBindingUnchanged(accepted, this.#bindingRequest(target, azdVersion));
+    } catch (error) {
+      if (error instanceof AzdBindingError) throw new IacProviderError("PREVIEW_HASH_MISMATCH", error.message);
+      throw error;
+    }
+  }
+
+  /** The cloud, tenant and default subscription the Azure CLI reports must equal the approved target before any run. */
+  async #assertIdentity(binding: AzdBindingV1): Promise<void> {
+    let account: Record<string, unknown> = {};
+    try {
+      account = parseJsonProcessOutput("azure-read", await this.run(this.#reads.account())) as Record<string, unknown>;
+    } catch {
+      // An unreadable account is reported by the preflight as a missing value.
+    }
+    const text = (value: unknown): string | undefined => (typeof value === "string" ? value : undefined);
+    assertAzdIdentityMatchesBinding(
+      {
+        ...(text(account.environmentName) === undefined ? {} : { cloud: text(account.environmentName)! }),
+        ...(text(account.tenantId) === undefined ? {} : { tenantId: text(account.tenantId)! }),
+        ...(text(account.id) === undefined ? {} : { azureCliDefaultSubscriptionId: text(account.id)! }),
+      },
+      binding,
+    );
+  }
+
+  async #readOrMissing(plan: CommandPlan): Promise<string | undefined> {
+    try {
+      return await this.run(plan);
+    } catch (error) {
+      if (error instanceof ProcessRunnerError && /ResourceGroupNotFound/u.test(error.result?.stderr ?? error.message))
+        return undefined;
+      throw error;
+    }
+  }
+
+  async #ownedState(target: ApprovedAzdTarget): Promise<AzdOwnedState> {
+    const [groups, resources] = await Promise.all([
+      this.run(this.#reads.taggedResourceGroups(target.subscriptionId, this.#target.environmentName)),
+      this.#readOrMissing(this.#reads.resourceGroupResources(target.subscriptionId, target.resourceGroup)),
+    ]);
+    const { taggedGroups } = normalizeAzdTaggedGroups(groups, this.#target.environmentName);
+    const listed = resources === undefined ? [] : normalizeAzdGroupResources(resources, target.scope);
+    return {
+      taggedGroups,
+      resources: listed,
+      hash: sha256({ taggedGroups: taggedGroups.map((name) => name.toLowerCase()), resources: listed }),
+    };
+  }
+
+  #isTagged(target: ApprovedAzdTarget, owned: AzdOwnedState): boolean {
+    return owned.taggedGroups.some((name) => name.toLowerCase() === target.resourceGroup.toLowerCase());
+  }
+
+  #ownershipBlockers(target: ApprovedAzdTarget, owned: AzdOwnedState): string[] {
+    const blockers: string[] = [];
+    if (!this.#isTagged(target, owned))
+      blockers.push(
+        `The approved resource group is not tagged azd-env-name=${this.#target.environmentName}; azd finds an environment's resources through that tag`,
+      );
+    const others = owned.taggedGroups.filter((name) => name.toLowerCase() !== target.resourceGroup.toLowerCase());
+    if (others.length > 0)
+      blockers.push(
+        `Other resource groups carry azd-env-name=${this.#target.environmentName}: ${others.join(", ")}; the environment must own only the approved group`,
+      );
+    return blockers;
   }
 
   async #bind(
     request: PreviewRequest,
     operation: "apply" | "destroy",
-    normalized: ReturnType<typeof normalizeAzureWhatIf>,
-    stackResources: ReturnType<typeof normalizeAzureStackResources>,
+    target: ApprovedAzdTarget,
+    normalized: NormalizedPreview,
+    azdBinding: AzdBindingV1,
+    owned: AzdOwnedState,
     policy: NativePolicyBinding = {},
-    policyInputs?: { templateHash: string; parametersHash: string },
-    source?: GeneratedSourceSnapshot,
   ): Promise<DeploymentPreviewV1> {
-    if (source !== undefined) await readGeneratedSource(source, source);
-    const { templateHash, parametersHash } = await this.#inputHashes(source);
-    if (
-      policyInputs !== undefined &&
-      (policyInputs.templateHash !== templateHash || policyInputs.parametersHash !== parametersHash)
-    ) {
-      normalized.blockers.push("Bicep inputs changed during policy validation preview");
-    }
-    const stackStateHash = sha256(stackResources);
-    const providerBindingHash = this.#providerBindingHash(templateHash, parametersHash, stackStateHash, policy);
+    const providerBindingHash = this.#providerBindingHash(azdBinding.bindingHash, owned.hash, policy);
     const preview = this.createPreview(this.track, operation, request, normalized, {
       artifactHash: providerBindingHash,
     });
@@ -894,75 +1177,31 @@ export class NativeBicepProvider extends NativeProviderBase implements IacProvid
       kind: "bicep",
       preview,
       providerBindingHash,
-      templateHash,
-      parametersHash,
-      stackStateHash,
+      azdBinding,
+      ownedStateHash: owned.hash,
       ...policy,
     };
+    this.#targets.set(`${target.projectId}\u0000${target.runId}`, target);
     this.#bindings.set(this.previewKey(request, operation), binding);
     await this.bindingStore?.save(preview.previewHash, binding);
     this.rememberPolicy(preview, binding);
     return preview;
   }
 
-  #providerBindingHash(
-    templateHash: string,
-    parametersHash: string,
-    stackStateHash: string,
-    policy: NativePolicyBinding,
-  ): string {
+  #providerBindingHash(azdBindingHash: string, ownedStateHash: string, policy: NativePolicyBinding): string {
     return sha256({
-      resourceGroup: this.#target.resourceGroup,
-      stackName: this.#target.stackName,
-      actionOnUnmanage: this.#target.actionOnUnmanage,
-      denySettingsMode: this.#target.denySettingsMode,
-      templateHash,
-      parametersHash,
-      stackStateHash,
+      azdBindingHash,
+      ownedStateHash,
       ...(policy.policyValidationBinding === undefined ? {} : { policyValidation: policy.policyValidationBinding }),
     });
-  }
-
-  async #inputHashes(source?: GeneratedSourceSnapshot): Promise<{ templateHash: string; parametersHash: string }> {
-    const fileHash = async (file: string): Promise<string> => {
-      if (source === undefined) return await this.#rawFileHash(file);
-      const path = relative(source.rootPath, resolve(source.rootPath, file)).split(sep).join("/");
-      const hash = source.fileHashes.get(path);
-      if (hash === undefined) throw sourceBindingError();
-      return hash;
-    };
-    return {
-      templateHash: await fileHash(this.#target.templateFile),
-      parametersHash:
-        this.#target.parametersFile === undefined
-          ? createHash("sha256").update(Buffer.alloc(0)).digest("hex")
-          : await fileHash(this.#target.parametersFile),
-    };
   }
 
   async #compiledTemplate(): Promise<string> {
     return await this.run({
       executable: "bicep",
-      args: ["build", this.#target.templateFile, "--stdout"],
-      ...(this.#target.cwd === undefined ? {} : { cwd: this.#target.cwd }),
+      args: ["build", BICEP_TEMPLATE, "--stdout"],
+      cwd: this.#target.projectRoot,
     });
-  }
-
-  async #rawFileHash(path: string): Promise<string> {
-    const filePath = isAbsolute(path) ? path : resolve(this.#target.cwd ?? process.cwd(), path);
-    return createHash("sha256")
-      .update(await readFile(filePath))
-      .digest("hex");
-  }
-
-  async #currentStackResources(): Promise<readonly ReturnType<typeof normalizeAzureStackResources>[number][]> {
-    const stdout = await this.run(this.#commands.stackList(this.#target));
-    const selected = selectAzureDeploymentStack(
-      parseJsonProcessOutput("azure-stack", stdout),
-      this.#target.resourceGroup,
-      this.#target.stackName,
-    );
-    return selected === null ? [] : normalizeAzureStackResources(selected);
   }
 
   async #execute(
@@ -988,7 +1227,7 @@ export class NativeBicepProvider extends NativeProviderBase implements IacProvid
       latestBinding?.preview.previewHash ?? binding?.preview.previewHash,
     );
     if (binding === undefined || binding.preview.previewHash !== preview.previewHash) {
-      throw new IacProviderError("PREVIEW_HASH_MISMATCH", "No exact Bicep stack binding is available for this preview");
+      throw new IacProviderError("PREVIEW_HASH_MISMATCH", "No exact azd binding is available for this preview");
     }
     this.verifyPolicy(preview, binding);
     if (
@@ -999,30 +1238,46 @@ export class NativeBicepProvider extends NativeProviderBase implements IacProvid
     ) {
       throw new IacProviderError("PREVIEW_HASH_MISMATCH", "Bicep compiler output changed after policy validation");
     }
-    const { templateHash, parametersHash } = await this.#inputHashes();
-    const stackStateHash = sha256(await this.#currentStackResources());
+    const accepted = binding.azdBinding;
+    const environment = accepted.environment;
     if (
-      templateHash !== binding.templateHash ||
-      parametersHash !== binding.parametersHash ||
-      stackStateHash !== binding.stackStateHash ||
       preview.artifactHash !== binding.providerBindingHash ||
-      preview.artifactHash !== this.#providerBindingHash(templateHash, parametersHash, stackStateHash, binding)
+      preview.artifactHash !== this.#providerBindingHash(accepted.bindingHash, binding.ownedStateHash, binding) ||
+      accepted.projectId !== preview.projectId ||
+      accepted.runId !== preview.runId ||
+      environment.name !== this.#target.environmentName ||
+      environment.target.resourceGroup === undefined
     ) {
+      throw new IacProviderError("PREVIEW_HASH_MISMATCH", "The azd binding does not match the approved preview");
+    }
+    const target: ApprovedAzdTarget = {
+      projectId: preview.projectId,
+      runId: preview.runId,
+      subscriptionId: environment.target.subscriptionId,
+      resourceGroup: environment.target.resourceGroup,
+      scope: preview.target,
+    };
+    if (
+      `/subscriptions/${target.subscriptionId}/resourceGroups/${target.resourceGroup}`.toLowerCase() !==
+      preview.target.toLowerCase()
+    )
+      throw new IacProviderError("PREVIEW_HASH_MISMATCH", "The azd binding does not match the approved target");
+    const azdVersion = await this.#assertAzd();
+    if (azdVersion !== accepted.azdVersion)
+      throw new IacProviderError("PREVIEW_HASH_MISMATCH", "The installed azd is not the version bound at preview");
+    const current = await this.#assertInputsUnchanged(accepted, target, azdVersion);
+    await this.#assertIdentity(current);
+    const owned = await this.#ownedState(target);
+    if (owned.hash !== binding.ownedStateHash) {
       throw new IacProviderError(
         "PREVIEW_HASH_MISMATCH",
-        "Bicep stack inputs, configuration, or managed state changed after preview",
+        "The azd environment's resource group or resources changed after preview",
       );
     }
+    this.#targets.set(`${target.projectId}\u0000${target.runId}`, target);
     this.rememberPolicy(preview, binding);
-    const stdout = await this.run(
-      operation === "apply" ? this.#commands.stackApply(this.#target) : this.#commands.stackDestroy(this.#target),
-    );
-    let providerOperationId: string | undefined;
-    if (stdout.trim().length > 0) {
-      const result = parseJsonProcessOutput("azure-stack", stdout) as Record<string, unknown>;
-      providerOperationId = typeof result.id === "string" ? result.id : undefined;
-    }
-    return this.record(operation, preview, approval, authority, providerOperationId, ["deploy:bicep-stack-ownership"]);
+    await this.run(this.#azdPlan(operation === "apply" ? "provision" : "down", current));
+    return this.record(operation, preview, approval, authority, undefined, ["deploy:bicep-azd-execution"]);
   }
 }
 

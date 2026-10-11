@@ -117,7 +117,7 @@ function matchingKnownValues(planned: unknown, after: unknown, unknown: unknown)
 function resourcesFromJson(json: string, track: IacTool): readonly Resource[] {
   if (Buffer.byteLength(json, "utf8") > POLICY_VALIDATION_LIMITS.bytes)
     throw new TypeError("POLICY_VALIDATION_LIMIT_EXCEEDED");
-  const parsed = parseJsonProcessOutput(track === "bicep" ? "azure-what-if" : "terraform-plan", json);
+  const parsed = parseJsonProcessOutput(track === "bicep" ? "bicep-build" : "terraform-plan", json);
   assertPolicyValidationJson(parsed);
   const root = object(parsed);
   if (root === undefined) throw new Error("POLICY_VALIDATION_INVALID_SOURCE");

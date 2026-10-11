@@ -30,9 +30,11 @@ approvals are not kernel approval.
 
 ## Current Versus Planned Support
 
-Today's Bicep track uses `az deployment group|sub what-if` and bound `create`; Terraform uses a saved
-`terraform plan -out` and applies that exact saved plan. Only the kernel-created preview is approvable.
-An ad hoc what-if or local plan is an observation, not an authorization receipt. Current runtime gates and the
+Today's Bicep track runs only through azd: `azd provision --preview` (azd's what-if, a prediction against live Azure
+state rather than an immutable plan), `azd provision` to apply and `azd down` to destroy, each its own bound operation
+with its own preview and approval. Terraform uses a saved `terraform plan -out` and applies that exact saved plan. Only
+the kernel-created preview is approvable. An ad hoc what-if or local plan is an observation, not an authorization
+receipt. Current runtime gates and the
 existing qualification handoff stay enforced until their replacements are implemented and qualified.
 
 **Executor and production delivery is planned (DECISION-036, ADR-0007).** The lab gate flow (CP-27
@@ -40,13 +42,20 @@ existing qualification handoff stay enforced until their replacements are implem
 kernel-recorded Gate 2 and 3 readiness checkpoints and the final Gate 4 preview approval, with each apply or destroy
 needing its own preview and approval; `production` is blocked. Do not claim any of the following exists today:
 
-1. Executors (CP-26 [#443](https://github.com/jonathan-vella/apex-vnext/issues/443)): azd executes Bicep only, bound
-   to source, parameters and environment. Native Terraform CLI executes Terraform from an exact saved plan with normal
-   backend locking and unchanged dependencies. There is no azd Terraform adapter.
-2. Provisioning and application delivery are separate operations; a service-delivery preview binds the service list
-   and package digests. `azure.yaml` and workflow generation are static CodeGen output; `azd pipeline config` creates
-   Entra identities, federation, roles and GitHub variables, so it needs its own preview and approval and is not a
-   private user-run bypass.
+1. Executors (CP-26 [#443](https://github.com/jonathan-vella/apex-vnext/issues/443)): the azd Bicep executor is
+   implemented (azd is a hard prerequisite at the exact bundled version). It is bound to `azure.yaml`, the
+   infrastructure tree, parameters, the azd environment, the azd version and the Azure identity; hooks and extensions
+   are trusted (DECISION-037) and listed in the approval material. Resources belong to the azd environment through the
+   `azd-env-name` tag of the approved resource group, and `azd down` deletes that whole group without `--purge`. Bicep
+   live runs stay unavailable until CP-30
+   [#455](https://github.com/jonathan-vella/apex-vnext/issues/455) qualifies the executor. Native Terraform CLI
+   executes Terraform from an exact saved plan with normal backend locking and unchanged dependencies. There is no azd
+   Terraform adapter and no Deployment Stack support.
+2. Provisioning and application delivery are separate operations; `azd deploy` application packages are the next
+   CP-26 pull request and are not available. A service-delivery preview binds the service list and package digests.
+   `azure.yaml` and workflow generation are static CodeGen output; `azd pipeline config` creates Entra identities,
+   federation, roles and GitHub variables, so it needs its own preview and approval and is not a private user-run
+   bypass.
 3. Production (CP-28 [#457](https://github.com/jonathan-vella/apex-vnext/issues/457), setup CP-29
    [#458](https://github.com/jonathan-vella/apex-vnext/issues/458)): opt-in and CI-owned. GitHub Actions owns the
    execution run and preview, and the kernel verifies a candidate-bound human review receipt before apply. OIDC job

@@ -343,12 +343,9 @@ function assertTarget(values: ReadonlyMap<string, string>, request: AzdBindingRe
   const tenant = values.get("AZURE_TENANT_ID");
   if (tenant !== undefined && !sameText(tenant, request.target.tenantId)) redirect("AZURE_TENANT_ID");
   const group = values.get("AZURE_RESOURCE_GROUP");
-  // Without an approved resource group (subscription scope) azd records the group it created here as an output.
-  if (
-    request.target.resourceGroup !== undefined &&
-    group !== undefined &&
-    !sameText(group, request.target.resourceGroup)
-  )
+  // Without an approved resource group (subscription scope) azd records the group it created here as an output. With
+  // one, the environment must name it, or azd could derive and provision a different default group.
+  if (request.target.resourceGroup !== undefined && !sameText(group, request.target.resourceGroup))
     redirect("AZURE_RESOURCE_GROUP");
 }
 

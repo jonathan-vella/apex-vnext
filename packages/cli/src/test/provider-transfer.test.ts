@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { lstat, mkdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { test } from "./test-shard.js";
-import { BoundEnvelopeTransport, type BoundEnvelope } from "@apexops/capabilities";
+import { BoundEnvelopeTransport, nativePolicyValidationBinding, type BoundEnvelope } from "@apexops/capabilities";
+import { calculatePolicyValidationHash } from "@apexops/contracts";
 import { canonicalJsonBytes, sha256Bytes } from "@apexops/kernel";
 import { execute } from "../cli.js";
 import {
@@ -13,6 +14,7 @@ import {
   type ProviderTransferBundle,
   type ProviderTransferProvider,
 } from "../provider-transfer.js";
+import { azdBindingFixture } from "./azd-binding-fixture.js";
 import { tempRoot, writeJson } from "./helpers.js";
 
 const instant = new Date("2026-07-15T10:00:00.000Z");
@@ -62,9 +64,8 @@ function bicepBinding() {
     kind: "bicep",
     preview: preview("bicep"),
     providerBindingHash: hashes.provider,
-    templateHash: hashes.template,
-    parametersHash: hashes.parameters,
-    stackStateHash: hashes.stack,
+    azdBinding: azdBindingFixture(),
+    ownedStateHash: hashes.stack,
   };
 }
 
@@ -191,6 +192,45 @@ test("provider export is deterministic and selects only exact Bicep authority", 
   await exportProviderTransfer(fixture.root, fixture.output, options, { now: () => instant });
   assert.deepEqual(await readFile(fixture.output), first);
   assert(!first.includes(Buffer.alloc(32, 6)));
+});
+
+test("provider export accepts a policy-validated Bicep binding and rejects a tampered receipt", async () => {
+  const body = {
+    schemaVersion: "1.0.0" as const,
+    projectId: "demo",
+    runId: "run-1",
+    track: "bicep" as const,
+    sourceHash: hashes.iac,
+    policyMapHash: hashes.policy,
+    policyMapContentHash: "a".repeat(64),
+    logicalResourceManifestHash: "b".repeat(64),
+    inputHash: hashes.input,
+    outcome: "unsupported" as const,
+    results: [],
+  };
+  const policyValidation = { ...body, receiptHash: calculatePolicyValidationHash(body) };
+  const policyValidationBinding = nativePolicyValidationBinding(policyValidation);
+  const options = { previewHash: hashes.preview, provider: "bicep" as const, recipient: "ci-apply", ttlMs: 1_000 };
+  const write = async (root: string, extra: Record<string, unknown>) =>
+    writeJson(join(root, ".apex", "local", "provider-runtime", "bindings", `${hashes.preview}.json`), {
+      ...bicepBinding(),
+      ...extra,
+    });
+  const accepted = await source("bicep");
+  await write(accepted.root, { policyValidation, policyValidationBinding });
+  assert.equal(
+    (await createProviderTransferBundle(accepted.root, options, instant)).bindings.previewHash,
+    hashes.preview,
+  );
+  for (const extra of [
+    { policyValidation },
+    { policyValidationBinding },
+    { policyValidation: { ...policyValidation, sourceHash: "c".repeat(64) }, policyValidationBinding },
+  ]) {
+    const rejected = await source("bicep");
+    await write(rejected.root, extra);
+    await assert.rejects(createProviderTransferBundle(rejected.root, options, instant), /policy validation|shape/);
+  }
 });
 
 test("provider export selects the exact Terraform binding and encrypted artifact only", async () => {

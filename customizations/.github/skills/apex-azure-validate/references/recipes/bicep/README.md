@@ -44,6 +44,9 @@ az deployment group validate \
 
 ### 3. What-If Preview
 
+This ad hoc what-if is a read-only diagnostic, not the approvable preview. The kernel-created Bicep preview is
+`azd provision --preview`, run by APEX through azd, which is the only Bicep executor.
+
 ```bash
 az deployment sub what-if \
   --location <location> \

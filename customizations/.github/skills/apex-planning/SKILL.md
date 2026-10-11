@@ -29,7 +29,7 @@ Use this skill only when the kernel routes the active foreground `APEX` agent to
    secret reference includes its required kind, provider and reference shape, never a secret value.
 4. Keep implementation intent track-neutral. Define logical resources, controls, dependencies, identity, networking,
    diagnostics, outputs, rollback boundaries and environment obligations. Keep dependencies acyclic.
-5. Put modules, providers, API versions, parameters, variables, phases, backend and stack ownership in the selected
+5. Put modules, providers, API versions, parameters, variables, phases, backend and state ownership in the selected
    IaC binding. Bind only the selected task track and trace every binding obligation to intent and projected policy
    requirements.
 6. Pin every binding to an exact published stable version read with `web_fetch` only from the APEX agent's allow-listed

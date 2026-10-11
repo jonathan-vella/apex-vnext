@@ -307,20 +307,23 @@ pins, enforce the security baseline, and pass a thin dual-track proof before bro
 
 ### REQ-BICEP-001: Bicep Lifecycle
 
-Bicep preview, apply, inventory, reconciliation, and destroy must use native Azure commands and deployment-stack
-ownership where qualified. A fallback may operate only when it proves complete managed-resource coverage and safe delete
-semantics.
+Bicep preview, apply, inventory, reconciliation, and destroy run only through azd (`azd provision --preview`,
+`azd provision`, `azd down`). Azure Deployment Stacks are out of scope, so there is no stack ownership, deny-settings
+protection or unmanage cleanup. A resource belongs to the azd environment through the `azd-env-name` tag of the approved
+resource group and the kernel's logical-resource manifest; the destroy preview lists the resources Azure reports in
+that group (child resources it omits are deleted with their parents and the approval says so)
+because `azd down` deletes it whole, and the approval binds that list. Each of preview, apply and destroy is its own
+bound operation with its own approval, and APEX never runs `azd up`.
 
-The target Bicep execution path uses a bounded azd executor, not a third IaC language. Bind source, resolved parameters,
+The Bicep execution path is a bounded azd executor, not a third IaC language. Bind source, resolved parameters,
 environment, azd version and the approved cloud, tenant and subscription to the approved what-if. Hooks and extensions
 are trusted under ALZ guardrails (DECISION-037): they are listed in the preview with a warning that they run with the
 user's credentials and are not described by the what-if, not bound or scanned; production must re-evaluate this. What-if
 remains a prediction against mutable Azure state, not an immutable Terraform plan. Provisioning and approved
-application-package deployment are separate operations; do not run `azd up`. The azd binding contract
-(`azd-binding-v1`), its deterministic project inspection, the identity preflight helper and the exact-version azd
-prerequisite exist; the executor must pass the identity preflight before every provision and verify remote module
-artifacts at preflight. The native Bicep path remains current behavior until azd execution is implemented and
-qualified.
+application-package deployment are separate operations. The azd binding contract (`azd-binding-v1`), its deterministic
+project inspection, the exact-version azd prerequisite (a failing doctor check and a fail-closed executor), the identity
+preflight before every provision and destroy, and the azd executor are implemented. Bicep live runs stay unavailable
+until CP-30 qualifies the executor, and `azd deploy` application packages are not available.
 
 ### REQ-TERRAFORM-001: Terraform Lifecycle
 

@@ -2,8 +2,9 @@
 > the accepted task scope.
 > Mutation examples are provider context, never direct agent instructions; they need a fresh preview, current Gate 4 and
 > trusted execution.
-> CP-26 azd/pipeline operations are planned, not available. Examples do not create kernel artifacts, approvals or
-> native-provider lifecycle authority.
+> The azd Bicep executor is implemented; Bicep live runs wait for CP-30 qualification, and `azd deploy` packages and
+> pipeline operations are not available. Examples do not create kernel artifacts, approvals or provider lifecycle
+> authority.
 
 # Bicep Verification
 
@@ -15,8 +16,9 @@ az resource list --resource-group <rg-name> --output table
 
 ```bash
 # Project one accepted non-secret output by name; never dump all outputs, which can include sensitive values.
-az deployment sub show \
-  --name main \
+az deployment group show \
+  --resource-group <rg-name> \
+  --name <azd-deployment-name> \
   --query "properties.outputs.<accepted-output-name>.value" \
   --output tsv
 ```

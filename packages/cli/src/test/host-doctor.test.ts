@@ -309,31 +309,20 @@ async function iacDoctor(iac: "bicep" | "terraform", azd?: string) {
   return { report, calls: fixture.calls };
 }
 
-test("Bicep runs only warn about azd until the azd executor ships, and a missing azd keeps doctor healthy", async () => {
+test("Bicep runs require the exact pinned azd and name the remedy", async () => {
   const ready = await iacDoctor("bicep", `azd version ${AZD_PIN} (commit 0123456789abcdef)`);
   assert.deepEqual(
     [check(ready.report, "executable:azd").ok, check(ready.report, "executable:azd").value],
     [true, AZD_PIN],
   );
-  assert.equal(check(ready.report, "executable:azd").severity, undefined);
   assert.ok(ready.calls.some(([executable, ...args]) => executable === "azd" && args.join(" ") === "version"));
 
   const missing = await iacDoctor("bicep");
   const absent = check(missing.report, "executable:azd");
-  assert.equal(absent.ok, true);
-  assert.equal(absent.severity, "warning");
-  assert.match(absent.value, /^not found on PATH \(advisory: Bicep will require azd once the azd executor ships\)$/u);
-  assert.equal(absent.value.includes("Bicep runs require azd"), false);
-  assert.ok(absent.remedy?.startsWith("Not needed yet"));
+  assert.equal(absent.ok, false);
+  assert.match(absent.value, /Bicep runs require azd/u);
   assert.ok(absent.remedy?.includes(`azd ${AZD_PIN}`) && absent.remedy.includes("releases/tag/azure-dev-cli_"));
-  const failing = (report: { checks: { id: string; ok: boolean }[] }) =>
-    report.checks.filter(({ ok }) => !ok).map(({ id }) => id);
-  // Other checks (Azure sign-in, backend) are unmet in this fixture; the advisory azd check must not be one of them.
-  assert.equal(failing(missing.report).includes("executable:azd"), false);
-  assert.equal(
-    missing.report.remedies.some((remedy) => remedy.includes("Not needed yet")),
-    false,
-  );
+  assert.ok(missing.report.remedies.includes(absent.remedy!));
 
   const [major, minor, patch] = AZD_PIN.split(".").map(Number) as [number, number, number];
   for (const [version, direction] of [
@@ -342,16 +331,13 @@ test("Bicep runs only warn about azd until the azd executor ships, and a missing
     [`${major + 1}.0.0`, "newer"],
     [`${major}.${minor - 1}.${patch}`, "older"],
   ] as const) {
-    const report = (await iacDoctor("bicep", `azd version ${version}`)).report;
-    const mismatched = check(report, "executable:azd");
-    assert.equal(mismatched.severity, "warning", version);
-    assert.equal(failing(report).includes("executable:azd"), false, version);
+    const mismatched = check((await iacDoctor("bicep", `azd version ${version}`)).report, "executable:azd");
+    assert.equal(mismatched.ok, false, version);
     assert.match(mismatched.value, new RegExp(`${version} is ${direction} than the pinned ${AZD_PIN}`, "u"));
   }
   for (const output of ["azd version 1.35.1-beta.1", "azd version unknown"]) {
     const unreadable = check((await iacDoctor("bicep", output)).report, "executable:azd");
-    assert.equal(unreadable.severity, "warning");
-    assert.match(unreadable.value, /^version unavailable from azd version/u);
+    assert.deepEqual([unreadable.ok, unreadable.value], [false, "version unavailable from azd version"]);
   }
 });
 

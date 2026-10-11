@@ -2,8 +2,9 @@
 > the accepted task scope.
 > Mutation examples are provider context, never direct agent instructions; they need a fresh preview, current Gate 4 and
 > trusted execution.
-> CP-26 azd/pipeline operations are planned, not available. Examples do not create kernel artifacts, approvals or
-> native-provider lifecycle authority.
+> The azd Bicep executor is implemented; Bicep live runs wait for CP-30 qualification, and `azd deploy` packages and
+> pipeline operations are not available. Examples do not create kernel artifacts, approvals or provider lifecycle
+> authority.
 
 # Bicep Errors
 
@@ -13,17 +14,13 @@
 | Missing parameter | Add to parameters file                        |
 | Invalid property  | Check the accepted resource type schema       |
 | Resource conflict | Check existing resources                      |
-| Deployment failed | `az deployment operation sub list --name <name> --query "[?properties.provisioningState=='Failed']"` |
+| Deployment failed | `az deployment operation group list --resource-group <rg-name> --name <name> --query "[?properties.provisioningState=='Failed']"` |
 | Permission denied | Verify RBAC roles                             |
 
 ## Cleanup (DESTRUCTIVE)
 
-```bash
-# Changes remote state — context only; fresh preview + current Gate 4 + trusted execution required.
-az group delete --name <rg-name> --yes
-```
-
-⚠️ Permanently deletes ALL resources in the group.
+Destroy is its own operation through `azd down` (see the [deploy recipe](README.md)); never delete the group directly.
+It needs a fresh destroy preview and approval and permanently deletes ALL resources in the approved group.
 
 ## Port Source
 

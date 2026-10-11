@@ -349,9 +349,9 @@ local device with azd. Both keep the kernel's deployment authority, `REQ-APPROVA
   diagnostic `az` and `azd` commands may run directly. Skills keep their azd and CLI guidance (CP-18), with mutations
   routed through `apex deploy` or the approved pipeline.
 
-Today's tracks: Bicep previews with `az deployment group|sub what-if` and deploys with `az deployment group|sub create`;
-Terraform previews with `terraform plan -out` and applies that saved plan. CP-26 owns delivery; CLIENT-039 and
-CLIENT-040 qualify it.
+Today's tracks: Bicep runs only through azd (`azd provision --preview`, `azd provision`, `azd down`; see the
+DECISION-037 amendment); Terraform previews with `terraform plan -out` and applies that saved plan. CP-26 owns
+delivery; CLIENT-039 and CLIENT-040 qualify it.
 
 ## DECISION-036: Deliver Non-Production First With Purpose-Bound Approval
 
@@ -404,13 +404,34 @@ extensions and layers be inventoried, bound and hashed so that any change invali
   with its parameters and `bicepconfig.json`, `.azure/config.json`, the azd environment name, a digest of the
   allowlisted non-secret environment values (any other key fails closed so secrets are never hashed or persisted),
   remote Bicep module pins (exact Microsoft public registry tag or `@sha256` digest), the azd version, the approved
-  cloud, tenant and subscription (checked by the identity preflight), explicit `--environment`, the project root as
+  cloud, tenant and subscription (the identity preflight checks the Azure CLI's cloud, tenant and default subscription
+  and azd's target is the bound azd environment), explicit `--environment`, the project root as
   working directory, `--no-prompt`, and provision-only commands (never `azd up`).
 - **Not bound.** Hook script contents beyond the one file a plain script path names, anything a hook or extension
   reaches or runs at run time, extension binaries and their sources, azd's own configuration and the user's Azure CLI
   sign-in state.
 - **Scope.** This decision covers non-production only. CP-28 and CP-29 must re-evaluate hook and extension controls
-  before production is unblocked.
+  and the executor's accepted residual limits (see the amendment) before production is unblocked.
+- **Amendment (2026-10-11): azd is the only Bicep executor; Deployment Stacks are out of scope.** CP-26 PR B replaces
+  the `az deployment group what-if`/`create` and `az stack` Bicep path with `azd provision --preview` (preview),
+  `azd provision` (apply) and `azd down` (destroy), each a separate bound operation with its own approval, built on the
+  `azd-binding-v1` contract; the old path is removed without a fallback. Consequences: there is no stack ownership,
+  deny-settings protection or unmanage cleanup. Ownership comes from the `azd-env-name` tag of the approved resource
+  group, which is how azd finds an environment's resources, and the kernel's logical-resource manifest. `azd down` has
+  no preview and deletes the whole resource group, so the destroy preview lists the resources Azure reports in the
+  group (not exhaustive for child resources, which the approval states) and the
+  approval binds that list; `--purge` is never used. A missing or different azd version fails closed. Azure Policy,
+  RBAC and deny assignments remain the compensating controls. Bicep live runs stay unavailable until CP-30 qualifies
+  the executor; `azd deploy` application packages are a separate, later change.
+- **Accepted residual limits of the executor (re-evaluate in CP-28 and CP-29 with hooks and extensions).** (1) The
+  identity preflight verifies the Azure CLI identity; azd uses its own credential store, so a different azd login can
+  act on the bound subscription with that principal's permissions, which Azure RBAC governs. (2) `azd down` deletes the
+  whole resource group: the preview lists the resources as Azure lists them, extension and child resources Azure does
+  not list are deleted with their parents and are not individually shown or hashed (the approval warning says so), and
+  resources Azure lists that are added after approval change the owned-state hash and block. (3) The bound azd binary
+  is identified by its reported version, resolved through `PATH`; a substituted binary is a compromised-host scenario
+  outside the threat model, as for `az`. (4) Between the final binding re-check and spawning azd a local writer could
+  change project files; no immutable execution snapshot is made.
 
 Historical archive entries are indexed in the [catalog](../../.archive/CATALOG.json);
 the [restore guide](../../.archive/RESTORE.md) grants no runtime, release or deployment authority.

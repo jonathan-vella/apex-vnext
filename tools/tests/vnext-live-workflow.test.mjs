@@ -206,9 +206,9 @@ rejectsMutation(
   "refreshed ARM token",
 );
 rejectsMutation(
-  "deployment stack deny settings fail without deny-assignment authority",
-  (text) => text.replace('denySettingsMode:"none"', 'denySettingsMode:"denyDelete"'),
-  "qualification stack must not require deny-assignment permissions",
+  "deployment stack settings fail because azd is the only Bicep executor",
+  (text) => text.replace('echo "Bicep live qualification', 'echo stackName denySettingsMode "Bicep live qualification'),
+  "deployment stacks are out of scope; azd is the only Bicep executor",
 );
 rejectsMutation(
   "relative return authority upload path fails",

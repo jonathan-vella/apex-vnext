@@ -12,6 +12,7 @@ import type {
   PolicyValidationV1,
   ResourceInventoryV1,
 } from "@apexops/contracts";
+import type { AzdApprovalMaterial } from "./azd-binding.js";
 import type { PolicyResourceBinding } from "./policy-validation.js";
 
 export type IacProviderErrorCode =
@@ -202,6 +203,8 @@ export interface IacProvider {
   reconcile(operationId: string): Promise<OperationRecordV1 | undefined>;
   executionEvidence?(operationId: string): ProviderExecutionEvidence | undefined;
   policyValidation?(previewHash: string): PolicyValidationV1 | undefined;
+  /** Reviewer-facing inventory and warnings for the exact bound preview, when the executor has any. */
+  approvalMaterial?(previewHash: string): AzdApprovalMaterial | undefined;
 }
 
 export interface FakeIaCProviderOptions {

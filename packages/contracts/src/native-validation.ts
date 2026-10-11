@@ -17,7 +17,7 @@ import {
 export const NATIVE_VALIDATION_COMMANDS = {
   bicep: [
     { validatorId: "bicep:format", executable: "bicep", args: ["format", "--pattern", "**/*.bicep"] },
-    { validatorId: "bicep:build", executable: "bicep", args: ["build", "main.bicep", "--stdout"] },
+    { validatorId: "bicep:build", executable: "bicep", args: ["build", "infra/main.bicep", "--stdout"] },
     { validatorId: "bicep:lint", executable: "bicep", args: ["lint", "--pattern", "**/*.bicep", "--no-restore"] },
   ],
   terraform: [

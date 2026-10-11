@@ -245,6 +245,7 @@ import { currentHostEnvironment, firstReleaseVersion, hostDoctorChecks, type Hos
 import { ApexError, EXIT_CODES, governanceBaselineApexError, retiredProjectionError } from "./errors.js";
 import { MCP_TOOL_REVIEW_GUARDS, type ReviewGuardedTool } from "./mcp-tool-effects.js";
 import { APEX_VERSION, meetsMinimumVersion, MINIMUM_NODE_VERSION } from "./version.js";
+import { bundledToolchainMinimums, type BundledToolchainMinimums } from "./toolchain-pin.js";
 import {
   registerWorkflowValidators,
   resolveNativeBicepResourceOwnership,
@@ -481,8 +482,6 @@ interface DoctorCheck {
   /** Marks a passing advisory check; warnings never make doctor unhealthy. */
   severity?: "warning";
 }
-
-const RELEASE_VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/u;
 
 const DERIVED_DECISION_KEYS: ReadonlySet<string> = new Set([
   "projectId",
@@ -4301,7 +4300,7 @@ export class ApexService {
       throw new ApexError("APEX_AUTHORIZATION", "Only code generation tasks may stage files", EXIT_CODES.authorization);
     await this.assertPreviousGeneratedSourceUnmodified(await this.journal(run).replay());
     const normalized = relativePath.replaceAll("\\", "/");
-    const suffixes = [".terraform.lock.hcl", ".tfvars.example", ".bicep", ".json", ".tf", ".md"];
+    const suffixes = [".terraform.lock.hcl", ".tfvars.example", ".bicep", ".json", ".tf", ".md", ".yaml"];
     if (
       isAbsolute(relativePath) ||
       normalized.length === 0 ||
@@ -4415,6 +4414,15 @@ export class ApexService {
         });
       }
     } else {
+      // Detect every conflicting staged file before staging any, so a refused generation leaves nothing partial.
+      for (const file of tree.files) {
+        const staged = join(sourceRoot, file.path);
+        if (
+          (await this.exists(staged)) &&
+          sha256Bytes(await readFile(staged)) !== sha256Bytes(Buffer.from(file.content, "utf8"))
+        )
+          throw new ApexError("APEX_CONFLICT", `Refusing to overwrite staged file: ${file.path}`, EXIT_CODES.conflict);
+      }
       for (const file of tree.files) files.push(await this.stageFile(taskId, file.path, file.content));
     }
     try {
@@ -7081,7 +7089,12 @@ export class ApexService {
         ...(attestationHash === undefined ? {} : { attestationHash }),
         ...(policyValidationHash === undefined ? {} : { policyValidationHash }),
       });
-      await this.materializeOperationsPreviewPackage(run, preview, previewObjectHash);
+      await this.materializeOperationsPreviewPackage(
+        run,
+        preview,
+        previewObjectHash,
+        provider.approvalMaterial?.(preview.previewHash),
+      );
       await this.openRunGate(await this.currentRun(), 4, preview.previewHash);
       return preview;
     }
@@ -7154,6 +7167,7 @@ export class ApexService {
     run: RunConfigV1,
     preview: DeploymentPreviewV1,
     previewObjectHash: string,
+    executor?: { readonly warnings: readonly string[]; readonly inventory: readonly string[] },
   ): Promise<void> {
     const directory = this.operationsReviewDirectory(run);
     const changes =
@@ -7184,6 +7198,15 @@ export class ApexService {
         ? "- None."
         : preview.blockers.map((blocker) => `- ${this.reviewMarkdownText(blocker)}`).join("\n"),
       "",
+      ...(executor === undefined
+        ? []
+        : [
+            "## Executor (azd)",
+            "",
+            ...executor.warnings.map((warning) => `- Warning: ${this.reviewMarkdownText(warning)}`),
+            ...executor.inventory.map((line) => `- ${this.reviewMarkdownText(line)}`),
+            "",
+          ]),
       approvalContext,
     ].join("\n");
     await mkdir(directory, { recursive: true });
@@ -7671,19 +7694,22 @@ export class ApexService {
         ]),
       );
       const seen = new Set<string>();
-      inventory.resources = inventory.resources.map((resource) => {
-        const identity = resource.resourceId.toLowerCase();
-        const accepted = managed.get(identity);
-        if (accepted === undefined || seen.has(identity)) {
-          throw new ApexError(
-            "APEX_VALIDATION",
-            "Native inventory violates accepted Bicep ownership",
-            EXIT_CODES.validation,
-          );
-        }
-        seen.add(identity);
-        return { ...resource, resourceId: accepted.resourceId, logicalId: accepted.logicalId };
-      });
+      const protectedIds = await this.nativeBicepProtectedResourceIds(run, events);
+      inventory.resources = inventory.resources
+        .filter(({ resourceId }) => !protectedIds.has(resourceId.toLowerCase()))
+        .map((resource) => {
+          const identity = resource.resourceId.toLowerCase();
+          const accepted = managed.get(identity);
+          if (accepted === undefined || seen.has(identity)) {
+            throw new ApexError(
+              "APEX_VALIDATION",
+              "Native inventory violates accepted Bicep ownership",
+              EXIT_CODES.validation,
+            );
+          }
+          seen.add(identity);
+          return { ...resource, resourceId: accepted.resourceId, logicalId: accepted.logicalId };
+        });
     }
     const inventoryValidatorIds = await this.validateInventoryValidators(run, preview, operation, inventory);
     const inventoryHash = await this.objects.putJson(inventory);
@@ -10882,10 +10908,14 @@ export class ApexService {
     return validatorIds;
   }
 
-  private async nativeBicepManagedResources(
+  private async nativeBicepOwnership(
     run: RunConfigV1,
     events: Awaited<ReturnType<EventJournal["replay"]>>,
-  ): Promise<ResourceInventoryV1["resources"]> {
+  ): Promise<{
+    intent: ImplementationIntentV1;
+    binding: IacBindingV1;
+    ownership: ReturnType<typeof resolveNativeBicepResourceOwnership>;
+  }> {
     const artifacts = this.acceptedArtifactHashes(events);
     if (!artifacts["implementation-intent"] || !artifacts["iac-binding"] || !artifacts["logical-resource-manifest"])
       throw new ApexError(
@@ -10903,6 +10933,23 @@ export class ApexService {
         "preview:coverage cannot resolve accepted Bicep ownership",
         EXIT_CODES.validation,
       );
+    return { intent, binding, ownership };
+  }
+
+  /** Resources the accepted manifest only references; the azd environment's group may hold them but does not own them. */
+  private async nativeBicepProtectedResourceIds(
+    run: RunConfigV1,
+    events: Awaited<ReturnType<EventJournal["replay"]>>,
+  ): Promise<ReadonlySet<string>> {
+    const { ownership } = await this.nativeBicepOwnership(run, events);
+    return new Set(ownership.protectedResourceIds.map((id) => id.toLowerCase()));
+  }
+
+  private async nativeBicepManagedResources(
+    run: RunConfigV1,
+    events: Awaited<ReturnType<EventJournal["replay"]>>,
+  ): Promise<ResourceInventoryV1["resources"]> {
+    const { intent, binding, ownership } = await this.nativeBicepOwnership(run, events);
     return intent.resources.flatMap((resource) => {
       const primaryId = ownership.resourceIdsByLogicalId[resource.id];
       if (primaryId === undefined) return [];
@@ -11453,31 +11500,11 @@ export class ApexService {
     return bytes;
   }
 
-  private async bundledToolchainMinimums(): Promise<{
-    vscode?: string | undefined;
-    copilotCli?: string | undefined;
-    azd?: string | undefined;
-  }> {
-    try {
-      const assets = await resolveBundledAssets();
-      const entry = assets.manifest.files.find(({ path }) => path === "config/toolchain.v1.json");
-      const bytes = entry === undefined ? undefined : await readBundledFile(assets.root, entry.path);
-      if (entry === undefined || bytes === undefined || sha256Bytes(bytes) !== entry.sha256) return {};
-      const set = (
-        JSON.parse(bytes.toString("utf8")) as {
-          compatibilitySet?: { minimumVscode?: unknown; copilotCli?: unknown; azd?: unknown };
-        }
-      ).compatibilitySet;
-      const release = (value: unknown) =>
-        typeof value === "string" && RELEASE_VERSION.test(value) ? value : undefined;
-      return { vscode: release(set?.minimumVscode), copilotCli: release(set?.copilotCli), azd: release(set?.azd) };
-    } catch {
-      return {};
-    }
+  private async bundledToolchainMinimums(): Promise<BundledToolchainMinimums> {
+    return await bundledToolchainMinimums();
   }
 
-  // Bicep deploys through the native path until the azd executor ships (CP-26 PR B), so a missing or different azd is
-  // an advisory warning for now and never makes doctor unhealthy. The exact pinned release will be required then.
+  // Bicep runs execute through azd and bind its exact version, so unlike the client minimums only the pin passes.
   private async azdPrerequisiteCheck(): Promise<DoctorCheck> {
     const pinnedVersion = (await this.bundledToolchainMinimums()).azd;
     const found = await this.executableChecker("azd");
@@ -11485,15 +11512,7 @@ export class ApexService {
       ? await this.hostToolVersion("azd", ["version"], { AZD_SKIP_UPDATE_CHECK: "true" })
       : undefined;
     const { ok, value, remedy } = evaluateAzdPrerequisite({ pinnedVersion, found, installedVersion });
-    if (ok) return { id: "executable:azd", ok: true, value };
-    return {
-      id: "executable:azd",
-      ok: true,
-      severity: "warning",
-      value: `${value.replace(/; Bicep runs require azd$/u, "")} (advisory: Bicep will require azd once the azd executor ships)`,
-      remedy:
-        `Not needed yet: Bicep still deploys with the native path until the azd executor ships. ${remedy ?? ""}`.trim(),
-    };
+    return { id: "executable:azd", ok, value, ...(remedy === undefined ? {} : { remedy }) };
   }
 
   private async hostToolVersion(

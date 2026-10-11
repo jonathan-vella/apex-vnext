@@ -701,7 +701,7 @@ function bindingTrackMatch(value: unknown): ValidationIssue[] {
               ownership: "managed",
               dependsOn: resource.dependsOn,
               generatedDependencies: [],
-              sourcePath: "main.bicep",
+              sourcePath: "infra/main.bicep",
             })),
           },
         }).issues,
@@ -1189,11 +1189,11 @@ function providerReceiptIncludes(id: string, context: WorkflowDeployValidatorCon
   );
 }
 
-function deployBicepStackOwnership(value: unknown): ValidationIssue[] {
+function deployBicepAzdExecution(value: unknown): ValidationIssue[] {
   const context = deployContext(value);
-  return context.provider === "bicep" && providerReceiptIncludes("deploy:bicep-stack-ownership", context)
+  return context.provider === "bicep" && providerReceiptIncludes("deploy:bicep-azd-execution", context)
     ? []
-    : issue("/executionEvidence", "Native Bicep stack ownership evidence is missing");
+    : issue("/executionEvidence", "azd Bicep execution evidence is missing");
 }
 
 function deployExactSavedPlan(value: unknown): ValidationIssue[] {
@@ -1484,7 +1484,7 @@ export function registerWorkflowValidators(registry: ValidatorRegistry): void {
 
   registry.registerHandler("deploy:exact-approved-operation", deployExactApprovedOperation, "authorization");
   registry.registerHandler("deploy:stale-writer-rejection", deployStaleWriterRejection, "authorization");
-  registry.registerHandler("deploy:bicep-stack-ownership", deployBicepStackOwnership, "authorization");
+  registry.registerHandler("deploy:bicep-azd-execution", deployBicepAzdExecution, "authorization");
   registry.registerHandler("deploy:exact-saved-plan", deployExactSavedPlan, "authorization");
   registry.registerHandler("deploy:state-lineage-and-serial", deployStateLineageAndSerial, "authorization");
 

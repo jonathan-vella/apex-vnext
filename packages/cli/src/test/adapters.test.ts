@@ -1549,41 +1549,39 @@ test("CLI task complete accepts repeated self-describing files", async () => {
 test("CLI rejects incomplete native provider config before execution", async () => {
   const root = await tempRoot();
   const path = join(root, "providers.json");
-  await writeJson(path, { bicep: { resourceGroup: "rg" } });
-  await assert.rejects(execute(["version", "--provider-config", path], root), /requires deploymentName/i);
+  await writeJson(path, { bicep: { cwd: "azd-project" } });
+  await assert.rejects(execute(["version", "--provider-config", path], root), /requires environmentName/i);
 });
 
-test("CLI requires explicit Bicep stack cleanup ownership", async () => {
+test("CLI rejects obsolete native and Deployment Stack Bicep provider config", async () => {
   const root = await tempRoot();
   const path = join(root, "providers.json");
-  const bicep = {
-    resourceGroup: "rg",
-    deploymentName: "deployment",
-    stackName: "stack",
-    templateFile: "main.bicep",
-    actionOnUnmanage: "deleteResources",
-    denySettingsMode: "none",
-  };
-  await writeJson(path, { bicep });
-  await assert.rejects(execute(["version", "--provider-config", path], root), /explicit ownership authorization/i);
-
-  await writeJson(path, { bicep: { ...bicep, ownershipAuthorizesDeleteResources: true } });
-  assert.deepEqual(await execute(["version", "--provider-config", path], root), {
-    version: "0.11.0-next.4",
-    bundleVersion: "0.11.0-next.4",
-    configVersion: "1.0.0",
-  });
+  const azd = { cwd: "azd-project", environmentName: "dev", tenantId: "t", location: "swedencentral" };
+  for (const obsolete of [
+    { resourceGroup: "rg", deploymentName: "deployment", stackName: "stack", templateFile: "main.bicep" },
+    { ...azd, stackName: "stack" },
+    { ...azd, actionOnUnmanage: "deleteResources" },
+    { ...azd, denySettingsMode: "none" },
+    { ...azd, ownershipAuthorizesDeleteResources: true },
+    { ...azd, templateFile: "main.bicep" },
+  ]) {
+    await writeJson(path, { bicep: obsolete });
+    await assert.rejects(
+      execute(["version", "--provider-config", path], root),
+      /azd is the only Bicep executor|requires environmentName|requires cwd/i,
+    );
+  }
 });
 
-test("CLI defaults Bicep stack cleanup to detachAll", async () => {
+test("CLI accepts the azd Bicep provider config", async () => {
   const root = await tempRoot();
   const path = join(root, "providers.json");
   await writeJson(path, {
     bicep: {
-      resourceGroup: "rg",
-      deploymentName: "deployment",
-      stackName: "stack",
-      templateFile: "main.bicep",
+      cwd: "azd-project",
+      environmentName: "dev",
+      tenantId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+      location: "swedencentral",
     },
   });
   assert.deepEqual(await execute(["version", "--provider-config", path], root), {

@@ -557,46 +557,7 @@ async function localProviderConfig(args, temporary, account) {
   });
   const providerConfig = join(temporary, "provider-config.json");
   if (args.track === "bicep") {
-    const parametersFile = join(temporary, "main.parameters.json");
-    await writeFile(
-      parametersFile,
-      `${JSON.stringify(
-        {
-          $schema: "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
-          contentVersion: "1.0.0.0",
-          parameters: {
-            projectName: { value: "vnext" },
-            environment: { value: "qualification" },
-            location: { value: "swedencentral" },
-            tags: { value: EXPECTED_TAGS },
-            logAnalyticsWorkspaceResourceId: { value: workspace },
-          },
-        },
-        null,
-        2,
-      )}\n`,
-    );
-    await writeFile(
-      providerConfig,
-      `${JSON.stringify(
-        {
-          bicep: {
-            resourceGroup: "rg-vnext-qualification-bicep",
-            deploymentName: "vnext-qualification",
-            stackName: "vnext-qualification",
-            templateFile: join(SCRIPT_ROOT, "infra/bicep/vnext-qualification/main.bicep"),
-            parametersFile,
-            actionOnUnmanage: "deleteResources",
-            ownershipAuthorizesDeleteResources: true,
-            dedicatedSandboxResourceGroup: true,
-            denySettingsMode: "none",
-          },
-        },
-        null,
-        2,
-      )}\n`,
-    );
-    return { providerConfig, environment };
+    throw new Error("Bicep live qualification is unavailable until CP-30 qualifies the azd executor");
   }
   const terraformRoot = join(SCRIPT_ROOT, "infra/terraform/vnext-qualification");
   const backendFile = join(temporary, "backend.hcl");

@@ -25,6 +25,16 @@ A preview is proof for one exact dependency revision, IaC track, target, operati
 Approval must reference that preview and expire no later than it. Deployment revalidates the binding before and after the
 provider operation.
 
+For Bicep the provider is azd, the only Bicep executor. The preview (`azd provision --preview`) is a prediction
+against live Azure state, not an immutable plan, so the approval also binds the exact `azure.yaml`, infrastructure
+tree, parameters, azd environment and azd version, the approved cloud, tenant and subscription (a preflight of the
+Azure CLI identity stops the run on any difference; azd keeps its own login) and the tagging and contents of the
+approved resource group. Apply (`azd provision`) and destroy (`azd down`) each need their own current preview and
+approval. Hooks and extensions are trusted rather than scanned (DECISION-037) and are listed with a warning in the
+approval material. There are no deny settings or unmanage cleanup, and `azd down` deletes the whole resource group, so
+Azure Policy, RBAC and the destroy list are the controls. Bicep live runs stay unavailable until CP-30 qualifies the
+executor.
+
 DECISION-036 permits a future CI-hosted human review surface, not workflow self-approval. The kernel must verify the
 actual reviewer and bound candidate before apply; a triggering actor or OIDC token is not human approval evidence.
 Unavailable repository approval features, wrong purpose or target, changed artifacts and expired evidence block
