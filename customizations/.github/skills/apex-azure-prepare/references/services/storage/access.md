@@ -10,7 +10,8 @@
 
 > ⚠️ **Important**: To assign storage roles to managed identities, you need:
 >
-> - **User Access Administrator** or **Owner** role on the Storage Account (or parent resource group/subscription)
+> - **Role Based Access Control Administrator** (least privilege) or **Owner** role on the Storage Account (or parent
+>   resource group/subscription)
 > - The role must include the `Microsoft.Authorization/roleAssignments/write` permission
 
 **Common scenarios**:
@@ -33,8 +34,8 @@
   - Set `AZURE_CLIENT_ID` app setting to the User Assigned Managed Identity's client ID
   - Configure identity in Bicep with both `type: 'SystemAssigned, UserAssigned'` and `userAssignedIdentities`
 
-If you encounter `AuthorizationFailed` errors when assigning roles, ensure you have User Access Administrator or Owner
-permissions at the target scope.
+If you encounter `AuthorizationFailed` errors when assigning roles, ensure you have Role Based Access Control Administrator
+or Owner permissions at the target scope.
 
 ## Managed Identity Role Assignment
 

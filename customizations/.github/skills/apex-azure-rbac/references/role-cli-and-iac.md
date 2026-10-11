@@ -142,7 +142,10 @@ module over a raw `azurerm_role_assignment` when available.
 The identity that runs the routed change needs `Microsoft.Authorization/roleAssignments/write` at or above the target
 scope:
 
-- **User Access Administrator**: least privilege for assignment only.
+- **Role Based Access Control Administrator**: least privilege for assignment; add a condition that limits the
+  assignable roles and principal types where appropriate.
+- **User Access Administrator**: broader authorization management (`Microsoft.Authorization/*`); use only when the
+  task needs more than role assignment.
 - **Owner**: full access, including assignment.
 - **Custom role** with `Microsoft.Authorization/roleAssignments/write`.
 

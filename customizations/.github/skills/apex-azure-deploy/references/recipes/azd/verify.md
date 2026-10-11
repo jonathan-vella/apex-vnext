@@ -31,7 +31,8 @@ Showing deployed resources:
 ENDPOINT=$(azd env get-value <task-selected-service-uri-key>)
 
 # Test endpoint
-curl -f "$ENDPOINT/health" || curl -f "$ENDPOINT"
+curl --fail-with-body -sS --connect-timeout 5 --max-time 15 "$ENDPOINT/health" \
+  || curl --fail-with-body -sS --connect-timeout 5 --max-time 15 "$ENDPOINT"
 ```
 
 Expected: HTTP 200 response.

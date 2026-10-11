@@ -89,14 +89,15 @@ az role assignment create \
 
 | Your Role                     | Permissions                                          | Recommended For                        |
 | ----------------------------- | ---------------------------------------------------- | -------------------------------------- |
-| **User Access Administrator** | Assign roles (no data access)                        | ✅ Least privilege for role assignment |
+| **Role Based Access Control Administrator** | Assign roles (no data access); supports conditions | ✅ Least privilege for role assignment |
+| **User Access Administrator** | Manage all authorization (`Microsoft.Authorization/*`), no data access | ⚠️ Broader than assignment needs |
 | **Owner**                     | Full access + assign roles                           | ❌ More permissions than needed        |
 | **Custom Role**               | Specific permissions including roleAssignments/write | ✅ Fine-grained control                |
 
 **Common Scenario**: Granting Storage Blob Data Owner to a Web App's managed identity
 
 ```bash
-# You need User Access Administrator (or Owner) on the Storage Account to run this:
+# You need Role Based Access Control Administrator (or Owner) on the Storage Account to run this:
 # Changes Azure/state: provider syntax only; use apex preview, local Gate 4 and apex deploy. Never run directly.
 az role assignment create \
   --role "Storage Blob Data Owner" \
@@ -104,8 +105,8 @@ az role assignment create \
   --scope /subscriptions/SUB/resourceGroups/RG/providers/Microsoft.Storage/storageAccounts/ACCOUNT
 ```
 
-If you encounter `AuthorizationFailed` errors when assigning roles, you likely need the User Access Administrator role
-at the target scope.
+If you encounter `AuthorizationFailed` errors when assigning roles, you likely need the Role Based Access Control Administrator
+role at the target scope.
 
 ### RBAC Best Practices
 

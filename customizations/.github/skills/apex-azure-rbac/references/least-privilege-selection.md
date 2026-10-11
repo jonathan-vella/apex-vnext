@@ -42,7 +42,7 @@ before selecting it.
 | Write blobs | Contributor does not suffice through Entra authorization | Storage Blob Data Contributor |
 | Read Key Vault secrets | Key Vault Reader reads metadata only | Key Vault Secrets User |
 | Pull container images | Reader does not suffice | AcrPull |
-| Grant access to others | User Access Administrator (least privilege for assignment) | - |
+| Grant access to others | Role Based Access Control Administrator (least privilege for assignment; add a condition where appropriate) | - |
 
 Use a custom role only when accepted catalog evidence shows no built-in role satisfies the requirement. Define only the
 required `actions` and `dataActions`, use `notActions` or `notDataActions` where justified, avoid wildcards, and keep

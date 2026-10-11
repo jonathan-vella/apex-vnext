@@ -263,7 +263,8 @@ apex gate decide --gate 1 --decision approved --actor USER_ID --json
 
 Confirming Gate 1 binds the purpose (`lab`), the target and the accepted requirements. Changed requirements reopen
 Gate 1, and a different purpose or target needs a new run (promotion to a different target reopens Gate 1). Through MCP
-the agent calls `apex/gateDecide` for Gate 1 only after your explicit confirmation.
+the agent calls `apex/gateDecide` (`gate: 1`, `decision` `approved` or `rejected`, `confirm: true`) for Gate 1 only
+after your explicit confirmation or rejection.
 
 Requirements acceptance also materializes a read-only Gate 1 review package at
 `agent-output/<project>/<run>/`. Review `01-requirements.md`, `README.md`,

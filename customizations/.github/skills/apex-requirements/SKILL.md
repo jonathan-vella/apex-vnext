@@ -69,8 +69,9 @@ or task.
     `apex/nextTask` while Gate 1 is pending. Gate 1 is the single intent confirmation: show the user the run's
     purpose (`lab` by default; `production` is unavailable until the CI-owned production flow ships), its target scope
     and the accepted requirements, and say that confirming binds all three. If the user's scope permits it and the
-    user explicitly confirms or rejects, call `apex/gateDecide` with `gate: 1` and `confirm: true`. Changing the
-    purpose or target needs a new project or run; changed requirements reopen Gate 1.
+    user explicitly confirms or rejects, call `apex/gateDecide` with `gate: 1`, `decision: "approved"` (confirmed) or
+    `"rejected"` (rejected) and `confirm: true`. Never infer the decision. Changing the purpose or target needs a new
+    project or run; changed requirements reopen Gate 1.
 
 ## Boundaries
 

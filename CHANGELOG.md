@@ -12,6 +12,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Skill guidance corrections from the 0.11.0-next.3 marketplace review (Refs #384): `apex/gateDecide` guidance now
+  names the required `decision` (`approved` or `rejected`) with `gate: 1` and `confirm: true`; deployment recipes use
+  `az deployment operation sub list`, `terraform import <address> <id>`, fail-fast bounded `curl` health checks and
+  secret-store guidance for CI/CD secrets; role-assignment delegation prefers Role Based Access Control Administrator
+  over User Access Administrator; native and mobile Entra redirect URIs are no longer forced to HTTPS; Cosmos DB
+  hierarchical keys carry `version: 2`; AKS, Application Insights and Event Grid references no longer overstate
+  minimums, mislabel the workspace SKU or require Key Vault.
+
 ## [0.11.0-next.3] — Preview
 
 This preview adds the purpose-bound lab approval flow and re-ports the Azure design, IaC and operations skills. A run now

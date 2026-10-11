@@ -45,7 +45,7 @@ services:
 
 | Pool   | Purpose                                 |
 | ------ | --------------------------------------- |
-| System | Cluster infrastructure, 3 nodes minimum |
+| System | Cluster infrastructure; at least 2 nodes for a production cluster with one system pool, 3 recommended for resilience across availability zones |
 | User   | Application workloads, auto-scaling     |
 
 ## References

@@ -27,7 +27,9 @@ than a display name so imports and refreshes stay stable. Set the principal type
 managed identities are service principals.
 
 The future delivery principal needs the `Microsoft.Authorization/roleAssignments/write` permission at or above the target
-scope. User Access Administrator grants it with the least privilege; Owner also grants it with far broader access.
+scope. Role Based Access Control Administrator grants it with the least privilege and can carry an assignment condition
+that limits which roles and principal types the delivery principal may assign. User Access Administrator and Owner
+grant far broader authorization access; use them only when the task needs more than role assignment.
 Record missing authorization as a blocker rather than proposing a broader role for the workload principal.
 
 ## Propagation And Validation

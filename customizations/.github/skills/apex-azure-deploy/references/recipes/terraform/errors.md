@@ -10,7 +10,7 @@
 | Error            | Resolution                                 |
 | ---------------- | ------------------------------------------ |
 | State lock error | Wait; confirm the lock is stale and no operation is running before any `force-unlock` |
-| Resource exists  | `terraform import <resource>` is a state change needing its own approved operation |
+| Resource exists  | `terraform import <resource-address> <resource-id>` (both are required) is a state change needing its own approved operation |
 | Backend denied   | Check storage permissions                  |
 | Provider error   | Diagnose the error first; provider upgrades need a separate validated change |
 

@@ -30,7 +30,7 @@ Azure Application Insights for telemetry, monitoring, and APM.
 | ---------- | ------------------------------- |
 | Resource   | `Microsoft.Insights/components` |
 | Depends on | Log Analytics Workspace         |
-| SKU        | PerGB2018 (consumption-based)   |
+| Mode       | Workspace-based (`WorkspaceResourceId` set; billing follows the workspace, whose SKU is `PerGB2018`) |
 
 ## Architecture Notes
 

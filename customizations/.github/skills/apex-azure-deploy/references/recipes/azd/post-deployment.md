@@ -71,10 +71,10 @@ See [EF Core Migrations](ef-migrations.md) for deployment patterns and troublesh
 ENDPOINT=$(azd env get-value SERVICE_API_URI)
 
 # Health check
-curl -f "$ENDPOINT/health" || echo "Health check failed"
+curl --fail-with-body -sS --max-time 15 "$ENDPOINT/health" || echo "Health check failed"
 
 # Test database connectivity
-curl -f "$ENDPOINT/api/test-db" || echo "Database connection failed"
+curl --fail-with-body -sS --max-time 15 "$ENDPOINT/api/test-db" || echo "Database connection failed"
 ```
 
 **Expected Result:**

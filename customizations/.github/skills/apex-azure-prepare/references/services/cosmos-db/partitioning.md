@@ -32,6 +32,7 @@ For complex scenarios, use hierarchical keys:
 partitionKey: {
   paths: ['/tenantId', '/userId']
   kind: 'MultiHash'
+  version: 2 // hierarchical partition keys require partition key version 2
 }
 ```
 

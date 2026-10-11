@@ -24,7 +24,10 @@ az deployment sub show \
 ## Health Check
 
 ```bash
-curl -s https://<endpoint>/health | jq .
+# --fail-with-body makes curl exit non-zero on HTTP 4xx/5xx; pipefail keeps that failure through jq. Bound the wait.
+set -o pipefail
+curl --fail-with-body -sS --connect-timeout 5 --max-time 15 https://<endpoint>/health | jq .
+echo "health check exit code: $?"
 ```
 
 ## Port Source

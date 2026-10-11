@@ -11,7 +11,7 @@
 | ---------------------- | -------------------------------------- |
 | Not authenticated      | `az login`                             |
 | Subscription not found | `az account list`                      |
-| Deployment failed      | `az deployment sub operation list --name <name>` with a failed-state query |
+| Deployment failed      | `az deployment operation sub list --name <name> --query "[?properties.provisioningState=='Failed']"` |
 | Template error         | `az deployment sub validate`           |
 | Permission denied      | Verify RBAC roles                      |
 | Quota exceeded         | Request increase or change region      |

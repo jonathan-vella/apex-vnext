@@ -21,7 +21,6 @@ Serverless event routing for event-driven architectures.
 | Resource      | Purpose                  |
 | ------------- | ------------------------ |
 | None required | Event Grid is serverless |
-| Key Vault     | Store topic keys         |
 
 ## Event Sources
 

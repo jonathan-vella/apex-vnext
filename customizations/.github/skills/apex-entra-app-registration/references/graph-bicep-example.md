@@ -9,7 +9,7 @@ It requires Bicep 0.21.1 or later with the Microsoft Graph extension, and a depl
 `Application.ReadWrite.All` (check it with the Graph permission preflight in `apex-azure-defaults`).
 
 The values are illustrative. Before use, apply the same least-privilege review as any registration: drop the implicit
-grant ID token issuance unless a legacy flow needs it, keep only HTTPS redirect URIs outside local development, request
+grant ID token issuance unless a legacy flow needs it, keep only HTTPS web redirect URIs outside local development, request
 only the permissions the workload uses (the example's application permission `User.Read.All` needs admin consent), and
 replace the placeholder scope and role IDs with generated GUIDs. CodeGen owns the generated module and its pins.
 
