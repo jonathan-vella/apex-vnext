@@ -12,6 +12,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Run Bicep only through azd and remove the Deployment Stack path (CP-26, PR B). `azd provision --preview` is the
+  preview, `azd provision` the apply and `azd down` the destroy, each its own bound operation with its own preview and
+  approval; APEX never runs `azd up`. The `az deployment group what-if`/`create` and `az stack` commands, stack
+  targets, `stackName`, `actionOnUnmanage` and `denySettingsMode` provider config, the stack-state hash and the
+  `deploy:bicep-stack-ownership` marker are removed without a fallback; obsolete provider config is rejected. The
+  executor fails closed unless the installed azd is exactly the bundled pin, re-inspects the azd binding and runs the
+  identity preflight before every preview, apply and destroy, and refuses when the binding, the azd version or the
+  approved resource group's tagging and contents changed after preview. Provisioning passes `--no-state`, so the
+  approved Bicep is always deployed. The preview is read from `azd provision --preview --output json` and resolved to
+  accepted resource IDs by ARM type and name. Without stacks, resources belong to the azd environment through the
+  `azd-env-name` tag of the approved resource group plus the logical-resource manifest; `azd down` deletes that whole
+  group (never with `--purge`), so the destroy preview lists the resources Azure reports in it (child resources the
+  listing omits are deleted with their parents, which the approval states) and the approval binds that list.
+  Deny settings and unmanage cleanup no longer exist. Generated Bicep trees are azd projects (`azure.yaml`,
+  `infra/main.bicep`, `infra/bicepconfig.json`). The `executable:azd` doctor check is again a failing prerequisite.
+  Bicep live runs, including the live qualification handoff, are unavailable until CP-30 qualifies the executor, and
+  `azd deploy` application packages (PR C) are not available.
+>>>>>>> 40d1a712 (docs: keep the azd executor entry under Unreleased)
+
 ## [0.11.0-next.4] — Preview
 
 This fix release corrects agent and skill guidance findings from the 0.11.0-next.3 marketplace review: wrong CLI command
@@ -39,24 +60,6 @@ internal.
 
 ### Changed
 
-- Run Bicep only through azd and remove the Deployment Stack path (CP-26, PR B). `azd provision --preview` is the
-  preview, `azd provision` the apply and `azd down` the destroy, each its own bound operation with its own preview and
-  approval; APEX never runs `azd up`. The `az deployment group what-if`/`create` and `az stack` commands, stack
-  targets, `stackName`, `actionOnUnmanage` and `denySettingsMode` provider config, the stack-state hash and the
-  `deploy:bicep-stack-ownership` marker are removed without a fallback; obsolete provider config is rejected. The
-  executor fails closed unless the installed azd is exactly the bundled pin, re-inspects the azd binding and runs the
-  identity preflight before every preview, apply and destroy, and refuses when the binding, the azd version or the
-  approved resource group's tagging and contents changed after preview. Provisioning passes `--no-state`, so the
-  approved Bicep is always deployed. The preview is read from `azd provision --preview --output json` and resolved to
-  accepted resource IDs by ARM type and name. Without stacks, resources belong to the azd environment through the
-  `azd-env-name` tag of the approved resource group plus the logical-resource manifest; `azd down` deletes that whole
-  group (never with `--purge`), so the destroy preview lists the resources Azure reports in it (child resources the
-  listing omits are deleted with their parents, which the approval states) and the approval binds that list.
-  Deny settings and unmanage cleanup no longer exist. Generated Bicep trees are azd projects (`azure.yaml`,
-  `infra/main.bicep`, `infra/bicepconfig.json`). The `executable:azd` doctor check is again a failing prerequisite.
-  Bicep live runs, including the live qualification handoff, are unavailable until CP-30 qualifies the executor, and
-  `azd deploy` application packages (PR C) are not available.
-
 - `status` now returns `satisfiedGates`, the gate numbers the kernel accepts (approved, inherited, or a lab readiness
   checkpoint whose journal record is still current). The live qualification handoff launcher uses it for its Gate 3
   preflight, so a lab run can be dispatched while a restored stale `ready` record in `run.json` is still refused.
@@ -73,10 +76,10 @@ internal.
   described by the what-if; they are not scanned, followed or verified, and production must re-evaluate this.
   `buildAzdArguments` builds only `provision` and `provision --preview` with explicit `--environment` and
   `--no-prompt`, and `assertAzdIdentityMatchesBinding` is the cloud, tenant and subscription preflight the executor must
-  pass. `doctor` now reports an `executable:azd` check for Bicep runs that requires the exact azd release pinned in
-  `config/toolchain.v1.json` (1.35.1); Terraform runs do not need azd. The executor that uses it is the entry above, and
-  `azd deploy` application packages follow in PR C.
-  Bicep reference detection stays regex-based; a compiler-backed inventory is tracked in #472.
+  pass. `doctor` reports an `executable:azd` check for Bicep runs against the exact azd release pinned in
+  `config/toolchain.v1.json` (1.35.1) as an advisory warning that never makes doctor unhealthy; Terraform runs do not
+  need azd. Execution still uses the native `az deployment` path: azd does not provision anything until PR B replaces
+  it, and `azd deploy` application packages follow in PR C. Bicep reference detection stays regex-based.
 
 - Record lab Gates 2 and 3 as kernel readiness checkpoints (CP-27, part 2). A new `ready` gate state and a journaled
   `gate.readiness-recorded` event (gate, dependency hash, passed validators; no actor or approval evidence) are recorded
