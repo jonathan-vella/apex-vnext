@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "./test-shard.js";
 import { GovernanceBaselineError } from "@apexops/capabilities";
 import { EXIT_CODES, governanceBaselineApexError, normalizeError } from "../errors.js";
 

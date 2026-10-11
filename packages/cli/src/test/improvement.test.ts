@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { join } from "node:path";
-import test from "node:test";
+import { test } from "./test-shard.js";
 import type { ImprovementPolicyV1 } from "@apexops/contracts";
 import { ImprovementStore } from "@apexops/kernel";
 import { execute } from "../cli.js";

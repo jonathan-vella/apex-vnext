@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import test from "node:test";
+import { test } from "./test-shard.js";
 import type { GovernanceSetupConfigV1 } from "@apexops/contracts";
 import type { ProcessRequest } from "@apexops/capabilities";
 import { ApexService } from "../service.js";

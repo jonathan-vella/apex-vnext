@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "./test-shard.js";
 import type { EventV1, RunConfigV1 } from "@apexops/contracts";
 import { dependencyRevision } from "../dependency-revision.js";
 

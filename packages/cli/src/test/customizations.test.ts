@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { lstat, mkdir, readFile, readdir, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
-import test from "node:test";
+import { test } from "./test-shard.js";
 import { ApexError } from "../errors.js";
 import { ApexService } from "../service.js";
 import { hostFixture, tempRoot } from "./helpers.js";

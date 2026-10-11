@@ -273,7 +273,7 @@ test("recall package and installation entry points remain retired", () => {
     false,
   );
   const workflow = load(readFileSync(".github/workflows/ci.yml", "utf8"));
-  assert.deepEqual(Object.keys(workflow.jobs), ["scope", "ci", "windows-package-tests"]);
+  assert.deepEqual(Object.keys(workflow.jobs), ["scope", "ci", "windows-package-shards", "windows-package-tests"]);
   assert.doesNotMatch(readFileSync("tools/scripts/setup-wsl.sh", "utf8"), /apex-recall/u);
   assert.doesNotMatch(readFileSync(".github/actions/setup-python-validation/action.yml", "utf8"), /apex-recall/u);
 });

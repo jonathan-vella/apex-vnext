@@ -262,6 +262,123 @@ export function loadLocalActionTexts(paths) {
   );
 }
 
+const WINDOWS_AGGREGATE_SCRIPT = [
+  'if [ "$SCOPE_RESULT" != "success" ]; then',
+  `  echo "The scope job finished as '$SCOPE_RESULT'."`,
+  "  exit 1",
+  "fi",
+  'if [ "$DOCS_ONLY" = "true" ]; then',
+  '  echo "Documentation-only change: the Windows shards were skipped."',
+  "  exit 0",
+  "fi",
+  'if [ "$SHARDS_RESULT" != "success" ]; then',
+  `  echo "The Windows shards finished as '$SHARDS_RESULT'."`,
+  "  exit 1",
+  "fi",
+  'echo "Every Windows shard passed."',
+].join("\n");
+
+const normalizeScript = (script) =>
+  String(script ?? "")
+    .split(/\r?\n/u)
+    .map((line) => line.trimEnd())
+    .join("\n")
+    .trim();
+
+const hasKeys = (object, expected) =>
+  object !== null &&
+  typeof object === "object" &&
+  !Array.isArray(object) &&
+  JSON.stringify(Object.keys(object).sort()) === JSON.stringify([...expected].sort());
+
+// The shard matrix must be one `core` entry plus CLI shards cli-1-of-N ... cli-N-of-N: exactly the set of
+// APEX_TEST_SHARD values whose slices cover every CLI test once.
+function windowsShardMatrixIsComplete(job) {
+  const include = job?.strategy?.matrix?.include;
+  if (
+    !hasKeys(job?.strategy, ["fail-fast", "matrix"]) ||
+    job.strategy["fail-fast"] !== false ||
+    !hasKeys(job.strategy.matrix, ["include"]) ||
+    !Array.isArray(include) ||
+    include.length < 2 ||
+    !hasKeys(include[0], ["suite"]) ||
+    include[0].suite !== "core"
+  ) {
+    return false;
+  }
+  const total = include.length - 1;
+  return include
+    .slice(1)
+    .every(
+      (entry, index) =>
+        hasKeys(entry, ["suite", "cli_shard"]) &&
+        entry.suite === `cli-${index + 1}-of-${total}` &&
+        entry.cli_shard === `${index + 1}/${total}`,
+    );
+}
+
+function windowsShardJobErrors(job) {
+  const steps = Array.isArray(job?.steps) ? job.steps : [];
+  const runs = (text) => steps.filter((step) => typeof step?.run === "string" && step.run.includes(text));
+  const unconditional = (text) => runs(text).length === 1 && runs(text)[0].if === undefined;
+  const conditional = (text, condition) => runs(text).length === 1 && runs(text)[0].if === condition;
+  const cliTest = runs("(cd packages/cli && node --test dist/test/*.test.js)")[0];
+  const errors = [];
+  if (
+    job?.name !== "windows-2025 shard (${{ matrix.suite }})" ||
+    job?.["runs-on"] !== "windows-2025" ||
+    job?.permissions?.contents !== "read" ||
+    job?.["timeout-minutes"] !== 60 ||
+    job?.["continue-on-error"] !== undefined ||
+    steps.some((step) => step?.["continue-on-error"] !== undefined) ||
+    !steps.some((step) => step?.uses === "./.github/actions/setup-node-repo" && step.if === undefined) ||
+    !steps.filter((step) => step?.run !== undefined).every((step) => step?.shell === "bash") ||
+    !unconditional("npm run prepare:assets --workspace @apexops/cli") ||
+    !unconditional("npm run build --workspace @apexops/kernel") ||
+    !unconditional("npm run build --workspace @apexops/capabilities") ||
+    !unconditional("npm run build --workspace @apexops/cli") ||
+    !conditional("(cd packages/kernel && node --test dist/test/*.test.js)", "matrix.suite == 'core'") ||
+    !conditional("(cd packages/capabilities && node --test dist/test/*.test.js)", "matrix.suite == 'core'") ||
+    !conditional("npm run test:plugin", "matrix.suite == 'core'") ||
+    !conditional("(cd packages/cli && node --test dist/test/*.test.js)", "matrix.suite != 'core'") ||
+    !hasKeys(cliTest?.env, ["APEX_TEST_SHARD"]) ||
+    cliTest.env.APEX_TEST_SHARD !== "${{ matrix.cli_shard }}"
+  ) {
+    errors.push("ci workflow must retain the windows-2025 kernel, capabilities and CLI test lane");
+  }
+  if (!windowsShardMatrixIsComplete(job)) {
+    errors.push("ci workflow's Windows shard matrix must be core plus every CLI shard exactly once");
+  }
+  return errors;
+}
+
+function windowsAggregateJobErrors(job) {
+  const [step] = Array.isArray(job?.steps) ? job.steps : [];
+  if (
+    job?.name !== "windows-2025 package tests" ||
+    job?.["runs-on"] !== "ubuntu-latest" ||
+    JSON.stringify(job?.needs) !== JSON.stringify(["scope", "windows-package-shards"]) ||
+    job?.if !== "always()" ||
+    job?.["timeout-minutes"] !== 5 ||
+    job?.permissions?.contents !== "read" ||
+    job?.["continue-on-error"] !== undefined ||
+    job?.steps?.length !== 1 ||
+    step?.if !== undefined ||
+    step?.["continue-on-error"] !== undefined ||
+    step?.uses !== undefined ||
+    !hasKeys(step?.env, ["DOCS_ONLY", "SCOPE_RESULT", "SHARDS_RESULT"]) ||
+    step.env.DOCS_ONLY !== "${{ needs.scope.outputs.docs_only }}" ||
+    step.env.SCOPE_RESULT !== "${{ needs.scope.result }}" ||
+    step.env.SHARDS_RESULT !== "${{ needs.windows-package-shards.result }}" ||
+    normalizeScript(step.run) !== WINDOWS_AGGREGATE_SCRIPT
+  ) {
+    return [
+      "ci workflow's windows-2025 package tests job must always run and pass only for a docs-only change or when the scope job and every Windows shard succeeded",
+    ];
+  }
+  return [];
+}
+
 export function validateGithubWorkflowContract({ contract, schema, workflowTexts, localActionTexts = {} }) {
   const errors = [];
   const ajv = new Ajv2020({ allErrors: true, strict: true });
@@ -400,7 +517,7 @@ export function validateGithubWorkflowContract({ contract, schema, workflowTexts
   const ciJobIds = Object.keys(ci?.jobs ?? {});
   if (
     ci?.jobs?.ci?.name !== "ci" ||
-    JSON.stringify(ciJobIds) !== JSON.stringify(["scope", "ci", "windows-package-tests"])
+    JSON.stringify(ciJobIds) !== JSON.stringify(["scope", "ci", "windows-package-shards", "windows-package-tests"])
   ) {
     errors.push("ci workflow must preserve the required vNext and Windows package-test jobs");
   }
@@ -410,10 +527,10 @@ export function validateGithubWorkflowContract({ contract, schema, workflowTexts
     errors.push("ci workflow's required ci job must not depend on or be conditional on another job");
   }
   if (
-    ci?.jobs?.["windows-package-tests"]?.needs !== "scope" ||
-    ci?.jobs?.["windows-package-tests"]?.if !== "needs.scope.outputs.docs_only != 'true'"
+    ci?.jobs?.["windows-package-shards"]?.needs !== "scope" ||
+    ci?.jobs?.["windows-package-shards"]?.if !== "needs.scope.outputs.docs_only != 'true'"
   ) {
-    errors.push("ci workflow must run the Windows package tests unless the scope job reports a docs-only change");
+    errors.push("ci workflow must run the Windows package test shards unless the scope job reports a docs-only change");
   }
   const ciSteps = Array.isArray(ci?.jobs?.ci?.steps) ? ci.jobs.ci.steps : [];
   const pythonSetup = ciSteps.filter((step) => step?.uses === "./.github/actions/setup-python-validation");
@@ -451,26 +568,10 @@ export function validateGithubWorkflowContract({ contract, schema, workflowTexts
   ) {
     errors.push("ci workflow must install an exact Copilot CLI version and then run the plugin install smoke");
   }
-  const windowsJob = ci?.jobs?.["windows-package-tests"];
-  const windowsSteps = Array.isArray(windowsJob?.steps) ? windowsJob.steps : [];
-  const windowsScripts = windowsSteps.map((step) => String(step?.run ?? "")).join("\n");
-  if (
-    windowsJob?.name !== "windows-2025 package tests" ||
-    windowsJob?.["runs-on"] !== "windows-2025" ||
-    windowsJob?.permissions?.contents !== "read" ||
-    windowsJob?.["timeout-minutes"] !== 90 ||
-    !windowsSteps.some((step) => step?.uses === "./.github/actions/setup-node-repo") ||
-    !windowsSteps.filter((step) => step?.run !== undefined).every((step) => step?.shell === "bash") ||
-    !windowsScripts.includes("npm run prepare:assets --workspace @apexops/cli") ||
-    !windowsScripts.includes("npm run build --workspace @apexops/kernel") ||
-    !windowsScripts.includes("npm run build --workspace @apexops/capabilities") ||
-    !windowsScripts.includes("npm run build --workspace @apexops/cli") ||
-    !windowsScripts.includes("(cd packages/kernel && node --test dist/test/*.test.js)") ||
-    !windowsScripts.includes("(cd packages/capabilities && node --test dist/test/*.test.js)") ||
-    !windowsScripts.includes("(cd packages/cli && node --test dist/test/*.test.js)")
-  ) {
-    errors.push("ci workflow must retain the windows-2025 kernel, capabilities and CLI test lane");
-  }
+  errors.push(
+    ...windowsShardJobErrors(ci?.jobs?.["windows-package-shards"]),
+    ...windowsAggregateJobErrors(ci?.jobs?.["windows-package-tests"]),
+  );
 
   for (const [workflowId, jobId] of [
     ["publish-npm", "publish"],

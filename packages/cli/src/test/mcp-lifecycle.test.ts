@@ -5,7 +5,7 @@ import { mkdir, readFile, readdir, realpath, symlink, writeFile } from "node:fs/
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { PassThrough } from "node:stream";
-import test, { before, describe, type TestContext } from "node:test";
+import type { TestContext } from "node:test";
 import { setImmediate as nextTurn } from "node:timers/promises";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
@@ -20,6 +20,7 @@ import { withRepeatGuardLock } from "@apexops/kernel";
 import { ApexService } from "../service.js";
 import { requirements, tempRoot } from "./helpers.js";
 import { MCP_PROTOCOL_VERSION, connectMcp, modernMcpClient } from "./mcp-client.js";
+import { before, describe, test } from "./test-shard.js";
 
 const hash = "a".repeat(64);
 const execFileAsync = promisify(execFile);

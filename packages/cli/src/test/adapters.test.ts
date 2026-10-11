@@ -5,7 +5,7 @@ import { promisify } from "node:util";
 import { once } from "node:events";
 import { mkdir, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import test from "node:test";
+import { test } from "./test-shard.js";
 import { CONTRACT_VERSION, type ArchetypeSourceProposalV1, type ArchetypeBatchPlanV1 } from "@apexops/contracts";
 import type { ProcessRequest } from "@apexops/capabilities";
 import { sha256Json } from "@apexops/kernel";

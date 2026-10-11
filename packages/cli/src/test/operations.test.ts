@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "./test-shard.js";
 import { ApexService } from "../service.js";
 import { nextTaskAfterInput, tempRoot } from "./helpers.js";
 

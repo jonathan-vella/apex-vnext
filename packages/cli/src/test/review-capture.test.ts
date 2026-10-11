@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { chmod, mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import test from "node:test";
+import { test } from "./test-shard.js";
 import {
   EventJournal,
   ObjectStore,

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "./test-shard.js";
 import type { Client } from "@modelcontextprotocol/client";
 import { mcpServiceResolver } from "../cli.js";
 import { ApexError } from "../errors.js";

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { mkdir, readFile, readdir, realpath, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import test, { type TestContext } from "node:test";
+import type { TestContext } from "node:test";
 import type { Client } from "@modelcontextprotocol/client";
 import { MCP_OUTPUT_SCHEMAS } from "../mcp-output-schemas.js";
 import { MCP_TOOL_EFFECTS } from "../mcp.js";
@@ -11,6 +11,7 @@ import { APEX_VERSION } from "../version.js";
 import { hash, selection, type ToolName } from "./mcp-fixtures.js";
 import { tempRoot } from "./helpers.js";
 import { connectMcp } from "./mcp-client.js";
+import { test } from "./test-shard.js";
 
 type CallResult = Awaited<ReturnType<Client["callTool"]>>;
 type ErrorEnvelope = { error?: { code?: string; message?: string; remediation?: string } };

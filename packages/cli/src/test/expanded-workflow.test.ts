@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdir, readFile, readdir, rename, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { platform } from "node:os";
 import { join } from "node:path";
-import test from "node:test";
+import { test } from "./test-shard.js";
 import type {
   DeploymentPreviewV1,
   ExecutionPlanAttestationV1,

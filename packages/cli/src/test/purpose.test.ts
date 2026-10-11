@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import test from "node:test";
+import { test } from "./test-shard.js";
 import { CONTRACT_VERSION } from "@apexops/contracts";
 import { execute } from "../cli.js";
 import { ApexError, EXIT_CODES, normalizeError } from "../errors.js";

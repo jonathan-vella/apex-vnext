@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import { release } from "node:os";
 import { join } from "node:path";
-import test from "node:test";
+import { test } from "./test-shard.js";
 import { formatHumanResult } from "../cli.js";
 import { copilotHome, detectHostKind, firstReleaseVersion, type HostEnvironment } from "../host-profile.js";
 import { ApexService } from "../service.js";

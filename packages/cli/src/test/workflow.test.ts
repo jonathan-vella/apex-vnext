@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
-import test from "node:test";
+import { test } from "./test-shard.js";
 import { EventJournal, ObjectStore, sha256Json } from "@apexops/kernel";
 import type {
   ArchitectureV1,

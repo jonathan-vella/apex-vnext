@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { chmod, lstat, mkdir, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import test from "node:test";
+import { test } from "./test-shard.js";
 import type { LocalEncryptedPlan, PersistedPreviewBinding } from "@apexops/capabilities";
 import { createFileProviderRuntime, hashTerraformConfiguration, hashTerraformLockFile } from "../provider-runtime.js";
 import { tempRoot } from "./helpers.js";
