@@ -150,6 +150,17 @@ jobs:
       - name: Setup Node
         uses: ./.github/actions/setup-node-repo
 
+      # The tests create many temporary workspaces and git repositories. The runner's default temp directory is on the
+      # slower C: drive; RUNNER_TEMP is on the D: drive next to the workspace, which cut shard test time by about 40%.
+      - name: Use the runner temp directory for temporary files
+        shell: bash
+        run: |
+          {
+            echo "TEMP=$RUNNER_TEMP"
+            echo "TMP=$RUNNER_TEMP"
+            echo "TMPDIR=$RUNNER_TEMP"
+          } >> "$GITHUB_ENV"
+
       - name: Prepare CLI assets
         shell: bash
         run: npm run prepare:assets --workspace @apexops/cli

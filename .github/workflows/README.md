@@ -7,7 +7,7 @@
 
 | Workflow                                                                     | Trigger                                        | Purpose                                                                                                | Side effects                                                                                          |
 | ---------------------------------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
-| [`ci.yml`](ci.yml)                                                           | PR + push to `main`                            | Required code check: formatting, Node validators, hook tests, deterministic vNext qualification, and Windows package tests. Docs-only PRs (only `docs/` or the root README, CONTRIBUTING, CONTRIBUTORS or SECURITY files) skip qualification, the plugin install smoke and the Windows tests. | None — fails the PR on regression.                                                                    |
+| [`ci.yml`](ci.yml)                                                           | PR + push to `main`                            | Required code check: formatting, Node validators, hook tests, deterministic vNext qualification, and the Windows package tests, which run as parallel shards. Docs-only PRs (only `docs/` or the root README, CONTRIBUTING, CONTRIBUTORS or SECURITY files) skip qualification, the plugin install smoke and the Windows shards. | None — fails the PR on regression.                                                                    |
 | [`branch-enforcement.yml`](branch-enforcement.yml)                           | PR to `main`                                   | Runs canonical branch naming and strict file-scope policy so PRs stay reviewable.                      | None — fails the PR on violation.                                                                     |
 | [`docs.yml`](docs.yml)                                                       | PR + push to `main` (Markdown)                 | Validate documentation links and freshness; required CI owns Markdown lint.                            | None - fails on documentation regression.                                                             |
 | [`governance-policy-baseline.yml`](governance-policy-baseline.yml)           | Weekly Mon 05:00 UTC + manual                  | Refresh `.github/data/governance-policy-baseline.json` from a live subscription.                       | Opens a PR (manual review + merge required) when baseline drifts.                                     |
@@ -18,6 +18,30 @@
 Devcontainer CI and obsolete long-lived branch maintenance are retired. Ordinary feature integration uses reviewed
 pull requests and the required CI checks. Native Windows client support is covered by the
 `windows-2025 package tests` CI job; no retired workflow is an execution authority.
+
+## Windows package test shards
+
+`ci.yml` runs the kernel, capabilities, CLI and plugin package tests on `windows-2025` as parallel
+`windows-2025 shard (<suite>)` jobs, so a pull request waits for the slowest shard rather than for all suites in
+sequence:
+
+- `core` runs the kernel and capabilities tests and the plugin package tests whole.
+- `cli-<i>-of-8` runs the one-eighth of every CLI test file selected by `APEX_TEST_SHARD=<i>/8`. Every CLI test file
+  declares its tests through `packages/cli/src/test/test-shard.ts`, which registers a test only when its position in the
+  file modulo the shard total matches. A few CLI test files hold most of the runtime and run their tests in sequence, so
+  splitting by file (`node --test --test-shard`) would leave one shard as slow as the old single job. The shards
+  therefore cover every test exactly once, and `test-shard.test.ts` fails if a CLI test file bypasses the helper.
+  Without `APEX_TEST_SHARD`, for example locally, every test runs.
+
+Every shard points `TEMP`, `TMP` and `TMPDIR` at `RUNNER_TEMP`. The tests create many temporary workspaces and git
+repositories, and the runner's default temporary directory is on the slower C: drive while `RUNNER_TEMP` and the
+workspace are on D:. Repeated A/B runs of the same shard measured about 40% less test time. Defender real-time
+protection is already off on the image and both drives are already excluded, so no exclusion is added.
+
+The `windows-2025 package tests` job aggregates the shards and keeps the status-check name stable. It always runs and
+passes only for a docs-only change (the shards are skipped) or when the scope job and every shard succeeded, so a failed
+or cancelled shard fails it. The required `ci` job still has no `needs` or `if`, and
+`tools/scripts/validate-github-workflows.mjs` enforces the shard matrix and the aggregate rule.
 
 ## Updating Action Pins
 

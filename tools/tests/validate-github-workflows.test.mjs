@@ -366,35 +366,116 @@ test("classifies docs-only changes with the one rule that both the scope and ci 
   assert.equal(isDocsOnly([]), false);
 });
 
-test("rejects Windows package-test lane weakening after rebaselining", () => {
+const LANE = "windows-2025 kernel, capabilities and CLI test lane";
+const MATRIX = "Windows shard matrix must be core plus every CLI shard exactly once";
+const AGGREGATE = "windows-2025 package tests job must always run";
+
+function assertRejected(cases) {
   const ciPath = ".github/workflows/ci.yml";
-  for (const [search, replacement, expected] of [
-    ["  windows-package-tests:", "  windows-tests:", "required vNext and Windows package-test jobs"],
-    ["    runs-on: windows-2025", "    runs-on: windows-latest", "windows-2025 kernel, capabilities and CLI test lane"],
-    ["    timeout-minutes: 90", "    timeout-minutes: 30", "windows-2025 kernel, capabilities and CLI test lane"],
-    [
-      "      - name: Prepare CLI assets\n        shell: bash\n        run: npm run prepare:assets --workspace @apexops/cli\n\n",
-      "",
-      "windows-2025 kernel, capabilities and CLI test lane",
-    ],
-    [
-      "          npm run build --workspace @apexops/capabilities\n",
-      "",
-      "windows-2025 kernel, capabilities and CLI test lane",
-    ],
-    [
-      "          (cd packages/cli && node --test dist/test/*.test.js)\n",
-      "",
-      "windows-2025 kernel, capabilities and CLI test lane",
-    ],
-    ["        shell: bash", "", "windows-2025 kernel, capabilities and CLI test lane"],
-  ]) {
+  for (const [search, replacement, expected] of cases) {
     const texts = mutate(ciPath, search, replacement);
     const errors = validate(texts, rebaseline(ciPath, texts));
     assert.ok(
       errors.some((error) => error.includes(expected)),
-      `expected ${expected} for ${search}`,
+      `expected ${expected} for ${search.trim().slice(0, 60)}`,
     );
+  }
+}
+
+test("rejects Windows package-test lane weakening after rebaselining", () => {
+  assertRejected([
+    ["  windows-package-shards:", "  windows-shards:", "required vNext and Windows package-test jobs"],
+    ["  windows-package-tests:", "  windows-tests:", "required vNext and Windows package-test jobs"],
+    ["    runs-on: windows-2025", "    runs-on: windows-latest", LANE],
+    ["    timeout-minutes: 60\n", "    timeout-minutes: 30\n", LANE],
+    ["    timeout-minutes: 60\n", "    timeout-minutes: 60\n    continue-on-error: true\n", LANE],
+    [
+      "      - name: Prepare CLI assets\n        shell: bash\n        run: npm run prepare:assets --workspace @apexops/cli\n\n",
+      "",
+      LANE,
+    ],
+    ["          npm run build --workspace @apexops/capabilities\n", "", LANE],
+    ["          (cd packages/kernel && node --test dist/test/*.test.js)\n", "", LANE],
+    ["          (cd packages/capabilities && node --test dist/test/*.test.js)\n", "", LANE],
+    ["        run: (cd packages/cli && node --test dist/test/*.test.js)", "        run: echo skipped", LANE],
+    [
+      "        env:\n          APEX_TEST_SHARD: ${{ matrix.cli_shard }}\n",
+      "        env:\n          APEX_TEST_SHARD: 1/8\n",
+      LANE,
+    ],
+    ["        env:\n          APEX_TEST_SHARD: ${{ matrix.cli_shard }}\n", "", LANE],
+    [
+      "      - name: Build and test the agent plugin package\n        if: matrix.suite == 'core'",
+      "      - name: Build and test the agent plugin package\n        if: matrix.suite == 'none'",
+      LANE,
+    ],
+    ["        run: npm run test:plugin\n\n", "        run: echo skipped\n\n", LANE],
+    ["        shell: bash", "", LANE],
+  ]);
+});
+
+test("rejects Windows shard matrices that skip or repeat a CLI shard", () => {
+  assertRejected([
+    ["          - suite: cli-8-of-8\n            cli_shard: 8/8\n", "", MATRIX],
+    ["            cli_shard: 8/8", "            cli_shard: 7/8", MATRIX],
+    ["          - suite: core\n", "", MATRIX],
+    ["      fail-fast: false", "      fail-fast: true", MATRIX],
+    [
+      "          - suite: cli-2-of-8\n            cli_shard: 2/8",
+      "          - suite: cli-2-of-8\n            cli_shard: 2/9",
+      MATRIX,
+    ],
+    ["          - suite: core\n", "          - suite: core\n          - suite: core\n", MATRIX],
+  ]);
+});
+
+test("rejects an aggregate Windows status that can pass without every shard", () => {
+  assertRejected([
+    ["    if: always()\n", "", AGGREGATE],
+    ["    if: always()\n", "    if: success()\n", AGGREGATE],
+    ["    needs: [scope, windows-package-shards]", "    needs: [scope]", AGGREGATE],
+    ["    needs: [scope, windows-package-shards]", "    needs: [windows-package-shards]", AGGREGATE],
+    [
+      '          if [ "$SHARDS_RESULT" != "success" ]; then\n            echo "The Windows shards finished as \'$SHARDS_RESULT\'."\n            exit 1\n          fi\n',
+      "",
+      AGGREGATE,
+    ],
+    [
+      '          if [ "$SCOPE_RESULT" != "success" ]; then\n            echo "The scope job finished as \'$SCOPE_RESULT\'."\n            exit 1\n          fi\n',
+      "",
+      AGGREGATE,
+    ],
+    ['if [ "$DOCS_ONLY" = "true" ]', 'if [ "$DOCS_ONLY" != "x" ]', AGGREGATE],
+    ["          SHARDS_RESULT: ${{ needs.windows-package-shards.result }}\n", "", AGGREGATE],
+    [
+      "          SHARDS_RESULT: ${{ needs.windows-package-shards.result }}",
+      "          SHARDS_RESULT: success",
+      AGGREGATE,
+    ],
+    ["    timeout-minutes: 5\n", "    timeout-minutes: 5\n    continue-on-error: true\n", AGGREGATE],
+  ]);
+});
+
+test("the aggregate Windows status passes only for docs-only changes or fully successful shards", () => {
+  const workflow = yaml.load(workflowTexts[".github/workflows/ci.yml"]);
+  const [{ run }] = workflow.jobs["windows-package-tests"].steps;
+  const verdict = (scope, docsOnly, shards) =>
+    spawnSync("bash", ["-c", run], {
+      encoding: "utf8",
+      env: { ...process.env, SCOPE_RESULT: scope, DOCS_ONLY: docsOnly, SHARDS_RESULT: shards },
+    }).status;
+
+  assert.equal(verdict("success", "true", "skipped"), 0, "docs-only skips the shards");
+  assert.equal(verdict("success", "false", "success"), 0);
+  assert.equal(verdict("success", "", "success"), 0, "push and dispatch runs have no docs-only output");
+  for (const shards of ["failure", "cancelled", "skipped", ""]) {
+    assert.equal(verdict("success", "false", shards), 1, `shards ${shards}`);
+    assert.equal(verdict("success", "", shards), 1, `shards ${shards} without a docs-only output`);
+  }
+  for (const scope of ["failure", "cancelled", "skipped", ""]) {
+    assert.equal(verdict(scope, "", "skipped"), 1, `scope ${scope}`);
+    assert.equal(verdict(scope, "true", "skipped"), 1, `docs-only with scope ${scope}`);
+    assert.equal(verdict(scope, "false", "success"), 1, `scope ${scope} with passing shards`);
   }
 });
 
