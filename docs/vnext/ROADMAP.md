@@ -48,8 +48,10 @@ or optional feature expansion is needed to follow this order.
 ### Purpose-Bound Delivery Sequence
 
 1. Record ADR-0007, PRD acceptance, this roadmap and linked backlog. Keep current runtime and qualification checks.
-2. Implement CP-27 purpose contracts and non-production intent/final-preview approval; required reviews still run.
-3. Deliver CP-26 azd/Bicep; retain native Terraform saved-plan/locking semantics rather than adding an azd Terraform path.
+2. CP-27 purpose contracts and non-production intent/final-preview approval are implemented; required reviews still run.
+3. CP-26 azd/Bicep provisioning and destroy are implemented (azd is the only Bicep executor); native Terraform keeps
+   saved-plan/locking semantics rather than gaining an azd path. Application packages (`azd deploy`) and pipeline
+   setup remain open under #443.
 4. Prepare CP-29 optional production inspection/configuration/operator guidance alongside lab delivery.
 5. Implement CP-28 CI-owned execution and protected artifacts with a verified human review receipt before apply.
 6. CP-30 qualifies non-production first, then production only when CP-28/CP-29 are complete and live runs authorized.
