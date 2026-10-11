@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0-next.4] — Preview
+
+This fix release corrects agent and skill guidance findings from the 0.11.0-next.3 marketplace review: wrong CLI command
+orderings, health-check exit codes, least-privilege role guidance and redirect URI guidance. It includes the Gate 1
+`apex/gateDecide` correction: the call must carry `decision`. There is no runtime change.
+
 ### Fixed
 
 - Skill guidance corrections from the 0.11.0-next.3 marketplace review (Refs #384): `apex/gateDecide` guidance now
