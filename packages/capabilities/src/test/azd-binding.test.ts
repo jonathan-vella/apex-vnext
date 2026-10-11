@@ -971,7 +971,8 @@ test("ambient azd configuration is hashed or refused", async () => {
   assert.equal(baseline.executionEnvelope.azdConfigDirectory, "isolated");
   const explicit = await inspect({}, (request) => ({ ...request, azureCliConfigDirectory: "explicit" }));
   assert.notEqual(explicit.bindingHash, baseline.bindingHash);
-  const windows = await inspect({}, (request) => ({ ...request, platform: "win32" }));
+  const otherPlatform = process.platform === "win32" ? "linux" : "win32";
+  const windows = await inspect({}, (request) => ({ ...request, platform: otherPlatform }));
   assert.notEqual(windows.bindingHash, baseline.bindingHash);
 });
 
