@@ -18,6 +18,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   checkpoint whose journal record is still current). The live qualification handoff launcher uses it for its Gate 3
   preflight, so a lab run can be dispatched while a restored stale `ready` record in `run.json` is still refused.
   Dispatch still requires the human Gate 4 approval of the exact preview.
+
+- Add the offline foundation for the Bicep azd executor (CP-26, PR A). The typed `azd-binding-v1` contract binds the
+  exact `azure.yaml`, infrastructure trees, resolved Bicep parameters, azd environment (non-secret key names plus a
+  values hash; secret-like entries fail closed and nothing secret is persisted), azd version and the inventory of hooks
+  (scope, event, order, shell, script path, content hash), exact-pinned extensions and layers, with a derived
+  `bindingHash`. `inspectAzdBicepProject` produces it deterministically from a project directory and refuses links,
+  traversal, oversize input, YAML aliases and unsupported surfaces (Terraform or extension providers, `resources`,
+  `platform`, `state`, `cloud`, `.bicepparam`, non-shell hook runners, hook secrets, unpinned extensions, target or
+  environment redirects, hooks that run further azd operations) with stable `AZD_*` codes. Any change to a bound
+  input, including hook content, order, addition or removal, changes the hash, and the approval material warns that
+  hooks can act beyond the what-if. `doctor` now reports an `executable:azd` check for Bicep runs that requires the
+  exact azd release pinned in `config/toolchain.v1.json` (1.35.1) and names the install remedy; Terraform runs do not
+  need azd. Execution still uses the native `az deployment` path: azd does not provision anything until PR B replaces
+  it, and `azd deploy` application packages follow in PR C.
+
 - Record lab Gates 2 and 3 as kernel readiness checkpoints (CP-27, part 2). A new `ready` gate state and a journaled
   `gate.readiness-recorded` event (gate, dependency hash, passed validators; no actor or approval evidence) are recorded
   automatically once the gate's required review has no open finding and its validators pass, for `lab` runs only.
