@@ -11476,7 +11476,8 @@ export class ApexService {
     }
   }
 
-  // Bicep runs execute through azd and bind its exact version, so unlike the client minimums only the pin passes.
+  // Bicep deploys through the native path until the azd executor ships (CP-26 PR B), so a missing or different azd is
+  // an advisory warning for now and never makes doctor unhealthy. The exact pinned release will be required then.
   private async azdPrerequisiteCheck(): Promise<DoctorCheck> {
     const pinnedVersion = (await this.bundledToolchainMinimums()).azd;
     const found = await this.executableChecker("azd");
@@ -11484,7 +11485,15 @@ export class ApexService {
       ? await this.hostToolVersion("azd", ["version"], { AZD_SKIP_UPDATE_CHECK: "true" })
       : undefined;
     const { ok, value, remedy } = evaluateAzdPrerequisite({ pinnedVersion, found, installedVersion });
-    return { id: "executable:azd", ok, value, ...(remedy === undefined ? {} : { remedy }) };
+    if (ok) return { id: "executable:azd", ok: true, value };
+    return {
+      id: "executable:azd",
+      ok: true,
+      severity: "warning",
+      value: `${value} (advisory until the azd executor ships)`,
+      remedy:
+        `Not needed yet: Bicep still deploys with the native path until the azd executor ships. ${remedy ?? ""}`.trim(),
+    };
   }
 
   private async hostToolVersion(
