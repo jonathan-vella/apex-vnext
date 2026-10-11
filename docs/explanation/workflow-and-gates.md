@@ -66,8 +66,10 @@ comparison with a generated-review base file, the same mechanism `approval.md` u
 `preview.created` or the approval evidence. The exact preview binding remains the authority for what is authorized.
 Binding the context hash is tracked in [#466](https://github.com/jonathan-vella/apex-vnext/issues/466).
 
-Still planned: the CLI and MCP prompts and `nextTask` wording, managed agent and skill guidance, and the client
-qualification scenarios still describe three human gate decisions and are updated separately (CP-27 PR 3).
+The CLI and MCP descriptions, managed agent and skill guidance and the client qualification scenarios describe this
+flow. `gate decide` and `apex/gateDecide` on a lab Gate 2 or 3 are refused with reason `GATE_READINESS_AUTOMATIC`, the
+managed agent never prompts for them, and `nextTask` reports `Gate N readiness checkpoint is not recorded: <reason>`
+until the review and validators allow the kernel to record readiness. CLIENT-039 to CLIENT-042 remain planned and not run.
 
 ### Accepted Production Target
 

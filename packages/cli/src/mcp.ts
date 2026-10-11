@@ -41,6 +41,7 @@ export const MCP_SERVER_INSTRUCTIONS = [
   "Call status first, then use returned task, run, expected head, and owner epoch values exactly.",
   "Do not retry mutations blindly after timeout, cancellation, or conflict; refresh status and confirm intent first.",
   "Use ask_user for human approvals, risk decisions, missing inputs, and any choice the kernel requires.",
+  "Never ask the user to approve a kernel-recorded readiness checkpoint (Gates 2 and 3 in a lab run); report the blocking review or validation finding instead.",
   "Large read results may include nextCursor; call the same tool with the same workspace and cursor until it is absent.",
 ].join(" ");
 
@@ -913,7 +914,7 @@ export function createMcpServerFactory(
     "gateDecide",
     {
       description:
-        "Record an explicitly confirmed human decision for Gate 1, 2, or 3 using the local OS username as actor. Gate 4 remains CLI-only.",
+        "Record the explicitly confirmed human Gate 1 intent confirmation (purpose, target and requirements) using the local OS username as actor. In a lab run Gates 2 and 3 are kernel-recorded readiness checkpoints, not human decisions, and are refused here with reason GATE_READINESS_AUTOMATIC: resolve the reported review or validation blocker instead. Gate 4, the final preview approval, remains CLI-only.",
       inputSchema: gateDecisionInput,
     },
     async ({ gate, decision }) => result(await service.decideInteractiveGate(gate, decision)),

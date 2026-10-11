@@ -183,6 +183,13 @@ Changed trees use a new isolated task directory. Resource-level incremental gene
 
 Only a human-authorized operator should run gate or deployment mutations. A preview must match the selected IaC track.
 
+`apex gate decide` records the human decision for Gate 1 (the intent confirmation of purpose, target and requirements)
+and Gate 4 (the final approval of the exact preview). In a lab run Gates 2 and 3 are readiness checkpoints that the
+kernel records itself once their required reviews and deterministic checks pass, so `gate decide --gate 2` and
+`--gate 3` are refused with reason `GATE_READINESS_AUTOMATIC`; resolve the blocker that `apex task next` reports as
+`Gate N readiness checkpoint is not recorded: <reason>`. Each apply and each destroy needs its own preview and Gate 4
+approval.
+
 `apex render --kind implementation-plan` projects current accepted implementation intent with logical resources,
 dependencies, controls, intended outputs and source hashes. It uses the same renderer as the generated plan-review file
 and refuses invalidated sources. This view does not establish validation, review completion or deployment approval.
@@ -199,7 +206,7 @@ operational evidence gaps. It does not query Azure, establish live execution ind
 
 `apex render --kind architecture-decisions` renders explicit `decisionRecords` from accepted Architecture data, including
 requirement links, alternatives, consequences, WAF impacts and implementation notes. Missing structured records return
-an unavailable error. Acceptance as an Architecture artifact is not Gate 2 approval or proof of implementation.
+an unavailable error. Acceptance as an Architecture artifact is not Gate 2 readiness or proof of implementation.
 
 `apex render --kind operations-runbook` projects optional `operationalHandoff` data from accepted Diagnosis: ownership,
 escalation, access prerequisites, configuration references, health checks, monitoring, incident response, rollback,

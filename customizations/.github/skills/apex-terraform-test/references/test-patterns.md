@@ -185,7 +185,7 @@ This is a static offline-unit-test sketch: replace action placeholders with revi
 Terraform version with the accepted toolchain. The selected file must explicitly use mocks and plan mode.
 No Azure credentials or apply/cleanup runs belong in this job. Live integration needs a separately supported bounded
 operation, the current Gate 4 and exact preview binding; CI job identity (OIDC) or an environment pause is not human
-approval. Planned purpose-bound and CI-owned production flows (CP-27 to CP-29) are not shipped.
+approval. CI-owned production flows (CP-28 and CP-29) are not shipped.
 
 ### GitLab CI
 

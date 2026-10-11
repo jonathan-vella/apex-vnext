@@ -24,15 +24,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   target, promotion to a different target no longer inherits Gate 1 or the requirements review; the new run redoes the
   review, so the Gate 1 dependency hash is computed for the new target, and needs a fresh human confirmation. A ready
   gate counts only while the journal proves it, and a journal written for another run is rejected.
-  `apex render status` lists the purpose and readiness time. CLI/MCP prompts, managed guidance and qualification
-  scenarios still describe three human gate decisions until part 3.
+  `apex render status` lists the purpose and readiness time.
 
 - Bind a typed deployment `purpose` (`lab` or `production`) to every run (CP-27, part 1). `apex init`, `bootstrap` and
   `project create` accept `--purpose` (MCP `projectCreate` and `promote` accept `purpose`) and default to `lab`;
   `purpose` joins the dependency revision and the workflow source dependencies, so a change invalidates affected
   previews and approvals. `production` fails closed with `APEX_VALIDATION` until CP-28/CP-29, and a run's purpose cannot
-  change. Run configurations without `purpose` are rejected; start a new project. Gate 1-4 behavior is unchanged; the
-  lab gate flow is a later part of CP-27.
+  change. Run configurations without `purpose` are rejected; start a new project. This part left Gate 1-4 behavior
+  unchanged.
+
+- Describe the lab approval flow across the user-facing surfaces (CP-27, part 3). The managed `APEX` agent and the
+  requirements, architecture, planning, next and operations skills treat Gate 1 as the one intent confirmation of
+  purpose, target and requirements and Gate 4 as the final preview approval, never ask for Gate 2 or 3 and never call
+  `apex/gateDecide` for them, and report the `Gate N readiness checkpoint is not recorded` blocker instead. The
+  `apex/gateDecide` description, MCP server instructions, review-package and deployment-guide text, the how-to and
+  reference docs and the client/live qualification plans agree; `gateDecide` on a lab Gate 2 or 3 is documented as
+  refused with reason `GATE_READINESS_AUTOMATIC`. CLIENT-039 to CLIENT-042 stay planned and not run. azd, CI-owned
+  production runs and setup remain planned.
 
 - Align the shipped Azure design skills' command-routing guidance with DECISION-036: today's `apex preview`, Gate 4 and
   `apex deploy` flow is stated as the enforced path, azd is described as a planned Bicep-only executor (CP-26) and

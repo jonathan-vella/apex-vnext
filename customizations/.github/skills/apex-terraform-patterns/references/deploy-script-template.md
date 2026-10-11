@@ -27,8 +27,8 @@ accepted Terraform binding
   → accepted operation/output evidence
 ```
 
-This is today's enforced runtime flow. The planned purpose-bound lab flow (CP-27, #456) and CI-owned production runs
-(CP-28, #457) do not replace it until implemented and qualified.
+This is the enforced runtime flow. In a lab run Gates 2 and 3 are earlier kernel readiness checkpoints and Gate 4 is the
+final approval of the exact preview; CI-owned production runs (CP-28, #457) are not shipped and production is blocked.
 
 A shell `yes/no` prompt is not Gate 4. A sequence of phases does not share blanket approval:
 each changed preview must be separately approved with its operation, recipient and expiry.

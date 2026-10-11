@@ -312,7 +312,8 @@ test("plugin agents and skills carry the guidance the retired workspace copies c
   assert.match(apexAgent, /Use `ask_user` for project lifecycle choices/u);
   assert.match(apexAgent, /Reuse values the user already stated/u);
   assert.match(apexAgent, /Carry the user's requested outcome, stop point and prohibited operations/u);
-  assert.match(apexAgent, /If a gate is pending, report it and stop/u);
+  assert.match(apexAgent, /If a human gate \(Gate 1 or Gate 4\) is pending, report it\s+and stop/u);
+  assert.match(apexAgent, /never call `apex\/gateDecide` for them/u);
   assert.match(apexAgent, /worker to call `apex\/taskContext`/u);
   for (const worker of ["apex-codegen.agent.md", "apex-validator.agent.md"]) {
     const profile = await readFile(join(agentsRoot, worker), "utf8");

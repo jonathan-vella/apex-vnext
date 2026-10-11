@@ -80,8 +80,8 @@ Current lab gate flow (kernel): Gate 1 is the one human intent confirmation and 
 Gates 2 and 3 are kernel-recorded `ready` checkpoints with no actor, approval evidence or `gate.decided` event; they
 record only after their required reviews and gate validators pass, `ready` can never satisfy Gate 1, Gate 4, deploy or
 destroy, and promotion recomputes it. Gate 4 material shows the purpose, target, architecture, cost estimate and
-accepted risks. Not yet updated: CLI/MCP prompts and `nextTask` wording, managed agent and skill guidance, and client
-qualification scenarios, which still describe three human gate decisions (CP-27 PR 3).
+accepted risks. The CLI/MCP descriptions, managed agent and skill guidance and client qualification scenarios describe
+this flow; the scenarios are not yet run.
 
 ## Functional Requirements
 
@@ -393,7 +393,8 @@ authorization decisions, gates and evidence. The VS Code Local projection, `vsco
 and `.vscode/mcp.json` stay retired. Every client must resolve the kernel-owned `needs_input` contract and record typed
 answers without relying on chat history.
 
-- The APEX agent asks all human questions in chat with `ask_user`, including gate decisions. Guidance never prescribes
+- The APEX agent asks all human questions in chat with `ask_user`, including the Gate 1 intent confirmation. Guidance
+  never prescribes
   `ask_user` argument names, because the CLI and the VS Code and app clients use different shapes. When a request needs
   several values, use the tool's native checkboxes where offered; otherwise present the options numbered in kernel
   order. The kernel validates the resolved values; confirmation, correction and cancellation follow
@@ -401,7 +402,8 @@ answers without relying on chat history.
   already stated, asks only for missing ones, and never invents or defaults them.
 - Stage guidance lives in skills the APEX agent loads per kernel task. `apex-next` reads status and the next task and
   continues in the same agent, without agent switches or scope prompts. It carries the user's requested outcome to
-  the next stop point and stops while a gate is pending.
+  the next stop point and stops while a human gate (Gate 1 or Gate 4) is pending; it never prompts for the Gate 2 and 3
+  readiness checkpoints that the kernel records in a lab run.
 - Hidden workers never ask the user questions. Their task prompts carry everything they need, because a subagent cannot
   see the calling agent's file.
 - The built-in `rubber-duck` agent performs the requirements, architecture and plan reviews under DECISION-031, and a

@@ -164,7 +164,8 @@ npx apex task next --json
 
 A new project normally needs requirements input. Start Copilot CLI with `copilot --agent apex` and ask APEX to
 continue the project. It reads kernel state, loads the same-agent stage skill for the next step, and stops at the next
-gate or user-owned question.
+human gate (the Gate 1 intent confirmation or the final Gate 4 approval) or user-owned question. It never asks you to
+approve Gate 2 or 3, which the kernel records itself in a lab run.
 
 Do not edit `.apex` directly or infer progress from chat history.
 
