@@ -6,8 +6,11 @@
 
 Current provider behavior is documented below.
 [DECISION-036](../vnext/DECISIONS.md#decision-036-deliver-non-production-first-with-purpose-bound-approval) selects a
-bounded azd executor for Bicep and retains native Terraform CLI. azd is not a third IaC language. CP-26 implements its
-input, environment, hook and operation boundaries; no new executor is enabled by this document.
+bounded azd executor for Bicep and retains native Terraform CLI. azd is not a third IaC language. CP-26 delivers it in
+three steps. The first (this document's `azd-binding-v1` and prerequisite sections) adds the typed binding contract,
+its deterministic inspection and the azd prerequisite check; it executes nothing. Bicep preview and apply still use the
+native `az deployment` provider until azd provisioning replaces it, and `azd deploy` application packages come after
+that. No new executor is enabled by this document.
 
 Non-production purpose will use confirmed intent and final deployment approval with required reviews/checks retained.
 Production will be opt-in, CI-owned and subject to verified human approval before apply. These purpose/approval
@@ -36,6 +39,84 @@ the same accepted intent. The target must be a declared dependency; missing targ
 resources, self-reference, chained extension scopes and competing raw scope/parent parameters are rejected. The generator
 emits a symbolic `scope`, and ownership resolves only the diagnostic extension ID beneath that target. Terraform does
 not accept this Bicep-only field. Plan review displays the scope reference; it is not evidence that diagnostics ran.
+
+## azd Binding For Bicep
+
+Implemented, offline and not yet used to run anything: execution still uses the native Azure CLI path until the
+executor (CP-26 PR B) lands. A Bicep azd project is described by the typed `azd-binding-v1` artifact, produced by
+`inspectAzdBicepProject` from a project directory that holds `azure.yaml` and `.azure/<environment>/`. azd recompiles
+Bicep and re-resolves parameters whenever it provisions, so the binding hashes what that reads. Any change to any of
+these changes its `bindingHash`:
+
+- the exact `azure.yaml` bytes (which contain every hook and extension declaration), the infrastructure tree of each root
+  (one `default` root or each declared layer, with its dependencies, including `bicepconfig.json`) and the parameters
+  after substitution;
+- the azd environment: only azd-managed, non-secret keys (`AZURE_ENV_NAME`, `AZURE_LOCATION`,
+  `AZURE_SUBSCRIPTION_ID`, `AZURE_TENANT_ID`, `AZURE_RESOURCE_GROUP`, `AZURE_PRINCIPAL_ID`, `AZURE_PRINCIPAL_TYPE`)
+  are accepted and hashed together with the approved target, and any other key fails closed
+  (`AZD_ENV_UNAPPROVED_KEY`) so a secret is never hashed or persisted. Custom values belong in the reviewed
+  `main.parameters.json` or the typed environment inputs and secrets in Key Vault references. `${NAME}` in the parameter
+  file may only name an allowlisted key. The per-environment `config.json` must be empty and `.azure/config.json` (the
+  default-environment pointer) may only hold `version` and `defaultEnvironment`; both are hashed;
+- the exact azd version and every remote Bicep module and template spec in the infrastructure trees, with its
+  reference, registry, path and pin;
+- the execution envelope: the environment name, the project root as working directory, no prompts and the approved
+  cloud, tenant and subscription.
+
+### Hooks And Extensions
+
+Hooks and extensions are trusted (DECISION-037), not bound. They are listed so the approver can see them, exactly as
+declared in `azure.yaml`: each hook with its scope (project, layer or service), event, order, platform variant, shell,
+working directory, declared `run` text and `continueOnError`/`interactive` flags, plus the content hash of the file when
+`run` is a plain project-relative script path; each extension with its id and declared version, from azd's default
+registry. Nothing else about a hook is read: script bodies are not parsed, sourced files are not followed, and commands
+are not rejected. The approval material that PR B shows must carry this warning:
+
+> This project declares hooks/extensions. They run with your Azure credentials and are not described by the what-if
+> preview.
+
+Not bound: hook script contents beyond the declared path, extension binaries and sources, anything a hook or extension
+reaches at run time, azd's own configuration and the user's Azure CLI sign-in. Azure Policy, RBAC and deny assignments
+under an Azure Landing Zone are the compensating controls, and this covers non-production only: production (CP-28,
+CP-29) must re-evaluate hook and extension controls first.
+
+### Remote modules
+
+Remote references are inventoried in every `.bicep` file (`module`, `extension`, `import`, `using`), resolving aliases
+from the nearest `bicepconfig.json` in the bound tree. Only exact, immutable references are accepted: an exact `x.y.z`
+tag on the Microsoft public registry (`br/public:` or `br:mcr.microsoft.com/bicep/...`, whose tags are immutable) or an
+`@sha256:` digest on any registry. Floating or partial tags, a missing tag, a tag on any other registry, a template
+spec without a version, URLs and undefined or redefined aliases fail with `AZD_MODULE_UNPINNED`. A template spec version
+is not content-addressed, so the executor must verify the resolved artifact (digest) at preflight; the binding records
+the reference, not the artifact, and does not verify it. Reference detection is regex-based rather than compiler-backed
+and relies on the pinned Bicep and azd versions; a compiler-backed inventory is tracked in #472.
+
+### Execution envelope
+
+`buildAzdExecutionEnvelope` builds the envelope the binding carries. `buildAzdArguments` can express only `provision` and
+`provision --preview`, always with an explicit `--environment` (the default-environment pointer is never consulted) and
+`--no-prompt`; `azd up` cannot be built. The executor runs azd from the project root. azd's own configuration and
+extensions and the user's `az login` are left alone. `assertAzdIdentityMatchesBinding` is the preflight the executor
+must pass before every provision: the active cloud, tenant, subscription and Azure CLI default subscription must equal
+the approved target, and a missing or different value stops the run with `AZD_IDENTITY_MISMATCH` (identifiers are never
+echoed). The approved target therefore requires `tenantId`.
+
+### Unsupported surfaces
+
+These fail closed with stable error codes: Terraform or extension `infra.provider`, `resources`, `platform`, `state`
+and `cloud` in `azure.yaml`, `.bicepparam` and parameter substitution other than `${NAME}`, secret-like parameters, a
+hook runner other than `sh`/`pwsh`, a hook script path that is missing, ambiguous, absolute or outside the project, an
+`azure.yaml` `requiredVersions.azd` the bound azd does not meet or that uses more than simple comparators, environment
+values that redirect the subscription, location, tenant, environment name or resource group, custom azd environment keys,
+links, path traversal, YAML aliases and merge keys, local Bicep references that leave the bound tree, a root without its
+own `bicepconfig.json` (so aliases and linter settings are never inherited from outside the tree) and oversize input.
+
+### azd Prerequisite
+
+Bicep runs require azd; Terraform runs do not. `config/toolchain.v1.json` pins the exact release (`core.azd`,
+`compatibilitySet.azd`: 1.35.1, observed 2026-10-11) and `apex doctor`, including the MCP doctor, reports an
+`executable:azd` check for Bicep runs. It fails with an install remedy when azd is missing, its version cannot be read,
+or it differs from the pin in either direction, because the approved binding includes the azd version.
 
 ## Resource Ownership
 

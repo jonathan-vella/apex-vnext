@@ -1,5 +1,6 @@
 export * from "./artifacts.js";
 export * from "./archetype-source.js";
+export * from "./azd-binding.js";
 export * from "./common.js";
 export * from "./deployment.js";
 export * from "./evidence.js";
@@ -19,6 +20,7 @@ import {
   RequirementsAmendmentV1Schema,
   RequirementsChangeProposalV1Schema,
 } from "./artifacts.js";
+import { AzdBindingV1Schema } from "./azd-binding.js";
 import {
   ArchetypeSourceProposalV1Schema,
   ArchetypeBatchConfigV1Schema,
@@ -114,6 +116,7 @@ export const contractSchemas = [
   RequirementsChangeProposalV1Schema,
   ImplementationIntentV1Schema,
   IacBindingV1Schema,
+  AzdBindingV1Schema,
   ApprovalEvidenceV1Schema,
   DeploymentPreviewV1Schema,
   OperationRecordV1Schema,
@@ -196,6 +199,7 @@ export const contractMetadata: Readonly<Record<string, ContractMetadata>> = {
   "https://schemas.apexops.dev/requirements-change-proposal-v1.json": metadata(524_288, "confidential"),
   "https://schemas.apexops.dev/implementation-intent-v1.json": metadata(524_288),
   "https://schemas.apexops.dev/iac-binding-v1.json": metadata(524_288, "confidential"),
+  "https://schemas.apexops.dev/azd-binding-v1.json": metadata(524_288, "confidential"),
   "https://schemas.apexops.dev/approval-evidence-v1.json": metadata(32_768, "confidential"),
   "https://schemas.apexops.dev/deployment-preview-v1.json": metadata(2_097_152, "confidential"),
   "https://schemas.apexops.dev/operation-record-v1.json": metadata(65_536, "confidential"),

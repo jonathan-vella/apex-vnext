@@ -464,6 +464,54 @@ test("requires the VS Code 1.140 Copilot harness minimum in the toolchain", () =
   assert.equal(hasRule(accepted, "toolchain.vscode-minimum"), false);
 });
 
+test("requires an exact, consistent azd pin that applies to Bicep only", () => {
+  const azd = (change) =>
+    mutate((model) => {
+      change(model.config["toolchain.v1.json"]);
+    });
+  assert.equal(
+    hasRule(
+      azd(() => undefined),
+      "toolchain.azd-pin",
+    ),
+    false,
+  );
+  for (const version of ["1.35", ">=1.35.1", "latest", "1.35.1-beta.1", "01.35.1"]) {
+    assert.ok(
+      hasRule(
+        azd((toolchain) => {
+          toolchain.core.azd.selectedExactVersion = version;
+          toolchain.compatibilitySet.azd = version;
+        }),
+        "toolchain.azd-pin",
+      ),
+      version,
+    );
+  }
+  for (const change of [
+    (toolchain) => {
+      toolchain.compatibilitySet.azd = "1.35.0";
+    },
+    (toolchain) => {
+      toolchain.core.azd.newestObservedVersion = "1.35.0";
+    },
+    (toolchain) => {
+      toolchain.core.azd.releaseArtifact.sha256 = "not-a-digest";
+    },
+    (toolchain) => {
+      toolchain.core.azd.authoritativeReleaseSource =
+        "https://github.com/Azure/azure-dev/releases/tag/azure-dev-cli_1.35.0";
+    },
+    (toolchain) => {
+      toolchain.core.azd.requiredFor = ["bicep", "terraform"];
+    },
+    (toolchain) => {
+      delete toolchain.core.azd;
+    },
+  ])
+    assert.ok(hasRule(azd(change), "toolchain.azd-pin"));
+});
+
 test("rejects permissive or non-object contract union branches", () => {
   for (const mutation of [
     (branch) => {

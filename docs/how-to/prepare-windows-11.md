@@ -64,11 +64,13 @@ Then [install the plugin](manage-installation.md#windows-vs-code-or-the-app).
 
 ### Install Azure Tooling On Windows
 
-Install Azure CLI and the IaC tool for each project, Bicep or Terraform:
+Install Azure CLI and the IaC tool for each project, Bicep or Terraform. Bicep projects also need the Azure Developer
+CLI (`azd`) at the exact release `apex doctor` names (currently 1.35.1); Terraform projects do not need it:
 
 ```powershell
 winget install Microsoft.AzureCLI
 winget install Microsoft.Bicep
+winget install Microsoft.Azd --version 1.35.1
 winget install Hashicorp.Terraform
 ```
 
@@ -148,11 +150,14 @@ az version
 
 APEX supports Bicep and Terraform. Choose one for each APEX project.
 
-Install the Bicep CLI through Azure CLI:
+Install the Bicep CLI through Azure CLI, and the Azure Developer CLI (`azd`) at the exact release `apex doctor` names
+(currently 1.35.1). Bicep projects require `azd`; Terraform projects do not:
 
 ```bash
 az bicep install
 az bicep version
+curl -fsSL https://aka.ms/install-azd.sh | bash -s -- --version 1.35.1
+azd version
 ```
 
 Or install HashiCorp Terraform for Ubuntu:

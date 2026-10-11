@@ -312,10 +312,15 @@ ownership where qualified. A fallback may operate only when it proves complete m
 semantics.
 
 The target Bicep execution path uses a bounded azd executor, not a third IaC language. Bind source, resolved parameters,
-environment, azd version and allowed hooks/extensions/layers to the approved what-if. Unsupported mutation surfaces
-fail closed; what-if remains a prediction against mutable Azure state, not an immutable Terraform plan. Provisioning
-and approved application-package deployment are separate operations; do not run `azd up`. The native Bicep path remains
-current behavior until azd execution is implemented and qualified.
+environment, azd version and the approved cloud, tenant and subscription to the approved what-if. Hooks and extensions
+are trusted under ALZ guardrails (DECISION-037): they are listed in the preview with a warning that they run with the
+user's credentials and are not described by the what-if, not bound or scanned; production must re-evaluate this. What-if
+remains a prediction against mutable Azure state, not an immutable Terraform plan. Provisioning and approved
+application-package deployment are separate operations; do not run `azd up`. The azd binding contract
+(`azd-binding-v1`), its deterministic project inspection, the identity preflight helper and the exact-version azd
+prerequisite exist; the executor must pass the identity preflight before every provision and verify remote module
+artifacts at preflight. The native Bicep path remains current behavior until azd execution is implemented and
+qualified.
 
 ### REQ-TERRAFORM-001: Terraform Lifecycle
 

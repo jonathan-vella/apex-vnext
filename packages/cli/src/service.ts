@@ -127,6 +127,7 @@ import {
   GovernanceBaselineError,
   nativePolicyValidationBinding,
   assertGeneratedSourceUnchanged,
+  evaluateAzdPrerequisite,
   resolveExecutable,
   type GovernanceBaselineFinding,
   type GovernanceBaselineSelection,
@@ -7903,6 +7904,7 @@ export class ApexService {
           remedy: `Install ${executable} and add it to PATH`,
         });
       }
+      if (run.iacTool === "bicep") checks.push(await this.azdPrerequisiteCheck());
       const auth = await this.azureAuthStatus(live);
       checks.push({
         id: "azure-auth",
@@ -11451,30 +11453,51 @@ export class ApexService {
     return bytes;
   }
 
-  private async bundledToolchainMinimums(): Promise<{ vscode?: string | undefined; copilotCli?: string | undefined }> {
+  private async bundledToolchainMinimums(): Promise<{
+    vscode?: string | undefined;
+    copilotCli?: string | undefined;
+    azd?: string | undefined;
+  }> {
     try {
       const assets = await resolveBundledAssets();
       const entry = assets.manifest.files.find(({ path }) => path === "config/toolchain.v1.json");
       const bytes = entry === undefined ? undefined : await readBundledFile(assets.root, entry.path);
       if (entry === undefined || bytes === undefined || sha256Bytes(bytes) !== entry.sha256) return {};
       const set = (
-        JSON.parse(bytes.toString("utf8")) as { compatibilitySet?: { minimumVscode?: unknown; copilotCli?: unknown } }
+        JSON.parse(bytes.toString("utf8")) as {
+          compatibilitySet?: { minimumVscode?: unknown; copilotCli?: unknown; azd?: unknown };
+        }
       ).compatibilitySet;
       const release = (value: unknown) =>
         typeof value === "string" && RELEASE_VERSION.test(value) ? value : undefined;
-      return { vscode: release(set?.minimumVscode), copilotCli: release(set?.copilotCli) };
+      return { vscode: release(set?.minimumVscode), copilotCli: release(set?.copilotCli), azd: release(set?.azd) };
     } catch {
       return {};
     }
   }
 
-  private async hostToolVersion(executable: string, args: readonly string[]): Promise<string | undefined> {
+  // Bicep runs execute through azd and bind its exact version, so unlike the client minimums only the pin passes.
+  private async azdPrerequisiteCheck(): Promise<DoctorCheck> {
+    const pinnedVersion = (await this.bundledToolchainMinimums()).azd;
+    const found = await this.executableChecker("azd");
+    const installedVersion = found
+      ? await this.hostToolVersion("azd", ["version"], { AZD_SKIP_UPDATE_CHECK: "true" })
+      : undefined;
+    const { ok, value, remedy } = evaluateAzdPrerequisite({ pinnedVersion, found, installedVersion });
+    return { id: "executable:azd", ok, value, ...(remedy === undefined ? {} : { remedy }) };
+  }
+
+  private async hostToolVersion(
+    executable: string,
+    args: readonly string[],
+    env: Readonly<Record<string, string>> = {},
+  ): Promise<string | undefined> {
     try {
       const result = await this.processRunner.run({
         executable,
         args,
         cwd: this.root,
-        env: this.host.env,
+        env: { ...this.host.env, ...env },
         timeoutMs: 15_000,
         maxOutputBytes: 4_096,
       });

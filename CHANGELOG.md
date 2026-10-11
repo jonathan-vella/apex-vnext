@@ -18,6 +18,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   checkpoint whose journal record is still current). The live qualification handoff launcher uses it for its Gate 3
   preflight, so a lab run can be dispatched while a restored stale `ready` record in `run.json` is still refused.
   Dispatch still requires the human Gate 4 approval of the exact preview.
+
+- Add the offline foundation for the Bicep azd executor (CP-26, PR A). The typed `azd-binding-v1` contract binds the
+  exact `azure.yaml`, infrastructure trees, resolved Bicep parameters, the azd version, the allowlisted non-secret azd
+  environment (any custom key fails closed, so no secret is hashed or persisted), `.azure/config.json`, remote Bicep
+  module pins (exact Microsoft public registry tag or an `@sha256` digest) and the approved cloud, tenant and
+  subscription, with a derived `bindingHash`. `inspectAzdBicepProject` produces it deterministically and refuses links,
+  traversal, oversize input, YAML aliases and unsupported surfaces with stable `AZD_*` codes. Hooks and extensions are
+  trusted (DECISION-037): the binding and `describeAzdBinding` list each exactly as declared (a hook's `run` text,
+  plus a content hash for a plain script path) and carry the warning that they run with the user's credentials and are not
+  described by the what-if; they are not scanned, followed or verified, and production must re-evaluate this.
+  `buildAzdArguments` builds only `provision` and `provision --preview` with explicit `--environment` and
+  `--no-prompt`, and `assertAzdIdentityMatchesBinding` is the cloud, tenant and subscription preflight the executor must
+  pass. `doctor` now reports an `executable:azd` check for Bicep runs that requires the exact azd release pinned in
+  `config/toolchain.v1.json` (1.35.1); Terraform runs do not need azd. Execution still uses the native `az deployment`
+  path: azd does not provision anything until PR B replaces it, and `azd deploy` application packages follow in PR C.
+  Bicep reference detection stays regex-based; a compiler-backed inventory is tracked in #472.
+
 - Record lab Gates 2 and 3 as kernel readiness checkpoints (CP-27, part 2). A new `ready` gate state and a journaled
   `gate.readiness-recorded` event (gate, dependency hash, passed validators; no actor or approval evidence) are recorded
   automatically once the gate's required review has no open finding and its validators pass, for `lab` runs only.

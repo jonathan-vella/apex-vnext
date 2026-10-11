@@ -3,11 +3,11 @@ import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import { release } from "node:os";
 import { join } from "node:path";
 import { test } from "./test-shard.js";
-import { formatHumanResult } from "../cli.js";
+import { execute, formatHumanResult } from "../cli.js";
 import { copilotHome, detectHostKind, firstReleaseVersion, type HostEnvironment } from "../host-profile.js";
 import { ApexService } from "../service.js";
 import { APEX_VERSION } from "../version.js";
-import { hostFixture, tempRoot, type HostFixtureKind } from "./helpers.js";
+import { AZD_PINNED_VERSION, hostFixture, tempRoot, type HostFixtureKind } from "./helpers.js";
 
 type Report = Awaited<ReturnType<ApexService["doctor"]>>;
 
@@ -284,3 +284,72 @@ test(
     assert.equal((await readFile(marker, "utf8")).trim().split(/\s+/u).length, 1);
   },
 );
+
+const AZD_PIN = AZD_PINNED_VERSION;
+
+async function iacDoctor(iac: "bicep" | "terraform", azd?: string) {
+  const tools: Record<string, string> = {
+    git: "git version 2.51.0",
+    copilot: "GitHub Copilot CLI 1.0.93.",
+    bwrap: "bubblewrap 0.11.0",
+    slirp4netns: "slirp4netns version 1.2.1",
+    az: "azure-cli 2.80.0",
+    bicep: "Bicep CLI version 0.40.0",
+    terraform: "Terraform v1.14.0",
+    ...(azd === undefined ? {} : { azd }),
+  };
+  const fixture = await hostFixture("linux", { tools });
+  const root = await tempRoot();
+  await execute(
+    ["init", "--project", "demo", "--risk-owner", "partner", "--target", "local", "--iac", iac],
+    root,
+    fixture,
+  );
+  const report = await new ApexService(root, fixture).doctor();
+  return { report, calls: fixture.calls };
+}
+
+test("Bicep runs require the exact pinned azd and name the remedy", async () => {
+  const ready = await iacDoctor("bicep", `azd version ${AZD_PIN} (commit 0123456789abcdef)`);
+  assert.deepEqual(
+    [check(ready.report, "executable:azd").ok, check(ready.report, "executable:azd").value],
+    [true, AZD_PIN],
+  );
+  assert.ok(ready.calls.some(([executable, ...args]) => executable === "azd" && args.join(" ") === "version"));
+
+  const missing = await iacDoctor("bicep");
+  const absent = check(missing.report, "executable:azd");
+  assert.equal(absent.ok, false);
+  assert.match(absent.value, /Bicep runs require azd/u);
+  assert.ok(absent.remedy?.includes(`azd ${AZD_PIN}`) && absent.remedy.includes("releases/tag/azure-dev-cli_"));
+  assert.ok(missing.report.remedies.includes(absent.remedy!));
+
+  const [major, minor, patch] = AZD_PIN.split(".").map(Number) as [number, number, number];
+  for (const [version, direction] of [
+    [`${major}.${minor}.${patch + 1}`, "newer"],
+    [`${major}.${minor + 1}.0`, "newer"],
+    [`${major + 1}.0.0`, "newer"],
+    [`${major}.${minor - 1}.${patch}`, "older"],
+  ] as const) {
+    const mismatched = check((await iacDoctor("bicep", `azd version ${version}`)).report, "executable:azd");
+    assert.equal(mismatched.ok, false, version);
+    assert.match(mismatched.value, new RegExp(`${version} is ${direction} than the pinned ${AZD_PIN}`, "u"));
+  }
+  for (const output of ["azd version 1.35.1-beta.1", "azd version unknown"]) {
+    const unreadable = check((await iacDoctor("bicep", output)).report, "executable:azd");
+    assert.deepEqual([unreadable.ok, unreadable.value], [false, "version unavailable from azd version"]);
+  }
+});
+
+test("Terraform runs neither check nor run azd", async () => {
+  const { report, calls } = await iacDoctor("terraform", `azd version ${AZD_PIN}`);
+  assert.equal(
+    report.checks.some(({ id }) => id === "executable:azd"),
+    false,
+  );
+  assert.equal(check(report, "executable:terraform").ok, true);
+  assert.equal(
+    calls.some(([executable]) => executable === "azd"),
+    false,
+  );
+});

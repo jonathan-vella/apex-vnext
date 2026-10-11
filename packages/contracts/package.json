@@ -37,7 +37,7 @@
     "build": "tsc -b",
     "schemas": "npm run build && node dist/export-schemas.js --metadata",
     "schemas:check": "npm run build && node dist/export-schemas.js --check --metadata",
-    "test": "node --test dist/test/contracts.test.js"
+    "test": "node --test dist/test/contracts.test.js dist/test/azd-binding.test.js"
   },
   "engines": {
     "node": ">=24.21.0"
