@@ -1,85 +1,161 @@
-# APEX vNext
+# APEX
 
-APEX vNext is the standalone development repository for the deterministic APEX
-runtime, CLI, managed Copilot customizations, qualification infrastructure, and
-release controls.
+**Design, validate and deploy Azure workloads with GitHub Copilot, one reviewed step at a time.**
 
-The product goal is a workload platform factory: a COE builds documented, coded
-archetypes, and consumers reuse independent copies and adapt them through APEX.
-Preserve rich output while minimizing repeated input and keeping one owner per
-fact. Both ALZ-backed workloads and standalone labs/demos are initial scope.
-
-The supported hosts are VS Code with the Copilot harness and the GitHub Copilot
-app on native Windows 11, and GitHub Copilot CLI on Linux or WSL2, without a
-devcontainer ([DECISION-033](docs/vnext/DECISIONS.md)). APEX ships as the
-`apex` Agent Plugin plus `apex init` onboarding; no plugin release is published
-yet.
-See the [PRD](docs/vnext/PRD.md) and [roadmap](docs/vnext/ROADMAP.md) for planned
-scope, and the [checkpoint](docs/vnext/PROJECT.md) for implementation status.
+APEX turns a conversation about a workload into reviewed requirements, an architecture with cost and policy
+constraints, Bicep or Terraform, validation evidence and a deployment preview. You approve each decision that matters.
+A deterministic runtime, not the model, owns the state, the gates and the evidence.
 
 > [!WARNING]
-> This repository is a pre-cutover release line with no current release
-> candidate. The `0.10.0` contract is being re-baselined for GitHub Copilot in
-> VS Code, the GitHub Copilot app and GitHub Copilot CLI. Prior qualification
-> is historical only.
+> **Preview software.** The current release is `0.11.0-next.2`, published under the `next` tag. It targets
+> **non-production** use: labs, demos and learning. Production deployment is blocked by design until its own approval
+> and execution model ships. Live qualification of the supported clients is still pending. See
+> [Project status](#project-status).
 
-## Start Here
+## What You Get
 
-For repository development, install locked dependencies and run qualification:
+- **A guided workflow.** One APEX agent in your Copilot client walks you through requirements, governance discovery,
+  architecture, implementation planning, IaC generation, validation, preview, deployment, inventory and a quality
+  review.
+- **Design that starts from policy.** Governance discovery runs before the architecture, so the design starts from known
+  constraints. APEX uses a reviewed baseline of your subscription's Azure Policy when one exists. Otherwise it uses
+  the shipped ALZ Corp reference baseline, which is an assumption about policy, not evidence of yours.
+- **Rich, traceable output.** Requirements, architecture and cost decisions, implementation intent, validation results
+  and operational documents are typed artifacts with a recorded lineage, not chat history.
+- **Bicep or Terraform.** One IaC track per run, with the same governed outcome. Terraform applies the exact saved plan
+  under native state locking.
+- **Human approval before any change.** A deployment changes Azure only after you approve its exact preview. The agent
+  guides, the kernel decides what is allowed next, and changed or stale inputs invalidate earlier approvals. The
+  optional interactive bootstrap is separate: it can create a missing federation and Reader assignment for governance
+  collection, but only after you confirm its own provisioning plan.
+- **Both ALZ-backed workloads and standalone labs.** The deployment purpose (`lab` today) is separate from the
+  foundation you build on.
 
-```bash
-npm ci
-npm run qualify:vnext
+## How It Works
+
+```mermaid
+flowchart LR
+    R["Requirements<br/>(you confirm intent)"] --> G[Governance and architecture]
+    G --> P[Implementation plan]
+    P --> C[IaC generation and validation]
+    C --> V["Deployment preview<br/>(you approve it)"]
+    V --> D[Deploy]
+    D --> O[Inventory, diagnosis and quality]
 ```
 
-Consumer onboarding starts with [Manage installation](docs/how-to/manage-installation.md),
-not a clone of this development repository. It covers install, update and reset
-for each host. No token-baseline project is required now.
+In a `lab` run you confirm your intent once, after the requirements are reviewed, and approve the final deployment
+preview. The architecture and plan checkpoints between them are recorded by the kernel when their required reviews and
+validators pass; they never count as your approval. Each apply and each destroy needs its own preview and approval.
 
-Use focused commands while developing:
+Three layers keep responsibilities separate:
 
-```bash
-npm run build:vnext
-npm run validate:vnext
-npm run test:vnext
-npm run test:vnext-validator
-npm run test:vnext-pack
-```
+| Layer              | Owns                                                                                       |
+| ------------------ | ------------------------------------------------------------------------------------------ |
+| **The kernel**     | State, gates, authorization, evidence and recovery. It is deterministic and has no model.  |
+| **The agent**      | The conversation: asking, proposing and explaining. It follows what the kernel says next.  |
+| **The validators** | Contract, policy, ownership and native-tool checks that decide whether a proposal is sound. |
+
+Read [Workflow and gates](docs/explanation/workflow-and-gates.md) and
+[Security and authority](docs/explanation/security-and-authority.md) for the full model.
+
+## Supported Clients
+
+| Client                           | Platform                | Start APEX                                                |
+| -------------------------------- | ----------------------- | --------------------------------------------------------- |
+| VS Code with the Copilot harness | Windows 11              | Set the session target to **Copilot**, then pick **APEX** |
+| GitHub Copilot app               | Windows 11              | Start a local session in the project with **APEX**        |
+| GitHub Copilot CLI               | Linux or WSL2           | Run `copilot --agent apex` in the workspace               |
+
+Use one client per workspace. Local sandboxing should be on. No devcontainer is needed. Other combinations are not
+qualified; see [client support](docs/reference/client-support.md).
+
+## Quick Start
+
+APEX has two parts: the `apex` Agent Plugin, which carries the agent, skills and MCP server, and the `@apexops/cli`
+npm package, which sets up and checks your workspace. Install both at the same version.
+
+1. **Prepare the host.** On Windows, follow [Prepare Windows 11](docs/how-to/prepare-windows-11.md). Turn on your
+   client's sandbox. You need Node.js 24.21.0 or newer and Git.
+2. **Install the plugin.**
+
+   ```bash
+   copilot plugin marketplace add jonathan-vella/apex-plugins
+   copilot plugin install apex@apex-plugins
+   ```
+
+3. **Set up a workspace.** In an empty project directory, use the version shown by `copilot plugin list`:
+
+   ```bash
+   npx --yes @apexops/cli@PLUGIN_VERSION bootstrap --create-repo --yes
+   ```
+
+4. **Start APEX** in your client and describe the workload you want. The agent asks for the rest and tells you what it
+   needs approved.
+
+The full steps, including updating and resetting, are in
+[Install, update and reset APEX](docs/how-to/manage-installation.md). First-run walkthroughs:
+[Windows 11](docs/tutorials/windows-11-first-run.md) and
+[Copilot CLI on WSL2](docs/tutorials/wsl2-vscode-consumer-runbook.md).
+
+The `bootstrap` command above needs no Azure sign-in. The optional interactive governance setup is separate and does
+need an authenticated Azure session, because it can check your account and provision the identity access that
+governance collection uses. Deployments to Azure always go through an approved preview.
+
+## Project Status
+
+| Area                           | State                                                                                          |
+| ------------------------------ | ---------------------------------------------------------------------------------------------- |
+| Runtime, CLI and agent plugin  | Preview `0.11.0-next.2`, published to npm (`next`) and the `apex-plugins` marketplace           |
+| Lab approval flow              | Implemented: one intent confirmation, kernel readiness checkpoints, final preview approval     |
+| Bicep and Terraform tracks     | Implemented with native tooling. Bicep moves to an `azd` executor in a coming release           |
+| Supported-client qualification | Pending. Live runs in the three clients are still to be recorded                                |
+| Production deployments         | **Not available.** Planned as an opt-in, CI-owned run with verified human approval and setup help |
+
+The scope, decisions and plan live in the [PRD](docs/vnext/PRD.md), the [roadmap](docs/vnext/ROADMAP.md),
+the [decision log](docs/vnext/DECISIONS.md) and the [project checkpoint](docs/vnext/PROJECT.md).
+Release notes are in the [changelog](CHANGELOG.md).
 
 ## Documentation
 
-- [Documentation index](docs/README.md)
-- [Install, update and reset APEX](docs/how-to/manage-installation.md)
-- [First local run](docs/tutorials/first-run.md)
-- [Workflow](docs/how-to/run-workflow.md)
-- [CLI reference](docs/reference/cli.md)
-- [Operations](docs/how-to/operate-project.md)
-- [Security and authority](docs/explanation/security-and-authority.md)
-- [Security policy and vulnerability reporting](SECURITY.md)
-- [Qualification](docs/how-to/qualify-candidate.md)
-- [Project and release controls](docs/vnext/README.md)
+| I want to...                           | Read                                                                  |
+| -------------------------------------- | --------------------------------------------------------------------- |
+| Install, update or reset APEX          | [Manage installation](docs/how-to/manage-installation.md)             |
+| Understand a run end to end            | [Run the workflow](docs/how-to/run-workflow.md)                       |
+| Operate an existing project            | [Operate a project](docs/how-to/operate-project.md)                   |
+| Look up commands and MCP tools         | [CLI reference](docs/reference/cli.md), [MCP reference](docs/reference/mcp.md) |
+| Compare the Bicep and Terraform tracks | [IaC tracks](docs/reference/iac-tracks.md)                            |
+| Understand the safety model            | [Security and authority](docs/explanation/security-and-authority.md)  |
+| Browse everything                      | [Documentation index](docs/README.md)                                 |
 
-Documentation is maintained as ordinary Markdown under `docs/`. This repository
-does not include or publish an Astro site.
+## Contributing
 
-## Repository Structure
+Contributions are welcome. APEX is developed in this repository from issues, with conventional branches and commits
+and one focused change per pull request.
 
-| Path                                                                      | Purpose                                                                       |
-| ------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `packages/`                                                               | TypeScript contracts, kernel, capabilities, renderers, testkit, and CLI       |
-| `customizations/`                                                         | Canonical managed source for supported Copilot client projections             |
-| `config/`                                                                 | Runtime, workflow, capability-pack, toolchain, and scorecard contracts        |
-| `infra/`                                                                  | Bicep and Terraform qualification infrastructure                              |
-| `tools/`                                                                  | Validators, packaging, live qualification, MCP servers, and project utilities |
-| `docs/tutorials/`, `docs/how-to/`, `docs/explanation/`, `docs/reference/` | vNext product documentation                                                   |
-| `docs/vnext/`                                                             | Product scope, roadmap, decisions, risks, and qualification procedures        |
+```bash
+npm ci
+npm run build:vnext
+npm run validate:vnext
+```
 
-## Release Safety
+Read [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md) before opening a pull request. They explain the
+package layout, the validation each kind of change needs, and the rules for the kernel, contracts and managed skills.
+The [project hub](docs/vnext/README.md) holds scope, risks and qualification procedures.
 
-Cloud deployment, GitHub Environment approval, package publication, tags, and
-release cutover remain explicit maintainer-authorized operations. Local tests do
-not substitute for the live evidence required by the
-[product acceptance criteria](docs/vnext/PRD.md#cutover-acceptance).
+| Path              | Purpose                                                                        |
+| ----------------- | ------------------------------------------------------------------------------ |
+| `packages/`       | TypeScript contracts, kernel, capabilities, renderers, testkit and the CLI     |
+| `customizations/` | Canonical source for the agent, skills and hooks that ship in the plugin       |
+| `config/`         | Versioned workflow, policy, toolchain and quality contracts                    |
+| `infra/`          | Bicep and Terraform qualification infrastructure                               |
+| `tools/`          | Validators, packaging, live qualification and project utilities                |
+| `docs/`           | Product documentation, plus project controls under `docs/vnext/`               |
+
+## Security
+
+Report vulnerabilities privately; see [SECURITY.md](SECURITY.md). Cloud deployment, package publication and release
+cutover are explicit, maintainer-authorized operations, and local tests do not replace the live evidence the
+[acceptance criteria](docs/vnext/PRD.md#cutover-acceptance) require.
 
 ## License
 
