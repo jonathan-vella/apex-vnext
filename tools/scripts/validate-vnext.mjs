@@ -574,6 +574,37 @@ function validateToolchainVscode(toolchain, findings) {
   }
 }
 
+function validateToolchainAzd(toolchain, findings) {
+  const source = "config/toolchain.v1.json";
+  const azd = toolchain?.core?.azd;
+  const selected = releaseVersion(azd?.selectedExactVersion);
+  if (selected === undefined) {
+    finding(findings, "toolchain.azd-pin", "core.azd.selectedExactVersion must be an exact release version", source);
+    return;
+  }
+  if (toolchain.compatibilitySet?.azd !== azd.selectedExactVersion)
+    finding(findings, "toolchain.azd-pin", "compatibilitySet.azd must equal core.azd.selectedExactVersion", source);
+  const newest = releaseVersion(azd.newestObservedVersion);
+  if (newest === undefined || compareReleaseVersions(newest, selected) < 0)
+    finding(
+      findings,
+      "toolchain.azd-pin",
+      "core.azd.newestObservedVersion must be a release version at or above the selected version",
+      source,
+    );
+  if (!/^[0-9a-f]{64}$/u.test(azd.releaseArtifact?.sha256 ?? ""))
+    finding(findings, "toolchain.azd-pin", "core.azd.releaseArtifact.sha256 must be a SHA-256 digest", source);
+  if (!String(azd.authoritativeReleaseSource).endsWith(`azure-dev-cli_${azd.selectedExactVersion}`))
+    finding(
+      findings,
+      "toolchain.azd-pin",
+      "core.azd.authoritativeReleaseSource must name the selected release tag",
+      source,
+    );
+  if (JSON.stringify(azd.requiredFor) !== '["bicep"]' || JSON.stringify(azd.notRequiredFor) !== '["terraform"]')
+    finding(findings, "toolchain.azd-pin", "azd is required for Bicep runs only (DECISION-036)", source);
+}
+
 function validateConfig(model, findings) {
   for (const [name, requiredKeys] of Object.entries(CONFIG_SHAPES)) {
     const value = model.config[name];
@@ -585,6 +616,7 @@ function validateConfig(model, findings) {
         finding(findings, "config.shape", `${name} has unknown top-level field ${key}`, `config/${name}`);
   }
   validateToolchainVscode(model.config["toolchain.v1.json"], findings);
+  validateToolchainAzd(model.config["toolchain.v1.json"], findings);
   const workflow = model.config["workflow.v1.json"];
   const nodes = array(workflow.nodes);
   const nodeIds = nodes.map(({ id }) => id);

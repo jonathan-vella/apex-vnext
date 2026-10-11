@@ -17,6 +17,13 @@ import type { HostEnvironment } from "../host-profile.js";
 import type { ApexService, ServiceOptions, TaskOutput } from "../service.js";
 import { APEX_VERSION } from "../version.js";
 
+/** The azd release the repository toolchain pins; a ready Bicep host reports exactly this. */
+export const AZD_PINNED_VERSION = (
+  JSON.parse(await readFile(join(import.meta.dirname, "../../../../config/toolchain.v1.json"), "utf8")) as {
+    compatibilitySet: { azd: string };
+  }
+).compatibilitySet.azd;
+
 const roots: string[] = [];
 
 // Rubber-duck captures and their signing key live outside the workspace. Tests always use a suite-owned review home,
@@ -754,6 +761,7 @@ export async function hostFixture(
   const tools = input.tools ?? {
     git: "git version 2.51.0",
     copilot: "GitHub Copilot CLI 1.0.93.",
+    azd: `azd version ${AZD_PINNED_VERSION}`,
     ...(kind === "wsl2" || kind === "linux"
       ? { bwrap: "bubblewrap 0.11.0", slirp4netns: "slirp4netns version 1.2.1" }
       : {}),
