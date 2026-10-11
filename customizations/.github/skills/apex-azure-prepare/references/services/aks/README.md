@@ -41,7 +41,7 @@ The cluster needs no other resource to exist. Add each integration only when the
 | Container Registry      | Image storage          | Workloads pull private images; grant the kubelet identity AcrPull  |
 | Log Analytics Workspace | Container Insights     | The design enables Container Insights or other Azure Monitor logs  |
 | Virtual Network         | Network isolation      | Custom networking or private cluster requirements                  |
-| Key Vault               | Secrets management     | Workloads read secrets through the Key Vault CSI provider add-on   |
+| Key Vault               | Secrets management     | Optional; only for secrets that cannot use workload identity or Entra authentication, read through the Key Vault CSI provider add-on   |
 
 ## Node Pool Types
 

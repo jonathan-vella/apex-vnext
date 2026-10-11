@@ -44,7 +44,7 @@ services:
 | Resource             | Purpose                          | Needed when                                |
 | -------------------- | -------------------------------- | ------------------------------------------ |
 | Storage Account      | Function runtime state           | Always                                     |
-| App Service Plan     | Hosting (Consumption or Premium) | Always                                     |
+| Hosting plan         | Compute for the selected plan (Flex Consumption by default) | Always                                     |
 | Application Insights | Monitoring                       | Optional; add it for application telemetry |
 
 ## Hosting Plans

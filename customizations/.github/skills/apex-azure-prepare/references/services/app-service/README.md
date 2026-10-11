@@ -31,7 +31,7 @@ services:
 | -------------------- | --------------- | ---------------------------------------- |
 | App Service Plan     | Compute hosting | Always                                   |
 | Application Insights | Monitoring      | Optional; add it for application telemetry |
-| Key Vault            | Secrets         | Optional; the app reads secrets from it  |
+| Key Vault            | Secrets         | Optional; only for secrets that cannot use managed identity or Entra authentication |
 
 ## Runtime Stacks
 
