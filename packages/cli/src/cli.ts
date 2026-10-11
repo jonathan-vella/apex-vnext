@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { mkdir, readFile, realpath, writeFile } from "node:fs/promises";
-import { NativeBicepProvider, NativeTerraformProvider, ProcessRunner, type IacProvider } from "@apexops/capabilities";
+import { AzdBicepProvider, NativeTerraformProvider, ProcessRunner, type IacProvider } from "@apexops/capabilities";
 import {
   CONTRACT_VERSION,
   OnboardingConfigV1Schema,
@@ -33,6 +33,7 @@ import { join, resolve } from "node:path";
 import { ApexError, EXIT_CODES, normalizeError } from "./errors.js";
 import { dependencyRevision as calculateDependencyRevision } from "./dependency-revision.js";
 import { isDeploymentPurpose } from "./purpose.js";
+import { bundledToolchainMinimums } from "./toolchain-pin.js";
 import { resolveBundledAssets } from "./assets.js";
 import { assertTargetScope } from "./target-scope.js";
 import { serveMcp, type McpServiceResolver } from "./mcp.js";
@@ -146,17 +147,12 @@ async function onboardingConfig(flags: Flags, _root: string): Promise<Onboarding
 
 interface NativeProviderConfig {
   bicep?: {
-    resourceGroup: string;
-    deploymentName: string;
-    stackName: string;
-    templateFile: string;
-    parametersFile?: string;
-    cwd?: string;
-    actionOnUnmanage?: "deleteAll" | "deleteResources" | "detachAll";
-    denySettingsMode?: "denyDelete" | "denyWriteAndDelete" | "none";
-    ownershipAuthorizesDeleteResources?: boolean;
-    dedicatedSandboxResourceGroup?: boolean;
-    allowDeleteAll?: boolean;
+    /** Accepted generated azd project root, relative to the workspace. */
+    cwd: string;
+    environmentName: string;
+    tenantId: string;
+    location: string;
+    cloud?: "AzureCloud" | "AzureUSGovernment" | "AzureChinaCloud";
   };
   terraform?: {
     cwd: string;
@@ -233,31 +229,30 @@ async function configuredProviders(
   const providers: Partial<Record<"bicep" | "terraform", IacProvider>> = {};
   if (config.bicep !== undefined) {
     const value = config.bicep;
-    for (const key of ["resourceGroup", "deploymentName", "stackName", "templateFile"] as const) {
+    for (const key of Object.keys(value)) {
+      if (!["cwd", "environmentName", "tenantId", "location", "cloud"].includes(key))
+        throw new ApexError(
+          "APEX_USAGE",
+          `Bicep provider config does not support '${key}'; azd is the only Bicep executor and Deployment Stacks are not supported`,
+          EXIT_CODES.usage,
+        );
+    }
+    for (const key of ["cwd", "environmentName", "tenantId", "location"] as const) {
       if (typeof value[key] !== "string" || value[key].length === 0)
         throw new ApexError("APEX_USAGE", `Bicep provider config requires ${key}`, EXIT_CODES.usage);
     }
     const localRuntime = await runtime();
-    providers.bicep = new NativeBicepProvider({
+    providers.bicep = new AzdBicepProvider({
       runner,
       currentAuthority,
       bindingStore: localRuntime.bindingStores.bicep,
       target: {
-        resourceGroup: value.resourceGroup,
-        deploymentName: value.deploymentName,
-        stackName: value.stackName,
-        templateFile: value.templateFile,
-        actionOnUnmanage: value.actionOnUnmanage ?? "detachAll",
-        denySettingsMode: value.denySettingsMode ?? "denyDelete",
-        ...(value.ownershipAuthorizesDeleteResources === undefined
-          ? {}
-          : { ownershipAuthorizesDeleteResources: value.ownershipAuthorizesDeleteResources }),
-        ...(value.dedicatedSandboxResourceGroup === undefined
-          ? {}
-          : { dedicatedSandboxResourceGroup: value.dedicatedSandboxResourceGroup }),
-        ...(value.allowDeleteAll === undefined ? {} : { allowDeleteAll: value.allowDeleteAll }),
-        ...(value.parametersFile === undefined ? {} : { parametersFile: value.parametersFile }),
-        ...(value.cwd === undefined ? {} : { cwd: value.cwd }),
+        projectRoot: resolve(root, value.cwd),
+        environmentName: value.environmentName,
+        tenantId: value.tenantId,
+        location: value.location,
+        azdVersion: (await bundledToolchainMinimums()).azd,
+        ...(value.cloud === undefined ? {} : { cloud: value.cloud }),
       },
     });
   }

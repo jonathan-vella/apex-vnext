@@ -13,6 +13,7 @@ import {
   type ProviderTransferBundle,
   type ProviderTransferProvider,
 } from "../provider-transfer.js";
+import { azdBindingFixture } from "./azd-binding-fixture.js";
 import { tempRoot, writeJson } from "./helpers.js";
 
 const instant = new Date("2026-07-15T10:00:00.000Z");
@@ -62,9 +63,8 @@ function bicepBinding() {
     kind: "bicep",
     preview: preview("bicep"),
     providerBindingHash: hashes.provider,
-    templateHash: hashes.template,
-    parametersHash: hashes.parameters,
-    stackStateHash: hashes.stack,
+    azdBinding: azdBindingFixture(),
+    ownedStateHash: hashes.stack,
   };
 }
 

@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { test } from "./test-shard.js";
 import type { LocalEncryptedPlan, PersistedPreviewBinding } from "@apexops/capabilities";
 import { createFileProviderRuntime, hashTerraformConfiguration, hashTerraformLockFile } from "../provider-runtime.js";
+import { azdBindingFixture } from "./azd-binding-fixture.js";
 import { tempRoot } from "./helpers.js";
 
 const previewHash = "a".repeat(64);
@@ -17,10 +18,9 @@ const binding = {
     previewHash,
   },
   providerBindingHash: "b".repeat(64),
-  templateHash: "c".repeat(64),
-  parametersHash: "d".repeat(64),
-  stackStateHash: "e".repeat(64),
-} as PersistedPreviewBinding;
+  azdBinding: azdBindingFixture(),
+  ownedStateHash: "e".repeat(64),
+} as unknown as PersistedPreviewBinding;
 const artifact: LocalEncryptedPlan = {
   metadata: {
     implementation: "local-reference",

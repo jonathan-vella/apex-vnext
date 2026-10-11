@@ -327,8 +327,8 @@ export function validateWorkflowText(text) {
   );
   fail(apply.includes('deploy --preview "${{ inputs.preview_hash }}"'), "deploy must use exact dispatch preview hash");
   fail(
-    apply.includes('denySettingsMode:"none"') && !apply.includes('denySettingsMode:"denyDelete"'),
-    "qualification stack must not require deny-assignment permissions",
+    !apply.includes("stackName") && !apply.includes("denySettingsMode"),
+    "deployment stacks are out of scope; azd is the only Bicep executor",
   );
   fail(
     apply.includes("terraform -chdir=infra/terraform/vnext-qualification init"),

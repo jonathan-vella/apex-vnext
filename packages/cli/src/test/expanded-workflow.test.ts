@@ -22,7 +22,7 @@ import {
   NATIVE_VALIDATION_COMMANDS,
 } from "@apexops/contracts";
 import {
-  NativeBicepProvider,
+  AzdBicepProvider,
   NativeTerraformProvider,
   nativePolicyValidationBinding,
   validatePolicyProperties,
@@ -36,6 +36,7 @@ import { EventJournal, ObjectStore, RunRepository, ValidatorRegistry, sha256Byte
 import { ApexError } from "../errors.js";
 import { dependencyRevision } from "../dependency-revision.js";
 import { connectMcp } from "./mcp-client.js";
+import { createFakeAzd, handleFakeAzd, writeAzdProject } from "./azd-fake.js";
 import { MCP_OUTPUT_SCHEMAS } from "../mcp-output-schemas.js";
 import { ApexService, type TaskOutput } from "../service.js";
 import { registerWorkflowValidators } from "../workflow-validators.js";
@@ -624,7 +625,7 @@ function bicepPreviewProvider(now: Date): IacProvider {
         operationId: "bicep-operation",
         projectId: preview.projectId,
         runId: preview.runId,
-        providerOperationId: "/stack/workload",
+        providerOperationId: "/azd/workload",
         operation: preview.operation,
         state: "succeeded" as const,
         previewHash: preview.previewHash,
@@ -636,7 +637,7 @@ function bicepPreviewProvider(now: Date): IacProvider {
         mode: "native",
         operationId: operation.operationId,
         previewHash: preview.previewHash,
-        validatorIds: ["deploy:bicep-stack-ownership"],
+        validatorIds: ["deploy:bicep-azd-execution"],
       };
       return operation;
     },
@@ -1141,7 +1142,7 @@ for (const secure of [true, false]) {
     const provider: IacProvider = {
       ...nativeBase,
       async validateSource(request) {
-        const native = new NativeBicepProvider({
+        const native = new AzdBicepProvider({
           runner: {
             run: async (command) => {
               commands.push(`${command.executable}:${command.args[0]}`);
@@ -1153,12 +1154,11 @@ for (const secure of [true, false]) {
             throw new Error("No cloud authority in compiler fixture");
           },
           target: {
-            cwd: request.generatedSource.rootPath,
-            templateFile: "main.bicep",
-            resourceGroup: "rg-test",
-            deploymentName: "fixture",
-            stackName: "fixture",
-            denySettingsMode: "denyDelete",
+            projectRoot: request.generatedSource.rootPath,
+            environmentName: "dev",
+            tenantId: "22222222-2222-2222-2222-222222222222",
+            location: "swedencentral",
+            azdVersion: "1.35.1",
           },
         });
         return native.validateSource(request);
@@ -1876,7 +1876,7 @@ for (const track of ["bicep", "terraform"] as const) {
     assert.deepEqual(
       (deployment?.payload as { omittedValidatorIds?: unknown }).omittedValidatorIds,
       track === "bicep"
-        ? ["deploy:bicep-stack-ownership"]
+        ? ["deploy:bicep-azd-execution"]
         : ["deploy:exact-saved-plan", "deploy:state-lineage-and-serial"],
     );
     assert.equal((deployment?.payload as { evidenceMode?: unknown }).evidenceMode, "simulated");
@@ -2048,7 +2048,7 @@ for (const track of ["bicep", "terraform"] as const) {
   });
 }
 
-test("native Bicep deploy records stack ownership evidence in manifest order", async () => {
+test("native Bicep deploy records azd execution evidence in manifest order", async () => {
   const now = new Date("2026-01-01T00:00:00.000Z");
   const root = await tempRoot();
   const service = new ApexService(root, { clock: () => now, providers: { bicep: bicepPreviewProvider(now) } });
@@ -2066,7 +2066,7 @@ test("native Bicep deploy records stack ownership evidence in manifest order", a
   const completed = [...events].reverse().find((event) => event.type === "deployment.completed");
   assert.deepEqual((completed?.payload as { validatorIds?: unknown }).validatorIds, [
     "deploy:exact-approved-operation",
-    "deploy:bicep-stack-ownership",
+    "deploy:bicep-azd-execution",
     "deploy:stale-writer-rejection",
   ]);
   assert.deepEqual((completed?.payload as { preValidatorIds?: unknown }).preValidatorIds, [
@@ -2074,7 +2074,7 @@ test("native Bicep deploy records stack ownership evidence in manifest order", a
     "deploy:stale-writer-rejection",
   ]);
   assert.deepEqual((completed?.payload as { postValidatorIds?: unknown }).postValidatorIds, [
-    "deploy:bicep-stack-ownership",
+    "deploy:bicep-azd-execution",
   ]);
   assert.equal((completed?.payload as { evidenceMode?: unknown }).evidenceMode, "native");
 });
@@ -4566,11 +4566,15 @@ for (const track of ["bicep", "terraform"] as const) {
       if (mode !== "simulated") {
         const sourceRoot = join(root, ".apex/work/code");
         await mkdir(sourceRoot, { recursive: true });
-        const source = {
-          path: track === "bicep" ? "main.bicep" : "main.tf",
-          content: track === "bicep" ? "targetScope = 'resourceGroup'\n" : "terraform {}\n",
-        };
-        await writeFile(join(sourceRoot, source.path), source.content);
+        const sourceFiles =
+          track === "bicep"
+            ? (await writeAzdProject(sourceRoot)).files
+            : [{ path: "main.tf", content: "terraform {}\n" }];
+        if (track === "terraform") await writeFile(join(sourceRoot, "main.tf"), "terraform {}\n");
+        const azd = createFakeAzd({
+          groups: [{ name: "rg-test", tags: { "azd-env-name": "dev" } }],
+          preview: [{ Operation: "Create", Type: "Microsoft.Storage/storageAccounts", Name: "apidemo" }],
+        });
         const bundle = codegenBundle(runId, track, generated.plan);
         const handoff = bundle.find(({ kind }) => kind === "iac-handoff")!.value as IacHandoffV1;
         const terraformAddress = mode === "native-module" ? "module.api.azapi_resource.storage" : "azapi_resource.api";
@@ -4581,7 +4585,7 @@ for (const track of ["bicep", "terraform"] as const) {
           if (track === "bicep") manifest.resources[0]!.implementationKind = "module";
           handoff.logicalResourceManifestHash = sha256Json(manifest);
         }
-        handoff.treeHash = sha256Json([source]);
+        handoff.treeHash = sha256Json(sourceFiles);
         const generatedHashes = (await service.completeTaskOutputs(generated.taskId, bundle)).outputHashes;
         const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", runId, "journal"));
         const runtime = await createFileProviderRuntime(root);
@@ -4607,17 +4611,8 @@ for (const track of ["bicep", "terraform"] as const) {
               });
             } else if (command.executable === "bicep" && ["format", "lint"].includes(command.args[0]!)) {
               stdout = "";
-            } else if (command.executable === "az" && command.args.includes("what-if")) {
-              stdout = JSON.stringify({
-                changes: [
-                  {
-                    resourceId: `${targetScope}/providers/Microsoft.Storage/storageAccounts/apidemo`,
-                    changeType: "Create",
-                  },
-                ],
-              });
-            } else if (command.executable === "az" && command.args.includes("list")) {
-              stdout = "[]";
+            } else if (command.executable === "azd" || command.executable === "az") {
+              stdout = (await handleFakeAzd(azd, command)) ?? "";
             } else if (command.executable === "terraform" && ["init", "fmt", "validate"].includes(command.args[0]!)) {
               stdout = "";
             } else if (
@@ -4676,18 +4671,17 @@ for (const track of ["bicep", "terraform"] as const) {
         };
         const makeProvider = () =>
           track === "bicep"
-            ? new NativeBicepProvider({
+            ? new AzdBicepProvider({
                 runner,
                 currentAuthority,
                 now: () => now,
                 bindingStore: runtime.bindingStores.bicep,
                 target: {
-                  cwd: sourceRoot,
-                  templateFile: "main.bicep",
-                  resourceGroup: "rg-test",
-                  deploymentName: "policy-test",
-                  stackName: "policy-test",
-                  denySettingsMode: "denyDelete",
+                  projectRoot: sourceRoot,
+                  environmentName: "dev",
+                  tenantId: "22222222-2222-2222-2222-222222222222",
+                  location: "swedencentral",
+                  azdVersion: "1.35.1",
                 },
               })
             : new NativeTerraformProvider({

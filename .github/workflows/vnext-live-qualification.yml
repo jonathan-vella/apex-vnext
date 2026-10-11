@@ -224,8 +224,8 @@ jobs:
         run: |
           set -euo pipefail
           if test "$TRACK" = bicep; then
-            jq -n --arg project "$APEX_PROJECT_NAME" --arg location "$APEX_LOCATION" --arg workspace "$APEX_LOG_ANALYTICS_WORKSPACE_RESOURCE_ID" --argjson tags "$APEX_QUALIFICATION_TAGS_JSON" '{"$schema":"https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",contentVersion:"1.0.0.0",parameters:{projectName:{value:$project},environment:{value:"qualification"},location:{value:$location},tags:{value:$tags},logAnalyticsWorkspaceResourceId:{value:$workspace}}}' > apex-live/main.parameters.json
-            jq -n --arg rg "$APEX_BICEP_RESOURCE_GROUP" --arg template "$GITHUB_WORKSPACE/infra/bicep/vnext-qualification/main.bicep" --arg params "$GITHUB_WORKSPACE/apex-live/main.parameters.json" '{bicep:{resourceGroup:$rg,deploymentName:"vnext-qualification",stackName:"vnext-qualification",templateFile:$template,parametersFile:$params,actionOnUnmanage:"deleteResources",ownershipAuthorizesDeleteResources:true,dedicatedSandboxResourceGroup:true,denySettingsMode:"none"}}' > apex-live/provider-config.json
+            echo "Bicep live qualification is unavailable until CP-30 qualifies the azd executor" >&2
+            exit 1
           else
             printf 'resource_group_name = "%s"\nstorage_account_name = "%s"\ncontainer_name = "tfstate"\nkey = "vnext-qualification.tfstate"\nuse_oidc = true\nuse_azuread_auth = true\n' "$APEX_CONTROL_RESOURCE_GROUP" "$APEX_BACKEND_STORAGE_ACCOUNT" > apex-live/backend.hcl
             printf 'TF_CLI_ARGS_init=-backend-config=%s\n' "$GITHUB_WORKSPACE/apex-live/backend.hcl" >> "$GITHUB_ENV"

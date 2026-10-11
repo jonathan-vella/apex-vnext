@@ -137,9 +137,9 @@ const ownershipGroups: readonly OwnershipGroup[] = [
     boundary: "deploy",
   },
   {
-    ids: ["deploy:bicep-stack-ownership"],
+    ids: ["deploy:bicep-azd-execution"],
     owner: "@apexops/capabilities",
-    entrypoint: "NativeBicepProvider.apply",
+    entrypoint: "AzdBicepProvider.apply",
     execution: "capability",
     boundary: "deploy",
   },

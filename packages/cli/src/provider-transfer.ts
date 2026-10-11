@@ -1,6 +1,7 @@
 import { chmod, lstat, mkdir, readFile } from "node:fs/promises";
 import { join, relative, resolve, sep } from "node:path";
 import { BoundEnvelopeTransport, type BoundEnvelope, type EnvelopeBindings } from "@apexops/capabilities";
+import { hasValidAzdBinding } from "@apexops/contracts";
 import { atomicWriteBytes, canonicalJsonBytes, sha256Bytes, sha256Json, type JsonValue } from "@apexops/kernel";
 
 export const PROVIDER_TRANSFER_KIND = "apex-provider-authority";
@@ -186,7 +187,7 @@ function parseBinding(
   exactKeys(
     binding,
     binding.kind === "bicep"
-      ? ["kind", "parametersHash", "preview", "providerBindingHash", "stackStateHash", "templateHash"]
+      ? ["azdBinding", "kind", "ownedStateHash", "preview", "providerBindingHash"]
       : ["attestation", "kind", "preview"],
     "Provider binding",
   );
@@ -204,9 +205,8 @@ function parseBinding(
   }
   if (preview.track !== binding.kind) throw new Error("Provider binding track is invalid");
   if (binding.kind === "bicep") {
-    for (const key of ["parametersHash", "providerBindingHash", "stackStateHash", "templateHash"] as const) {
-      requireHash(binding[key], `Bicep ${key}`);
-    }
+    for (const key of ["ownedStateHash", "providerBindingHash"] as const) requireHash(binding[key], `Bicep ${key}`);
+    if (!hasValidAzdBinding(binding.azdBinding)) throw new Error("Bicep azdBinding is invalid");
   }
   const common: ProviderTransferBindings = {
     provider: binding.kind as ProviderTransferProvider,

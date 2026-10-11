@@ -780,7 +780,7 @@ test("full requirements to fake deploy workflow survives restart", async () => {
   ]);
   assert.deepEqual((completed?.payload as { postValidatorIds?: unknown }).postValidatorIds, []);
   assert.deepEqual((completed?.payload as { omittedValidatorIds?: unknown }).omittedValidatorIds, [
-    "deploy:bicep-stack-ownership",
+    "deploy:bicep-azd-execution",
   ]);
   assert.equal((completed?.payload as { evidenceMode?: unknown }).evidenceMode, "simulated");
 
