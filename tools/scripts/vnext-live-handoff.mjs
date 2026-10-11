@@ -52,10 +52,12 @@ export function workflowRef(repository, ref = BRANCH) {
 export function validateDispatchRunState(status, track) {
   const run = status?.result?.run;
   if (run?.iacTool !== track) throw new Error("Selected APEX run does not match --track");
-  const gate3 = run.gates?.find((gate) => gate.gate === 3);
   const gate4 = run.gates?.find((gate) => gate.gate === 4);
-  if (!new Set(["approved", "inherited"]).has(gate3?.state)) {
-    throw new Error("Selected APEX run requires approved Gate 3 before dispatch");
+  // The kernel decides whether Gate 3 counts: an approved or inherited gate, or a lab readiness checkpoint whose
+  // journal record is still current. The raw run file state is not trusted. Dispatch still needs the human Gate 4
+  // approval of the exact preview, which approvedDispatchState verifies.
+  if (!Array.isArray(status.result.satisfiedGates) || !status.result.satisfiedGates.includes(3)) {
+    throw new Error("Selected APEX run requires a kernel-satisfied Gate 3 (approved or current lab readiness)");
   }
   if (!new Set(["closed", "invalidated", "open", "approved", "rejected"]).has(gate4?.state)) {
     throw new Error("Selected APEX run has an unsupported Gate 4 state");

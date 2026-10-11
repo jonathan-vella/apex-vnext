@@ -484,6 +484,7 @@ test("launcher binds local approval to the stable handoff recipient", () => {
     approvedDispatchState(
       {
         result: {
+          satisfiedGates: [1, 2, 3, 4],
           run: {
             iacTool: "bicep",
             ownerEpoch: 3,
@@ -515,6 +516,7 @@ test("launcher binds local approval to the stable handoff recipient", () => {
       approvedDispatchState(
         {
           result: {
+            satisfiedGates: [1, 2, 3, 4],
             run: {
               iacTool: "bicep",
               ownerEpoch: 3,
@@ -696,63 +698,64 @@ test("launcher cleans up before propagating a protected operation failure", asyn
   assert.ok(rendered.some((command) => command.includes("account show") && command.includes("publicNetworkAccess")));
 });
 
-test("launcher preflights selected track and gate state before dispatch", () => {
-  const status = {
-    result: {
-      run: {
-        iacTool: "bicep",
-        gates: [
-          { gate: 3, state: "approved" },
-          { gate: 4, state: "closed" },
-        ],
-      },
-    },
-  };
-  assert.equal(validateDispatchRunState(status, "bicep"), true);
-  assert.throws(() => validateDispatchRunState(status, "terraform"), /does not match/);
+test("launcher preflights selected track and the kernel's Gate 3 verdict before dispatch", () => {
+  const status = (satisfiedGates, gates, extra = {}) => ({
+    result: { satisfiedGates, run: { iacTool: "bicep", gates, ...extra } },
+  });
+  const closed4 = [
+    { gate: 3, state: "approved" },
+    { gate: 4, state: "closed" },
+  ];
+  assert.equal(validateDispatchRunState(status([1, 2, 3], closed4), "bicep"), true);
+  assert.throws(() => validateDispatchRunState(status([1, 2, 3], closed4), "terraform"), /does not match/);
+  assert.throws(() => validateDispatchRunState(status([1, 2], [{ gate: 3, state: "open" }]), "bicep"), /Gate 3/);
   assert.throws(
     () =>
       validateDispatchRunState(
-        { result: { run: { ...status.result.run, gates: [{ gate: 3, state: "open" }] } } },
-        "bicep",
-      ),
-    /Gate 3/,
-  );
-  assert.throws(
-    () =>
-      validateDispatchRunState(
-        {
-          result: {
-            run: {
-              ...status.result.run,
-              gates: [
-                { gate: 3, state: "approved" },
-                { gate: 4, state: "inherited" },
-              ],
-            },
-          },
-        },
+        status(
+          [1, 2, 3],
+          [
+            { gate: 3, state: "approved" },
+            { gate: 4, state: "inherited" },
+          ],
+        ),
         "bicep",
       ),
     /unsupported Gate 4/,
   );
   assert.equal(
     validateDispatchRunState(
-      {
-        result: {
-          run: {
-            ...status.result.run,
-            gates: [
-              { gate: 3, state: "approved" },
-              { gate: 4, state: "approved" },
-            ],
-          },
-        },
-      },
+      status(
+        [1, 2, 3, 4],
+        [
+          { gate: 3, state: "approved" },
+          { gate: 4, state: "approved" },
+        ],
+      ),
       "bicep",
     ),
     true,
   );
+});
+
+test("launcher follows the kernel's verdict for a lab readiness Gate 3, not the raw run state", () => {
+  const ready = [
+    { gate: 3, state: "ready" },
+    { gate: 4, state: "closed" },
+  ];
+  const status = (satisfiedGates, purpose) => ({
+    result: {
+      ...(satisfiedGates === undefined ? {} : { satisfiedGates }),
+      run: { iacTool: "bicep", purpose, gates: ready },
+    },
+  });
+  // The kernel proved the readiness record current.
+  assert.equal(validateDispatchRunState(status([1, 2, 3], "lab"), "bicep"), true);
+  // A restored run file shows `ready`, but the kernel rejects the stale record, so Gate 3 is not satisfied.
+  assert.throws(() => validateDispatchRunState(status([1, 2], "lab"), "bicep"), /Gate 3/);
+  // An older kernel without the field, or a malformed value, is never trusted.
+  assert.throws(() => validateDispatchRunState(status(undefined, "lab"), "bicep"), /Gate 3/);
+  assert.throws(() => validateDispatchRunState(status("3", "lab"), "bicep"), /Gate 3/);
 });
 
 test("launcher recognizes only the exact accepted local return owner", () => {
