@@ -89,7 +89,7 @@ tag on the Microsoft public registry (`br/public:` or `br:mcr.microsoft.com/bice
 spec without a version, URLs and undefined or redefined aliases fail with `AZD_MODULE_UNPINNED`. A template spec version
 is not content-addressed, so the executor must verify the resolved artifact (digest) at preflight; the binding records
 the reference, not the artifact, and does not verify it. Reference detection is regex-based rather than compiler-backed
-and relies on the pinned Bicep and azd versions; a compiler-backed inventory is tracked in #472.
+and relies on the pinned Bicep and azd versions.
 
 ### Execution envelope
 
@@ -113,10 +113,12 @@ own `bicepconfig.json` (so aliases and linter settings are never inherited from 
 
 ### azd Prerequisite
 
-Bicep runs require azd; Terraform runs do not. `config/toolchain.v1.json` pins the exact release (`core.azd`,
-`compatibilitySet.azd`: 1.35.1, observed 2026-10-11) and `apex doctor`, including the MCP doctor, reports an
-`executable:azd` check for Bicep runs. It fails with an install remedy when azd is missing, its version cannot be read,
-or it differs from the pin in either direction, because the approved binding includes the azd version.
+Bicep runs will require azd once the azd executor ships; Terraform runs never do. `config/toolchain.v1.json` pins the
+exact release (`core.azd`, `compatibilitySet.azd`: 1.35.1, observed 2026-10-11) and `apex doctor`, including the MCP
+doctor, reports an `executable:azd` check for Bicep runs. Until the executor ships Bicep still deploys with the native
+path, so the check is an advisory warning that never makes doctor unhealthy; it names the install remedy when azd is
+missing, its version cannot be read, or it differs from the pin in either direction. The executor will fail closed on
+any of those, because the approved binding includes the azd version.
 
 ## Resource Ownership
 

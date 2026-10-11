@@ -30,10 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   described by the what-if; they are not scanned, followed or verified, and production must re-evaluate this.
   `buildAzdArguments` builds only `provision` and `provision --preview` with explicit `--environment` and
   `--no-prompt`, and `assertAzdIdentityMatchesBinding` is the cloud, tenant and subscription preflight the executor must
-  pass. `doctor` now reports an `executable:azd` check for Bicep runs that requires the exact azd release pinned in
-  `config/toolchain.v1.json` (1.35.1); Terraform runs do not need azd. Execution still uses the native `az deployment`
-  path: azd does not provision anything until PR B replaces it, and `azd deploy` application packages follow in PR C.
-  Bicep reference detection stays regex-based; a compiler-backed inventory is tracked in #472.
+  pass. `doctor` reports an `executable:azd` check for Bicep runs against the exact azd release pinned in
+  `config/toolchain.v1.json` (1.35.1) as an advisory warning that never makes doctor unhealthy; Terraform runs do not
+  need azd. Execution still uses the native `az deployment` path: azd does not provision anything until PR B replaces
+  it, and `azd deploy` application packages follow in PR C. Bicep reference detection stays regex-based.
 
 - Record lab Gates 2 and 3 as kernel readiness checkpoints (CP-27, part 2). A new `ready` gate state and a journaled
   `gate.readiness-recorded` event (gate, dependency hash, passed validators; no actor or approval evidence) are recorded
