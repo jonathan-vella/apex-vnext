@@ -3,7 +3,8 @@
 # Consolidates: lint, agent-validation, policy-compliance-check
 # Runs markdown linting + all Node.js validators + handoff validation, then installs the agent plugin
 # with a pinned Copilot CLI and smoke-tests the installed MCP server (no Copilot sign-in or secret)
-# Skips the "Qualify APEX vNext" and plugin install steps for PRs whose changes are entirely under docs/
+# Skips the "Qualify APEX vNext" and plugin install steps, and the Windows package tests, for PRs whose changes are
+# entirely under docs/ or are the root contributor documents (README, CONTRIBUTING, CONTRIBUTORS, SECURITY)
 # (push and workflow_dispatch runs always run the full qualification)
 
 name: ci
@@ -23,6 +24,30 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Decides whether a pull request only changes documentation. The required `ci` job repeats this check itself so a
+  # failure here can never turn a required check into a skipped (passing) one; only the optional Windows job waits for it.
+  scope:
+    name: scope
+    runs-on: ubuntu-latest
+    outputs:
+      docs_only: ${{ steps.scope.outputs.docs_only }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Detect docs-only pull request
+        id: scope
+        if: github.event_name == 'pull_request'
+        run: |
+          changed_files="$(git diff --name-only HEAD^1 HEAD)"
+          if [ -n "$changed_files" ] && printf '%s\n' "$changed_files" | awk '!/^docs\// && !/^(README|CONTRIBUTING|CONTRIBUTORS|SECURITY)\.md$/ { found = 1 } END { exit found }'; then
+            echo "docs_only=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+          fi
+
   ci:
     name: ci
     runs-on: ubuntu-latest
@@ -37,7 +62,7 @@ jobs:
         if: github.event_name == 'pull_request'
         run: |
           changed_files="$(git diff --name-only HEAD^1 HEAD)"
-          if [ -n "$changed_files" ] && printf '%s\n' "$changed_files" | awk '!/^docs\// { found = 1 } END { exit found }'; then
+          if [ -n "$changed_files" ] && printf '%s\n' "$changed_files" | awk '!/^docs\// && !/^(README|CONTRIBUTING|CONTRIBUTORS|SECURITY)\.md$/ { found = 1 } END { exit found }'; then
             echo "docs_only=true" >> "$GITHUB_OUTPUT"
           else
             echo "docs_only=false" >> "$GITHUB_OUTPUT"
@@ -85,6 +110,8 @@ jobs:
 
   windows-package-tests:
     name: windows-2025 package tests
+    needs: scope
+    if: needs.scope.outputs.docs_only != 'true'
     runs-on: windows-2025
     timeout-minutes: 90
     permissions:

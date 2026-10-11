@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import * as yaml from "js-yaml";
@@ -289,6 +290,80 @@ test("rejects an unpinned or missing Copilot CLI plugin install smoke after reba
       "ci workflow must install an exact Copilot CLI version and then run the plugin install smoke",
     ),
   );
+});
+
+test("keeps the required ci job independent and gates only the Windows lane on the docs-only scope", () => {
+  const ciPath = ".github/workflows/ci.yml";
+  for (const [search, replacement, expected] of [
+    [
+      "  ci:\n    name: ci\n    runs-on: ubuntu-latest\n",
+      "  ci:\n    name: ci\n    needs: scope\n    runs-on: ubuntu-latest\n",
+      "required ci job must not depend on or be conditional on another job",
+    ],
+    [
+      "  ci:\n    name: ci\n    runs-on: ubuntu-latest\n",
+      "  ci:\n    name: ci\n    if: needs.scope.outputs.docs_only != 'true'\n    runs-on: ubuntu-latest\n",
+      "required ci job must not depend on or be conditional on another job",
+    ],
+    [
+      "    needs: scope\n    if: needs.scope.outputs.docs_only != 'true'\n    runs-on: windows-2025",
+      "    runs-on: windows-2025",
+      "unless the scope job reports a docs-only change",
+    ],
+    [
+      "    if: needs.scope.outputs.docs_only != 'true'\n    runs-on: windows-2025",
+      "    if: always()\n    runs-on: windows-2025",
+      "unless the scope job reports a docs-only change",
+    ],
+  ]) {
+    const texts = mutate(ciPath, search, replacement);
+    const errors = validate(texts, rebaseline(ciPath, texts));
+    assert.ok(
+      errors.some((error) => error.includes(expected)),
+      `expected ${expected} for ${search.trim().slice(0, 40)}`,
+    );
+  }
+});
+
+test("classifies docs-only changes with the one rule that both the scope and ci jobs run", () => {
+  const workflow = yaml.load(workflowTexts[".github/workflows/ci.yml"]);
+  const detectionScripts = ["scope", "ci"].map((jobId) => {
+    const step = workflow.jobs[jobId].steps.find(({ id }) => id === "scope");
+    assert.ok(step, `${jobId} job needs its docs-only detection step`);
+    return step.run;
+  });
+  // The two jobs must not drift: the required ci job and the optional Windows lane have to agree.
+  assert.equal(detectionScripts[0], detectionScripts[1]);
+  const [program] = /awk '([^']+)'/u.exec(detectionScripts[0]).slice(1);
+
+  const isDocsOnly = (files) =>
+    spawnSync("awk", [program], { input: `${files.join("\n")}\n`, encoding: "utf8" }).status === 0;
+
+  for (const files of [
+    ["README.md"],
+    ["CONTRIBUTING.md", "SECURITY.md", "CONTRIBUTORS.md"],
+    ["docs/how-to/manage-installation.md"],
+    ["README.md", "docs/vnext/ROADMAP.md"],
+  ])
+    assert.equal(isDocsOnly(files), true, `docs-only: ${files.join(", ")}`);
+
+  for (const files of [
+    ["CHANGELOG.md"],
+    ["VERSION.md"],
+    ["README.md", "CHANGELOG.md"],
+    ["packages/cli/README.md"],
+    ["customizations/README.md"],
+    ["sub/README.md"],
+    ["README.md.bak"],
+    ["README.markdown"],
+    ["docs/README.md", "packages/cli/src/service.ts"],
+    [".github/workflows/ci.yml", "README.md"],
+    ["tools/scripts/validate-github-workflows.mjs"],
+  ])
+    assert.equal(isDocsOnly(files), false, `full CI: ${files.join(", ")}`);
+
+  // No changed files at all is never treated as docs-only.
+  assert.equal(isDocsOnly([]), false);
 });
 
 test("rejects Windows package-test lane weakening after rebaselining", () => {

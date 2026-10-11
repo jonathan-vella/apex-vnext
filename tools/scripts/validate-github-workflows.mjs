@@ -398,8 +398,22 @@ export function validateGithubWorkflowContract({ contract, schema, workflowTexts
 
   const ci = values.get("ci");
   const ciJobIds = Object.keys(ci?.jobs ?? {});
-  if (ci?.jobs?.ci?.name !== "ci" || JSON.stringify(ciJobIds) !== JSON.stringify(["ci", "windows-package-tests"])) {
+  if (
+    ci?.jobs?.ci?.name !== "ci" ||
+    JSON.stringify(ciJobIds) !== JSON.stringify(["scope", "ci", "windows-package-tests"])
+  ) {
     errors.push("ci workflow must preserve the required vNext and Windows package-test jobs");
+  }
+  // The required `ci` check must never wait on another job: a failed dependency would skip it, and GitHub treats a
+  // skipped required check as passing. Only the optional Windows lane waits for the docs-only scope decision.
+  if (ci?.jobs?.ci?.needs !== undefined || ci?.jobs?.ci?.if !== undefined) {
+    errors.push("ci workflow's required ci job must not depend on or be conditional on another job");
+  }
+  if (
+    ci?.jobs?.["windows-package-tests"]?.needs !== "scope" ||
+    ci?.jobs?.["windows-package-tests"]?.if !== "needs.scope.outputs.docs_only != 'true'"
+  ) {
+    errors.push("ci workflow must run the Windows package tests unless the scope job reports a docs-only change");
   }
   const ciSteps = Array.isArray(ci?.jobs?.ci?.steps) ? ci.jobs.ci.steps : [];
   const pythonSetup = ciSteps.filter((step) => step?.uses === "./.github/actions/setup-python-validation");
