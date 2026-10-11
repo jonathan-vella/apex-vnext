@@ -101,6 +101,10 @@ immutable history. Task IDs and owner epochs prevent stale completion.
 The workflow branches by selected track for code generation, validation, preview, and deployment, then converges on the
 same operation, inventory, diagnosis, and quality contracts.
 
+Bicep previews, applies and destroys run through azd (`azd provision --preview`, `azd provision`, `azd down`), each as
+its own bound operation with its own Gate 4 approval; the Bicep preview is azd's what-if, a prediction against live
+Azure state. Terraform keeps native saved plans and backend locking. See [Bicep and Terraform](../reference/iac-tracks.md).
+
 ## Planned COE Reuse And Change
 
 The following is the target experience in [the PRD](../vnext/PRD.md#req-reuse-001-coe-archetype-import), not a claim that

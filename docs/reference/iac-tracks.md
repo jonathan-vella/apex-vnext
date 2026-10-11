@@ -6,11 +6,13 @@
 
 Current provider behavior is documented below.
 [DECISION-036](../vnext/DECISIONS.md#decision-036-deliver-non-production-first-with-purpose-bound-approval) selects a
-bounded azd executor for Bicep and retains native Terraform CLI. azd is not a third IaC language. CP-26 delivers it in
-three steps. The first (this document's `azd-binding-v1` and prerequisite sections) adds the typed binding contract,
-its deterministic inspection and the azd prerequisite check; it executes nothing. Bicep preview and apply still use the
-native `az deployment` provider until azd provisioning replaces it, and `azd deploy` application packages come after
-that. No new executor is enabled by this document.
+bounded azd executor for Bicep and retains native Terraform CLI. azd is not a third IaC language, and it is the only
+Bicep executor: the native `az deployment` and Azure Deployment Stack paths are removed, with no fallback. CP-26
+delivers it in three steps. The first added the typed `azd-binding-v1` contract, its deterministic inspection and the
+azd prerequisite check. The second (the azd executor section below) runs Bicep previews, applies and destroys through
+azd; it is implemented but not qualified, so Bicep live runs stay unavailable until CP-30
+([#455](https://github.com/jonathan-vella/apex-vnext/issues/455)) qualifies it. The third, `azd deploy` application
+packages, is not available.
 
 Non-production purpose will use confirmed intent and final deployment approval with required reviews/checks retained.
 Production will be opt-in, CI-owned and subject to verified human approval before apply. These purpose/approval
@@ -22,7 +24,8 @@ preview, approval evidence, an operation record, and inventory.
 
 A track cannot reuse the other track's preview or approval.
 
-Generated Bicep trees include `bicepconfig.json` with symbolic-name code generation enabled. This file participates in
+Generated Bicep trees are azd projects: `azure.yaml` (no hooks, extensions, layers or services), `infra/main.bicep` and
+`infra/bicepconfig.json` with symbolic-name code generation enabled. The configuration participates in
 the source tree hash, so compiled resource identity does not depend on an ambient workspace setting. A conflicting
 staged configuration blocks generation rather than being overwritten. Native validation copies and verifies the same
 configuration with the accepted source.
@@ -42,11 +45,10 @@ not accept this Bicep-only field. Plan review displays the scope reference; it i
 
 ## azd Binding For Bicep
 
-Implemented, offline and not yet used to run anything: execution still uses the native Azure CLI path until the
-executor (CP-26 PR B) lands. A Bicep azd project is described by the typed `azd-binding-v1` artifact, produced by
-`inspectAzdBicepProject` from a project directory that holds `azure.yaml` and `.azure/<environment>/`. azd recompiles
-Bicep and re-resolves parameters whenever it provisions, so the binding hashes what that reads. Any change to any of
-these changes its `bindingHash`:
+Implemented; the azd executor below runs on it. A Bicep azd project is described by the typed `azd-binding-v1`
+artifact, produced by `inspectAzdBicepProject` from a project directory that holds `azure.yaml` and
+`.azure/<environment>/`. azd recompiles Bicep and re-resolves parameters whenever it provisions, so the binding hashes
+what that reads. Any change to any of these changes its `bindingHash`:
 
 - the exact `azure.yaml` bytes (which contain every hook and extension declaration), the infrastructure tree of each root
   (one `default` root or each declared layer, with its dependencies, including `bicepconfig.json`) and the parameters
@@ -93,9 +95,13 @@ and relies on the pinned Bicep and azd versions.
 
 ### Execution envelope
 
-`buildAzdExecutionEnvelope` builds the envelope the binding carries. `buildAzdArguments` can express only `provision` and
-`provision --preview`, always with an explicit `--environment` (the default-environment pointer is never consulted) and
-`--no-prompt`; `azd up` cannot be built. The executor runs azd from the project root. azd's own configuration and
+`buildAzdExecutionEnvelope` builds the envelope the binding carries. `buildAzdArguments` can express only
+`provision --preview`, `provision` and `down`, always with an explicit `--environment` (the default-environment pointer
+is never consulted), `--cwd` set to the absolute project root and `--no-prompt`; `azd up`, `azd deploy` and `--purge`
+cannot be built. `provision` and `provision --preview` pass `--no-state`, so the approved Bicep is always deployed
+instead of being skipped when azd's stored deployment state hash is unchanged. The preview passes `--output json`, and
+`down` passes `--force` because the Gate 4 approval of the destroy preview replaces azd's prompt. The executor runs azd
+from the project root. azd's own configuration and
 extensions and the user's `az login` are left alone. `assertAzdIdentityMatchesBinding` is the preflight the executor
 must pass before every provision: the active cloud, tenant, subscription and Azure CLI default subscription must equal
 the approved target, and a missing or different value stops the run with `AZD_IDENTITY_MISMATCH` (identifiers are never
@@ -113,12 +119,68 @@ own `bicepconfig.json` (so aliases and linter settings are never inherited from 
 
 ### azd Prerequisite
 
-Bicep runs will require azd once the azd executor ships; Terraform runs never do. `config/toolchain.v1.json` pins the
-exact release (`core.azd`, `compatibilitySet.azd`: 1.35.1, observed 2026-10-11) and `apex doctor`, including the MCP
-doctor, reports an `executable:azd` check for Bicep runs. Until the executor ships Bicep still deploys with the native
-path, so the check is an advisory warning that never makes doctor unhealthy; it names the install remedy when azd is
-missing, its version cannot be read, or it differs from the pin in either direction. The executor will fail closed on
-any of those, because the approved binding includes the azd version.
+Bicep runs require azd; Terraform runs do not. `config/toolchain.v1.json` pins the exact release (`core.azd`,
+`compatibilitySet.azd`: 1.35.1, observed 2026-10-11) and `apex doctor`, including the MCP doctor, reports an
+`executable:azd` check for Bicep runs. It fails with an install remedy when azd is missing, its version cannot be read,
+or it differs from the pin in either direction, because the approved binding includes the azd version. The executor
+enforces the same pin: a Bicep preview, apply or destroy stops with `AZD_NOT_FOUND`, `AZD_VERSION_UNAVAILABLE` or
+`AZD_VERSION_MISMATCH` when azd is missing or is not exactly that release, and never falls back to another path.
+
+## azd Bicep Executor
+
+`AzdBicepProvider` is configured in `.apex/provider-config.json` with a `bicep` block of `cwd` (the generated azd
+project root, which must be the accepted generated source), `environmentName`, `tenantId`, `location` and an optional
+`cloud`. The subscription and resource group come from the run's exact resource-group target scope. Any other key,
+including the retired `stackName`, `actionOnUnmanage`, `denySettingsMode`, `templateFile` and `resourceGroup` fields, is
+rejected. When the project has no `.azure/<environment>/.env`, APEX writes the five allowlisted, non-secret keys from
+the approved target; an existing file is bound as it is and never overwritten.
+
+| Operation | azd command               | Notes                                                                |
+| --------- | ------------------------- | -------------------------------------------------------------------- |
+| Preview   | `azd provision --preview` | azd's what-if, built on ARM what-if; a prediction against live Azure |
+| Apply     | `azd provision`           | Needs its own current preview and Gate 4 approval                    |
+| Destroy   | `azd down`                | Needs its own current destroy preview and approval; never `--purge`  |
+
+Before every preview, apply and destroy the executor verifies the pinned azd version, re-inspects the azd binding and
+runs the identity preflight (cloud, tenant and subscription from `az account show` and the bound azd environment). At
+apply and destroy it additionally requires that the binding is unchanged, that the azd version equals the one bound at
+preview, and that the owned state below is unchanged. Layered projects fail with `AZD_LAYER_UNSUPPORTED`, because azd
+previews one layer at a time. The preview hash binds the azd binding hash, the owned-state hash and the policy
+validation receipt, so reusing a preview across apply and destroy, an expired or superseded preview, a stale owner
+epoch or recipient and a changed input all stop before azd runs.
+
+### Preview format
+
+`azd provision --preview --output json` prints newline-delimited console events. The preview is the single event whose
+`data` is a list (or `null` when nothing would change) of `{ Operation, Type, Name, PropertyDeltas }`. It carries no
+resource ID, so each change is resolved to an accepted resource ID by ARM type and name; a material change that does
+not resolve to exactly one accepted resource blocks the preview. `Create` maps to create, `Modify` and `Deploy` to
+update, `Delete` to delete, `NoChange` and `Ignore` to no-op, and `Unsupported` blocks. azd omits resources that have
+neither a before nor an after state, and the JSON shape is not a documented azd contract, so a different azd release
+needs requalification (the exact pin and CP-30 cover this).
+
+### Ownership, inventory and destroy
+
+Stacks give no ownership or deny settings. A resource belongs to the azd environment when it lives in the approved
+resource group and that group carries the tag `azd-env-name` with the environment name, which is how azd itself finds
+an environment's resources. The group must be tagged before provisioning, and no other group may carry that tag for the
+environment; otherwise the preview carries a blocker. The kernel's logical-resource manifest still decides which
+resources are managed, protected (`existing`) or unaccepted.
+
+- **Inventory.** After apply, the executor lists the group's resources with read-only `az resource list` and reads each
+  planned child or extension resource that the listing omits by exact ID with `az resource show`. The kernel requires
+  every owned resource to match an accepted managed ID; protected `existing` resources are excluded rather than owned.
+- **Destroy.** `azd down` has no preview of its own, and it deletes the whole resource group of the latest deployment.
+  The destroy preview therefore lists every resource Azure reports in the approved group as a delete, and the existing
+  coverage check blocks it when any is not accepted managed ownership or is a protected existing resource. The list is
+  bound into the approval through the owned-state hash, and the destroy is refused when the group's tagging or contents
+  changed after preview. `--purge` is never used, so soft-deleted resources such as Key Vaults stay recoverable and keep
+  their names reserved; the approval material says so.
+- **Not provided.** Deny settings, action-on-unmanage cleanup and stack-based unmanaged-resource detection do not exist.
+  Azure Policy, RBAC and deny assignments from the landing zone are the compensating controls (DECISION-037).
+
+Parameter values that azd resolves at provision time, for example `$(secretOrRandomPassword ...)` Key Vault functions in
+`main.parameters.json`, are not part of the preview; the binding hashes the parameter file text only.
 
 ## Resource Ownership
 
@@ -148,10 +210,10 @@ Bicep AVM bindings can declare `physicalResources` as intended authorization sco
 subscription/resource group; case-insensitive duplicates, collisions with native resources, expressions and wildcards
 are rejected. Native bindings and Terraform bindings cannot use this field.
 
-The Gate 3 binding document displays this scope. Native Bicep requests include only approved managed IDs, and material
-what-if changes outside that exact set block preview. Observed deployment-stack inventory must contain only unique
-approved managed IDs before deployment completion is recorded. Protected existing IDs are never added to the managed
-set. Ancillary inventory entries retain distinct identities under their accepted logical parent.
+The Gate 3 binding document displays this scope. Bicep requests include only approved managed IDs, and material
+azd preview changes outside that exact set block preview. Observed inventory of the azd environment's resource group
+must contain only unique approved managed IDs before deployment completion is recorded. Protected existing IDs are
+never added to the managed set. Ancillary inventory entries retain distinct identities under their accepted logical parent.
 Delete and replace previews are also rejected when an approved managed ID is an ancestor of a protected existing ID;
 omitting the protected child from what-if does not authorize its implicit removal.
 
@@ -184,10 +246,10 @@ every AVM version or live resource compliance.
 | Concern           | Bicep                                        | Terraform                                                      |
 | ----------------- | -------------------------------------------- | -------------------------------------------------------------- |
 | Validation        | Bicep format/build/lint; configured severity | `terraform init`, format, validate, and provider schema checks |
-| Preview           | Azure CLI deployment what-if                 | Saved Terraform plan plus JSON rendering                       |
-| Apply             | Azure deployment create                      | Apply the exact saved plan                                     |
+| Preview           | `azd provision --preview` (azd what-if)      | Saved Terraform plan plus JSON rendering                       |
+| Apply             | `azd provision`; destroy with `azd down`     | Apply the exact saved plan                                     |
 | Preview lifetime  | Up to the configured Bicep TTL               | Up to the shorter configured Terraform TTL                     |
-| State             | Azure deployment control plane               | Terraform backend; state must never be committed               |
+| State             | Azure and the azd environment tag            | Terraform backend; state must never be committed               |
 | Provider metadata | Azure/Bicep schemas and AVM                  | Installed provider schema and bounded Registry client          |
 
 The shipped defaults currently define a longer Bicep preview TTL than Terraform. Any dependency, target, owner,
@@ -198,7 +260,7 @@ recipient, generated IaC, or provider change invalidates stale proof.
 ### Native Validation Receipts
 
 With an official native provider configured, validation-task completion executes fixed local checks against an isolated
-copy of the accepted source. Bicep runs format across `**/*.bicep`, `build main.bicep --stdout`, then lint across
+copy of the accepted source. Bicep runs format across `**/*.bicep`, `build infra/main.bicep --stdout`, then lint across
 `**/*.bicep` with `--no-restore`. Formatting modifies only the scratch copy; any source-byte change fails validation
 instead of repairing the accepted source. Lint follows configured diagnostic severity; error-level findings block.
 Terraform runs `init -backend=false -input=false`,

@@ -10,8 +10,8 @@ Azure CLI and Azure Developer CLI (azd) guidance ported from the upstream `azure
 | Class | Examples | How it runs |
 | --- | --- | --- |
 | Local client setup | `az login`, `az account set`, `az extension add`, `azd auth login`, `azd env select` | Directly; changes only the local CLI or azd state, for the intended tenant and subscription |
-| Read and diagnostic | `show`, `list`, `query`, `az account get-access-token`, `az deployment group what-if`, `az deployment sub what-if`, `azd provision --preview`, `azd show`, `azd env get-values`, registry version lookups | Directly, against the approved subscription and scope |
-| Changes Azure, Entra ID or GitHub settings | `create`, `update`, `delete`, `assign`, `register`, `az deployment group create`, `az deployment sub create`, `azd provision`, `azd deploy`, `azd pipeline config`, `azd down` | Never by the agent. Routed as described below |
+| Read and diagnostic | `show`, `list`, `query`, `az account get-access-token`, `azd provision --preview`, `azd show`, `azd env get-values`, registry version lookups | Directly, against the approved subscription and scope |
+| Changes Azure, Entra ID or GitHub settings | `create`, `update`, `delete`, `assign`, `register`, `azd provision`, `azd deploy`, `azd pipeline config`, `azd down` | Never by the agent. Routed as described below |
 | Not used by APEX | `azd up` | Never: no single preview covers both provisioning and service deployment |
 
 Read output is an observation. A typed APEX decision still cites accepted evidence from `apex/taskContext`; a direct
@@ -23,12 +23,13 @@ The current runtime's Gate 4 is the deployment approval today. Every route below
 Gate 4 decision with `apex gate decide`, and `apex deploy --preview <hash>`, bound to the same commit, dependency
 revision, hash, recipient and expiry rules.
 
-- **Bicep and Terraform tracks.** The Bicep track previews with `az deployment group|sub what-if` and applies with
-  `az deployment group|sub create`; the Terraform track applies the exact saved `terraform plan -out` file with native
-  Terraform CLI.
-- **azd (planned, CP-26 #443).** azd becomes a Bicep-only executor bound to source, parameters and environment; there
-  is no azd Terraform adapter and no azd executor in the runtime today. Provisioning and service deployment stay
-  separate operations, each with its own preview and approval. APEX never runs `azd up`, because no single preview
+- **Bicep and Terraform tracks.** The Bicep track runs only through azd: `azd provision --preview` previews,
+  `azd provision` applies and `azd down` destroys, each with its own preview and approval. The Terraform track applies
+  the exact saved `terraform plan -out` file with native Terraform CLI.
+- **azd (Bicep only, CP-26 #443).** azd is the Bicep executor in the runtime, bound to source, parameters, environment,
+  azd version and Azure identity. Bicep live runs stay unavailable until CP-30 #455 qualifies it. There is no azd
+  Terraform adapter. Provisioning and service deployment stay separate operations, each with its own preview and
+  approval; `azd deploy` application packages are not available yet. APEX never runs `azd up`, because no single preview
   covers both steps. Upstream guidance that says `azd up` is context only.
 - **Pipeline setup.** APEX generates `azure.yaml` and the GitHub Actions workflow as static, reviewable files that pass
   the normal gates, with OIDC federated credentials and no secrets in files. `azd pipeline config` creates Entra
@@ -221,8 +222,8 @@ az role assignment list --scope <scope> --role Owner --query "[?principalType=='
 
 When no human Owner exists at the budget scope, the budget alert emails must be supplied and routed through the action
 group. Budget, scheduled-action and anomaly-alert prerequisites are provider-side: `bicep build` and `bicep lint` do not
-catch them; they surface at `az deployment sub what-if` (read-only, part of the preview) or at the routed
-`az deployment sub create`.
+catch them; they surface at `azd provision --preview` (read-only, part of the preview) or at the routed
+`azd provision`.
 
 ## Service Lifecycle Checks
 

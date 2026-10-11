@@ -42,8 +42,9 @@ Today they require `apex preview`, a separate human decision at Gate 4 via `apex
 dependency revision, writer epoch and expiry. A changed preview requires new approval.
 Readiness, source generation and a successful partial check never authorize apply.
 
-Current native deployment tracks are Bicep and Terraform (`IacTool` is `bicep` or `terraform`): Bicep previews use
-`az deployment group|sub what-if`; Terraform applies only the exact saved plan approved at Gate 4.
+Current native deployment tracks are Bicep and Terraform (`IacTool` is `bicep` or `terraform`): azd is the only Bicep
+executor (`azd provision --preview`, `azd provision`, `azd down`; never `azd up`, and Azure Deployment Stacks are not
+used); Terraform applies only the exact saved plan approved at Gate 4.
 Provider mutation commands retained in examples are syntax for those bounded operations, never instructions to execute.
 An environment flag, shell confirmation, local plan status, CI environment approval or OIDC job identity is not an
 APEX gate decision. Never suppress provider errors, refresh approval in CI, or execute an unbound fallback.
@@ -54,10 +55,13 @@ Lab runs (CP-27, #456) confirm intent once at Gate 1 (purpose, target and requir
 kernel readiness checkpoints and approve the final deployment preview at Gate 4. Required reviews, deterministic
 checks, risk decisions and each apply or destroy preview and approval remain blocking; a readiness checkpoint is never
 human approval. `production` is blocked. The preview binding and qualification handoff above stay enforced.
-DECISION-036 and ADR-0007 select the following target; **none of it is shipped behavior**:
+DECISION-036 and ADR-0007 select the following target; **only the azd Bicep executor is shipped behavior**:
 
-- Executors: azd is the executor for **Bicep only** (CP-26, #443). Native Terraform CLI is the Terraform path with
-  exact saved plans, normal backend locking and unchanged dependencies. There is no azd Terraform adapter.
+- Executors: azd is the only executor for **Bicep** (CP-26, #443) and is implemented: `azd provision --preview`,
+  `azd provision` and `azd down` are separately previewed and approved operations, and Azure Deployment Stacks are out
+  of scope. Bicep live runs wait for CP-30 (#455) qualification and `azd deploy` application packages are not
+  available. Native Terraform CLI is the Terraform path with exact saved plans, normal backend locking and unchanged
+  dependencies. There is no azd Terraform adapter.
 - APEX **never runs `azd up`**. Provisioning and application deployment stay separate operations.
 - Production (CP-28, #457; setup CP-29, #458): opt-in and CI-owned, with a verified candidate-bound human review
   receipt before apply. OIDC job identity or an environment pause alone is not human approval.

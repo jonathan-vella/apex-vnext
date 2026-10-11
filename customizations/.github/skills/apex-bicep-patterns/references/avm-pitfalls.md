@@ -17,7 +17,8 @@ Known gotchas when using Azure Verified Modules and pre-deployment validation.
 
 ## What-If Interpretation
 
-Before deploying, always run what-if to preview changes:
+Before deploying, review the what-if preview. APEX runs it as `azd provision --preview`, the only Bicep executor; the
+`az` form below is a read-only diagnostic for the same evaluation:
 
 ```bash
 az deployment group what-if \
@@ -325,7 +326,7 @@ render those properties unconditionally. Source lint, `bicep build`, and even
 - `bicep build` + `bicep lint` clean.
 - `validate:iac-security-baseline` clean.
 - `what-if` succeeds with non-zero changes.
-- `az deployment ... create` fails on the resource with `NetworkRuleNotSupported`,
+- The deployment (`azd provision`) fails on the resource with `NetworkRuleNotSupported`,
   `FeatureNotSupportedForTier`, `SkuDoesNotSupport...`, or similar.
 
 ### Mechanism
@@ -392,7 +393,7 @@ For every AVM module call with a non-default SKU/tier, do one of:
 `what-if` evaluates ARM templates against the cloud as it expects to be after
 deployment; it does not run the SKU/feature compatibility check that the
 resource provider runs at create time. Render-level inspection (#1 above) is
-the only deterministic guard between `bicep build` and `az deployment create`.
+the only deterministic guard between `bicep build` and the azd deployment.
 
 ### Mechanical check (lift this into bicep-validate-subagent)
 

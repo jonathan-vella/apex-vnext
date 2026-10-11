@@ -8,10 +8,10 @@ workspace detection suggests questions, not an automatic track change.
 
 | Configuration | Useful context | Static files | Execution boundary |
 | --- | --- | --- | --- |
-| azd + Bicep | Azure multi-service apps, environment/service packaging | `azure.yaml`, Bicep, service files | Planned azd executor for Bicep only (CP-26, #443); not enabled today |
+| azd + Bicep | Azure multi-service apps, environment/service packaging | `azure.yaml`, Bicep, service files | azd is the Bicep executor (CP-26, #443); live runs wait for CP-30 qualification, `azd deploy` packages are not available |
 | azd + Terraform | Upstream context only | `azure.yaml` with `infra.provider: terraform`, HCL | Not an APEX path: DECISION-036 adds no azd Terraform adapter; native Terraform CLI with exact saved plans is the Terraform path |
 | Azure CLI | Existing scripts, imperative service diagnostics, custom integration | Reviewed syntax and diagnostic queries | Read directly; mutations only through a supported bounded operation |
-| Bicep | Azure-native declarative infrastructure | Bicep modules and accepted parameter binding | Current native Bicep preview/deploy track |
+| Bicep | Azure-native declarative infrastructure | Bicep modules and accepted parameter binding | Current Bicep preview/deploy track, executed only through azd |
 | Terraform | Accepted provider/module/state management | HCL, locks, backend and parameter binding | Current native saved-plan preview/deploy track |
 
 Do not route Terraform requests through azd or imply CP-26 is delivered. `azd up` is historical upstream context
