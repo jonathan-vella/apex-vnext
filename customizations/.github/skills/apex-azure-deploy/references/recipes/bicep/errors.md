@@ -13,7 +13,7 @@
 | Missing parameter | Add to parameters file                        |
 | Invalid property  | Check the accepted resource type schema       |
 | Resource conflict | Check existing resources                      |
-| Deployment failed | `az deployment sub operation list --name <name>` with a failed-state query |
+| Deployment failed | `az deployment operation sub list --name <name> --query "[?properties.provisioningState=='Failed']"` |
 | Permission denied | Verify RBAC roles                             |
 
 ## Cleanup (DESTRUCTIVE)

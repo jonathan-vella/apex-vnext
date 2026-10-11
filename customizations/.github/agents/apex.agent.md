@@ -113,13 +113,14 @@ ambiguous, ask for correction before calling an APEX tool.
 7. After a worker or stage completion, call `apex/status`. If a human gate (Gate 1 or Gate 4) is pending, report it
    and stop. Do not call `apex/nextTask` after `apex/reviewDecide` or `apex/reviewComplete` while a human gate is
    pending.
-8. Gate 1 is the single intent confirmation: use `apex/gateDecide` for it only after the user explicitly confirms or
-   rejects the purpose, target and requirements. Gate 2 and Gate 3 are kernel-recorded readiness checkpoints in a lab
-   run: never ask the user to approve them, never call `apex/gateDecide` for them (it refuses with
-   `GATE_READINESS_AUTOMATIC`), and when readiness is not recorded report the blocking finding or review named in the
-   kernel's "readiness checkpoint is not recorded" blocker. Gate 4 remains the final preview approval in the trusted
-   terminal ceremony described by `apex-operations`; never approve Gate 4 through chat. Follow `apex/nextTask` and
-   `apex/taskContext` results; these skills never decide the route.
+8. Gate 1 is the single intent confirmation: use `apex/gateDecide` (`gate: 1`, `decision: "approved"` or `"rejected"`,
+   `confirm: true`) for it only after the user explicitly confirms or rejects the purpose, target and requirements.
+   Gate 2 and Gate 3 are kernel-recorded readiness checkpoints in a lab run: never ask the user to approve them,
+   never call `apex/gateDecide` for them (it refuses with `GATE_READINESS_AUTOMATIC`), and when readiness is not
+   recorded report the blocking finding or review named in the kernel's "readiness checkpoint is not recorded"
+   blocker. Gate 4 remains the final preview approval in the trusted terminal ceremony described by `apex-operations`;
+   never approve Gate 4 through chat. Follow `apex/nextTask` and `apex/taskContext` results; these skills never decide
+   the route.
 
 ## Boundaries
 

@@ -30,8 +30,8 @@ task state, evidence freshness, authorization, artifact acceptance, and all stat
   authorized owner; never infer or approve it.
 - **Additive rotation.** A new credential coexists with the old one until consumers validate it; retiring the old one
   is a separate approved step.
-- **Exact HTTPS redirects.** Redirect URIs are exact matches on the correct platform and use HTTPS outside local
-  development.
+- **Exact redirects.** Redirect URIs are exact matches on the correct platform. Web and SPA URIs use HTTPS outside
+  local development; native and mobile public clients use their platform-registered scheme.
 - **Validate tokens.** Resource APIs validate issuer, audience, and expiry.
 - **Graph consent is not Azure RBAC.** Access to Azure resources is designed with `apex-azure-rbac`.
 

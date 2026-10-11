@@ -10,7 +10,7 @@
 | Error                 | Resolution                                    |
 | --------------------- | --------------------------------------------- |
 | Authentication failed | Check service principal/federated credentials |
-| Missing secrets       | Add required secrets to repository            |
+| Missing secrets       | Add required secrets to the GitHub Actions or Azure DevOps secret store (or the environment's secrets); never commit secret values to source control |
 | Missing variables     | Add required variables                        |
 | Pipeline timeout      | Increase timeout or optimize deployment       |
 | Approval pending      | Request approval in environment settings      |

@@ -17,8 +17,11 @@ traceable design choice that an authorized capability may later implement and va
 
 ## Redirect URI Intent
 
-Record the owning application, URI class, environment boundary, and exact-match requirement. Redirect URIs use HTTPS
-outside local development. Unknown redirect URIs block implementation intent; do not substitute placeholders or
+Record the owning application, URI class, environment boundary, and exact-match requirement. Web and SPA redirect URIs
+use HTTPS outside local development (loopback `http` is for local development only). Native and mobile public clients
+use the platform-registered redirect URI the identity platform issues, such as `msauth.<bundle-id>://auth` on iOS or
+`msauth://<package>/<signature>` on Android, or an `http://localhost` loopback for desktop; never a broadened or
+wildcard URI. Unknown redirect URIs block implementation intent; do not substitute placeholders or
 broaden accepted callback locations.
 
 ## Exposed APIs

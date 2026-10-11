@@ -27,7 +27,7 @@ resource aks 'Microsoft.ContainerService/managedClusters@2026-05-01' = {
         mode: 'System'
         osType: 'Linux'
         enableAutoScaling: true
-        minCount: 1
+        minCount: 2
         maxCount: 5
       }
     ]
