@@ -4,6 +4,8 @@ import {
   calculatePolicyValidationDigest,
   CONTRACT_VERSION,
   EnvironmentSchema,
+  AzdEnvironmentV1Schema,
+  AzdVersionSchema,
   hasValidAzdBinding,
   SECRET_FIELD_PATTERN,
   SECRET_VALUE_PATTERN,
@@ -24,8 +26,12 @@ import {
 export interface AzdBindingTarget {
   readonly subscriptionId: string;
   readonly location: string;
+  /** Needed when the environment records AZURE_TENANT_ID; any tenant recorded without an approved one is a mismatch. */
   readonly tenantId?: string;
-  /** Omit for subscription-scope deployments; any resource group declared by azd then counts as a redirect. */
+  /**
+   * The approved resource group. Omit only for subscription-scope deployments; a resource group declared by
+   * azure.yaml then counts as a redirect.
+   */
   readonly resourceGroup?: string;
 }
 
@@ -145,6 +151,12 @@ function text(value: unknown, context: string, code: AzdBindingErrorCode, max = 
   if (typeof value !== "string" || value.length === 0 || value.length > max || CONTROL.test(value))
     fail(code, `${context} must be a non-empty single-line string of at most ${max} characters`);
   return value;
+}
+
+function moduleName(value: unknown, context: string, code: AzdBindingErrorCode): string {
+  const name = text(value, context, code, 64);
+  if (!NAME.test(name)) fail(code, `${context} must be a bare module name without path separators`);
+  return name;
 }
 
 function bool(value: unknown, fallback: boolean, context: string, code: AzdBindingErrorCode): boolean {
@@ -309,7 +321,13 @@ function assertTarget(values: ReadonlyMap<string, string>, request: AzdBindingRe
   const tenant = values.get("AZURE_TENANT_ID");
   if (tenant !== undefined && !sameText(tenant, request.target.tenantId)) redirect("AZURE_TENANT_ID");
   const group = values.get("AZURE_RESOURCE_GROUP");
-  if (group !== undefined && !sameText(group, request.target.resourceGroup)) redirect("AZURE_RESOURCE_GROUP");
+  // Without an approved resource group (subscription scope) azd records the group it created here as an output.
+  if (
+    request.target.resourceGroup !== undefined &&
+    group !== undefined &&
+    !sameText(group, request.target.resourceGroup)
+  )
+    redirect("AZURE_RESOURCE_GROUP");
 }
 
 function assertDeclaredGroup(value: unknown, request: AzdBindingRequest, context: string): void {
@@ -442,7 +460,7 @@ function declareRoots(infra: Record<string, unknown>): { layered: boolean; roots
         {
           name: "default",
           path: projectPath(infra.path ?? "infra", "infra.path"),
-          module: text(infra.module ?? "main", "infra.module", "AZD_PROJECT_UNSUPPORTED", 64),
+          module: moduleName(infra.module ?? "main", "infra.module", "AZD_PROJECT_UNSUPPORTED"),
           dependsOn: [],
           hooks: undefined,
         },
@@ -488,7 +506,7 @@ function declareRoots(infra: Record<string, unknown>): { layered: boolean; roots
     roots.push({
       name,
       path,
-      module: text(layer.module ?? "main", `Infra layer ${name} module`, "AZD_LAYER_UNSUPPORTED", 64),
+      module: moduleName(layer.module ?? "main", `Infra layer ${name} module`, "AZD_LAYER_UNSUPPORTED"),
       dependsOn,
       hooks: layer.hooks,
     });
@@ -741,9 +759,22 @@ function assertSupportedProject(project: Record<string, unknown>, request: AzdBi
  * infrastructure trees, resolved parameters, environment values, hooks, extensions and layers. Unsupported or
  * unverifiable surfaces fail closed with a stable {@link AzdBindingError} code. Nothing here runs azd or reads Azure.
  */
-export async function inspectAzdBicepProject(request: AzdBindingRequest): Promise<AzdBindingV1> {
+export async function inspectAzdBicepProject(input: AzdBindingRequest): Promise<AzdBindingV1> {
+  const request: AzdBindingRequest = {
+    ...input,
+    target: {
+      ...input.target,
+      subscriptionId: input.target.subscriptionId.toLowerCase(),
+      location: input.target.location.toLowerCase(),
+      ...(input.target.tenantId === undefined ? {} : { tenantId: input.target.tenantId.toLowerCase() }),
+    },
+  };
   if (!Value.Check(EnvironmentSchema, request.environmentName))
     fail("AZD_BINDING_INPUT_INVALID", "The azd environment name is invalid");
+  if (!Value.Check(AzdEnvironmentV1Schema.properties.target, request.target))
+    fail("AZD_BINDING_INPUT_INVALID", "The approved azd target is invalid");
+  if (!Value.Check(AzdVersionSchema, request.azdVersion))
+    fail("AZD_BINDING_INPUT_INVALID", "The azd version must be an exact x.y.z release");
   const files = await AzdProjectFiles.open(request.projectRoot);
   const manifest = await files.read("azure.yaml", AZD_FILE_LIMITS.fileBytes, "AZD_PROJECT_MISSING");
   const project = parseYaml(manifest);

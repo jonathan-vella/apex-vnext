@@ -297,6 +297,8 @@ test("unsupported project surfaces fail closed with stable codes", async () => {
     ["AZD_PROJECT_UNSUPPORTED", "state:\n  remote:\n    backend: AzureBlobStorage\n"],
     ["AZD_PROJECT_UNSUPPORTED", "unknownSetting: true\n"],
     ["AZD_PROJECT_UNSUPPORTED", "infra:\n  path: infra\n  unknown: 1\n"],
+    ["AZD_PROJECT_UNSUPPORTED", "infra:\n  module: ../hooks/pre\n"],
+    ["AZD_LAYER_UNSUPPORTED", "infra:\n  layers:\n    - name: a\n      path: infra\n      module: sub/main\n"],
     ["AZD_PATH_UNSAFE", "infra:\n  path: ../outside\n"],
     ["AZD_PATH_UNSAFE", "infra:\n  path: /etc\n"],
     ["AZD_PATH_UNSAFE", "infra:\n  path: .\n"],
@@ -369,6 +371,25 @@ test("service hooks are inventoried and an ambiguous script location fails close
   });
 });
 
+test("target identifiers are normalized and a subscription-scope group output is tolerated", async () => {
+  const lower = await inspect();
+  const upper = await inspect({}, (request) => ({
+    ...request,
+    target: { subscriptionId: SUBSCRIPTION.toUpperCase(), location: "SwedenCentral" },
+  }));
+  assert.equal(upper.bindingHash, lower.bindingHash);
+  const output = { ".azure/lab/.env": `${baseFiles()[".azure/lab/.env"]!}\nAZURE_RESOURCE_GROUP="rg-created"` };
+  assert.equal((await inspect(output)).environment.keys.includes("AZURE_RESOURCE_GROUP"), true);
+  await rejects("AZD_ENV_TARGET_MISMATCH", output, (request) => ({
+    ...request,
+    target: { ...request.target, resourceGroup: "rg-approved" },
+  }));
+  await rejects("AZD_BINDING_INPUT_INVALID", {}, (request) => ({
+    ...request,
+    target: { ...request.target, subscriptionId: "not-a-guid" },
+  }));
+});
+
 test("environment redirects, secrets and ambiguous syntax fail closed", async () => {
   const env = (edit: (text: string) => string): Record<string, string> => ({
     ".azure/lab/.env": edit(baseFiles()[".azure/lab/.env"]!),
@@ -388,6 +409,7 @@ test("environment redirects, secrets and ambiguous syntax fail closed", async ()
   await rejects(
     "AZD_ENV_TARGET_MISMATCH",
     env((text) => `${text}\nAZURE_RESOURCE_GROUP="rg-other"`),
+    (request) => ({ ...request, target: { ...request.target, resourceGroup: "rg-approved" } }),
   );
   await rejects(
     "AZD_ENV_TARGET_MISMATCH",
