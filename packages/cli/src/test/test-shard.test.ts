@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { readFile, readdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { parseTestShard, shardSelects, test } from "./test-shard.js";
@@ -36,14 +37,27 @@ test("every CLI test file declares its tests through the shard helper so no file
   const offenders: string[] = [];
   for (const name of files) {
     const source = await readFile(`${directory}${name}`, "utf8");
-    const nodeTestImports = [...source.matchAll(/import\s+([^;]*?)\s+from\s+["']node:test["']/gu)].map(
-      ([, clause]) => clause ?? "",
-    );
-    const bypasses = nodeTestImports.some(
-      (clause) => !clause.startsWith("{") || /\b(?:test|it|suite|run)\b/u.test(clause.replace(/\btype\s+\w+/gu, "")),
-    );
     if (!source.includes('from "./test-shard.js"')) offenders.push(`${name}: no shard`);
-    if (bypasses) offenders.push(`${name}: registers tests outside the shard helper`);
+    // Tests, suites and hooks all come from the helper; anything imported from node:test could register unsharded work.
+    if (/from\s+["']node:test["']|import\s*\(\s*["']node:test["']/u.test(source)) {
+      offenders.push(`${name}: registers tests or hooks outside the shard helper`);
+    }
   }
   assert.deepEqual(offenders, []);
+});
+
+test("a suite's setup runs only in the shard that selects one of its tests", () => {
+  const fixture = fileURLToPath(new URL("./test-shard-fixture.js", import.meta.url));
+  const ran = (shardSpecification: string | undefined) => {
+    const environment = { ...process.env };
+    delete environment.APEX_TEST_SHARD;
+    delete environment.NODE_TEST_CONTEXT;
+    if (shardSpecification !== undefined) environment.APEX_TEST_SHARD = shardSpecification;
+    const result = spawnSync(process.execPath, [fixture], { encoding: "utf8", env: environment });
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    return [...result.stdout.matchAll(/RAN ([a-z ]+)/gu)].map(([, marker]) => marker);
+  };
+  assert.deepEqual(ran(undefined), ["first", "suite setup", "second", "third"]);
+  assert.deepEqual(ran("1/2"), ["first", "third"]);
+  assert.deepEqual(ran("2/2"), ["suite setup", "second"]);
 });

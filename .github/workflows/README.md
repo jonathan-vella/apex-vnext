@@ -27,8 +27,9 @@ sequence:
 
 - `core` runs the kernel and capabilities tests and the plugin package tests whole.
 - `cli-<i>-of-8` runs the one-eighth of every CLI test file selected by `APEX_TEST_SHARD=<i>/8`. Every CLI test file
-  declares its tests through `packages/cli/src/test/test-shard.ts`, which registers a test only when its position in the
-  file modulo the shard total matches. A few CLI test files hold most of the runtime and run their tests in sequence, so
+  declares its tests, suites and `before` hooks through `packages/cli/src/test/test-shard.ts`, which registers a test only
+  when its position in the file modulo the shard total matches and skips a suite's setup in shards that select none of
+  its tests. A few CLI test files hold most of the runtime and run their tests in sequence, so
   splitting by file (`node --test --test-shard`) would leave one shard as slow as the old single job. The shards
   therefore cover every test exactly once, and `test-shard.test.ts` fails if a CLI test file bypasses the helper.
   Without `APEX_TEST_SHARD`, for example locally, every test runs.

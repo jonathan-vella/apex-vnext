@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { mkdir, readFile, readdir, realpath, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { type TestContext } from "node:test";
+import type { TestContext } from "node:test";
 import type { Client } from "@modelcontextprotocol/client";
 import { MCP_OUTPUT_SCHEMAS } from "../mcp-output-schemas.js";
 import { MCP_TOOL_EFFECTS } from "../mcp.js";
