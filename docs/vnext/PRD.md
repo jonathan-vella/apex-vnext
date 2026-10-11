@@ -310,7 +310,8 @@ pins, enforce the security baseline, and pass a thin dual-track proof before bro
 Bicep preview, apply, inventory, reconciliation, and destroy run only through azd (`azd provision --preview`,
 `azd provision`, `azd down`). Azure Deployment Stacks are out of scope, so there is no stack ownership, deny-settings
 protection or unmanage cleanup. A resource belongs to the azd environment through the `azd-env-name` tag of the approved
-resource group and the kernel's logical-resource manifest; the destroy preview lists every resource in that group
+resource group and the kernel's logical-resource manifest; the destroy preview lists the resources Azure reports in
+that group (child resources it omits are deleted with their parents and the approval says so)
 because `azd down` deletes it whole, and the approval binds that list. Each of preview, apply and destroy is its own
 bound operation with its own approval, and APEX never runs `azd up`.
 

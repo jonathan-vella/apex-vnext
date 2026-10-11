@@ -14,6 +14,7 @@ import {
   hasValidNativeValidationReceipt,
   PolicyPropertyMapV1Schema,
   LogicalResourceManifestV1Schema,
+  EnvironmentSchema,
   IacBindingV1Schema,
 } from "@apexops/contracts";
 import type {
@@ -801,6 +802,8 @@ export class AzdBicepProvider extends NativeProviderBase implements IacProvider 
 
   constructor(options: AzdBicepProviderOptions) {
     super(options);
+    if (!Value.Check(EnvironmentSchema, options.target.environmentName))
+      throw new AzdBindingError("AZD_BINDING_INPUT_INVALID", "The azd environment name is invalid");
     this.#target = options.target;
   }
 
@@ -822,7 +825,7 @@ export class AzdBicepProvider extends NativeProviderBase implements IacProvider 
             ...material,
             warnings: [
               ...material.warnings,
-              "azd down deletes the entire approved resource group and everything in it. It runs without --purge, so soft-deleted resources such as Key Vaults are not purged and keep their names reserved.",
+              "azd down deletes the entire approved resource group and everything in it, including child and extension resources that Azure does not list and so are not shown above. It runs without --purge, so soft-deleted resources such as Key Vaults are not purged and keep their names reserved.",
             ],
           }
         : material;
@@ -873,7 +876,20 @@ export class AzdBicepProvider extends NativeProviderBase implements IacProvider 
     await this.#ensureEnvironment(target);
     const inspected = await this.#inspect(target, azdVersion);
     await this.#assertIdentity(inspected);
-    const owned = await this.#ownedState(target);
+    const listedState = await this.#ownedState(target);
+    // Accepted child resources that a group listing omits are shown too; unaccepted children of listed resources are
+    // deleted with them and cannot be enumerated, which the approval material states.
+    const owned: AzdOwnedState = {
+      ...listedState,
+      resources: [
+        ...listedState.resources,
+        ...(await this.#readUnlisted(
+          target,
+          listedState.resources,
+          request.resources.map(({ resourceId }) => resourceId),
+        )),
+      ],
+    };
     const normalized: NormalizedPreview = {
       changes: owned.resources.map(({ resourceId }) => ({
         resourceId,
@@ -926,22 +942,19 @@ export class AzdBicepProvider extends NativeProviderBase implements IacProvider 
   }
 
   /**
-   * A group listing omits child and extension resources, so the material resources of the latest approved apply
-   * preview that the listing lacks are read by exact ID. Anything Azure does not return stays out of the inventory,
-   * which the inventory coverage check then reports.
+   * A group listing omits child and extension resources, so the given IDs the listing lacks are read one by one.
+   * Anything Azure does not return is left out, which the inventory coverage check then reports.
    */
-  async #unlistedPlannedResources(
+  async #readUnlisted(
     target: ApprovedAzdTarget,
     listed: readonly AzdOwnedResource[],
+    resourceIds: readonly string[],
   ): Promise<readonly AzdOwnedResource[]> {
-    const key = `${target.projectId}\u0000${target.runId}\u0000apply`;
-    const latest =
-      this.#bindings.get(key) ?? (await this.bindingStore?.loadLatest?.(target.projectId, target.runId, "apply"));
-    if (latest?.kind !== "bicep") return [];
     const known = new Set(listed.map(({ resourceId }) => resourceId.toLowerCase()));
     const found: AzdOwnedResource[] = [];
-    for (const { resourceId, action, material } of latest.preview.changes) {
-      if (!material || action === "delete" || action === "no-op" || known.has(resourceId.toLowerCase())) continue;
+    for (const resourceId of resourceIds) {
+      if (known.has(resourceId.toLowerCase())) continue;
+      known.add(resourceId.toLowerCase());
       let stdout: string;
       try {
         stdout = await this.run(this.#reads.resourceById(resourceId));
@@ -953,6 +966,24 @@ export class AzdBicepProvider extends NativeProviderBase implements IacProvider 
       found.push(...normalizeAzdGroupResources(`[${stdout}]`, target.scope));
     }
     return found;
+  }
+
+  /** The material resources of the latest approved apply preview, which a group listing may omit. */
+  async #unlistedPlannedResources(
+    target: ApprovedAzdTarget,
+    listed: readonly AzdOwnedResource[],
+  ): Promise<readonly AzdOwnedResource[]> {
+    const key = `${target.projectId}\u0000${target.runId}\u0000apply`;
+    const latest =
+      this.#bindings.get(key) ?? (await this.bindingStore?.loadLatest?.(target.projectId, target.runId, "apply"));
+    if (latest?.kind !== "bicep") return [];
+    return await this.#readUnlisted(
+      target,
+      listed,
+      latest.preview.changes
+        .filter(({ material, action }) => material && action !== "delete" && action !== "no-op")
+        .map(({ resourceId }) => resourceId),
+    );
   }
 
   #approvedTarget(request: Pick<PreviewRequest, "projectId" | "runId" | "target">): ApprovedAzdTarget {

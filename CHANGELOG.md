@@ -50,7 +50,8 @@ internal.
   approved Bicep is always deployed. The preview is read from `azd provision --preview --output json` and resolved to
   accepted resource IDs by ARM type and name. Without stacks, resources belong to the azd environment through the
   `azd-env-name` tag of the approved resource group plus the logical-resource manifest; `azd down` deletes that whole
-  group (never with `--purge`), so the destroy preview lists every resource in it and the approval binds that list.
+  group (never with `--purge`), so the destroy preview lists the resources Azure reports in it (child resources the
+  listing omits are deleted with their parents, which the approval states) and the approval binds that list.
   Deny settings and unmanage cleanup no longer exist. Generated Bicep trees are azd projects (`azure.yaml`,
   `infra/main.bicep`, `infra/bicepconfig.json`). The `executable:azd` doctor check is again a failing prerequisite.
   Bicep live runs, including the live qualification handoff, are unavailable until CP-30 qualifies the executor, and

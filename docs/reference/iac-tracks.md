@@ -133,7 +133,9 @@ project root, which must be the accepted generated source), `environmentName`, `
 `cloud`. The subscription and resource group come from the run's exact resource-group target scope. Any other key,
 including the retired `stackName`, `actionOnUnmanage`, `denySettingsMode`, `templateFile` and `resourceGroup` fields, is
 rejected. When the project has no `.azure/<environment>/.env`, APEX writes the five allowlisted, non-secret keys from
-the approved target; an existing file is bound as it is and never overwritten.
+the approved target; an existing file is bound as it is and never overwritten. The environment name must be a valid
+APEX environment name (checked before any path is built), and an existing environment must itself name the approved
+resource group in `AZURE_RESOURCE_GROUP` (`AZD_ENV_TARGET_MISMATCH` otherwise), so azd cannot derive another group.
 
 | Operation | azd command               | Notes                                                                |
 | --------- | ------------------------- | -------------------------------------------------------------------- |
@@ -171,8 +173,11 @@ resources are managed, protected (`existing`) or unaccepted.
   planned child or extension resource that the listing omits by exact ID with `az resource show`. The kernel requires
   every owned resource to match an accepted managed ID; protected `existing` resources are excluded rather than owned.
 - **Destroy.** `azd down` has no preview of its own, and it deletes the whole resource group of the latest deployment.
-  The destroy preview therefore lists every resource Azure reports in the approved group as a delete, and the existing
-  coverage check blocks it when any is not accepted managed ownership or is a protected existing resource. The list is
+  The destroy preview therefore lists every top-level resource Azure reports in the approved group, plus accepted child
+  resources the listing omits (read by exact ID), as deletes. Unaccepted child or extension resources under a listed
+  resource are deleted with it and cannot be enumerated, so the approval material says the list is not exhaustive. The
+  existing coverage check blocks the preview when any listed resource is not accepted managed ownership or is a
+  protected existing resource. The list is
   bound into the approval through the owned-state hash, and the destroy is refused when the group's tagging or contents
   changed after preview. `--purge` is never used, so soft-deleted resources such as Key Vaults stay recoverable and keep
   their names reserved; the approval material says so.

@@ -1,7 +1,12 @@
 import { chmod, lstat, mkdir, readFile } from "node:fs/promises";
 import { join, relative, resolve, sep } from "node:path";
 import { BoundEnvelopeTransport, type BoundEnvelope, type EnvelopeBindings } from "@apexops/capabilities";
-import { hasValidAzdBinding } from "@apexops/contracts";
+import {
+  hasValidAzdBinding,
+  hasValidPolicyValidation,
+  type PolicyValidationBinding,
+  type PolicyValidationV1,
+} from "@apexops/contracts";
 import { atomicWriteBytes, canonicalJsonBytes, sha256Bytes, sha256Json, type JsonValue } from "@apexops/kernel";
 
 export const PROVIDER_TRANSFER_KIND = "apex-provider-authority";
@@ -184,13 +189,24 @@ function parseBinding(
   if (binding.kind !== "bicep" && binding.kind !== "terraform") throw new Error("Provider binding kind is invalid");
   if (provider !== undefined && binding.kind !== provider)
     throw new Error("Provider binding does not match requested provider");
+  const policyKeys = ["policyValidation", "policyValidationBinding"].filter((key) => key in binding);
   exactKeys(
     binding,
     binding.kind === "bicep"
-      ? ["azdBinding", "kind", "ownedStateHash", "preview", "providerBindingHash"]
+      ? ["azdBinding", "kind", "ownedStateHash", "preview", "providerBindingHash", ...policyKeys]
       : ["attestation", "kind", "preview"],
     "Provider binding",
   );
+  if (binding.kind === "bicep" && policyKeys.length > 0) {
+    if (
+      policyKeys.length !== 2 ||
+      !hasValidPolicyValidation(
+        binding.policyValidation as PolicyValidationV1,
+        binding.policyValidationBinding as PolicyValidationBinding,
+      )
+    )
+      throw new Error("Provider binding policy validation is invalid");
+  }
   const preview = requireRecord(binding.preview, "Provider binding preview");
   validatePreview(preview);
   const previewExpiresAt = preview.expiresAt as string;

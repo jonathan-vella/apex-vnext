@@ -2196,6 +2196,7 @@ test("azd destroy previews every resource in the owned group, binds that list an
           type: "Microsoft.Network/virtualNetworks",
           name: "foreign",
         },
+        { id: BLOB_ID, type: BLOB.type, name: "default", unlisted: true },
       ],
     },
   });
@@ -2207,10 +2208,15 @@ test("azd destroy previews every resource in the owned group, binds that list an
     [
       ["foreign", "delete", true],
       ["stlab", "delete", true],
+      ["default", "delete", true],
     ],
   );
   assert.equal(fixture.executions().length, 0);
   assert.match(fixture.provider.approvalMaterial(preview.previewHash)!.warnings.join("\n"), /without --purge/);
+  assert.match(
+    fixture.provider.approvalMaterial(preview.previewHash)!.warnings.join("\n"),
+    /child and extension resources/,
+  );
 
   fixture.state.resources.push({
     id: resourceId("Microsoft.KeyVault/vaults", "kv"),
@@ -2631,4 +2637,29 @@ test("local reference plan transport authenticates metadata, recipient, expiry, 
   clock.value = new Date("2026-07-13T01:02:00.000Z");
   assert.throws(() => transport.decrypt(encrypted, key, authority.recipientIdentity), /expired/);
   clock.value = new Date("2026-07-13T01:00:00.000Z");
+});
+
+test("azd rejects an environment name that could leave the project before touching the disk", async (context) => {
+  const fixture = await azdFixture(context);
+  for (const environmentName of ["../../outside", "/abs/path", "Upper", "a/b", ""])
+    assert.throws(
+      () => fixture.build({ environmentName }),
+      (error) => error instanceof AzdBindingError && error.code === "AZD_BINDING_INPUT_INVALID",
+      environmentName,
+    );
+  assert.equal(fixture.runner.requests.length, 0);
+});
+
+test("azd requires the environment to name the approved resource group", async (context) => {
+  const fixture = await azdFixture(context);
+  await mkdir(join(fixture.root, ".azure", AZD_ENVIRONMENT), { recursive: true });
+  await writeFile(
+    join(fixture.root, ".azure", AZD_ENVIRONMENT, ".env"),
+    `AZURE_ENV_NAME="dev"\nAZURE_LOCATION="swedencentral"\nAZURE_SUBSCRIPTION_ID="${AZD_SUBSCRIPTION}"\n`,
+  );
+  await assert.rejects(
+    fixture.provider.previewApply(fixture.preview()),
+    (error) => error instanceof AzdBindingError && error.code === "AZD_ENV_TARGET_MISMATCH",
+  );
+  assert.equal(fixture.runner.requests.filter((entry) => entry.args.includes("--preview")).length, 0);
 });

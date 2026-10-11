@@ -417,7 +417,8 @@ extensions and layers be inventoried, bound and hashed so that any change invali
   `azd-binding-v1` contract; the old path is removed without a fallback. Consequences: there is no stack ownership,
   deny-settings protection or unmanage cleanup. Ownership comes from the `azd-env-name` tag of the approved resource
   group, which is how azd finds an environment's resources, and the kernel's logical-resource manifest. `azd down` has
-  no preview and deletes the whole resource group, so the destroy preview lists every resource in the group and the
+  no preview and deletes the whole resource group, so the destroy preview lists the resources Azure reports in the
+  group (not exhaustive for child resources, which the approval states) and the
   approval binds that list; `--purge` is never used. A missing or different azd version fails closed. Azure Policy,
   RBAC and deny assignments remain the compensating controls. Bicep live runs stay unavailable until CP-30 qualifies
   the executor; `azd deploy` application packages are a separate, later change.
