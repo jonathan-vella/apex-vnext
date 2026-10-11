@@ -11490,7 +11490,7 @@ export class ApexService {
       id: "executable:azd",
       ok: true,
       severity: "warning",
-      value: `${value} (advisory until the azd executor ships)`,
+      value: `${value.replace(/; Bicep runs require azd$/u, "")} (advisory: Bicep will require azd once the azd executor ships)`,
       remedy:
         `Not needed yet: Bicep still deploys with the native path until the azd executor ships. ${remedy ?? ""}`.trim(),
     };

@@ -322,7 +322,8 @@ test("Bicep runs only warn about azd until the azd executor ships, and a missing
   const absent = check(missing.report, "executable:azd");
   assert.equal(absent.ok, true);
   assert.equal(absent.severity, "warning");
-  assert.match(absent.value, /Bicep runs require azd.*advisory until the azd executor ships/u);
+  assert.match(absent.value, /^not found on PATH \(advisory: Bicep will require azd once the azd executor ships\)$/u);
+  assert.equal(absent.value.includes("Bicep runs require azd"), false);
   assert.ok(absent.remedy?.startsWith("Not needed yet"));
   assert.ok(absent.remedy?.includes(`azd ${AZD_PIN}`) && absent.remedy.includes("releases/tag/azure-dev-cli_"));
   const failing = (report: { checks: { id: string; ok: boolean }[] }) =>
