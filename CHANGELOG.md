@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The live qualification handoff launcher accepts a lab run's kernel-recorded Gate 3 readiness checkpoint (`ready`, lab
+  purpose only) in its dispatch preflight. Dispatch still requires the human Gate 4 approval of the exact preview, and
+  `ready` is accepted nowhere else.
 - Record lab Gates 2 and 3 as kernel readiness checkpoints (CP-27, part 2). A new `ready` gate state and a journaled
   `gate.readiness-recorded` event (gate, dependency hash, passed validators; no actor or approval evidence) are recorded
   automatically once the gate's required review has no open finding and its validators pass, for `lab` runs only.

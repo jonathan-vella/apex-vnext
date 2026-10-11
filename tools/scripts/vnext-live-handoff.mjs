@@ -54,8 +54,12 @@ export function validateDispatchRunState(status, track) {
   if (run?.iacTool !== track) throw new Error("Selected APEX run does not match --track");
   const gate3 = run.gates?.find((gate) => gate.gate === 3);
   const gate4 = run.gates?.find((gate) => gate.gate === 4);
-  if (!new Set(["approved", "inherited"]).has(gate3?.state)) {
-    throw new Error("Selected APEX run requires approved Gate 3 before dispatch");
+  // A lab run records Gate 3 as a kernel readiness checkpoint, never as a human approval. Dispatch still needs the
+  // human Gate 4 approval of the exact preview, which approvedDispatchState verifies.
+  const gate3Accepted =
+    new Set(["approved", "inherited"]).has(gate3?.state) || (gate3?.state === "ready" && run.purpose === "lab");
+  if (!gate3Accepted) {
+    throw new Error("Selected APEX run requires an approved or lab-ready Gate 3 before dispatch");
   }
   if (!new Set(["closed", "invalidated", "open", "approved", "rejected"]).has(gate4?.state)) {
     throw new Error("Selected APEX run has an unsupported Gate 4 state");

@@ -755,6 +755,25 @@ test("launcher preflights selected track and gate state before dispatch", () => 
   );
 });
 
+test("launcher accepts a lab readiness Gate 3 only for a lab run", () => {
+  const run = (purpose, gate3) => ({
+    result: {
+      run: {
+        iacTool: "bicep",
+        ...(purpose === undefined ? {} : { purpose }),
+        gates: [
+          { gate: 3, state: gate3 },
+          { gate: 4, state: "closed" },
+        ],
+      },
+    },
+  });
+  assert.equal(validateDispatchRunState(run("lab", "ready"), "bicep"), true);
+  assert.throws(() => validateDispatchRunState(run("production", "ready"), "bicep"), /Gate 3/);
+  assert.throws(() => validateDispatchRunState(run(undefined, "ready"), "bicep"), /Gate 3/);
+  assert.throws(() => validateDispatchRunState(run("lab", "open"), "bicep"), /Gate 3/);
+});
+
 test("launcher recognizes only the exact accepted local return owner", () => {
   const ownership = {
     result: {
