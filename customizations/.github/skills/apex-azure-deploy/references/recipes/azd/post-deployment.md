@@ -70,11 +70,16 @@ See [EF Core Migrations](ef-migrations.md) for deployment patterns and troublesh
 # Get app endpoint
 ENDPOINT=$(azd env get-value SERVICE_API_URI)
 
+failed=0
+
 # Health check
-curl --fail-with-body -sS --max-time 15 "$ENDPOINT/health" || echo "Health check failed"
+curl --fail-with-body -sS --max-time 15 "$ENDPOINT/health" || { echo "Health check failed"; failed=1; }
 
 # Test database connectivity
-curl --fail-with-body -sS --max-time 15 "$ENDPOINT/api/test-db" || echo "Database connection failed"
+curl --fail-with-body -sS --max-time 15 "$ENDPOINT/api/test-db" || { echo "Database connection failed"; failed=1; }
+
+# The block status is the verification result
+test "$failed" -eq 0
 ```
 
 **Expected Result:**

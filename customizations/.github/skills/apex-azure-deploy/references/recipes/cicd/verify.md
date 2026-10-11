@@ -21,10 +21,10 @@ az resource list --resource-group <rg-name> --output table
 ## Health Check
 
 ```bash
-# --fail-with-body makes curl exit non-zero on HTTP 4xx/5xx; pipefail keeps that failure through jq. Bound the wait.
+# --fail-with-body makes curl exit non-zero on HTTP 4xx/5xx; pipefail keeps that failure through jq, so the block
+# status is the health result. Bound the wait.
 set -o pipefail
 curl --fail-with-body -sS --connect-timeout 5 --max-time 15 https://<endpoint>/health | jq .
-echo "health check exit code: $?"
 ```
 
 ## Port Source
