@@ -342,6 +342,9 @@ test("unsupported hook surfaces fail closed", async () => {
     ["AZD_HOOK_UNBOUND_MUTATION", hook("    run: |\n      echo start\n      azd deploy api\n")],
     ["AZD_HOOK_UNBOUND_MUTATION", hook("    run: azd env set AZURE_LOCATION westeurope\n")],
     ["AZD_HOOK_UNBOUND_MUTATION", hook("    run: azd env select other\n")],
+    ["AZD_HOOK_UNBOUND_MUTATION", hook("    run: azd env set CUSTOM_SETTING changed\n")],
+    ["AZD_HOOK_UNBOUND_MUTATION", hook("    run: azd env set-secret SOME_VALUE\n")],
+    ["AZD_HOOK_UNBOUND_MUTATION", hook("    run: echo CUSTOM_SETTING=x >> .azure/lab/.env\n")],
     ["AZD_HOOK_UNBOUND_MUTATION", hook("    run: azd extension install foo\n")],
     ["AZD_HOOK_UNBOUND_MUTATION", hook("    run: hooks/pre.sh\n"), { "hooks/pre.sh": "#!/bin/sh\nazd provision\n" }],
     ["AZD_HOOK_UNBOUND_MUTATION", hook("    run: az account set --subscription other\n")],
@@ -349,6 +352,25 @@ test("unsupported hook surfaces fail closed", async () => {
   for (const [code, yaml, files] of cases) await rejects(code, { "azure.yaml": yaml, ...files });
   const readOnly = await inspect({ "azure.yaml": hook("    run: azd env get-value AZURE_LOCATION\n") });
   assert.equal(readOnly.hooks.length, 1);
+});
+
+test("requiredVersions.azd must be satisfied by the bound azd and use simple comparators", async () => {
+  const required = (constraint: string): Record<string, string> => ({
+    "azure.yaml": withHooks(`requiredVersions:\n  azd: "${constraint}"\n`),
+  });
+  for (const constraint of [
+    ">= 0.6.0-beta.3",
+    ">=1.35.1",
+    "1.35.1",
+    ">=1.0.0 <2.0.0",
+    ">1.0.0, <1.36.0",
+    "<1.0.0 || >=1.35.0",
+  ])
+    assert.equal((await inspect(required(constraint))).azdVersion, "1.35.1", constraint);
+  for (const constraint of [">= 1.36.0", "<1.35.1", "!=1.35.1", "1.35.0", ">=2.0.0 || <1.0.0"])
+    await rejects("AZD_VERSION_CONSTRAINT", required(constraint));
+  for (const constraint of ["~1.35", "^1.0.0", "1.x", "latest", ">=1.35", "|| >=1.0.0", ">=1.0.0 || "])
+    await rejects("AZD_PROJECT_UNSUPPORTED", required(constraint));
 });
 
 test("service hooks are inventoried and an ambiguous script location fails closed", async () => {

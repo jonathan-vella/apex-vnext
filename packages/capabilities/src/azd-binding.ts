@@ -15,6 +15,7 @@ import {
   type AzdInfraRootV1,
 } from "@apexops/contracts";
 import { Value } from "@sinclair/typebox/value";
+import { satisfiesAzdVersionConstraint } from "./azd-prerequisites.js";
 import {
   AZD_FILE_LIMITS,
   AzdBindingError,
@@ -114,11 +115,12 @@ const UNBOUND_MUTATIONS: ReadonlyArray<readonly [RegExp, string]> = [
     /\bazd(?:\.exe)?["']?\s+(?:up|deploy|provision|down|package|publish|restore|init|pipeline|extension|ext|config|auth|add|infra|hooks|template|mcp|x)\b/iu,
     "runs another azd operation",
   ],
-  [/\bazd(?:\.exe)?["']?\s+env\s+(?:new|select|remove|rm|refresh|config)\b/iu, "changes the azd environment"],
+  // Any environment write can change a value the binding hashed or a ${NAME} parameter after the preview.
   [
-    /\bazd(?:\.exe)?["']?\s+env\s+set(?:-secret)?\s+["']?AZURE_(?:SUBSCRIPTION_ID|LOCATION|RESOURCE_GROUP|TENANT_ID|ENV_NAME)\b/iu,
-    "redirects the azd target",
+    /\bazd(?:\.exe)?["']?\s+env\s+(?:set|set-secret|new|select|remove|rm|refresh|config)\b/iu,
+    "changes the azd environment",
   ],
+  [/\.azure[\\/]/u, "touches the azd environment files directly (read values with azd env get-value)"],
   [/\baz(?:\.cmd)?\s+account\s+set\b/iu, "redirects the Azure subscription"],
 ];
 
@@ -723,11 +725,21 @@ async function inventoryHook(
   };
 }
 
-function inventoryExtensions(required: unknown): AzdBindingV1["extensions"] {
+function inventoryExtensions(required: unknown, azdVersion: string): AzdBindingV1["extensions"] {
   if (required === undefined) return [];
   const declaration = plain(required, "requiredVersions", "AZD_PROJECT_UNSUPPORTED");
   onlyKeys(declaration, ["azd", "extensions"], "requiredVersions", "AZD_PROJECT_UNSUPPORTED");
-  if (declaration.azd !== undefined) text(declaration.azd, "requiredVersions.azd", "AZD_PROJECT_UNSUPPORTED", 64);
+  if (declaration.azd !== undefined) {
+    const constraint = text(declaration.azd, "requiredVersions.azd", "AZD_PROJECT_UNSUPPORTED", 64);
+    const satisfied = satisfiesAzdVersionConstraint(azdVersion, constraint);
+    if (satisfied === undefined)
+      fail("AZD_PROJECT_UNSUPPORTED", "requiredVersions.azd must use simple comparators such as '>= 1.35.0'");
+    if (!satisfied)
+      fail(
+        "AZD_VERSION_CONSTRAINT",
+        `azure.yaml requires azd ${constraint}, which the bound azd ${azdVersion} does not meet`,
+      );
+  }
   if (declaration.extensions === undefined) return [];
   const extensions = plain(declaration.extensions, "requiredVersions.extensions", "AZD_PROJECT_UNSUPPORTED");
   const result: Array<AzdBindingV1["extensions"][number]> = [];
@@ -844,7 +856,7 @@ export async function inspectAzdBicepProject(input: AzdBindingRequest): Promise<
       roots.map(({ name, resolvedParametersHash }) => [name, resolvedParametersHash]),
     ),
     hooks,
-    extensions: inventoryExtensions(project.requiredVersions),
+    extensions: inventoryExtensions(project.requiredVersions, request.azdVersion),
   };
   const binding = { ...body, bindingHash: calculateAzdBindingHash(body) };
   if (!hasValidAzdBinding(binding))

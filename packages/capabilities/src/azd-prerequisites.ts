@@ -32,6 +32,49 @@ function compareVersions(left: string, right: string): number {
   return 0;
 }
 
+const COMPARATOR = /^(>=|<=|!=|>|<|=)?\s*v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z][0-9A-Za-z.-]*))?/u;
+
+/**
+ * Evaluates the comparator subset of azure.yaml `requiredVersions.azd` (`>=`, `>`, `<=`, `<`, `=`, `!=`, spaces or commas
+ * for "and", `||` for "or") for a release version. Returns undefined for any other syntax so callers fail closed.
+ */
+export function satisfiesAzdVersionConstraint(version: string, constraint: string): boolean | undefined {
+  const release = /^(\d+)\.(\d+)\.(\d+)$/u.exec(version);
+  if (release === null) return undefined;
+  const actual = [Number(release[1]), Number(release[2]), Number(release[3])] as const;
+  let satisfied = false;
+  for (const group of constraint.split("||")) {
+    let rest = group.trim();
+    if (rest.length === 0) return undefined;
+    let groupSatisfied = true;
+    while (rest.length > 0) {
+      const match = COMPARATOR.exec(rest);
+      if (match === null) return undefined;
+      const wanted = [Number(match[2]), Number(match[3]), Number(match[4])] as const;
+      // A release outranks a pre-release of the same version.
+      let order = compareVersions(actual.join("."), wanted.join("."));
+      if (order === 0 && match[5] !== undefined) order = 1;
+      const operator = match[1] ?? "=";
+      const holds =
+        operator === ">="
+          ? order >= 0
+          : operator === ">"
+            ? order > 0
+            : operator === "<="
+              ? order <= 0
+              : operator === "<"
+                ? order < 0
+                : operator === "!="
+                  ? order !== 0
+                  : order === 0;
+      groupSatisfied &&= holds;
+      rest = rest.slice(match[0].length).replace(/^[\s,]+/u, "");
+    }
+    satisfied ||= groupSatisfied;
+  }
+  return satisfied;
+}
+
 /**
  * Bicep runs execute through the Azure Developer CLI, and the bound azd version is part of what the user approved, so
  * only the exact pinned release satisfies the prerequisite. Terraform runs do not require azd.

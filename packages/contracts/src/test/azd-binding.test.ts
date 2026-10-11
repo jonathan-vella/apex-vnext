@@ -109,6 +109,50 @@ describe("azd-binding-v1", () => {
     for (const edit of invalid) assert.equal(hasValidAzdBinding(binding(edit)), false);
   });
 
+  it("rejects dependency, parameter and scope inconsistencies a producer would never emit", () => {
+    const layered = (body: Omit<AzdBindingV1, "bindingHash">): void => {
+      const [root] = body.infra.roots;
+      body.infra.layered = true;
+      body.infra.roots = [
+        { ...root!, name: "network", path: "infra/network", parametersPath: "infra/network/main.parameters.json" },
+        { ...root!, name: "workload", path: "infra/workload", parametersPath: "infra/workload/main.parameters.json" },
+      ];
+    };
+    const valid = binding(layered);
+    assert.equal(hasValidAzdBinding(valid), true);
+    const invalid: Array<(body: Omit<AzdBindingV1, "bindingHash">) => void> = [
+      (body) => (body.infra.roots[0]!.dependsOn = ["network"]),
+      (body) => {
+        body.infra.roots[0]!.dependsOn = ["workload"];
+        body.infra.roots[1]!.dependsOn = ["network"];
+      },
+      (body) => (body.infra.roots[1]!.name = "NETWORK"),
+      (body) => (body.infra.roots[1]!.path = "INFRA/network"),
+      (body) => delete body.infra.roots[0]!.parametersFileHash,
+      (body) => delete body.infra.roots[0]!.parametersPath,
+      (body) => (body.infra.roots[0]!.parametersPath = "infra/other/main.parameters.json"),
+      (body) => (body.hooks[0]!.scope = "layer:missing"),
+    ];
+    for (const edit of invalid)
+      assert.equal(
+        hasValidAzdBinding(
+          binding((body) => {
+            layered(body);
+            edit(body);
+          }),
+        ),
+        false,
+      );
+    assert.equal(
+      hasValidAzdBinding(
+        binding((body) => {
+          body.hooks[0]!.scope = "layer:default";
+        }),
+      ),
+      false,
+    );
+  });
+
   it("only describes Bicep through azd with exact versions and safe relative paths", () => {
     const check = (change: (body: Omit<AzdBindingV1, "bindingHash">) => void): boolean =>
       Value.Check(AzdBindingV1Schema, binding(change));

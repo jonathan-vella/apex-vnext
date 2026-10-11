@@ -146,15 +146,41 @@ function unique(values: readonly string[]): boolean {
   return new Set(values).size === values.length;
 }
 
+function hasValidInfra(infra: AzdBindingV1["infra"], hooks: AzdBindingV1["hooks"]): boolean {
+  const roots = infra.roots;
+  const names = roots.map(({ name }) => name);
+  // Producers compare names and paths case-insensitively, so a persisted binding must too.
+  if (!unique(names.map((name) => name.toLowerCase())) || !unique(roots.map(({ path }) => path.toLowerCase())))
+    return false;
+  if (infra.layered === (names.length === 1 && names[0] === "default")) return false;
+  const dependencies = new Map(roots.map((root) => [root.name, root.dependsOn]));
+  for (const root of roots) {
+    if (root.dependsOn.some((name) => name === root.name || !dependencies.has(name))) return false;
+    if ((root.parametersPath === undefined) !== (root.parametersFileHash === undefined)) return false;
+    if (root.parametersPath !== undefined && root.parametersPath !== `${root.path}/${root.module}.parameters.json`)
+      return false;
+  }
+  const state = new Map<string, "visiting" | "done">();
+  const cyclic = (name: string): boolean => {
+    if (state.get(name) === "done") return false;
+    if (state.get(name) === "visiting") return true;
+    state.set(name, "visiting");
+    if ((dependencies.get(name) ?? []).some(cyclic)) return true;
+    state.set(name, "done");
+    return false;
+  };
+  if (names.some(cyclic)) return false;
+  return hooks.every(
+    (hook) => !hook.scope.startsWith("layer:") || (infra.layered && names.includes(hook.scope.slice("layer:".length))),
+  );
+}
+
 /** Schema, structural-uniqueness and self-hash check for a persisted azd binding. */
 export function hasValidAzdBinding(value: unknown): value is AzdBindingV1 {
   try {
     if (!Value.Check(AzdBindingV1Schema, value)) return false;
     const { bindingHash, ...binding } = value;
-    const rootNames = binding.infra.roots.map(({ name }) => name);
-    if (!unique(rootNames) || binding.infra.layered === (rootNames.length === 1 && rootNames[0] === "default"))
-      return false;
-    if (binding.infra.roots.some(({ dependsOn }) => dependsOn.some((name) => !rootNames.includes(name)))) return false;
+    if (!hasValidInfra(binding.infra, binding.hooks)) return false;
     if (!unique(binding.extensions.map(({ id }) => id))) return false;
     if (!unique(binding.environment.keys)) return false;
     if (!unique(binding.hooks.map((hook) => `${hook.scope}\n${hook.event}\n${hook.platform}\n${hook.order}`)))

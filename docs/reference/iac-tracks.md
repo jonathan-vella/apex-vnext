@@ -57,14 +57,17 @@ every input that recompilation or execution reads, and any change to any of them
 Hooks, extensions and layers are allowed but always inventoried, listed in approval material and hashed, so adding,
 removing, reordering or editing any of them invalidates the preview. The approval material warns that hooks run
 arbitrary scripts and can act beyond the what-if, and that the what-if is a prediction against current Azure state, not
-an immutable plan like a Terraform saved plan.
+an immutable plan like a Terraform saved plan. The preview does not run hooks, so a hook that changes an input the
+preview already read (a parameter file or an environment value) is an accepted risk of approving that hook.
 
 Unsupported surfaces fail closed with stable error codes: Terraform or extension `infra.provider`, `resources`,
 `platform`, `state` and `cloud` in `azure.yaml`, `.bicepparam` and parameter substitution other than `${NAME}`,
 parameters or environment entries that look like secrets, non-`sh`/`pwsh` hook runners, hook `secrets`, missing or
-ambiguous hook scripts, hooks that run `azd up`, `azd deploy`, `azd provision` or other azd operations or retarget the
-subscription, extension versions that are not exact, environment values that redirect the subscription, location,
-tenant, environment name or resource group, links, path traversal, YAML aliases and merge keys, local Bicep module or
+ambiguous hook scripts, hooks that run `azd up`, `azd deploy`, `azd provision` or other azd operations, write the azd
+environment (`azd env set`, `.azure/` files) or retarget the subscription, extension versions that are not exact, an
+`azure.yaml` `requiredVersions.azd` the bound azd does not meet or that uses more than simple comparators, environment
+values that redirect the subscription, location, tenant, environment name or resource group, links, path traversal, YAML
+aliases and merge keys, local Bicep module or
 file references that leave the bound tree, a root without its own `bicepconfig.json` (so module aliases and linter
 settings cannot be inherited from outside the tree) and oversize input. The hook scan is a best-effort text check, not a
 sandbox; the approved hook content and the warning are the controls. Remote registry modules (`br:` and `ts:`) are not
