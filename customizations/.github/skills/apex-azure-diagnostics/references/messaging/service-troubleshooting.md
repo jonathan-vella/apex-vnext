@@ -57,7 +57,7 @@ If connectivity is **intermittent**:
 |-------|-----|
 | Invalid connection string | Re-copy from Azure portal |
 | Expired SAS token | Regenerate or increase validity |
-| Missing RBAC role | Assign the corresponding *Azure Event Hubs Data Owner/Sender/Receiver* or *Azure Service Bus Data Owner/Sender/Receiver* role |
+| Missing RBAC role | Assign the narrowest matching data role (*Azure Event Hubs Data Sender/Receiver* or *Azure Service Bus Data Sender/Receiver*) at namespace or entity scope; *Data Owner* only when the workload manages entities |
 | Managed Identity not configured | Enable system/user-assigned identity, assign role on namespace |
 
 ## Sender Issues (All Languages)

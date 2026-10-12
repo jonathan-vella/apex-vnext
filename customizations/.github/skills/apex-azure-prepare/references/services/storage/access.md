@@ -35,7 +35,7 @@
   - Configure identity in Bicep with both `type: 'SystemAssigned, UserAssigned'` and `userAssignedIdentities`
 
 If you encounter `AuthorizationFailed` errors when assigning roles, ensure you have Role Based Access Control Administrator
-or Owner permissions at the target scope.
+at the target scope; use Owner only when no narrower role is available.
 
 ## Managed Identity Role Assignment
 

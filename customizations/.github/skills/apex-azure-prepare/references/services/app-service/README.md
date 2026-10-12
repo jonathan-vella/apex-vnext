@@ -25,13 +25,13 @@ services:
     project: ./src/my-web
 ```
 
-## Required Supporting Resources
+## Supporting Resources
 
-| Resource             | Purpose            |
-| -------------------- | ------------------ |
-| App Service Plan     | Compute hosting    |
-| Application Insights | Monitoring         |
-| Key Vault            | Secrets (optional) |
+| Resource             | Purpose         | Needed when                              |
+| -------------------- | --------------- | ---------------------------------------- |
+| App Service Plan     | Compute hosting | Always                                   |
+| Application Insights | Monitoring      | Optional; add it for application telemetry |
+| Key Vault            | Secrets         | Optional; only for secrets that cannot use managed identity or Entra authentication |
 
 ## Runtime Stacks
 

@@ -24,12 +24,12 @@ Managed relational database with ACID compliance and full SQL Server compatibili
 - More secure than SQL authentication
 - Eliminates password management
 
-## Required Supporting Resources
+## Supporting Resources
 
-| Resource         | Purpose                  |
-| ---------------- | ------------------------ |
-| Key Vault        | Store connection strings |
-| Private Endpoint | Secure access (optional) |
+| Resource         | Purpose                  | Needed when                                                        |
+| ---------------- | ------------------------ | ------------------------------------------------------------------ |
+| Key Vault        | Store secrets            | Optional; only for secrets the app cannot obtain through Entra ID  |
+| Private Endpoint | Secure access            | Optional; required when public network access is disabled          |
 
 ## SKU Selection
 

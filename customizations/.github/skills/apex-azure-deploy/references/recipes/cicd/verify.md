@@ -23,6 +23,7 @@ az resource list --resource-group <rg-name> --output table
 ```bash
 # --fail-with-body makes curl exit non-zero on HTTP 4xx/5xx; pipefail keeps that failure through jq, so the block
 # status is the health result. Bound the wait.
+# <endpoint> is a bare host name; if the accepted output already includes https://, use it as the base URL instead.
 set -o pipefail
 curl --fail-with-body -sS --connect-timeout 5 --max-time 15 https://<endpoint>/health | jq .
 ```

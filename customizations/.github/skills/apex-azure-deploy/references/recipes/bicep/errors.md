@@ -15,7 +15,7 @@
 | Invalid property  | Check the accepted resource type schema       |
 | Resource conflict | Check existing resources                      |
 | Deployment failed | `az deployment operation group list --resource-group <rg-name> --name <name> --query "[?properties.provisioningState=='Failed']"` |
-| Permission denied | Verify RBAC roles                             |
+| Permission denied | Read the denied action and scope, then verify the narrowest role that grants it |
 
 ## Cleanup (DESTRUCTIVE)
 

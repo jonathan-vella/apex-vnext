@@ -25,13 +25,13 @@ Logic Apps are typically deployed as infrastructure, not application services:
 # Logic Apps are defined in Bicep infrastructure
 ```
 
-## Required Supporting Resources
+## Supporting Resources
 
-| Resource        | Purpose                        |
-| --------------- | ------------------------------ |
-| Storage Account | Workflow state (Standard only) |
-| Log Analytics   | Monitoring                     |
-| API Connections | External service connections   |
+| Resource        | Purpose                      | Needed when                                                                      |
+| --------------- | ---------------------------- | -------------------------------------------------------------------------------- |
+| Storage Account | Workflow state               | Standard plan only; Consumption state is Azure-managed                           |
+| Log Analytics   | Monitoring                   | Optional; add it when the design routes diagnostic logs to a workspace           |
+| API Connections | External service connections | Only workflows that use managed connectors; built-in operations need no resource |
 
 ## Consumption vs Standard
 
