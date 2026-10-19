@@ -10,6 +10,11 @@ When you prepare a release, rename `## [Unreleased]` to the new version.
 
 ## [Unreleased]
 
+### Changed
+
+- Static Web Apps Bicep guidance no longer shows a Key Vault reference in the managed integrated API's application
+  settings, which Managed Functions do not resolve; secrets belong on a linked bring-your-own Functions app.
+
 ## [0.11.0-next.5] - 2026-10-19
 
 This release bundles the azd Bicep executor (CP-26, PR B) and skill guidance corrections from the 0.11.0-next.4

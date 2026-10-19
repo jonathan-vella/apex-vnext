@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Static Web Apps Bicep guidance no longer shows a Key Vault reference in the managed integrated API's application
+  settings, which Managed Functions do not resolve; secrets belong on a linked bring-your-own Functions app (Refs #384).
+  There is no runtime change.
+
 ## [0.11.0-next.5] — Preview
 
 This release moves Bicep execution onto azd (CP-26, PR B) and ships the skill guidance corrections from the
