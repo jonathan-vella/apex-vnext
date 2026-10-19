@@ -1059,5 +1059,39 @@
       "name": "markdown-lint",
       "script": "lint:md"
     }
+  ],
+  "excludedScripts": [
+    {
+      "script": "validate:vnext",
+      "reason": "vNext qualification entrypoint invoked via qualify:vnext after asset preparation"
+    },
+    {
+      "script": "lint:md:fix",
+      "reason": "Mutating markdownlint autofix helper"
+    },
+    {
+      "script": "lint:vendor-prompting",
+      "reason": "Focused vendor-prompting subset of validate:agents"
+    },
+    {
+      "script": "lint:prose",
+      "reason": "Optional local Vale prose linter"
+    },
+    {
+      "script": "lint:python:fix",
+      "reason": "Mutating Ruff autofix helper"
+    },
+    {
+      "script": "validate:avm-versions",
+      "reason": "Standalone local AVM module version check"
+    },
+    {
+      "script": "validate:avm-versions:freeze",
+      "reason": "Standalone AVM module version freeze helper"
+    },
+    {
+      "script": "lint:js",
+      "reason": "Local cached ESLint runner wrapped by lint:js:ci"
+    }
   ]
 }

@@ -30,7 +30,8 @@ const REQUIRED_WORK_ITEM_FIELDS = [
 const REQUIRED_BUG_FIELDS = ["integration-head", "failed-check", "regression-test"];
 
 function extractIds(content, pattern) {
-  return [...content.matchAll(pattern)].map((match) => match[1]);
+  const withoutCodeFences = content.replace(/^```[\s\S]*?^```/gm, "");
+  return [...withoutCodeFences.matchAll(pattern)].map((match) => match[1]);
 }
 
 function extractLocalLinks(root, sourcePath, content) {

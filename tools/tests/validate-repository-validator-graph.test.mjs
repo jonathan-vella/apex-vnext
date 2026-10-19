@@ -89,8 +89,44 @@ test("valid repository validator graph passes", () => {
 });
 
 test("collects read-only workflow and hook consumer evidence", () => {
-  const evidence = collectConsumerEvidence(graph, () => "name: ci\nrun: npm run validate:_node-ci\n");
+  const evidence = collectConsumerEvidence(
+    graph,
+    () => "jobs:\n  ci:\n    name: ci\n    steps:\n      - run: npm run validate:_node-ci\n",
+  );
   assert.deepEqual(evidence, { "ci-main": "validate:_node-ci" });
+});
+
+test("ignores workflow consumers where npm run appears only in YAML comments or disabled steps", () => {
+  const commentedEvidence = collectConsumerEvidence(
+    graph,
+    () =>
+      "jobs:\n  ci:\n    name: ci\n    steps:\n      # - run: npm run validate:_node-ci\n      - run: |\n          # npm run validate:_node-ci\n          echo ok\n",
+  );
+  assert.deepEqual(commentedEvidence, { "ci-main": null });
+
+  const disabledEvidence = collectConsumerEvidence(
+    graph,
+    () => "jobs:\n  ci:\n    name: ci\n    steps:\n      - if: false\n        run: npm run validate:_node-ci\n",
+  );
+  assert.deepEqual(disabledEvidence, { "ci-main": null });
+});
+
+test("rejects unaccounted-for validate:* or lint:* scripts in package.json unless excluded", () => {
+  const errors = validateRepositoryValidatorGraph({
+    ...options,
+    scripts: { ...scripts, "validate:unregistered": "node unregistered.mjs" },
+  });
+  assert.ok(errors.includes("validate:unregistered: package validation/lint script is not registered in graph"));
+
+  const withExcluded = validateRepositoryValidatorGraph({
+    ...options,
+    graph: {
+      ...graph,
+      excludedScripts: [{ script: "validate:unregistered", reason: "Internal helper" }],
+    },
+    scripts: { ...scripts, "validate:unregistered": "node unregistered.mjs" },
+  });
+  assert.deepEqual(withExcluded, []);
 });
 
 test("reports unreadable consumer files as missing evidence", () => {

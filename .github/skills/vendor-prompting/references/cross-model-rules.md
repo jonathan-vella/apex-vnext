@@ -32,7 +32,7 @@ contain BOTH:
 
 ```yaml
 handoffs:
-  - agent: 03-Architect
+  - agent: APEX
     prompt: "Create a WAF assessment based on agent-output/{project}/01-requirements.md.
       Output: 02-architecture-assessment.md and 03-des-cost-estimate.md."
 ```
@@ -41,7 +41,7 @@ handoffs:
 
 ```yaml
 handoffs:
-  - agent: 03-Architect
+  - agent: APEX
     prompt: "Begin architecture review."
 ```
 

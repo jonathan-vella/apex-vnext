@@ -1,6 +1,7 @@
 ---
 name: apex-next
 description: "Routes the next APEX kernel step inside the same APEX agent by mapping owner roles to stage skills, hidden workers or captured rubber-duck reviews."
+user-invocable: false
 ---
 
 When calling any `apex/*` MCP tool, include the current session checkout or worktree as the required absolute

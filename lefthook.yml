@@ -9,7 +9,8 @@ pre-commit:
       glob: "*.md"
       run: |
         # Get staged markdown files
-        STAGED_MD=$(git diff --cached --name-only --diff-filter=ACM | grep '\.md$' || true)
+        STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM)
+        STAGED_MD=$(printf '%s\n' "$STAGED_FILES" | grep '\.md$' || true)
         if [ -n "$STAGED_MD" ]; then
           COUNT=$(echo "$STAGED_MD" | wc -l | tr -d ' ')
           echo "📝 Validating $COUNT markdown file(s)..."

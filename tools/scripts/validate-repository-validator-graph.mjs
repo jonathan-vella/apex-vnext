@@ -1,12 +1,40 @@
 #!/usr/bin/env node
 
 import { readFileSync } from "node:fs";
+import path from "node:path";
 import process from "node:process";
+import { fileURLToPath } from "node:url";
 import Ajv2020 from "ajv/dist/2020.js";
+import { load } from "js-yaml";
 import { reportRegistryValidation, requestedReportFormat } from "./_lib/registry-validator-reporter.mjs";
 
-const GRAPH_PATH = "tools/registry/repository-validator-graph.json";
-const SCHEMA_PATH = "tools/registry/schemas/repository-validator-graph.schema.json";
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const GRAPH_REL_PATH = "tools/registry/repository-validator-graph.json";
+const GRAPH_PATH = path.join(repoRoot, GRAPH_REL_PATH);
+const SCHEMA_PATH = path.join(repoRoot, "tools/registry/schemas/repository-validator-graph.schema.json");
+const PACKAGE_JSON_PATH = path.join(repoRoot, "package.json");
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+}
+
+function stripShellComments(text) {
+  return text
+    .split("\n")
+    .filter((line) => !/^\s*#/u.test(line))
+    .map((line) => line.replace(/\s+#.*$/u, ""))
+    .join("\n");
+}
+
+function hasScriptToken(text, script) {
+  if (typeof text !== "string") return false;
+  const pattern = new RegExp(`(?:^|[\\s;&|()])npm\\s+run\\s+${escapeRegExp(script)}(?=$|[\\s;&|()])`, "mu");
+  return pattern.test(stripShellComments(text));
+}
+
+function isActiveYamlCondition(condition) {
+  return condition !== false && condition !== "false";
+}
 
 function unique(errors, values, label) {
   const seen = new Set();
@@ -82,12 +110,18 @@ export function validateRepositoryValidatorGraph({ graph, schema, scripts, consu
     graph.consumers.map(({ id }) => id),
     "consumer IDs",
   );
+  unique(
+    errors,
+    (graph.excludedScripts ?? []).map(({ script }) => script),
+    "excluded scripts",
+  );
 
   const profiles = new Map(graph.profiles.map((profile) => [profile.id, profile]));
   const commands = new Map(graph.commands.map((command) => [command.script, command]));
   const commandIds = new Set(graph.commands.map(({ id }) => id));
   const aliases = new Set(graph.commands.flatMap(({ aliases: values }) => values));
   const aggregates = new Map(graph.aggregates.map((aggregate) => [aggregate.script, aggregate]));
+  const excludedScripts = new Set((graph.excludedScripts ?? []).map(({ script }) => script));
 
   const visiting = new Set();
   const visited = new Set();
@@ -188,17 +222,62 @@ export function validateRepositoryValidatorGraph({ graph, schema, scripts, consu
     else if (value !== consumer.script) errors.push(`${consumer.id}: expected ${consumer.script}, found ${value}`);
   }
 
+  for (const excluded of graph.excludedScripts ?? []) {
+    if (scripts[excluded.script] === undefined) {
+      errors.push(`${excluded.script}: excluded package script is missing`);
+    }
+    if (commands.has(excluded.script) || aggregates.has(excluded.script) || aliases.has(excluded.script)) {
+      errors.push(`${excluded.script}: excluded script is already registered in graph`);
+    }
+  }
+
+  const accountedScripts = new Set([...commands.keys(), ...aggregates.keys(), ...aliases, ...excludedScripts]);
+  for (const script of Object.keys(scripts)) {
+    if (/^(?:validate|lint):/u.test(script) && !accountedScripts.has(script)) {
+      errors.push(`${script}: package validation/lint script is not registered in graph`);
+    }
+  }
+
   return errors;
 }
 
-export function collectConsumerEvidence(graph, read = readFileSync) {
+function matchesWorkflowConsumer(content, consumer) {
+  const doc = load(content);
+  if (!doc || typeof doc !== "object" || !doc.jobs || typeof doc.jobs !== "object") return false;
+  for (const [jobKey, job] of Object.entries(doc.jobs)) {
+    if (!job || typeof job !== "object" || !isActiveYamlCondition(job.if)) continue;
+    const jobMatches = jobKey === consumer.name || job.name === consumer.name;
+    const steps = Array.isArray(job.steps) ? job.steps : [];
+    for (const step of steps) {
+      if (!step || typeof step !== "object" || !isActiveYamlCondition(step.if)) continue;
+      if ((jobMatches || step.name === consumer.name) && hasScriptToken(step.run, consumer.script)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function matchesNonWorkflowConsumer(content, consumer) {
+  const uncommented = stripShellComments(content);
+  const namePattern = new RegExp(`(?:^|\\n)\\s*(?:name:\\s*)?${escapeRegExp(consumer.name)}\\s*:?(?:\\s|$)`, "mu");
+  return namePattern.test(uncommented) && hasScriptToken(uncommented, consumer.script);
+}
+
+export function collectConsumerEvidence(
+  graph,
+  read = (filePath, encoding) => readFileSync(path.resolve(repoRoot, filePath), encoding),
+) {
   return Object.fromEntries(
     graph.consumers.map((consumer) => {
       try {
         const content = read(consumer.path, "utf8");
-        const hasName = content.includes(`name: ${consumer.name}`) || content.includes(`${consumer.name}:`);
-        const hasScript = content.includes(`npm run ${consumer.script}`);
-        return [consumer.id, hasName && hasScript ? consumer.script : null];
+        const isWorkflow =
+          consumer.kind === "github-actions" || /^\.github\/workflows\/.+\.ya?ml$/u.test(consumer.path);
+        const matched = isWorkflow
+          ? matchesWorkflowConsumer(content, consumer)
+          : matchesNonWorkflowConsumer(content, consumer);
+        return [consumer.id, matched ? consumer.script : null];
       } catch {
         return [consumer.id, null];
       }
@@ -209,12 +288,12 @@ export function collectConsumerEvidence(graph, read = readFileSync) {
 function main() {
   const graph = JSON.parse(readFileSync(GRAPH_PATH, "utf8"));
   const schema = JSON.parse(readFileSync(SCHEMA_PATH, "utf8"));
-  const scripts = JSON.parse(readFileSync("package.json", "utf8")).scripts ?? {};
+  const scripts = JSON.parse(readFileSync(PACKAGE_JSON_PATH, "utf8")).scripts ?? {};
   const consumers = collectConsumerEvidence(graph);
   const errors = validateRepositoryValidatorGraph({ graph, schema, scripts, consumers });
   process.exitCode = reportRegistryValidation({
     title: "Repository Validator Graph Validator",
-    source: GRAPH_PATH,
+    source: GRAPH_REL_PATH,
     errors,
     passMessage: "Repository validator dependency graph is valid",
     format: requestedReportFormat(process.argv.slice(2)),
