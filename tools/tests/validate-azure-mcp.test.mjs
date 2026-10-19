@@ -63,6 +63,59 @@ function example(schema) {
   return schema.format === "date-time" ? "2026-10-19T10:00:00Z" : "example";
 }
 
+test("every captured nullable command field accepts explicit null without weakening required field types", () => {
+  for (const [name, namespace] of Object.entries(registry.namespaces)) {
+    const tools = namespace.kind === "direct" ? [[undefined, namespace]] : Object.entries(namespace.commands);
+    for (const [command, { inputSchema }] of tools) {
+      const args = (parameters) =>
+        namespace.kind === "direct" ? parameters : { intent: "Read approved diagnostics", command, parameters };
+      const nullable = Object.entries(inputSchema.properties ?? {}).filter(
+        ([, schema]) => Array.isArray(schema.type) && schema.type.includes("null"),
+      );
+      for (const form of forms) {
+        for (const [field] of nullable) {
+          assert.equal(invoke(form(name), args({ ...example(inputSchema), [field]: null })), "", `${command}/${field}`);
+        }
+        if (nullable.length) {
+          assert.equal(
+            invoke(
+              form(name),
+              args({
+                ...example(inputSchema),
+                ...Object.fromEntries(nullable.map(([field]) => [field, null])),
+              }),
+            ),
+            "",
+            `${command}: all nullable fields`,
+          );
+        }
+        for (const field of inputSchema.required ?? []) {
+          const schema = inputSchema.properties[field];
+          if (!(Array.isArray(schema.type) ? schema.type : [schema.type]).includes("null"))
+            denied(form(name), args({ ...example(inputSchema), [field]: null }));
+        }
+      }
+    }
+  }
+});
+
+test("captured nullable timestamp fields still reject malformed strings", () => {
+  for (const [name, namespace] of Object.entries(registry.namespaces)) {
+    for (const [command, { inputSchema }] of Object.entries(namespace.commands ?? {})) {
+      for (const [field, schema] of Object.entries(inputSchema.properties ?? {})) {
+        if (schema.format !== "date-time") continue;
+        for (const value of ["not-a-date", "2026-10-19", "2026-99-19T10:00:00Z"]) {
+          denied(`apex-azure-${name}`, {
+            intent: "Read approved diagnostics",
+            command,
+            parameters: { ...example(inputSchema), [field]: value },
+          });
+        }
+      }
+    }
+  }
+});
+
 test("captured registry, explicit reviewed command set and generated hook policy agree", () => {
   assert.deepEqual(validateAzureMcpRegistry(registry), []);
   assert.deepEqual(azureCommandPolicy(), registry.namespaces);
