@@ -25,8 +25,8 @@
       "sha": "e797f83bcb11b83ae66e0230d6156d7c80228e7c"
     },
     "actions/upload-artifact": {
-      "release": "v7.0.1",
-      "sha": "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
+      "release": "v7.0.2",
+      "sha": "cf430e030ddbb5b0abf93d22962f4752f3646cd9"
     },
     "azure/login": {
       "release": "v3.1.0",
