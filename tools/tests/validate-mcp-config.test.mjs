@@ -64,6 +64,37 @@ test("renaming an official Azure MCP launch does not bypass developer workspace 
   }
 });
 
+test("Windows Node, native and npx launches cannot expose excluded commands under renamed servers", () => {
+  for (const excludedCommand of ["appservice_webapp_settings_get-appsettings", "azureterraform_aztfexport_resource"]) {
+    for (const [command, prefix] of [
+      ["node", ["C:\\repo\\node_modules\\@azure\\mcp\\index.js"]],
+      ["C:\\Program Files\\nodejs\\node.exe", ["C:\\repo\\node_modules\\@azure\\mcp\\index.js"]],
+      ["node", ["C:/repo/node_modules/@azure/mcp/index.js"]],
+      ["node", ["C:\\repo\\NODE_MODULES\\@AZURE\\MCP\\index.js"]],
+      ["node", ["\\\\buildhost\\repo\\node_modules\\@azure\\mcp\\index.js"]],
+      ["node", ["C:\\repo\\node_modules\\@azure\\\\mcp\\index.js"]],
+      ["C:\\tools\\azmcp.exe", []],
+      ["C:\\repo\\node_modules\\@azure\\mcp-win32-x64\\dist\\azmcp.exe", []],
+      ["npx.cmd", ["--yes", "@azure/mcp@3.0.0"]],
+      ["C:\\Program Files\\nodejs\\npx.cmd", ["--yes", "@azure/mcp@3.0.0"]],
+    ]) {
+      const config = validConfig();
+      config.servers.renamed = {
+        type: "stdio",
+        command,
+        args: [...prefix, "server", "start", "--read-only", "--tool", excludedCommand],
+      };
+      assert.deepEqual(
+        validateMcpConfig(JSON.parse(JSON.stringify(config))),
+        [
+          "Unguarded developer Azure MCP launch must not be active: servers.renamed; use the registry-guarded APEX plugin",
+        ],
+        `${command}: ${excludedCommand}`,
+      );
+    }
+  }
+});
+
 test("rejects Astro by legacy key or retired URL under another key", () => {
   const legacy = validConfig();
   legacy.servers["astro-docs"] = { type: "http", url: "https://example.invalid/mcp" };

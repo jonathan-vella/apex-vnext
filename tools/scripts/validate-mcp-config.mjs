@@ -60,7 +60,8 @@ function retiredDrawioMarker(name, server) {
 
 function unguardedAzureLaunch(name, server) {
   if (["apex-azure", "azure-mcp", "azure-mcp-server"].includes(name.toLowerCase().replaceAll("_", "-"))) return true;
-  const command = typeof server?.command === "string" ? server.command.replaceAll("\\", "/").toLowerCase() : "";
+  const normalize = (value) => (typeof value === "string" ? value.replace(/[/\\]+/gu, "/").toLowerCase() : "");
+  const command = normalize(server?.command);
   if (
     command
       .split("/")
@@ -68,7 +69,8 @@ function unguardedAzureLaunch(name, server) {
       ?.replace(/\.(?:exe|cmd|ps1)$/u, "") === "azmcp"
   )
     return true;
-  return JSON.stringify(server)?.toLowerCase().replaceAll("\\", "/").includes("@azure/mcp") ?? false;
+  const args = Array.isArray(server?.args) ? server.args.map(normalize) : [];
+  return [command, ...args].some((value) => value.includes("@azure/mcp"));
 }
 
 export function validateMcpConfig(mcpConfig) {
