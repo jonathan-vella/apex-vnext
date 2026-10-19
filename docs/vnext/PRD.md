@@ -248,6 +248,15 @@ failover and capacity details may be described as assumptions or guidance, never
 Policy, security controls and deployment authorization remain binding. Native deployment failures require approved
 corrections, not silent substitutions.
 
+**Planned (not implemented):** [DECISION-038](DECISIONS.md#decision-038-introduce-azure-mcp-server-3-as-a-managed-azure-tool-provider-planned)
+and [CP-31](https://github.com/jonathan-vella/apex-vnext/issues/489) plan to migrate retail pricing from Microsoft ARM
+MCP's `get_retail_prices` to the official Azure MCP Server's pricing capability, while retaining the ten existing ARM
+MCP CostManagement read tools unchanged under their own server identity — no regression to actual costs, forecasts,
+budgets, alerts or commitments. Azure MCP Server is also planned to become a broader discovery/diagnostics/service-
+guidance provider for architecture work, subject to discovered real tool availability; see
+[docs/reference/mcp.md](../reference/mcp.md#planned-azure-mcp-server-3) for current-versus-planned detail. Until that
+migration ships and is qualified, the Microsoft ARM MCP acceptance above governs.
+
 ### REQ-GOV-001: Governance And Policy
 
 Azure Policy always wins in both profiles. Follow [issue #344](https://github.com/jonathan-vella/apex-vnext/issues/344):
@@ -513,7 +522,12 @@ receipt. Separately authorized maintenance remains bounded by its manifest and h
 
 The CLI MCP adapter exposes kernel-authorized operations, not a second workflow engine. Under DECISION-034 it uses
 the MCP TypeScript SDK v2 (`@modelcontextprotocol/server`) with a low-level `Server` served by `serveStdio` and
-targets protocol `2026-07-28`, which all supported Copilot clients negotiate. Acceptance:
+targets protocol `2026-07-28`, which all supported Copilot clients negotiate. This requirement governs APEX's own
+server only. The planned official Azure MCP Server integration
+([DECISION-038](DECISIONS.md#decision-038-introduce-azure-mcp-server-3-as-a-managed-azure-tool-provider-planned),
+[CP-31](https://github.com/jonathan-vella/apex-vnext/issues/489)) is a separate external tool provider and dependency
+axis; it does not change this SDK, protocol version, or kernel authority, and its own tool contracts and grants are
+tracked by that decision, not by this requirement's acceptance below. Acceptance:
 
 1. Every successful tool result validates through the supported SDK. Preserve existing object responses; wrap Markdown
    and lists in named objects. Retain serialized text alongside structured results for compatible clients.

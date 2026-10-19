@@ -13,6 +13,42 @@ The `apex` plugin also declares `apex-azure-pricing`, the remote Azure Resource 
 [`arm-mcp-cost-pricing.v1.json`](../../tools/registry/arm-mcp-cost-pricing.v1.json) and denies writes such as
 `create_budget`, operation tools and unknown tools on that server.
 
+**This is the complete current MCP tool-provider surface.** APEX does not currently ship a general official Azure
+MCP Server (`@azure/mcp`) dependency. Imported skill references to `mcp_azure-mcp_*` tool names describe external
+usage patterns only and do not themselves grant tool access in this repository.
+
+## Planned: Azure MCP Server 3
+
+[DECISION-038](../vnext/DECISIONS.md#decision-038-introduce-azure-mcp-server-3-as-a-managed-azure-tool-provider-planned)
+and [CP-31](https://github.com/jonathan-vella/apex-vnext/issues/489) plan to add the official Azure MCP Server
+(upstream GA `3.0.0`, commit `61715e6a9054d7922809b01e08a2efa85e032a6d`) as a separate, additional managed tool
+provider alongside APEX MCP and `apex-azure-pricing`. **None of the following is implemented yet**; it is the
+recorded target, not current behavior:
+
+- **Role.** A general Azure discovery/configuration/resource-query, diagnostics/health/logs, service/IaC-guidance and
+  retail-pricing provider for the foreground APEX agent — not a pricing-only server, and not a replacement for APEX's
+  own `@modelcontextprotocol/server` v2 SDK (DECISION-034), which is a separate product and dependency axis.
+- **Footprint.** Namespace mode is the initial tool-footprint _candidate_; real tool/namespace schemas must be
+  discovered against actual GA `3.0.0` server output before any grant is finalized. Conditional or proxied
+  capabilities (quota, policy) need individual availability validation — no invented tool names or assumed universal
+  availability. `--read-only` and explicit grants are the expected posture; tool annotations are not authorization,
+  and kernel authority for Azure state-changing operations is unaffected.
+- **Pricing migration.** Retail pricing moves from this document's `apex-azure-pricing` `Pricing` toolset
+  (`get_retail_prices`) to Azure MCP's pricing capability (`pricing_get` in GA source; the `azmcp_` documentation
+  prefix needs confirmation against the real `tools/list` name). The GA tool silently caps results at 5,000 rows with
+  no continuation or completeness field — a capped response must never be reported as complete. `include-savings-plan`
+  is a Consumption-nested option, not a `price-type` value.
+  The ten ARM MCP `CostManagement` read tools above are retained unchanged under their own identity; this is not a
+  pricing-only server migration.
+- **Version policy.** Track stable `3.x` through existing dependency automation, but execute and record an exact
+  tested `3.y.z` in a tracked dependency manifest; no floating `@azure/mcp@latest`/`@3`/`@3.x` runtime dependency and
+  no custom update/version-attestation service. A new major requires a separate explicit decision.
+- **Dependency lifecycle.** An `npx`-launched Azure MCP Server may download/cache platform packages on cold install.
+  This is a separate, explicitly documented external dependency lifecycle — it does not change or weaken APEX's own
+  bundled-plugin offline-startup guarantee (`CLIENT-029`). Per-client (Windows VS Code/Copilot app, Linux/WSL2 Copilot
+  CLI) discovery, schema and permission checks remain required before any qualification claim; public local schema
+  discovery is not itself authorized Azure/client/live execution evidence.
+
 ## Server Instructions
 
 The server sends compact session instructions in its `server/discover` result (and in the `initialize` result for

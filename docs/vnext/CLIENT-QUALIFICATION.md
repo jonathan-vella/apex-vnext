@@ -419,3 +419,16 @@ The [VS Code installation lifecycle matrix](../../tools/registry/vscode-installa
 bootstrap, reload, update, rollback, uninstall, and reinstall scenarios for the VS Code Copilot harness, which runs the
 CLI projection. Its deterministic evidence is committed; live scenarios remain `not-run` until executed in a clean
 supported profile. Slice 8 retired the profile bootstrap agent scenario with the VS Code Local projection.
+
+## Planned: Azure MCP Server 3 Qualification (Not Yet Scheduled)
+
+[DECISION-038](DECISIONS.md#decision-038-introduce-azure-mcp-server-3-as-a-managed-azure-tool-provider-planned) and
+[CP-31](https://github.com/jonathan-vella/apex-vnext/issues/489) plan to add the official Azure MCP Server as a
+separate managed tool provider. This does not add scenarios to the current candidate binding above, and does not
+retarget the frozen `0.11.0-next.5` evidence recorded there. Once CP-31's implementation PR lands, its own qualification
+will need, per supported client (VS Code Copilot harness and Copilot app on native Windows; Copilot CLI on Linux and
+WSL2): confirmed discovery/negotiation of the real server, its granted tool/namespace schemas matching the reviewed
+registry, read-only enforcement for any non-granted or state-changing tool, and verification that the external
+server's own install/cache lifecycle is documented separately from the `CLIENT-029` bundled-plugin offline-startup
+guarantee. Public local schema discovery alone does not satisfy any of these; only authorized, recorded client runs do.
+No live run, discovery probe, or qualification claim exists yet for this provider.

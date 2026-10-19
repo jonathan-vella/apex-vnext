@@ -1,6 +1,6 @@
 # APEX vNext Checkpoint
 
-- **Updated:** 2026-10-12
+- **Updated:** 2026-10-19
 - **Repository:** `jonathan-vella/apex-vnext`
 - **Integration branch:** `main`
 - **Product status:** Pre-release
@@ -95,6 +95,19 @@ or add optional agent helpers, telemetry or orchestration infrastructure to acce
 Pending branch changes must be separated by relevance before integration: retain and qualify shared CLI guidance only
 where needed for the active clients; park desktop-only runtime changes and evidence without deleting or shipping them
 as an implied support promise. Do not reset the dirty branch or overwrite prior test workspaces.
+
+### Azure MCP Server 3 Planning (2026-10-19)
+
+The maintainer recorded [DECISION-038](DECISIONS.md#decision-038-introduce-azure-mcp-server-3-as-a-managed-azure-tool-provider-planned)
+and opened [CP-31](https://github.com/jonathan-vella/apex-vnext/issues/489), tracked under the client pivot
+[epic #387](https://github.com/jonathan-vella/apex-vnext/issues/387), to introduce the official Azure MCP Server as a
+general managed Azure tool provider, closing the DECISION-014 gap and migrating retail pricing from ARM MCP
+`get_retail_prices` to Azure MCP's pricing capability while preserving all ten ARM MCP CostManagement reads under
+their own server identity. **This is a documentation/planning update only: no server declaration, grant, registry
+change, dependency pin, or pricing migration has shipped.** Next work is tool/schema discovery against real Azure MCP
+Server `3.0.0` output, then an exact version pin, then one coherent implementation PR per the [CP-31
+plan](ROADMAP.md#azure-mcp-server-3-integration-plan-cp-31-planned). See [docs/reference/mcp.md](../reference/mcp.md#planned-azure-mcp-server-3)
+for current-versus-planned tool-provider scope.
 
 ### Governance Native Validation Checkpoint
 
