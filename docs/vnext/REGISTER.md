@@ -183,6 +183,26 @@ and the repository archives.
   task or open a gate, and CLI probes cover each granted helper path. Slice 6 covers Explore; the other helpers need
   CLI tool scoping first.
 
+## RISK-016: External Azure MCP Server Dependency Can Weaken Offline Guarantees Or Pricing Completeness
+
+- **Owner:** MCP adapter and managed customization maintainers
+- **Impact:** Introducing the official Azure MCP Server (planned,
+  [DECISION-038](DECISIONS.md#decision-038-introduce-azure-mcp-server-3-as-a-managed-azure-tool-provider-planned),
+  [CP-31](https://github.com/jonathan-vella/apex-vnext/issues/489)) adds an external, separately versioned dependency
+  whose `npx` cold install may download/cache platform packages, which could be confused with or silently weaken
+  APEX's own bundled-plugin offline-startup guarantee (`CLIENT-029`). Separately, its GA pricing capability silently
+  caps results at 5,000 rows with no continuation or completeness field, so a capped response could be mislabeled
+  complete. A floating `@azure/mcp@latest`/`@3`/`@3.x` dependency could also drift behavior/schemas without a
+  corresponding APEX release.
+- **Mitigation:** Document and qualify the external server's install/cache/discovery lifecycle separately from
+  CLIENT-029 per supported client. Record and test an exact pinned `3.y.z` version in a tracked dependency manifest
+  rather than a floating range; require focused discovery/schema/grant tests on updates. Never report a capped
+  pricing response as complete; preserve timestamps, source and uncertainty on every pricing result.
+- **State:** Open; planning only, no implementation
+- **Closure proof:** CP-31 ships discovered real tool/schema evidence, an exact version pin in a tracked manifest,
+  cap-aware pricing handling with a passing regression, and per-client dependency-lifecycle documentation distinct
+  from CLIENT-029, before any qualification or release claim.
+
 ## ASSUMPTION-001: Supported Clients Can Share Typed Outcomes
 
 ### Active Scope And CLI Worker Evidence
