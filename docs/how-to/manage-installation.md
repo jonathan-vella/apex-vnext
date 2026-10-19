@@ -11,11 +11,11 @@ Each plugin release bundles the `@apexops/cli` version published to npm with the
 workspace CLI at the version of the installed plugin.
 
 > [!IMPORTANT]
-> **Release status.** The [apex-plugins](https://github.com/jonathan-vella/apex-plugins) marketplace and
-> `@apexops/cli` ship preview `0.11.0-next.2`. Live qualification of the three clients remains pending.
-> That published release predates #431's Azure skill changes; the source tree still reports the same version.
-> To evaluate those changes, install matching CLI tarballs and plugin from one
-> [local candidate](#install-a-local-candidate), not a mixture of local and registry packages. The
+> **Release status.** Preview `0.11.0-next.5` is the current release on npm (`next` tag, all six `@apexops/*`
+> packages) and in the [apex-plugins](https://github.com/jonathan-vella/apex-plugins) marketplace. Live qualification
+> of the three clients remains pending, and Bicep live runs stay unavailable until the azd executor is qualified. A
+> source checkout newer than the release is a different build with the same version: install matching CLI tarballs and
+> plugin from one [local candidate](#install-a-local-candidate), not a mixture of local and registry packages. The
 > [human-run qualification kit](qualify-live-clients.md) pins source/release provenance separately.
 
 ## Choose One Host Per Workspace

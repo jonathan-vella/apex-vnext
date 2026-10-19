@@ -6,13 +6,16 @@ Code Copilot harness and the GitHub Copilot app on native Windows, and GitHub Co
 Generated projection and plugin tests are necessary but do not replace live client interaction.
 
 The release target is the [client pivot scenarios](#client-pivot-scenarios) plus the shared matrix below. The plugin
-and thin workspace projection are shipped in the `0.11.0-next.2` preview; live qualification remains pending.
+and thin workspace projection are shipped in the `0.11.0-next.5` preview; live qualification remains pending.
 The slice results below are exploratory history, not current release evidence. Use the
 [human-run qualification kit](../how-to/qualify-live-clients.md) to freeze a candidate, prepare each host and record
-scenario applicability and bounded evidence. Published `0.11.0-next.2` does not include #431; a source build at
-`a4bc16fbe4eadea48902ab054ea7f02a8bdd008a` after #454 must not be identified by that version alone.
-The earlier #431 source candidate and its exploratory results remain historical; the current candidate needs fresh
-affected-scenario evidence without restoring retired root guidance.
+scenario applicability and bounded evidence. The current candidate is published `0.11.0-next.5`:
+plugin source `bc781afc03a18a9b5c3007813dfa8756bcf62af9`, npm `gitHead` `ab892a8f20ece801d2360586b349dd9804e68a42`,
+plugin tree SHA-256 `e1a1794d7c9a189eb40b8e8f33b5f5737a0da99c6f90ef334ba3e22d0e53c2eb`, marketplace commit
+`298194df5ad5309f53c6d35c37b33656ed788b79`. A later source commit is a new candidate and must not be identified by
+the version alone. Earlier candidates (`0.11.0-next.2` and source `a4bc16fbe4eadea48902ab054ea7f02a8bdd008a`, main
+after #454) and their exploratory results remain historical; the current candidate needs fresh affected-scenario
+evidence without restoring retired root guidance.
 
 Each client runs on its supported host with client local sandboxing on, without Docker or a devcontainer. Required
 outcomes follow the [PRD](PRD.md), including both environment profiles, COE reuse and conversational changes. Basic

@@ -11,7 +11,7 @@ the [Windows 11 first run](windows-11-first-run.md). Use one host per workspace:
 client and Copilot CLI in WSL2. Docker, a devcontainer and the APEX source repository are not required.
 
 > [!IMPORTANT]
-> The plugin and CLI ship preview `0.11.0-next.2`; live qualification is still pending. That release predates #431.
+> The plugin and CLI ship preview `0.11.0-next.5`; live qualification is still pending.
 > These steps describe the published flow. For source changes, use a
 > [local candidate](../how-to/manage-installation.md#install-a-local-candidate) and the
 > [human-run qualification kit](../how-to/qualify-live-clients.md); do not mix same-version source and registry bytes.
