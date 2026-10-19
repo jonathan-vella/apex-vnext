@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
 import { constants } from "node:fs";
-import { lstat, mkdir, open, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
+import { lstat, mkdir, open, readFile, readdir, realpath, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { dump as dumpYaml, load as loadYaml } from "js-yaml";
@@ -33,9 +33,49 @@ async function sleep(milliseconds) {
   await new Promise((done) => setTimeout(done, milliseconds));
 }
 
-export async function acquireAssetGenerationLock() {
-  const lockPath = join(packageRoot, ".prepare-assets.lock");
-  const deadline = Date.now() + ASSET_GENERATION_LOCK_TTL_MS;
+async function withAssetLockGuard(guardPath, deadline, retryMs, now, action) {
+  for (;;) {
+    try {
+      await mkdir(guardPath);
+      break;
+    } catch (error) {
+      if (error?.code !== "EEXIST") throw error;
+      if (now() >= deadline) {
+        await rm(guardPath, { recursive: true, force: true }).catch(() => {});
+        throw new Error(`Timed out waiting for asset generation lock guard: ${guardPath}`, { cause: error });
+      }
+      await sleep(retryMs);
+    }
+  }
+  try {
+    return await action();
+  } finally {
+    await rm(guardPath, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+export async function assertAssetGenerationLockHeld(lockPath, token, now = () => Date.now()) {
+  let metadata;
+  try {
+    metadata = JSON.parse(await readFile(join(lockPath, "metadata.json"), "utf8"));
+  } catch (error) {
+    throw new Error(`Asset generation lock was lost before completion: ${lockPath}`, { cause: error });
+  }
+  if (metadata?.token !== token) {
+    throw new Error(`Asset generation lock ownership changed before completion: ${lockPath}`);
+  }
+  if (!(Date.parse(metadata.expiresAt ?? "") > now())) {
+    throw new Error(`Asset generation lock expired before completion: ${lockPath}`);
+  }
+}
+
+export async function acquireAssetGenerationLock(options = {}) {
+  const lockPath = options.lockPath ?? join(packageRoot, ".prepare-assets.lock");
+  const guardPath = `${lockPath}.guard`;
+  const ttlMs = options.ttlMs ?? ASSET_GENERATION_LOCK_TTL_MS;
+  const retryMs = options.retryMs ?? ASSET_GENERATION_LOCK_RETRY_MS;
+  const now = options.now ?? (() => Date.now());
+  const deadline = now() + ttlMs;
   const token = crypto.randomUUID();
   for (;;) {
     try {
@@ -45,35 +85,66 @@ export async function acquireAssetGenerationLock() {
         `${JSON.stringify({
           token,
           pid: process.pid,
-          createdAt: new Date().toISOString(),
-          expiresAt: new Date(Date.now() + ASSET_GENERATION_LOCK_TTL_MS).toISOString(),
+          createdAt: new Date(now()).toISOString(),
+          expiresAt: new Date(now() + ttlMs).toISOString(),
         })}\n`,
       );
       let released = false;
-      return async () => {
+      const release = async () => {
         if (released) return;
         released = true;
-        try {
-          const metadata = JSON.parse(await readFile(join(lockPath, "metadata.json"), "utf8"));
-          if (metadata.token !== token) return;
-        } catch {
-          return;
-        }
-        await rm(lockPath, { recursive: true, force: true });
+        const releaseDeadline = now() + Math.max(ttlMs, 5_000);
+        const quarantinePath = `${lockPath}.release.${token}`;
+        const moved = await withAssetLockGuard(guardPath, releaseDeadline, retryMs, now, async () => {
+          try {
+            const metadata = JSON.parse(await readFile(join(lockPath, "metadata.json"), "utf8"));
+            if (metadata.token !== token) return false;
+            await rename(lockPath, quarantinePath);
+            return true;
+          } catch {
+            return false;
+          }
+        }).catch(() => false);
+        if (moved) await rm(quarantinePath, { recursive: true, force: true });
       };
+      release.token = token;
+      release.lockPath = lockPath;
+      release.assertHeld = () => assertAssetGenerationLockHeld(lockPath, token, now);
+      return release;
     } catch (error) {
       if (error?.code !== "EEXIST") throw error;
-      if (Date.now() >= deadline)
+      if (now() >= deadline)
         throw new Error(`Timed out waiting for asset generation lock: ${lockPath}`, { cause: error });
-      let expired = false;
+      let observedToken = null;
       try {
         const metadata = JSON.parse(await readFile(join(lockPath, "metadata.json"), "utf8"));
-        expired = Date.parse(metadata.expiresAt ?? "") <= Date.now();
+        if (Date.parse(metadata.expiresAt ?? "") <= now() && typeof metadata.token === "string") {
+          observedToken = metadata.token;
+        }
       } catch {
         // Unreadable metadata may be a concurrent writer; keep waiting until the deadline.
       }
-      if (expired) await rm(lockPath, { recursive: true, force: true });
-      else await sleep(ASSET_GENERATION_LOCK_RETRY_MS);
+      if (observedToken !== null) {
+        await options.onStaleRead?.(observedToken);
+        const quarantinePath = `${lockPath}.stale.${token}`;
+        const reclaimed = await withAssetLockGuard(guardPath, deadline, retryMs, now, async () => {
+          try {
+            const current = JSON.parse(await readFile(join(lockPath, "metadata.json"), "utf8"));
+            if (current.token !== observedToken || Date.parse(current.expiresAt ?? "") > now()) {
+              return false;
+            }
+            await rename(lockPath, quarantinePath);
+            return true;
+          } catch {
+            return false;
+          }
+        });
+        if (reclaimed) {
+          await rm(quarantinePath, { recursive: true, force: true });
+          continue;
+        }
+      }
+      await sleep(retryMs);
     }
   }
 }
@@ -751,6 +822,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     const release = await acquireAssetGenerationLock();
     try {
       await prepareAssets();
+      await release.assertHeld();
     } finally {
       await release();
     }

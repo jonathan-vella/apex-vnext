@@ -122,3 +122,24 @@ test("manifest order and dependencies are runtime routing authority", () => {
   assert.equal(route.nextTask, "governance-discovery");
   assert.notEqual(route.currentNode, "architecture");
 });
+
+test("workflow engine maps rejected gates to approval-rejected and enforces non-ambiguous edge conditions", () => {
+  const engine = new WorkflowEngine(manifest);
+  const rejected = engine.route({
+    run: { iacTool: "bicep" },
+    artifacts: {},
+    completedNodes: ["requirements"],
+    gateStates: { "gate-1": "rejected" },
+  });
+  assert.equal(rejected.currentNode, "approval-rejected");
+  assert.equal(rejected.nextTask, null);
+  assert.deepEqual(rejected.blockers, ["approval-rejected", "gate-1:rejected"]);
+
+  const invalidEvent = structuredClone(manifest) as any;
+  invalidEvent.edges[0].event = "invalid-event";
+  assert.throws(() => new WorkflowEngine(invalidEvent), /Unsupported workflow edge event invalid-event/);
+
+  const ambiguous = structuredClone(manifest) as any;
+  ambiguous.edges.push({ from: "requirements", to: "architecture", event: "completed" });
+  assert.throws(() => new WorkflowEngine(ambiguous), /Ambiguous non-fanout workflow edges from requirements/);
+});

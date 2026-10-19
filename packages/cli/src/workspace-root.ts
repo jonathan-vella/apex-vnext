@@ -51,12 +51,17 @@ async function gitCommonDirectory(gitDirectory: string): Promise<string> {
   return realpath(resolveGitPath(gitDirectory, content?.trim() || gitDirectory));
 }
 
+function ignoreMissingPath(error: unknown): undefined {
+  if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+  throw error;
+}
+
 // A session may start below the workspace root; stop at the repository boundary so an unrelated parent is never used.
 export async function mcpWorkspaceRoot(start: string): Promise<string> {
   for (let directory = resolve(start); ; directory = dirname(directory)) {
-    const apex = await lstat(join(directory, ".apex")).catch(() => undefined);
+    const apex = await lstat(join(directory, ".apex")).catch(ignoreMissingPath);
     if (apex?.isDirectory() === true) return directory;
-    const repository = await lstat(join(directory, ".git")).catch(() => undefined);
+    const repository = await lstat(join(directory, ".git")).catch(ignoreMissingPath);
     if (repository !== undefined || dirname(directory) === directory) return start;
   }
 }

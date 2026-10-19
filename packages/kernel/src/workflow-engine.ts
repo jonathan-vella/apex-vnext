@@ -2,6 +2,9 @@ import { sha256Json, type JsonValue } from "./canonical.js";
 import { workflowValidatorOwnership } from "./workflow-validator-ownership.js";
 
 const OPERATORS = new Set(["all", "equals", "in", "exists", "not"]);
+const ALLOWED_EDGE_EVENTS = new Set(["completed", "approved", "passed", "succeeded"]);
+
+export type WorkflowEdgeEvent = "completed" | "approved" | "passed" | "succeeded";
 
 export type WorkflowCondition =
   | { all: WorkflowCondition[] }
@@ -25,14 +28,23 @@ export interface WorkflowNode {
 export interface WorkflowEdge {
   from: string;
   to: string;
+  event?: WorkflowEdgeEvent;
   condition?: WorkflowCondition;
   fanout?: boolean;
+}
+
+export interface WorkflowReturnRoute {
+  from: string;
+  to: string;
+  reasonCode: string;
+  reopensFromGate: number;
+  condition?: WorkflowCondition;
 }
 
 export interface WorkflowManifest {
   nodes: WorkflowNode[];
   edges: WorkflowEdge[];
-  returnRoutes?: WorkflowEdge[];
+  returnRoutes?: WorkflowReturnRoute[];
   terminalStates: string[];
   blockedStates: string[];
 }
@@ -85,6 +97,19 @@ export class WorkflowEngine {
         terminal: false,
       };
     }
+    const rejectedGate = [1, 2, 3, 4]
+      .map((gate) => `gate-${gate}`)
+      .find((gateId) => state.gateStates?.[gateId] === "rejected");
+    if (rejectedGate !== undefined && this.manifest.blockedStates.includes("approval-rejected")) {
+      const blocked = this.nodes.get("blocked");
+      return {
+        currentNode: "approval-rejected",
+        nextTask: null,
+        ownerRole: blocked?.ownerRole ?? null,
+        blockers: ["approval-rejected", `${rejectedGate}:rejected`],
+        terminal: false,
+      };
+    }
     const completed = new Set(state.completedNodes ?? []);
     for (const node of this.manifest.nodes) {
       if (node.kind === "terminal" || completed.has(node.id) || !evaluateCondition(node.condition, state)) {
@@ -96,7 +121,9 @@ export class WorkflowEngine {
       if (blockers.length === 0) {
         return { currentNode: node.id, nextTask: node.id, ownerRole: node.ownerRole, blockers: [], terminal: false };
       }
-      const hasActivePredecessor = this.manifest.edges.some((edge) => edge.to === node.id && completed.has(edge.from));
+      const hasActivePredecessor = this.manifest.edges.some(
+        (edge) => edge.to === node.id && completed.has(edge.from) && evaluateCondition(edge.condition, state),
+      );
       if (hasActivePredecessor || node === this.manifest.nodes[0]) {
         return {
           currentNode: node.id,
@@ -179,12 +206,13 @@ export function validateWorkflowManifest(value: unknown): WorkflowManifest {
   }
   if ([1, 2, 3, 4].some((gate) => !gates.has(gate))) throw new Error("Workflow requires unique gates 1-4");
   const edges = value.edges.map(parseEdge);
-  const returnRoutes = Array.isArray(value.returnRoutes) ? value.returnRoutes.map(parseEdge) : [];
+  const returnRoutes = Array.isArray(value.returnRoutes) ? value.returnRoutes.map(parseReturnRoute) : [];
   for (const edge of [...edges, ...returnRoutes]) {
     if (!ids.has(edge.from) || !ids.has(edge.to))
       throw new Error(`Workflow edge references unknown node ${edge.from}->${edge.to}`);
   }
   assertAcyclic(ids, edges);
+  assertNonAmbiguousOutgoingEdges(edges);
   const tracks = new Set(nodes.flatMap((node) => conditionTrack(node.condition)));
   if (!tracks.has("bicep") || !tracks.has("terraform"))
     throw new Error("Workflow requires bicep and terraform track conditions");
@@ -223,12 +251,63 @@ function parseNode(value: unknown): WorkflowNode {
 function parseEdge(value: unknown): WorkflowEdge {
   if (!isRecord(value)) throw new Error("Workflow edge must be an object");
   const condition = value.condition === undefined ? undefined : parseCondition(value.condition);
+  let event: WorkflowEdgeEvent | undefined;
+  if (value.event !== undefined) {
+    const rawEvent = requiredString(value.event, "edge event");
+    if (!ALLOWED_EDGE_EVENTS.has(rawEvent)) {
+      throw new Error(`Unsupported workflow edge event ${rawEvent}`);
+    }
+    event = rawEvent as WorkflowEdgeEvent;
+  }
   return {
     from: requiredString(value.from, "edge from"),
     to: requiredString(value.to, "edge to"),
+    ...(event === undefined ? {} : { event }),
     ...(condition === undefined ? {} : { condition }),
     ...(value.fanout === true ? { fanout: true } : {}),
   };
+}
+
+function parseReturnRoute(value: unknown): WorkflowReturnRoute {
+  if (!isRecord(value)) throw new Error("Workflow return route must be an object");
+  const condition = value.condition === undefined ? undefined : parseCondition(value.condition);
+  const reopensFromGate = requiredInteger(value.reopensFromGate, "reopensFromGate");
+  if (reopensFromGate < 1 || reopensFromGate > 4) {
+    throw new Error(`Invalid reopensFromGate ${reopensFromGate}`);
+  }
+  return {
+    from: requiredString(value.from, "returnRoute from"),
+    to: requiredString(value.to, "returnRoute to"),
+    reasonCode: requiredString(value.reasonCode, "returnRoute reasonCode"),
+    reopensFromGate,
+    ...(condition === undefined ? {} : { condition }),
+  };
+}
+
+function assertNonAmbiguousOutgoingEdges(edges: WorkflowEdge[]): void {
+  const byFrom = new Map<string, WorkflowEdge[]>();
+  for (const edge of edges) {
+    if (edge.fanout === true) continue;
+    const list = byFrom.get(edge.from) ?? [];
+    list.push(edge);
+    byFrom.set(edge.from, list);
+  }
+  for (const [from, outgoing] of byFrom.entries()) {
+    if (outgoing.length < 2) continue;
+    const conditionFingerprints = new Set<string>();
+    for (const edge of outgoing) {
+      const fingerprint =
+        edge.condition === undefined ? "unconditional" : sha256Json(edge.condition as unknown as JsonValue);
+      if (
+        fingerprint === "unconditional" ||
+        conditionFingerprints.has("unconditional") ||
+        conditionFingerprints.has(fingerprint)
+      ) {
+        throw new Error(`Ambiguous non-fanout workflow edges from ${from}`);
+      }
+      conditionFingerprints.add(fingerprint);
+    }
+  }
 }
 
 function parseCondition(value: unknown): WorkflowCondition {

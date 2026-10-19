@@ -60,6 +60,12 @@ export class ProcessRunner implements ProcessRunnerLike {
     if (!Array.isArray(request.args)) {
       throw new TypeError("Process arguments must be an explicit array");
     }
+    if (!Number.isSafeInteger(request.timeoutMs) || request.timeoutMs <= 0) {
+      throw new TypeError("Process timeoutMs must be a positive safe integer");
+    }
+    if (!Number.isSafeInteger(request.maxOutputBytes) || request.maxOutputBytes <= 0) {
+      throw new TypeError("Process maxOutputBytes must be a positive safe integer");
+    }
 
     let launch: ReturnType<typeof planLaunch>;
     try {

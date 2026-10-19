@@ -807,6 +807,10 @@ export class AzdBicepProvider extends NativeProviderBase implements IacProvider 
     this.#target = options.target;
   }
 
+  /**
+   * Verifies that the configured Bicep template compiles cleanly.
+   * Full source-bound policy and resource-parity validation runs through `validateSource()`.
+   */
   async validate(): Promise<readonly string[]> {
     await this.#compiledTemplate();
     return [];

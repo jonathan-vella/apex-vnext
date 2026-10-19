@@ -2987,6 +2987,11 @@ test("gate approval rejects stale dependencies while explicit rejection remains 
   await assert.rejects(service.decideGateNumber(1, "approved", "tester"), /gate:requirements-ready/);
   const rejection = await service.decideGateNumber(1, "rejected", "tester");
   assert.equal(rejection.decision, "rejected");
+  const rejectedStatus = await service.status();
+  assert.match(
+    rejectedStatus.blockers.join("; "),
+    /Gate 1 approval was rejected \(approval-rejected\); revise requirements to reopen Gate 1/u,
+  );
 
   const events = await new EventJournal(
     join(root, ".apex", "projects", "demo", "runs", initialized.runId, "journal"),

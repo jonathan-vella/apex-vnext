@@ -202,6 +202,18 @@ test("every guarded MCP tool returns APEX_REVIEW_PENDING with a finish-or-cancel
   assert.equal(mcpCode(await call("status", {})), "ok");
   assert.equal(mcpCode(await call("taskContext", { taskId })), "ok");
   assert.equal(mcpCode(await call("nextTask", {})), "ok");
+  let repeatSafeReached = false;
+  const originalRepeatSafe = service.repeatSafe.bind(service);
+  service.repeatSafe = (async (...args: Parameters<ApexService["repeatSafe"]>) => {
+    repeatSafeReached = true;
+    return await originalRepeatSafe(...args);
+  }) as ApexService["repeatSafe"];
+  try {
+    assert.equal(mcpCode(await call("gateDecide", invocations.gateDecide.mcp(taskId))), "APEX_REVIEW_PENDING");
+    assert.equal(repeatSafeReached, false, "MCP adapter enforces MCP_TOOL_REVIEW_GUARDS before repeatSafe");
+  } finally {
+    service.repeatSafe = originalRepeatSafe;
+  }
   await captureReview(service, taskId, { findings: [] });
   assert.equal(mcpCode(await call("reviewComplete", { taskId })), "ok");
   for (const tool of guardedTools)

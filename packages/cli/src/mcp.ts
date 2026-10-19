@@ -14,7 +14,13 @@ import { MCP_DOCTOR_CHECK_LIMIT, MCP_OUTPUT_SCHEMAS } from "./mcp-output-schemas
 import { TARGET_SCOPE_HINT, TARGET_SCOPE_PATTERN } from "./target-scope.js";
 import { resolveMcpWorkspace } from "./workspace-root.js";
 import { runtimeMismatchError, runtimeMismatchStatus, workspaceRuntimeBinding } from "./runtime-binding.js";
-import { MCP_TOOL_EFFECTS, type McpToolEffect } from "./mcp-tool-effects.js";
+import {
+  MCP_TOOL_EFFECTS,
+  MCP_TOOL_REVIEW_GUARDS,
+  type McpStateChangingTool,
+  type McpToolEffect,
+  type ReviewGuardedTool,
+} from "./mcp-tool-effects.js";
 
 const errorMessages: Record<ApexErrorCode, string> = {
   APEX_USAGE: "Invalid operation arguments; check the tool input contract.",
@@ -633,6 +639,7 @@ export function createMcpServerFactory(
     if (outputSchema === undefined) throw new Error(`Missing output schema for ${name}`);
     const effect: McpToolEffect | undefined = MCP_TOOL_EFFECTS[name as keyof typeof MCP_OUTPUT_SCHEMAS];
     if (effect === undefined) throw new Error(`Missing effect class for ${name}`);
+    const reviewGuard = name in MCP_TOOL_REVIEW_GUARDS ? MCP_TOOL_REVIEW_GUARDS[name as McpStateChangingTool] : null;
     const fileArguments = repeatFileArguments[name as keyof typeof MCP_OUTPUT_SCHEMAS];
     const originalInputSchema =
       config.inputSchema === undefined
@@ -681,6 +688,9 @@ export function createMcpServerFactory(
         activeService = resolved.service;
         let response: ToolResult;
         try {
+          if (reviewGuard !== null && binding.state !== "mismatch") {
+            await resolved.service.assertNoPendingReview?.(name as ReviewGuardedTool);
+          }
           const execute = async (): Promise<ToolResult> =>
             binding.state === "mismatch"
               ? result(runtimeMismatchStatus(binding))

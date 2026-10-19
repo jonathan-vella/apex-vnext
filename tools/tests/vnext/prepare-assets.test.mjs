@@ -8,6 +8,7 @@ import { promisify } from "node:util";
 import test from "node:test";
 import { load } from "js-yaml";
 import {
+  acquireAssetGenerationLock,
   canonicalJson,
   pinSourceRoot,
   readSourceFile,
@@ -861,5 +862,56 @@ test("plugin skills include operational references", async () => {
   ]) {
     assert.ok(manifest.plugin.files.includes(relativePath));
     assert.match(await readFile(join(root, "customizations", relativePath), "utf8"), /Operational Checklist/u);
+  }
+});
+
+test("asset generation lock prevents stale-reclaim and late-release TOCTOU races", async () => {
+  const scratch = await mkdtemp(join(tmpdir(), "apex-asset-lock-"));
+  const lockPath = join(scratch, ".prepare-assets.lock");
+  let currentNow = 1_000;
+  try {
+    const expiredOwner = await acquireAssetGenerationLock({
+      lockPath,
+      ttlMs: 100,
+      retryMs: 5,
+      now: () => currentNow,
+    });
+    await expiredOwner.assertHeld();
+    currentNow = 1_200;
+    await assert.rejects(() => expiredOwner.assertHeld(), /expired before completion/u);
+
+    let contenderreplacementOwner;
+    const staleReclaimer = acquireAssetGenerationLock({
+      lockPath,
+      ttlMs: 1_000,
+      retryMs: 5,
+      now: () => currentNow,
+      onStaleRead: async () => {
+        // Simulate another contender reclaiming the expired lock and acquiring a fresh lock first.
+        await rm(lockPath, { recursive: true, force: true });
+        contenderreplacementOwner = await acquireAssetGenerationLock({
+          lockPath,
+          ttlMs: 1_000,
+          retryMs: 5,
+          now: () => currentNow,
+        });
+      },
+    });
+    // Wait briefly so staleReclaimer executes its guarded reclaim check and sees contenderreplacementOwner's fresh token.
+    await new Promise((done) => setTimeout(done, 25));
+    assert.ok(contenderreplacementOwner, "replacement owner acquired the lock");
+    await contenderreplacementOwner.assertHeld();
+
+    // Late release by the original expired owner must not delete the replacement owner's active lock.
+    await expiredOwner();
+    await contenderreplacementOwner.assertHeld();
+
+    // Once the replacement owner releases, the waiting staleReclaimer acquires the lock cleanly.
+    await contenderreplacementOwner();
+    const secondOwner = await staleReclaimer;
+    await secondOwner.assertHeld();
+    await secondOwner();
+  } finally {
+    await rm(scratch, { recursive: true, force: true });
   }
 });
