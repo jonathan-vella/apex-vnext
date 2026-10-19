@@ -266,6 +266,19 @@ export function verifyManagedCapture(registry, managed) {
   };
 }
 
+export function developerMcpConfig() {
+  return {
+    servers: {
+      github: { type: "http", url: "https://api.githubcopilot.com/mcp/" },
+      "apex-azure-cost": {
+        type: "http",
+        url: "https://mcp.management.azure.com",
+        headers: { "x-mcp-toolset": "CostManagement" },
+      },
+    },
+  };
+}
+
 async function main() {
   const [directory] = process.argv.slice(2);
   if (!directory) throw new Error("Supply the directory produced by capture-azure-mcp-inventory.mjs");
@@ -314,15 +327,8 @@ async function main() {
       "apex-azure-cost": { type: "streamable-http", ...cost },
     },
   };
-  const development = {
-    servers: {
-      github: { type: "http", url: "https://api.githubcopilot.com/mcp/" },
-      "apex-azure": { type: "stdio", command: "node", args: azureMcpArguments(registry) },
-      "apex-azure-cost": { type: "http", ...cost },
-    },
-  };
   await writeJson("plugin/mcp.json", plugin);
-  await writeJson(".vscode/mcp.json", development);
+  await writeJson(".vscode/mcp.json", developerMcpConfig());
   console.log(
     `Approved ${Object.keys(registry.namespaces).length} namespaces and ${APPROVED_COMMANDS.length} explicit commands`,
   );

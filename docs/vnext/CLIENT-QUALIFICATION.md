@@ -432,5 +432,7 @@ registry, read-only enforcement for any non-granted or state-changing tool, and 
 server's own install/cache lifecycle is documented separately from the `CLIENT-029` bundled-plugin offline-startup
 guarantee. Public local schema discovery alone does not satisfy any of these; only authorized, recorded client runs do.
 Credential-free local `3.0.0` tools/list discovery grounds the registry, not a supported-client qualification claim.
+Local qualification stages pass after restoring the missing jq prerequisite and rerunning packaging; final-head CI
+remains pending. This does not retarget the frozen candidate or satisfy human client/authenticated Azure qualification.
 No authorized client/live run or release is claimed. Verify general `apex-azure` namespace/command permissions and
 all ten retained `apex-azure-cost` reads; preserve APEX SDK v2/protocol and the kernel approval boundary unchanged.

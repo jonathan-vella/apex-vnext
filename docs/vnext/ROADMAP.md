@@ -150,7 +150,7 @@ qualification.
 | DECISION-036 purpose-bound delivery | `REQ-WORKFLOW-001`, `REQ-STATE-001`, `REQ-APPROVAL-001`, `REQ-PRODUCTION-001` | CP-26 to CP-30               | CLIENT-039 to CLIENT-042; CP-30 live evidence                |
 | DECISION-033 models and worktrees   | `REQ-CUSTOMIZATION-001`, `REQ-STATE-001`                                      | CP-05, CP-10, CP-14          | CLIENT-034, CLIENT-036, CLIENT-037                           |
 | Governance and content follow-ups   | `REQ-GOV-001`, `REQ-GUIDANCE-001`                                             | CP-17, CP-18, CP-21          | CLIENT-018                                                   |
-| DECISION-038 Azure MCP Server 3     | `REQ-ARCH-001`, `REQ-MCP-001`                                                 | CP-31                        | IMPLEMENTED LOCAL; integration/client qualification pending  |
+| DECISION-038 Azure MCP Server 3     | `REQ-ARCH-001`, `REQ-MCP-001`                                                 | CP-31                        | Local stages pass; final CI/human qualification pending      |
 
 ### Client Pivot Backlog
 
@@ -186,7 +186,7 @@ qualification.
 | [CP-28](https://github.com/jonathan-vella/apex-vnext/issues/457) | Production      | CI-owned runs, protected artifacts and pre-apply human approval receipts                                                                                                                                             | Actual reviewer and exact candidate verified before apply; no mandatory developer plan/key/writer handoff                     |
 | [CP-29](https://github.com/jonathan-vella/apex-vnext/issues/458) | Setup           | Optional production readiness/configuration kit                                                                                                                                                                      | Inspect, generate, explicitly configure, verify; unsupported consumer approval features block production                      |
 | [CP-30](https://github.com/jonathan-vella/apex-vnext/issues/455) | Qualification   | Purpose-bound deployment qualification                                                                                                                                                                               | Initial non-production evidence separate from deferred production; exact-candidate adversarial and authorized live acceptance |
-| [CP-31](https://github.com/jonathan-vella/apex-vnext/issues/489) | MCP             | Azure MCP Server 3 managed provider (IMPLEMENTED LOCAL); amends DECISION-014 via DECISION-038                                                                                                                        | 44 grants; exact `3.0.0`; cap-aware prices; ten ARM reads; qualification pending                                              |
+| [CP-31](https://github.com/jonathan-vella/apex-vnext/issues/489) | MCP             | Azure MCP Server 3 managed provider (IMPLEMENTED LOCAL); amends DECISION-014 via DECISION-038                                                                                                                        | Local qualification stages pass; final-head CI and human client/authenticated Azure qualification pending                     |
 
 Order: CP-01 to CP-04 and CP-17 and CP-18 can start now. CP-05 precedes CP-06 to CP-11. CP-09, then CP-23, precede
 CP-06, CP-08, CP-10 and CP-15. CP-13 and CP-14 precede CP-15 and CP-16. CP-21 runs with CP-18. CP-25 precedes the
@@ -205,8 +205,8 @@ Owner: MCP adapter and managed customization maintainers. Decision:
 [DECISION-038](DECISIONS.md#decision-038-introduce-azure-mcp-server-3-as-a-managed-azure-tool-provider).
 Acceptance: [REQ-ARCH-001](PRD.md#req-arch-001-architecture-cost-and-assumptions),
 [REQ-MCP-001](PRD.md#req-mcp-001-predictable-tool-contracts). Tracking:
-[issue #489](https://github.com/jonathan-vella/apex-vnext/issues/489). Status: **IMPLEMENTED LOCAL**, focused checks pass;
-integration and human client/live qualification pending.
+[issue #489](https://github.com/jonathan-vella/apex-vnext/issues/489). Status: **IMPLEMENTED LOCAL**, local qualification
+stages pass after restoring jq; final-head CI and human client/authenticated Azure qualification remain pending.
 Planning merged in [PR #490](https://github.com/jonathan-vella/apex-vnext/pull/490), `42d82a54`.
 
 1. **Discovered locally.** Credential-free real `3.0.0` tools/list output grounds namespace schemas and explicit
@@ -219,10 +219,10 @@ Planning merged in [PR #490](https://github.com/jonathan-vella/apex-vnext/pull/4
    pricing provenance/contracts, managed skills and tests move together. `pricing_get` results at or above 5,000
    rows require narrowing or explicit unpriced items, never a complete priced line or fake zero. Kernel approvals
    and APEX SDK v2/protocol remain unchanged.
-4. **Focused verification passed; integration pending.** Agent/skill discovery, guidance delivery, catalogs,
-   project controls and Azure grant validators pass; 55 skill/guidance/catalog regressions pass. Pricing runtime
-   and managed MCP policy checks pass in their owning slices. The parent runs one `qualify:vnext` integration
-   checkpoint. Local checks do not qualify clients or authorize Azure execution.
+4. **Local qualification stages passed.** Focused checks, credential-free capture and the `qualify:vnext`
+   validation/workspace/validator stages pass. After the missing jq host prerequisite was restored, the final pack
+   rerun passed 131/131; the HIGH-fix regressions pass 52/52. Final-head CI remains pending. These local results
+   do not qualify human clients or authorize authenticated Azure execution.
 5. **Qualify and release (separately authorized, out of scope here).** Per-supported-client discovery/schema/
    permission qualification, then any release step — neither is claimed or started by this plan.
 

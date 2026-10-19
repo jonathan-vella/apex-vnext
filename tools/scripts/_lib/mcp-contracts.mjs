@@ -26,8 +26,10 @@ export const contractDigest = (value) =>
     .digest("hex");
 
 export function azureMcpArguments(registry, packageSpecifier) {
+  if (!packageSpecifier) throw new Error("Azure MCP plugin launch requires an explicit package specifier");
   return [
-    ...(packageSpecifier ? ["--yes", packageSpecifier] : ["${workspaceFolder}/node_modules/@azure/mcp/index.js"]),
+    "--yes",
+    packageSpecifier,
     "server",
     "start",
     "--mode",
@@ -50,15 +52,15 @@ export function exactAzureMcpVersion(root = repositoryRoot) {
   return version;
 }
 
-export function azureLaunchErrors(server, { development = false, source = false, root = repositoryRoot } = {}) {
+export function azureLaunchErrors(server, { source = false, root = repositoryRoot } = {}) {
   try {
     const registry = readJson(azureRegistryPath, root);
     const version = exactAzureMcpVersion(root);
     if (registry.package.version !== version) return ["Azure MCP approved inventory must match the exact dependency"];
     const expected = {
       type: "stdio",
-      command: development ? "node" : "npx",
-      args: azureMcpArguments(registry, development ? undefined : source ? "@azure/mcp" : `@azure/mcp@${version}`),
+      command: "npx",
+      args: azureMcpArguments(registry, source ? "@azure/mcp" : `@azure/mcp@${version}`),
     };
     return JSON.stringify(canonicalValue(server)) === JSON.stringify(canonicalValue(expected))
       ? []

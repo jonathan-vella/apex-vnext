@@ -1,13 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { validateMcpConfig } from "../scripts/validate-mcp-config.mjs";
-import { azureMcpArguments, azureRegistryPath, readJson } from "../scripts/_lib/mcp-contracts.mjs";
 
 function validConfig() {
   return {
     servers: {
       github: { type: "http", url: "https://api.githubcopilot.com/mcp/" },
-      "apex-azure": { type: "stdio", command: "node", args: azureMcpArguments(readJson(azureRegistryPath)) },
       "apex-azure-cost": {
         type: "http",
         url: "https://mcp.management.azure.com",
@@ -19,6 +17,51 @@ function validConfig() {
 
 test("accepts the active MCP contract without Astro", () => {
   assert.deepEqual(validateMcpConfig(validConfig()), []);
+});
+
+test("developer workspace rejects standalone Azure namespaces and tools even with --read-only", () => {
+  for (const [namespace, excludedCommand] of [
+    ["appservice", "appservice_webapp_settings_get-appsettings"],
+    ["azureterraform", "azureterraform_aztfexport_resource"],
+  ]) {
+    for (const selection of [
+      ["--namespace", namespace],
+      ["--tool", excludedCommand],
+    ]) {
+      const config = validConfig();
+      config.servers["apex-azure"] = {
+        type: "stdio",
+        command: "node",
+        args: ["${workspaceFolder}/node_modules/@azure/mcp/index.js", "server", "start", "--read-only", ...selection],
+      };
+      assert.deepEqual(
+        validateMcpConfig(config),
+        [
+          "Unguarded developer Azure MCP launch must not be active: servers.apex-azure; use the registry-guarded APEX plugin",
+        ],
+        excludedCommand,
+      );
+    }
+  }
+});
+
+test("renaming an official Azure MCP launch does not bypass developer workspace rejection", () => {
+  for (const server of [
+    {
+      type: "stdio",
+      command: "node",
+      args: ["${workspaceFolder}/node_modules/@azure/mcp/index.js", "server", "start"],
+    },
+    { type: "stdio", command: "npx", args: ["--yes", "@azure/mcp@3.0.0", "server", "start", "--read-only"] },
+    { type: "stdio", command: "azmcp", args: ["server", "start", "--read-only"] },
+    { type: "stdio", command: "C:\\tools\\azmcp.exe", args: ["server", "start", "--read-only"] },
+  ]) {
+    const config = validConfig();
+    config.servers.renamed = server;
+    assert.deepEqual(validateMcpConfig(config), [
+      "Unguarded developer Azure MCP launch must not be active: servers.renamed; use the registry-guarded APEX plugin",
+    ]);
+  }
 });
 
 test("rejects Astro by legacy key or retired URL under another key", () => {

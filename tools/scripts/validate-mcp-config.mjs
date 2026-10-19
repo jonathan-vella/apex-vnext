@@ -5,7 +5,6 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { parseJsonc } from "./_lib/parse-jsonc.mjs";
 import { Reporter } from "./_lib/reporter.mjs";
-import { azureLaunchErrors } from "./_lib/mcp-contracts.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -59,6 +58,19 @@ function retiredDrawioMarker(name, server) {
   return null;
 }
 
+function unguardedAzureLaunch(name, server) {
+  if (["apex-azure", "azure-mcp", "azure-mcp-server"].includes(name.toLowerCase().replaceAll("_", "-"))) return true;
+  const command = typeof server?.command === "string" ? server.command.replaceAll("\\", "/").toLowerCase() : "";
+  if (
+    command
+      .split("/")
+      .at(-1)
+      ?.replace(/\.(?:exe|cmd|ps1)$/u, "") === "azmcp"
+  )
+    return true;
+  return JSON.stringify(server)?.toLowerCase().replaceAll("\\", "/").includes("@azure/mcp") ?? false;
+}
+
 export function validateMcpConfig(mcpConfig) {
   const errors = [];
   const servers = mcpConfig?.servers;
@@ -67,9 +79,6 @@ export function validateMcpConfig(mcpConfig) {
   }
   if (!servers.github) errors.push("Missing required MCP server: servers.github");
 
-  const azure = servers["apex-azure"];
-  if (!azure) errors.push("Missing required MCP server: servers.apex-azure");
-  else errors.push(...azureLaunchErrors(azure, { development: true }));
   const armMcp = servers["apex-azure-cost"];
   if (!armMcp) errors.push("Missing required MCP server: servers.apex-azure-cost");
   else if (armMcp.type !== "http") errors.push('apex-azure-cost must use type: "http"');
@@ -81,6 +90,11 @@ export function validateMcpConfig(mcpConfig) {
 
   for (const [name, server] of Object.entries(servers)) {
     const serialized = JSON.stringify(server).toLowerCase().replaceAll("\\", "/");
+    if (unguardedAzureLaunch(name, server)) {
+      errors.push(
+        `Unguarded developer Azure MCP launch must not be active: servers.${name}; use the registry-guarded APEX plugin`,
+      );
+    }
     if (
       ["azure-pricing", "apex-azure-pricing", "azure-resource-manager-mcp"].includes(name.toLowerCase()) ||
       serialized.includes("azure_pricing_mcp")
@@ -129,7 +143,7 @@ function main() {
   if (mcpConfig?.servers?.github) r.ok("MCP config includes required server: github");
   r.tick();
   if (hasServerMap && !errors.some((error) => error.includes("apex-azure"))) {
-    r.ok("MCP config includes official Azure MCP and ARM Cost Management-only");
+    r.ok("MCP config keeps ARM Cost Management-only; general Azure MCP is available only through the guarded plugin");
   }
   r.tick();
   if (hasServerMap && !errors.some((error) => error.startsWith("Retired custom Azure Pricing MCP"))) {

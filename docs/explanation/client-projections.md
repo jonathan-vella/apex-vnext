@@ -24,6 +24,11 @@ nothing. The foreground agent has 44 explicit Azure namespace/direct grants; hid
 See [MCP providers](../reference/mcp.md#azure-mcp-server-3) for excluded operations, safe discovery and the external
 install/cache lifecycle, which is separate from APEX's bundled offline startup guarantee.
 
+The root developer `.vscode/mcp.json` intentionally omits standalone general `apex-azure` access because the plugin's
+command/parameter guard is not available when the plugin is unloaded; its CostManagement-only endpoint remains.
+Use a guarded plugin consumer for general Azure tools. Do not duplicate plugin providers in workspace configuration
+or add a broad standalone launch before equivalent guarding exists.
+
 ## Consumer Guidance
 
 Managed consumer skills retain Azure design, planning, validation, operations, identity, migration, Terraform, artifact,

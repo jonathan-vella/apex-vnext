@@ -198,7 +198,8 @@ and the repository archives.
   CLIENT-029 per supported client. Record and test an exact pinned `3.y.z` version in a tracked dependency manifest
   rather than a floating range; require focused discovery/schema/grant tests on updates. Never report a capped
   pricing response as complete; preserve timestamps, source and uncertainty on every pricing result.
-- **State:** Open; IMPLEMENTED LOCAL with focused checks passing; integration and human client/live qualification pending
+- **State:** Open; IMPLEMENTED LOCAL with local qualification stages passing after restoring jq; final-head CI and
+  human client/authenticated Azure qualification pending
 - **Closure proof:** CP-31 ships discovered real tool/schema evidence, an exact version pin in a tracked manifest,
   cap-aware pricing handling with a passing regression, and per-client dependency-lifecycle documentation distinct
   from CLIENT-029, before any qualification or release claim.

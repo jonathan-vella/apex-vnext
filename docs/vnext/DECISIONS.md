@@ -450,8 +450,9 @@ Azure MCP Server GA `3.0.0` (commit `61715e6a9054d7922809b01e08a2efa85e032a6d`) 
 This amends [DECISION-014](#decision-014-use-microsoft-arm-mcp-directly-for-managed-pricing), whose original managed
 surface was remote ARM MCP CostManagement/Pricing only. Planning merged in
 [PR #490](https://github.com/jonathan-vella/apex-vnext/pull/490) at `42d82a54`.
-[CP-31](https://github.com/jonathan-vella/apex-vnext/issues/489) is **IMPLEMENTED LOCAL** with focused checks passing;
-the integration `qualify:vnext` checkpoint and separately authorized client/live qualification remain pending.
+[CP-31](https://github.com/jonathan-vella/apex-vnext/issues/489) is **IMPLEMENTED LOCAL** with focused checks and local
+qualification stages passing after restoring the jq prerequisite. Final-head CI and separately authorized human
+client/authenticated Azure qualification remain pending.
 No release or supported-client/live qualification is implied.
 
 - **Decision.** Introduce the official Azure MCP Server as a first-class managed tool provider to the foreground APEX
@@ -486,8 +487,8 @@ No release or supported-client/live qualification is implied.
   per supported client (native Windows VS Code/Copilot app, Linux/WSL2 Copilot CLI). Public local schema discovery is
   not itself authorized Azure/client/live execution evidence.
 - **Verification boundary.** Local server/grant/registry, pricing provenance/cap handling, managed guidance and tests
-  belong to the same implementation slice. Focused verification and the integration `qualify:vnext` checkpoint must
-  pass before acceptance. Supported-client install/cache/discovery/permission runs remain separately human-authorized;
+  belong to the same implementation slice. Local qualification stages pass after restoring the jq prerequisite;
+  final-head CI remains pending. Supported-client install/cache/discovery/permission runs remain separately human-authorized;
   no live qualification, client installation evidence or release is claimed.
 
 See [CP-31](https://github.com/jonathan-vella/apex-vnext/issues/489) for the implementation backlog, acceptance

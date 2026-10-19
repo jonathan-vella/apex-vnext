@@ -11,14 +11,20 @@ avoids duplicate tools and independent state.
 
 [DECISION-038](../vnext/DECISIONS.md#decision-038-introduce-azure-mcp-server-3-as-a-managed-azure-tool-provider)
 and [CP-31](https://github.com/jonathan-vella/apex-vnext/issues/489) introduce three separate server identities.
-**IMPLEMENTED LOCAL; focused checks pass, integration qualification pending.**
-This is not a release or supported-client/live qualification claim.
+**IMPLEMENTED LOCAL; local qualification stages pass after restoring the jq prerequisite.**
+Final-head CI and human client/authenticated Azure qualification remain pending; this is not a release claim.
 
 | Server            | Provider                                                         | Managed role                                                                                    |
 | ----------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | `apex`            | Bundled APEX MCP                                                 | Kernel-authorized workflow, evidence, reviews, gates and execution                              |
 | `apex-azure`      | Official `@azure/mcp@3.0.0`, namespace mode, `--read-only`       | Verified general Azure reads, metadata, diagnostics, documentation, guidance and retail pricing |
 | `apex-azure-cost` | Remote `https://mcp.management.azure.com`, `CostManagement` only | Ten existing ARM cost, forecast, budget, alert and commitment reads                             |
+
+General `apex-azure` access is provided only through guarded plugin consumers. The root developer workspace's
+`.vscode/mcp.json` does not register that broad standalone server: without the loaded plugin, its command/parameter
+guard is absent, and `--read-only` alone is insufficient. The developer configuration retains its CostManagement-only
+endpoint. Do not add a standalone general Azure registration until equivalent guarding exists, or duplicate a provider
+already registered by the plugin.
 
 The foreground APEX agent has explicit grants for the 44 verified namespace/direct tools in
 [`azure-mcp.v1.json`](../../tools/registry/azure-mcp.v1.json), including the actual `documentation` proxy, quota,

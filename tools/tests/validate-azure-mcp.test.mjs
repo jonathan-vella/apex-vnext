@@ -10,7 +10,8 @@ import {
   readJson,
 } from "../scripts/_lib/mcp-contracts.mjs";
 import { azureCommandPolicy, pricingReadTools, renderHookScript, renderMcpConfig } from "../scripts/build-plugin.mjs";
-import { verifyManagedCapture } from "../scripts/generate-azure-mcp-registry.mjs";
+import { developerMcpConfig, verifyManagedCapture } from "../scripts/generate-azure-mcp-registry.mjs";
+import { validateMcpConfig } from "../scripts/validate-mcp-config.mjs";
 import { load as loadYaml } from "js-yaml";
 import { parseAggregate } from "../scripts/validate-repository-validator-graph.mjs";
 
@@ -214,7 +215,6 @@ test("source and rendered launches derive exact version and namespaces, never a 
   const rendered = renderMcpConfig(sourceConfig);
   assert.deepEqual(azureLaunchErrors(sourceConfig.mcpServers["apex-azure"], { source: true }), []);
   assert.deepEqual(azureLaunchErrors(rendered.mcpServers["apex-azure"]), []);
-  assert.deepEqual(azureLaunchErrors(readJson(".vscode/mcp.json").servers["apex-azure"], { development: true }), []);
   assert.ok(rendered.mcpServers["apex-azure"].args.includes(`@azure/mcp@${exactAzureMcpVersion()}`));
   for (const value of ["@azure/mcp@3", "@azure/mcp@^3.0.0", "@azure/mcp@latest", "@azure/mcp@3.0.1"]) {
     const changed = structuredClone(rendered.mcpServers["apex-azure"]);
@@ -256,4 +256,12 @@ test("source and rendered launches derive exact version and namespaces, never a 
   const retailReactivated = structuredClone(sourceConfig);
   retailReactivated.mcpServers["apex-azure-cost"].headers["x-mcp-toolset"] = "CostManagement,Pricing";
   assert.throws(() => renderMcpConfig(retailReactivated), /CostManagement only/u);
+});
+
+test("developer config generation omits general Azure MCP until equivalent command guards exist", () => {
+  const development = developerMcpConfig();
+  assert.deepEqual(readJson(".vscode/mcp.json"), development);
+  assert.deepEqual(Object.keys(development.servers), ["github", "apex-azure-cost"]);
+  assert.deepEqual(validateMcpConfig(development), []);
+  assert.deepEqual(development.servers["apex-azure-cost"].headers, { "x-mcp-toolset": "CostManagement" });
 });

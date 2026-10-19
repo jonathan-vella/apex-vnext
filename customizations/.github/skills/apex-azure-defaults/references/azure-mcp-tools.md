@@ -1,9 +1,13 @@
 # Managed Azure MCP Tools
 
-The foreground `APEX` agent uses `apex-azure` for verified general Azure read-only discovery, resource metadata,
-diagnostics, service guidance and retail pricing. It uses `apex-azure-cost` only for the ten ARM CostManagement reads.
+In a guarded plugin consumer, the foreground `APEX` agent uses `apex-azure` for verified general Azure read-only
+discovery, resource metadata, diagnostics, service guidance and retail pricing. It uses `apex-azure-cost` only for
+the ten ARM CostManagement reads.
 The `apex` server remains the sole workflow authority: external observations do not approve gates, accept evidence,
 authorize changes or replace `apex/taskContext`. Hidden workers do not inherit broad Azure grants.
+
+The root developer workspace does not register broad standalone Azure MCP access without the plugin guard.
+Use the guarded plugin provider; never duplicate its registration or bypass a missing guard with a standalone launch.
 
 ## Discover Before Calling
 

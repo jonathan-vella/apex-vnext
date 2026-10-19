@@ -111,9 +111,12 @@ hooks, skills and tests move together under the [CP-31 checkpoint](ROADMAP.md#az
 See [MCP providers](../reference/mcp.md#azure-mcp-server-3). The frozen `0.11.0-next.5` candidate evidence remains
 unchanged; per-client/live qualification and release require separate human authorization.
 
-Focused agent/skill discovery, guidance delivery, catalog, project-control and Azure grant validators pass, with
-55 skill/guidance/catalog regression tests passing. The parent integration `qualify:vnext` checkpoint is pending;
-this does not advance the frozen candidate or substitute for authorized client evidence.
+Focused checks and credential-free discovery pass, including 55 skill/guidance/catalog tests and 52 HIGH-fix
+regressions. The `qualify:vnext` validation, workspace-test and validator stages passed; final packaging first failed
+solely on the missing host jq prerequisite. After restoring official jq `1.8.1` with its verified SHA, the
+`test:vnext-pack` rerun passed 131/131. Local qualification stages therefore pass; final-head CI and human
+client/authenticated Azure qualification remain pending. This does not advance the frozen candidate or substitute for
+authorized client evidence.
 
 ### Governance Native Validation Checkpoint
 
