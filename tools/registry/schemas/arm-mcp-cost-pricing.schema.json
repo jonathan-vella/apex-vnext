@@ -26,7 +26,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["name", "value"],
-      "properties": { "name": { "const": "x-mcp-toolset" }, "value": { "const": "CostManagement,Pricing" } }
+      "properties": { "name": { "const": "x-mcp-toolset" }, "value": { "const": "CostManagement" } }
     },
     "supportedClients": { "const": ["github-copilot-vscode", "github-copilot-cli"] },
     "source": {
@@ -63,17 +63,12 @@
             "list_reservation_transactions"
           ],
           "writeTools": ["create_budget"]
-        },
-        "Pricing": {
-          "readTools": ["get_retail_prices", "get_pricesheet_status"],
-          "operationTools": ["start_pricesheet_download"]
         }
       }
     },
     "managedPolicy": {
       "const": {
         "candidateReadAllowlist": [
-          "get_retail_prices",
           "query_costs",
           "query_aks_costs",
           "forecast_costs",
@@ -85,7 +80,7 @@
           "get_benefit_recommendations",
           "list_reservation_transactions"
         ],
-        "deferredTools": ["start_pricesheet_download", "get_pricesheet_status"],
+        "deferredTools": ["get_retail_prices", "start_pricesheet_download", "get_pricesheet_status"],
         "denyBeforeTransport": ["create_budget", "create_template_deployment", "cancel_arm_template_deployment"],
         "unknownToolDisposition": "deny-before-transport"
       }

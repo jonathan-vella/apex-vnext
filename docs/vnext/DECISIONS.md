@@ -73,14 +73,15 @@ exact candidate before release.
 
 ## DECISION-014: Use Microsoft ARM MCP Directly For Managed Pricing
 
-Managed clients use explicit read-only Cost Management and Pricing tools. APEX owns request/evidence acceptance,
+Original decision: managed clients used explicit read-only ARM Cost Management and Pricing tools.
+APEX owns request/evidence acceptance,
 arithmetic, workflow, and gates.
 
-**Amended by [DECISION-038](#decision-038-introduce-azure-mcp-server-3-as-a-managed-azure-tool-provider-planned)
-(planned, not yet implemented):** retail pricing is planned to move from this ARM MCP `Pricing` toolset to Azure MCP
-Server 3's pricing capability; the ten ARM MCP `CostManagement` read tools are retained unchanged under their own
-server identity. This repository does not currently ship a general `@azure/mcp` dependency — only the remote ARM MCP
-`CostManagement`/`Pricing` toolsets described below are active today.
+**Amended by [DECISION-038](#decision-038-introduce-azure-mcp-server-3-as-a-managed-azure-tool-provider):**
+retail pricing moves to `apex-azure/pricing`, command `pricing_get`, in the general official Azure MCP Server
+integration. The ten ARM MCP `CostManagement` reads remain unchanged under `apex-azure-cost`; the ARM Pricing toolset
+is no longer the managed pricing source. This preserves the original kernel authority and read-only boundary.
+CP-31 local verification and separately authorized client/live qualification are tracked by DECISION-038.
 
 ## DECISION-015: Retire Unneeded MCP And Diagram Surfaces Through Explicit Gates
 
@@ -442,49 +443,53 @@ extensions and layers be inventoried, bound and hashed so that any change invali
 Historical archive entries are indexed in the [catalog](../../.archive/CATALOG.json);
 the [restore guide](../../.archive/RESTORE.md) grants no runtime, release or deployment authority.
 
-## DECISION-038: Introduce Azure MCP Server 3 As A Managed Azure Tool Provider (Planned)
+## DECISION-038: Introduce Azure MCP Server 3 As A Managed Azure Tool Provider
 
 Maintainer-recorded planning decision on 2026-10-19, grounded in internal research dated the same day against upstream
 Azure MCP Server GA `3.0.0` (commit `61715e6a9054d7922809b01e08a2efa85e032a6d`) and repository baseline `9c31358c`.
-This amends [DECISION-014](#decision-014-use-microsoft-arm-mcp-directly-for-managed-pricing): APEX currently grants
-only remote ARM MCP `CostManagement` and `Pricing` toolsets, not a general Azure tool provider. There is no shipped
-`@azure/mcp` dependency today; references to `mcp_azure-mcp_*` tool names in imported skill guidance describe external
-usage and do not themselves grant tool access. This decision is a target to implement under
-[CP-31](https://github.com/jonathan-vella/apex-vnext/issues/489), not an implemented change.
+This amends [DECISION-014](#decision-014-use-microsoft-arm-mcp-directly-for-managed-pricing), whose original managed
+surface was remote ARM MCP CostManagement/Pricing only. Planning merged in
+[PR #490](https://github.com/jonathan-vella/apex-vnext/pull/490) at `42d82a54`.
+[CP-31](https://github.com/jonathan-vella/apex-vnext/issues/489) is **IMPLEMENTED LOCAL** with focused checks passing;
+the integration `qualify:vnext` checkpoint and separately authorized client/live qualification remain pending.
+No release or supported-client/live qualification is implied.
 
 - **Decision.** Introduce the official Azure MCP Server as a first-class managed tool provider to the foreground APEX
   agent across relevant stages (Azure discovery/configuration/resource queries, diagnostics/health/logs, quota/policy
   where actually available, service/IaC guidance, retail pricing), alongside, not instead of, APEX's own kernel-
   authorized MCP server. This does not change APEX MCP's SDK or protocol (DECISION-034, `@modelcontextprotocol/server`
   v2) — Azure MCP Server is a different product and dependency axis.
-- **Discovery before grants.** Actual tools, namespaces and schemas must be discovered and verified against real
-  server output, not invented or assumed from documentation prefixes alone. Namespace mode is the initial tool-
-  footprint _candidate_, not a concluded design; conditional or proxied capabilities need explicit validation before
-  any grant. Do not blanket-disable every proxied tool, and do not expose every individual operation by default.
-  Tool annotations (read-only, destructive, etc.) describe behavior; they are not authorization. Kernel authority for
-  Azure state-changing operations and IaC/approval is unchanged and unaffected by this decision.
-- **Pricing migration.** Retail pricing moves from ARM MCP `get_retail_prices` to the Azure MCP pricing capability
-  (`pricing_get` in the GA source; the `azmcp_` documentation prefix needs confirmation against the real `tools/list`
-  name before implementation). The ten existing ARM MCP CostManagement read tools (`query_costs`, `query_aks_costs`,
+- **Discovery before grants.** Credential-free `3.0.0` tools/list discovery grounds namespace mode and the 44 explicit
+  foreground grants in `tools/registry/azure-mcp.v1.json`. The actual `documentation` proxy is included; unverified
+  `azd`, `arm` and `foundry` proxies are excluded. The hook verifies curated commands/parameters, not annotations alone.
+  Metadata-only Storage/Cosmos reads and Deploy guidance/log reads do not grant secret values, app settings, exports,
+  local installers, data-plane content, AI inference or SRE workflows. Hidden workers receive no broad Azure grants.
+  Namespace schema discovery uses exactly `{intent: "", learn: true}` without command/parameters; nonempty learn
+  intent can execute sampling. Kernel authority for mutations, IaC and approvals is unchanged.
+- **Pricing migration.** Retail pricing moves from ARM MCP `get_retail_prices` to `apex-azure/pricing` with command
+  `pricing_get`. Observed stable 3.x version, returned row count and completeness accompany Azure MCP-priced lines;
+  actual source URI, price ID and retrieval time retain lineage without a fabricated query digest.
+  The silent 5,000-row cap never supports a priced line: narrow or retain an explicit unpriced item, not a fake zero.
+  The ten existing ARM MCP CostManagement read tools (`query_costs`, `query_aks_costs`,
   `forecast_costs`, `list_dimensions`, `list_budgets`, `get_budget`, `list_alerts`, `list_benefit_utilization`,
   `get_benefit_recommendations`, `list_reservation_transactions`) are retained unchanged under their own clearly
-  separate server identity — no removal or regression of actual costs, forecasts, budgets, alerts or commitments.
+  separate server identity `apex-azure-cost` — no removal or regression of actual costs, forecasts, budgets, alerts or commitments.
   A pricing-only server is explicitly not the goal.
-- **Version policy (planned, not yet accepted as final acceptance evidence).** Track the stable `3.x` line through
-  existing dependency-update automation, but execute an exact tested `3.y.z` version recorded in a tracked dependency
-  manifest, not only a launch-string version. A floating `@azure/mcp@3` or `@3.x` range is technically possible but is
-  not adopted: npm caching and the absence of a runtime schema-attestation mechanism mean it cannot guarantee the
-  freshest publication on every launch. Moving to a new major (`4.x`) requires a separate explicit decision. This
-  policy is a recommendation carried from the grounding research, not a floating-runtime approval the maintainer has
-  given; treat any remaining acceptance step as outstanding rather than already granted.
+- **Version policy.** Track stable `3.x` updates through existing dependency review; execute the exact `3.0.0`
+  recorded in the dependency manifest and reviewed registry. Discovery/schema/grant tests precede pin changes.
+  Floating `latest`, `@3` and `@3.x` runtime launches are not adopted. Cache behavior cannot promise fresh publications
+  on every startup, and the hook is not a runtime binary/schema-attestation service. A new major requires an explicit
+  decision.
 - **External dependency lifecycle.** An `npx`-launched Azure MCP Server may download and cache platform packages on
   cold install. This must not be silently merged into APEX's own bundled-plugin offline-startup guarantee
   (`CLIENT-029`): the external dependency's install/cache/discovery lifecycle is documented and qualified separately,
   per supported client (native Windows VS Code/Copilot app, Linux/WSL2 Copilot CLI). Public local schema discovery is
   not itself authorized Azure/client/live execution evidence.
-- **Not yet done.** No server declaration, grant, registry, or pricing migration code has shipped under this decision.
-  No live qualification, client installation evidence or release is implied or claimed.
+- **Verification boundary.** Local server/grant/registry, pricing provenance/cap handling, managed guidance and tests
+  belong to the same implementation slice. Focused verification and the integration `qualify:vnext` checkpoint must
+  pass before acceptance. Supported-client install/cache/discovery/permission runs remain separately human-authorized;
+  no live qualification, client installation evidence or release is claimed.
 
 See [CP-31](https://github.com/jonathan-vella/apex-vnext/issues/489) for the implementation backlog, acceptance
-checklist and task order, and [docs/reference/mcp.md](../reference/mcp.md#planned-azure-mcp-server-3) for the current
-versus planned tool-provider description.
+checklist and task order, and [docs/reference/mcp.md](../reference/mcp.md#azure-mcp-server-3) for the split-provider
+contract.

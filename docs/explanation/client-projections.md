@@ -6,8 +6,9 @@
 ## Canonical Source
 
 The managed source under `customizations/.github` defines the single foreground APEX agent, hidden workers, skills,
-instructions and the plugin settings file. `plugin/mcp.json` defines the plugin's MCP servers: `apex` and
-`apex-azure-pricing`. `customizations/manifest.json` records workspace files, the plugin declaration and the files it
+instructions and the plugin settings file. `plugin/mcp.json` defines the plugin's MCP servers: kernel-owned `apex`,
+general read-only `apex-azure` (`@azure/mcp@3.0.0`) and ARM CostManagement-only `apex-azure-cost`.
+`customizations/manifest.json` records workspace files, the plugin declaration and the files it
 owns, roles, the supported target, interaction types and invocation edges.
 
 `packages/cli/scripts/prepare-assets.mjs` validates the sources and generates the thin `github-copilot-cli` workspace
@@ -16,8 +17,12 @@ with the skills, hooks and MCP servers into the `apex` plugin. Packaged assets a
 canonical source.
 
 The plugin cannot restrict which tools a remote MCP server exposes, and the `CostManagement` toolset includes writes
-such as budget creation. A managed `preToolUse` hook therefore denies every `apex-azure-pricing` tool that is not in
-the read allowlist of `tools/registry/arm-mcp-cost-pricing.v1.json`, for every agent in the session.
+such as budget creation. A managed `preToolUse` hook therefore denies every `apex-azure-cost` tool outside the ten-read
+allowlist of `tools/registry/arm-mcp-cost-pricing.v1.json`, for every agent in the session. It also validates
+`apex-azure` namespaces, commands and parameters against `tools/registry/azure-mcp.v1.json`; annotations alone grant
+nothing. The foreground agent has 44 explicit Azure namespace/direct grants; hidden workers have no broad Azure grants.
+See [MCP providers](../reference/mcp.md#azure-mcp-server-3) for excluded operations, safe discovery and the external
+install/cache lifecycle, which is separate from APEX's bundled offline startup guarantee.
 
 ## Consumer Guidance
 

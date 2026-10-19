@@ -1,8 +1,12 @@
 # Cost Tool Guardrails
 
-The `apex-azure-pricing` server exposes read-only Cost Management and pricing tools. A managed hook denies its write and
-operation tools. The limits below describe the tool contract as ported; when a tool rejects a request, its message is
-authoritative.
+The `apex-azure-cost` server exposes the ten ARM CostManagement reads; its managed hook denies writes and operation
+tools. Retail pricing is separate: `apex-azure/pricing`, command `pricing_get`, follows the
+[central pricing contract](../../apex-azure-defaults/references/retail-pricing.md). The limits below describe the cost
+tool contract as ported; when a tool rejects a request, its message is authoritative.
+
+The retained reads are `query_costs`, `query_aks_costs`, `forecast_costs`, `list_dimensions`, `list_budgets`, `get_budget`,
+`list_alerts`, `list_benefit_utilization`, `get_benefit_recommendations`, and `list_reservation_transactions`.
 
 ## Scope
 
@@ -50,7 +54,7 @@ Forecasts can be unavailable for new or inactive scopes. Unavailable data is not
 | --- | --- |
 | Actual cost | Returned by Cost Management for the stated scope and period |
 | Actual metric | Returned by a monitoring source for the same resource and period |
-| Retail price | Returned by `get_retail_prices` |
+| Retail price | Returned by `apex-azure/pricing` with command `pricing_get` |
 | Negotiated price | From the customer's price sheet; not available through the shipped tools |
 | Estimate | Calculated from stated assumptions and labeled evidence |
 

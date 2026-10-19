@@ -19,6 +19,8 @@ import {
   roleDelegatesOnClient,
 } from "../../packages/cli/scripts/prepare-assets.mjs";
 import { MARKETPLACE_NAME, MARKETPLACE_REPOSITORY, PLUGIN_NAME } from "./publish-plugin.mjs";
+import { azureLaunchErrors, azureRegistryPath, readJson as readMcpJson } from "./_lib/mcp-contracts.mjs";
+import { validateAzureMcpRegistry } from "./validate-azure-mcp.mjs";
 
 const REQUIRED_PACKAGES = ["contracts", "kernel", "capabilities", "renderers", "testkit", "cli"];
 const CORE_PACKAGES = new Set(["kernel", "capabilities", "renderers"]);
@@ -98,9 +100,10 @@ const RETIRED_AGENT_TOOLS = ["vscode/askQuestions", "agent"];
 const EXPLICIT_WEB_TOOLS = ["web_fetch"];
 const SECRET_KEY = /(secret|password|passwd|token|privateKey|clientSecret|connectionString)/i;
 const SOURCE_IMPORT = /(?:from\s+|import\s*\()["']([^"']+)["']/g;
-const ARM_MCP_SERVER = "apex-azure-pricing";
+const ARM_MCP_SERVER = "apex-azure-cost";
 const ARM_MCP_ENDPOINT = "https://mcp.management.azure.com";
-const ARM_MCP_TOOLSET = "CostManagement,Pricing";
+const ARM_MCP_TOOLSET = "CostManagement";
+const AZURE_MCP_TOOLS = Object.keys(readMcpJson(azureRegistryPath).namespaces);
 // One read allowlist for agent tool references, the plugin hook and the registry.
 const ARM_MCP_READ_TOOLS = JSON.parse(
   readFileSync(new URL("../registry/arm-mcp-cost-pricing.v1.json", import.meta.url), "utf8"),
@@ -925,6 +928,7 @@ function validateCustomizations(model, findings) {
   const allowedMcp = new Set([
     ...model.mcpTools.map((tool) => `apex/${tool}`),
     ...ARM_MCP_READ_TOOLS.map((tool) => `${ARM_MCP_SERVER}/${tool}`),
+    ...AZURE_MCP_TOOLS.map((tool) => `apex-azure/${tool}`),
   ]);
   const inventory = customization.toolInventory;
   const clientAgentTools = new Set([
@@ -1246,7 +1250,7 @@ function validateMcp(model, findings) {
   const apex = servers.apex;
   const pricing = servers[ARM_MCP_SERVER];
   if (
-    JSON.stringify(Object.keys(servers)) !== JSON.stringify(["apex", ARM_MCP_SERVER]) ||
+    JSON.stringify(Object.keys(servers)) !== JSON.stringify(["apex", "apex-azure", ARM_MCP_SERVER]) ||
     !apex ||
     apex.type !== "stdio" ||
     apex.command !== "node" ||
@@ -1256,9 +1260,14 @@ function validateMcp(model, findings) {
     finding(
       findings,
       "mcp.plugin-launch",
-      `The plugin MCP config must declare exactly apex (node \${PLUGIN_ROOT}/mcp/apex.mjs) and ${ARM_MCP_SERVER}`,
+      `The plugin MCP config must declare exactly apex (node \${PLUGIN_ROOT}/mcp/apex.mjs), apex-azure and ${ARM_MCP_SERVER}`,
       "plugin/mcp.json",
     );
+  for (const error of [
+    ...validateAzureMcpRegistry(readMcpJson(azureRegistryPath)),
+    ...azureLaunchErrors(servers["apex-azure"], { source: true }),
+  ])
+    finding(findings, "mcp.plugin-azure-launch", error, "plugin/mcp.json");
   if (
     !pricing ||
     pricing.type !== "streamable-http" ||

@@ -1,5 +1,5 @@
-> MCP names in this reference are upstream pseudo-interfaces, not current vNext tool registrations.
-> Use only capabilities projected by the active task; unavailable tools are blockers, never substitutes.
+> Managed Azure reads use verified `apex-azure` namespaces and actual command schemas.
+> Other provider examples are conditional; absent tools never grant mutation or hook-bypass authority.
 
 <!-- ref:avm-pitfalls-v1 -->
 
@@ -735,7 +735,10 @@ then `az automation job-schedule create`). Record both as post-deploy tasks.
 
 | Topic                | How to Find                                                                                          |
 | -------------------- | ---------------------------------------------------------------------------------------------------- |
-| AVM module catalog   | `mcp_azure-mcp_documentation` — `command: "microsoft_docs_search"`, `query: "Azure Verified Modules registry Bicep"`    |
-| Resource type schema | `mcp_azure-mcp_documentation` — `command: "microsoft_docs_search"`, `query: "{resource-type} Bicep template reference"` |
-| Networking patterns  | `mcp_azure-mcp_documentation` — `command: "microsoft_docs_search"`, `query: "Azure hub-spoke network topology Bicep"`   |
-| Security baseline    | `mcp_azure-mcp_documentation` — `command: "microsoft_docs_search"`, `query: "{service} security baseline"`              |
+| AVM module catalog   | `apex-azure/documentation` — `command: "microsoft_docs_search"`, `parameters: {query: "Azure Verified Modules registry Bicep"}` |
+| Resource type schema | `apex-azure/documentation` — `command: "microsoft_docs_search"`, `parameters: {query: "{resource-type} Bicep template reference"}` |
+| Networking patterns  | `apex-azure/documentation` — `command: "microsoft_docs_search"`, `parameters: {query: "Azure hub-spoke network topology Bicep"}` |
+| Security baseline    | `apex-azure/documentation` — `command: "microsoft_docs_search"`, `parameters: {query: "{service} security baseline"}` |
+
+Include a bounded `intent` in each call. Schema-only discovery is exactly `{intent: "", learn: true}` with no
+command/parameters; it is not a request to execute sampling.

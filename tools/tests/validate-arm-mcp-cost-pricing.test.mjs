@@ -32,7 +32,7 @@ test("Azure MCP Server product names cannot substitute for ARM MCP", () => {
   for (const mutation of [
     (value) => (value.product = "azure-mcp-server"),
     (value) => (value.endpoint = "stdio"),
-    (value) => (value.toolsets.Pricing.readTools = ["pricing_get"]),
+    (value) => (value.toolsets.Pricing = { readTools: ["pricing_get"] }),
     (value) => (value.source.repository = "https://github.com/microsoft/mcp"),
   ]) {
     assert.ok(validateArmMcpCostPricing(mutate(mutation), schema).length > 0);

@@ -1,5 +1,5 @@
-> MCP names in this reference are upstream pseudo-interfaces, not current vNext tool registrations.
-> Use only capabilities projected by the active task; unavailable tools are blockers, never substitutes.
+> Managed Azure reads use verified `apex-azure` namespaces and actual command schemas.
+> Other provider examples are conditional; absent tools never grant mutation or hook-bypass authority.
 
 > Ported from `jonathan-vella/apex@c209d8bb765681aa21dce5d3cd2a3b080dad8d5e`.
 > Read the [vNext authority and command boundary](../../../references/kernel-boundary.md) before using this reference.
@@ -284,7 +284,7 @@ When preparing a new azd+Terraform project:
 3. **Add required tags**:
    - Resource group: `azd-env-name`
    - Hosting resources: `azd-service-name` (matches azure.yaml services)
-4. **Research best practices** - Call `mcp_azure-mcp_azureterraformbestpractices`
+4. **Research best practices** - Call `apex-azure/azureterraformbestpractices` with `azureterraformbestpractices_get`
 
 ## AVM Terraform Module Priority
 
@@ -294,8 +294,8 @@ For Terraform module selection, enforce this order:
 2. AVM Terraform Resource Modules
 3. AVM Terraform Utility Modules
 
-Use `mcp_azure-mcp_documentation` (`azure-documentation`) for current guidance and AVM context first, then use Context7
-only as supplemental examples if required.
+Use `apex-azure/documentation` with a bounded `intent`, `command: "microsoft_docs_search"` and `parameters.query` for
+current guidance and AVM context first. Context7 needs a separate active grant and supplies supplemental examples only.
 
 ## Migration from Pure Terraform
 

@@ -6,15 +6,14 @@
  * preToolUse:
  * - Deny the user-facing APEX agent as a `task` target. A person selects APEX in the agent picker; it never runs as a
  *   subagent. Hidden workers and built-in agents are left to the normal permission flow.
- * - Deny every tool on the plugin's `apex-azure-pricing` server (Azure Resource Manager MCP) except the read-only
- *   pricing and cost tools. The plugin cannot give a remote server a tool allowlist, so without this rule its write
- *   tools, such as budget creation, would reach every agent. Unknown or unparseable tool names on that server are
- *   denied. Every other tool is left to the normal permission flow.
+ * - Restrict `apex-azure-cost` to the ten approved ARM cost reads. Restrict `apex-azure` to reviewed namespace
+ *   commands with schema-shaped arguments. Namespace grants and upstream readOnlyHint alone are not authorization.
+ *   Unknown commands, nonempty-intent learn requests and malformed protected calls are denied before transport.
  *
  * Failure rule: the script always exits 0, because the client denies a preToolUse call when a command hook exits
  * non-zero. Input it cannot parse therefore allows the call (fail open), except that a raw-text scan still denies a
- * `task` call whose target it can read as APEX and any call it can read as aimed at the pricing server, unless the
- * tool is an allowed read tool, and, while a rubber-duck run is marked, an APEX tool or rubber-duck `task` call (fail
+ * `task` call whose target it can read as APEX and every call aimed at either Azure server, and, while a
+ * rubber-duck run is marked, an APEX tool or rubber-duck `task` call (fail
  * closed for the deny rules). Allowing means writing nothing: empty output keeps
  * the client's default behaviour, while `permissionDecision: "allow"` could bypass its prompt.
  *
@@ -57,15 +56,18 @@ const TASK_TOOLS = new Set(["task", "Task", "Agent"]);
 
 export const APEX_PLUGIN_NAME = "apex";
 
-export const PRICING_SERVER = "apex-azure-pricing";
+export const PRICING_SERVER = "apex-azure-cost";
 // build-plugin.mjs replaces this line with managedPolicy.candidateReadAllowlist from
 // tools/registry/arm-mcp-cost-pricing.v1.json. Unbuilt, the hook allows no pricing tool.
 export const PRICING_READ_TOOLS = Object.freeze([]); // @apex-build: pricing-read-tools
+export const AZURE_COMMAND_POLICY = Object.freeze({}); // @apex-build: azure-command-policy
 // The server name, with "-" or "_" between its words, anywhere in a tool name.
-const PRICING_SERVER_MARK = /apex[-_]azure[-_]pricing/iu;
-// Copilot CLI sends "apex-azure-pricing-<tool>" (probed with 1.0.93). Also accepted: "/", ":" or "." separators and
+const PRICING_SERVER_MARK = /apex[-_]azure[-_]cost/iu;
+// Copilot CLI sends "<server>-<tool>". Also accepted: "/", ":" or "." separators and
 // the "mcp__<server>__<tool>" and "mcp_<server>_<tool>" forms other hosts use.
-const PRICING_TOOL_NAME = /^(?:mcp_{1,2})?apex[-_]azure[-_]pricing(?:-|_{1,2}|\/|:|\.)([A-Za-z0-9_.-]+)$/iu;
+const PRICING_TOOL_NAME = /^(?:mcp_{1,2})?apex[-_]azure[-_]cost(?:-|_{1,2}|\/|:|\.)([A-Za-z0-9_.-]+)$/iu;
+const AZURE_SERVER_MARK = /apex[-_]azure/iu;
+const AZURE_TOOL_NAME = /^(?:mcp_{1,2})?apex[-_]azure(?:-|_{1,2}|\/|:|\.)([A-Za-z0-9_.-]+)$/iu;
 
 /**
  * Lower-case agent ID without the APEX plugin namespace or file suffix: "apex:APEX.agent.md" becomes "apex". Copilot
@@ -114,19 +116,98 @@ export function pricingTool(toolName) {
 
 function pricingDenial(toolName) {
   return deny(
-    `"${toolName}" is not one of the read-only Azure pricing and cost tools. APEX uses only read-only tools from the ` +
+    `"${toolName}" is not one of the read-only Azure cost tools. APEX uses only read-only tools from the ` +
       `${PRICING_SERVER} server; write, operation and unrecognized tools on it are blocked.`,
   );
 }
 
-function denyPricingWrite({ toolName }) {
+function denyPricingWrite({ toolName, argsValid = true }) {
   const tool = pricingTool(toolName);
   if (tool === undefined) return null;
-  return PRICING_READ_TOOLS.includes(tool) ? null : pricingDenial(toolName);
+  return argsValid && PRICING_READ_TOOLS.includes(tool) ? null : pricingDenial(toolName);
 }
 
 function isObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+export function azureTool(toolName) {
+  if (typeof toolName !== "string" || pricingTool(toolName) !== undefined) return undefined;
+  const name = toolName.trim();
+  if (!AZURE_SERVER_MARK.test(name)) return undefined;
+  return AZURE_TOOL_NAME.exec(name)?.[1] ?? "";
+}
+
+function azureDenial(toolName) {
+  return deny(
+    `"${toolName}" is not an approved Azure namespace command with valid arguments. ` +
+      "Use an exact reviewed command and parameters, or pure learn with intent empty and no command or parameters.",
+  );
+}
+
+// Captured input schemas use only this bounded vocabulary. Unsupported shapes fail closed.
+export function matchesInput(schema, value) {
+  if (!isObject(schema)) return false;
+  const types = Array.isArray(schema.type) ? schema.type : [schema.type];
+  if (
+    !types.some((type) =>
+      type === "object"
+        ? isObject(value)
+        : type === "array"
+          ? Array.isArray(value)
+          : type === "integer"
+            ? Number.isInteger(value)
+            : type === "number"
+              ? typeof value === "number" && Number.isFinite(value)
+              : type === "null"
+                ? value === null
+                : ["string", "boolean"].includes(type) && typeof value === type,
+    )
+  )
+    return false;
+  if (schema.enum && !schema.enum.includes(value)) return false;
+  if (
+    schema.format === "date-time" &&
+    (typeof value !== "string" ||
+      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/u.test(value) ||
+      !Number.isFinite(Date.parse(value)))
+  )
+    return false;
+  if (Array.isArray(value)) return value.every((item) => matchesInput(schema.items, item));
+  if (!isObject(value)) return true;
+  const properties = schema.properties ?? {};
+  if ((schema.required ?? []).some((key) => !Object.hasOwn(value, key))) return false;
+  return Object.entries(value).every(([key, child]) =>
+    Object.hasOwn(properties, key) ? matchesInput(properties[key], child) : false,
+  );
+}
+
+function denyAzureCommand({ toolName, args, argsValid = true }) {
+  const tool = azureTool(toolName);
+  if (tool === undefined) return null;
+  if (!argsValid || !Object.hasOwn(AZURE_COMMAND_POLICY, tool)) return azureDenial(toolName);
+  const namespace = AZURE_COMMAND_POLICY[tool];
+  if (namespace.kind === "direct") return matchesInput(namespace.inputSchema, args) ? null : azureDenial(toolName);
+  if (
+    !isObject(args) ||
+    Object.keys(args).some((key) => !["intent", "command", "parameters", "learn"].includes(key)) ||
+    typeof args.intent !== "string"
+  )
+    return azureDenial(toolName);
+  if (args.learn === true)
+    return args.intent === "" && !Object.hasOwn(args, "command") && !Object.hasOwn(args, "parameters")
+      ? null
+      : azureDenial(toolName);
+  if (
+    (Object.hasOwn(args, "learn") && args.learn !== false) ||
+    typeof args.command !== "string" ||
+    !Object.hasOwn(namespace.commands, args.command)
+  )
+    return azureDenial(toolName);
+  return matchesInput(namespace.commands[args.command].inputSchema, args.parameters ?? {}) &&
+    (!Object.hasOwn(args, "parameters") || isObject(args.parameters))
+    ? null
+    : azureDenial(toolName);
 }
 
 /**
@@ -136,9 +217,18 @@ function isObject(value) {
 export function readPayload(text) {
   const payload = JSON.parse(text.replace(/^\uFEFF/u, ""));
   if (!isObject(payload)) throw new Error("hook payload is not a JSON object");
-  let args = payload.toolArgs ?? payload.tool_input ?? {};
+  let args = Object.hasOwn(payload, "toolArgs")
+    ? payload.toolArgs
+    : Object.hasOwn(payload, "tool_input")
+      ? payload.tool_input
+      : {};
   if (typeof args === "string") args = JSON.parse(args);
-  return { payload, toolName: String(payload.toolName ?? payload.tool_name ?? ""), args: isObject(args) ? args : {} };
+  return {
+    payload,
+    toolName: String(payload.toolName ?? payload.tool_name ?? ""),
+    args: isObject(args) ? args : {},
+    argsValid: isObject(args),
+  };
 }
 
 /** Finds tool names in text that is not valid JSON, including JSON-escaped payloads. */
@@ -533,6 +623,7 @@ export const handlers = Object.freeze({
   preToolUse: Object.freeze([
     denyApexTaskTarget,
     denyPricingWrite,
+    denyAzureCommand,
     denyNestedRubberDuck,
     denyApexMutationDuringRubberDuck,
   ]),
@@ -544,8 +635,8 @@ export const handlers = Object.freeze({
 
 /**
  * Fallback for unreadable input: the deny rules apply to what the raw text shows. A task target readable as APEX is
- * denied. A pricing-server tool name is denied unless it is an allowed read tool, and so is text that names the
- * pricing server without any readable tool name. While any rubber-duck run is marked active (or the marks cannot be
+ * denied. Every protected Azure call is denied because unreadable arguments cannot prove authorization.
+ * While any rubber-duck run is marked active (or the marks cannot be
  * read), an APEX tool call or a rubber-duck task call is denied.
  */
 function failSafe(event, text) {
@@ -555,10 +646,11 @@ function failSafe(event, text) {
   if (target !== undefined) return apexTaskDenial(target);
   const names = scanToolNames(text);
   for (const name of names) {
-    const decision = denyPricingWrite({ toolName: name });
-    if (decision) return decision;
+    if (pricingTool(name) !== undefined) return pricingDenial(name);
+    if (azureTool(name) !== undefined) return azureDenial(name);
   }
   if (names.length === 0 && PRICING_SERVER_MARK.test(text)) return pricingDenial(PRICING_SERVER);
+  if (names.length === 0 && AZURE_SERVER_MARK.test(text)) return azureDenial("apex-azure");
   const tool = names.map(apexToolName).find((name) => name !== undefined);
   const rubberDuck = targets.some(isRubberDuck);
   if (tool === undefined && !rubberDuck) return null;

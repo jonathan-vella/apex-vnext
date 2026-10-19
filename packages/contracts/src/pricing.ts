@@ -138,10 +138,10 @@ const PriceRecordSchema = Type.Object(
 
 const ProvenanceSchema = Type.Object(
   {
-    provider: Type.Literal("azure-resource-manager-mcp"),
+    provider: Type.Literal("azure-mcp-server"),
     endpointId: IdentifierSchema,
     toolName: IdentifierSchema,
-    toolVersion: Type.String({ pattern: "^[0-9]+(?:\\.[0-9]+){1,3}(?:-[0-9A-Za-z.-]+)?$", maxLength: 32 }),
+    toolVersion: Type.String({ pattern: "^3\\.[0-9]+\\.[0-9]+$", maxLength: 32 }),
     toolchainHash: Sha256Schema,
     toolsListHash: Sha256Schema,
     rawSourceDigest: Sha256Schema,
@@ -177,8 +177,8 @@ export const PricingEvidenceV1Schema = Type.Object(
           status: Type.Literal("matched"),
           records: Type.Array(PriceRecordSchema, { minItems: 1, maxItems: 256 }),
           totalAmount: Type.Number({ minimum: 0, maximum: 1_000_000_000_000 }),
+          sourceRowCount: Type.Integer({ minimum: 1, maximum: 5000 }),
           paginationStatus: Type.Union([Type.Literal("complete"), Type.Literal("partial")]),
-          continuationCursorHash: Type.Optional(Sha256Schema),
           bulk: Type.Optional(
             Type.Object(
               {
@@ -409,9 +409,8 @@ function validatePricingEvidence(
   const firstRecord = matchedResult.records[0];
   if (firstRecord === undefined) return false;
   const paginationValid =
-    matchedResult.paginationStatus === "complete"
-      ? matchedResult.continuationCursorHash === undefined
-      : matchedResult.continuationCursorHash !== undefined;
+    matchedResult.records.length <= matchedResult.sourceRowCount &&
+    (matchedResult.sourceRowCount < 5000 || matchedResult.paginationStatus === "partial");
   const bulkSpecIds = request.bulkItems?.map(({ specId }) => specId) ?? [];
   const bulkRecordIds = matchedResult.records.flatMap(({ specId }) => (specId === undefined ? [] : [specId]));
   const bulkFailureIds = matchedResult.bulk?.partialFailures.map(({ specId }) => specId) ?? [];

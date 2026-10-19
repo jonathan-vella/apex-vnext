@@ -1,5 +1,5 @@
-> MCP names in this reference are upstream pseudo-interfaces, not current vNext tool registrations.
-> Use only capabilities projected by the active task; unavailable tools are blockers, never substitutes.
+> Managed Azure reads use verified `apex-azure` namespaces and actual command schemas.
+> Other provider examples are conditional; absent tools never grant mutation or hook-bypass authority.
 
 <!-- ref:region-availability-v1 -->
 
@@ -27,7 +27,11 @@
 
 | Tool                  | Purpose                                                                                                                   |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `mcp_azure-mcp_quota` | Check Azure region availability and quota by setting `command` to `quota_usage_check` or `quota_region_availability_list` |
+| `apex-azure/quota` | Verified commands `quota_usage_check` or `quota_region_availability_list`; include bounded `intent` and `parameters` |
+
+Both commands require `parameters["resource-types"]` as a comma-separated string and the approved `subscription`.
+`quota_usage_check` also requires `region`. Schema-only discovery is `{intent: "", learn: true}` without
+command/parameters. These observations do not prove allocation capacity or replace native preflight.
 
 ---
 
@@ -69,13 +73,13 @@
 
 ### Azure Kubernetes Service (AKS)
 
-It has limited quota in some regions, to get available regions with enough quota, use `mcp_azure-mcp_quota` tool.
+For regional/quota observations use verified `apex-azure/quota` reads; they do not prove allocation capacity.
 
 ---
 
 ### Azure Database for PostgreSQL
 
-It has limited quota in some regions, to get available regions with enough quota, use `mcp_azure-mcp_quota` tool.
+For regional/quota observations use verified `apex-azure/quota` reads; they do not prove allocation capacity.
 
 ---
 

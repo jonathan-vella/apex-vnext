@@ -245,6 +245,16 @@ export const CostLineItemV1Schema = Type.Object(
         uri: NonEmptyStringSchema,
         retrievedAt: IsoDateTimeSchema,
         priceId: Type.Optional(NonEmptyStringSchema),
+        azureMcp: Type.Optional(
+          Type.Object(
+            {
+              toolVersion: Type.String({ pattern: "^3\\.[0-9]+\\.[0-9]+$" }),
+              returnedRowCount: Type.Integer({ minimum: 1, maximum: 5000 }),
+              paginationStatus: Type.Union([Type.Literal("complete"), Type.Literal("partial")]),
+            },
+            { additionalProperties: false },
+          ),
+        ),
       },
       { additionalProperties: false },
     ),
@@ -820,6 +830,20 @@ export function hasValidCostArithmetic(estimate: CostEstimateV1): boolean {
   );
   const lineTotal = estimate.lineItems.reduce((total, line) => total + line.monthlyCost, 0);
   return linesAreValid && arithmeticEqual(estimate.totalMonthlyCost, lineTotal);
+}
+
+export function hasValidCostPricingSources(estimate: CostEstimateV1): boolean {
+  return estimate.lineItems.every(({ source }) => {
+    if (/^(?:microsoft )?(?:arm mcp|azure[- ]resource[- ]manager[- ]mcp)$/iu.test(source.provider)) return false;
+    const isAzureMcp = /^azure[- ]mcp(?:[- ]server)?$/iu.test(source.provider);
+    if (!isAzureMcp) return source.azureMcp === undefined;
+    return (
+      source.azureMcp !== undefined &&
+      source.azureMcp.returnedRowCount < 5000 &&
+      source.azureMcp.paginationStatus === "complete" &&
+      source.priceId !== undefined
+    );
+  });
 }
 
 export function hasOnlyTypedSecretReferences(inputs: EnvironmentInputsV1): boolean {

@@ -1252,7 +1252,7 @@ test("architecture task waits for a kernel-owned decision and resumes the issued
           quantity: 1,
           attemptedAt: (context.outputTemplates["cost-estimate"] as { unpricedItems: Array<{ attemptedAt: string }> })
             .unpricedItems[0]!.attemptedAt,
-          reason: "A well-scoped ARM MCP query returned no matching retail row.",
+          reason: "A well-scoped Azure MCP pricing query returned no matching retail row.",
         },
       ],
     );
@@ -1287,7 +1287,7 @@ test("architecture task waits for a kernel-owned decision and resumes the issued
         sku: "caller sku",
         quantity: 1,
         attemptedAt: "2026-01-01T00:00:00.000Z",
-        reason: "Well-scoped ARM MCP query returned no matching retail row.",
+        reason: "Well-scoped Azure MCP pricing query returned no matching retail row.",
       },
     ];
     const manifest = workloadDecisionManifest({
@@ -1337,8 +1337,39 @@ test("architecture task waits for a kernel-owned decision and resumes the issued
         manifest,
         [],
       ),
-      architectureProblem(/Current ARM MCP pricing evidence is required/u),
+      architectureProblem(/Current Azure MCP pricing evidence is required/u),
     );
+    for (const paginationStatus of ["complete", "partial"] as const) {
+      const capped = structuredClone(partialCost);
+      capped.lineItems[0]!.source = {
+        provider: "Azure MCP Server",
+        uri: "https://prices.azure.com/api/retail/prices",
+        retrievedAt: "2026-01-01T00:00:00.000Z",
+        priceId: "compute-hour",
+        azureMcp: { toolVersion: "3.0.0", returnedRowCount: 5000, paginationStatus },
+      };
+      await assert.rejects(
+        service.completeArchitecture(issued.task.taskId, architectureValue, capped, manifest, []),
+        architectureProblem(/complete source metadata below the 5000-row cap/u),
+      );
+    }
+    const missingMetadata = structuredClone(partialCost);
+    missingMetadata.lineItems[0]!.source.provider = "Azure MCP Server";
+    await assert.rejects(
+      service.completeArchitecture(issued.task.taskId, architectureValue, missingMetadata, manifest, []),
+      architectureProblem(/Azure MCP priced lines require/u),
+    );
+    partialCost.lineItems[0]!.source = {
+      provider: "Azure MCP Server",
+      uri: "https://prices.azure.com/api/retail/prices",
+      retrievedAt: "2026-01-01T00:00:00.000Z",
+      priceId: "compute-hour",
+      azureMcp: {
+        toolVersion: "3.0.0",
+        returnedRowCount: 4999,
+        paginationStatus: "complete",
+      },
+    };
     const designed = new Set(architectureValue.components.flatMap(({ resourceTypes }) => resourceTypes));
     const findings = (await governanceFindings(service, issued.task.taskId)) as Array<
       GovernanceFindingProjection & { resourceTypes: string[] }
@@ -1487,13 +1518,14 @@ test("architecture task waits for a kernel-owned decision and resumes the issued
     const store = new ObjectStore(service.root);
     const storedCost = await store.getJson<{
       pricingStatus: string;
-      lineItems: Array<{ sku: string }>;
+      lineItems: Array<{ sku: string; source: { azureMcp?: { returnedRowCount: number } } }>;
       unpricedItems: Array<{ service: string; sku: string }>;
     }>(completed.outputHashes["cost-estimate"]!);
     const storedManifest = await store.getJson<{ requirementTraceability: Array<{ requirementId: string }> }>(
       completed.outputHashes["workload-decision-manifest"]!,
     );
     assert.equal(storedCost.lineItems[0]?.sku, "test");
+    assert.equal(storedCost.lineItems[0]?.source.azureMcp?.returnedRowCount, 4999);
     assert.equal(storedCost.pricingStatus, "partial");
     assert.deepEqual(
       storedCost.unpricedItems.map(({ service, sku }) => ({ service, sku })),

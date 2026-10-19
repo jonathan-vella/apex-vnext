@@ -10,6 +10,7 @@ import { pathToFileURL } from "node:url";
 import test from "node:test";
 import { load as loadYaml } from "js-yaml";
 import { renderClientAgentProjection } from "../../../packages/cli/scripts/prepare-assets.mjs";
+import { azureLaunchErrors } from "../../scripts/_lib/mcp-contracts.mjs";
 import {
   buildReviewPrompt,
   loadReviewCaptures,
@@ -109,12 +110,13 @@ test("plugin layout, manifests, agents, skills and bundle are valid", async (con
 
   const mcp = await readJson(join(outputDirectory, "mcp.json"));
   validateMcpJson(mcp, manifest);
-  assert.deepEqual(Object.keys(mcp.mcpServers), ["apex", "apex-azure-pricing"]);
+  assert.deepEqual(Object.keys(mcp.mcpServers), ["apex", "apex-azure", "apex-azure-cost"]);
+  assert.deepEqual(azureLaunchErrors(mcp.mcpServers["apex-azure"]), []);
   assert.deepEqual(mcp.mcpServers.apex, { type: "stdio", command: "node", args: ["${PLUGIN_ROOT}/mcp/apex.mjs"] });
-  assert.deepEqual(mcp.mcpServers["apex-azure-pricing"], {
+  assert.deepEqual(mcp.mcpServers["apex-azure-cost"], {
     type: "streamable-http",
     url: "https://mcp.management.azure.com",
-    headers: { "x-mcp-toolset": "CostManagement,Pricing" },
+    headers: { "x-mcp-toolset": "CostManagement" },
   });
   const entry = mcp.mcpServers.apex.args[0].replace("${PLUGIN_ROOT}/", "");
   assert.ok((await stat(join(outputDirectory, entry))).isFile(), "MCP entry exists in the package");
@@ -190,7 +192,7 @@ test("plugin layout, manifests, agents, skills and bundle are valid", async (con
   assert.deepEqual(
     Object.fromEntries(Object.entries(hooks.hooks).map(([event, entries]) => [event, entries.map((e) => e.matcher)])),
     {
-      preToolUse: ["task|Task|Agent|.*apex[-_]azure[-_]pricing.*", "apex-.*|apex/.*|mcp__apex__.*"],
+      preToolUse: ["task|Task|Agent|.*apex[-_]azure.*", "apex-.*|apex/.*|mcp__apex__.*"],
       postToolUse: ["task|Task|Agent"],
       postToolUseFailure: [undefined],
       subagentStart: ["rubber-duck"],
@@ -204,14 +206,16 @@ test("plugin layout, manifests, agents, skills and bundle are valid", async (con
     }
   const [hook] = hooks.hooks.preToolUse;
   assert.equal(hook.type, "command");
-  assert.equal(hook.matcher, "task|Task|Agent|.*apex[-_]azure[-_]pricing.*");
+  assert.equal(hook.matcher, "task|Task|Agent|.*apex[-_]azure.*");
   const matcher = new RegExp(`^(?:${hook.matcher})$`, "u");
   for (const name of [
     "task",
     "Task",
     "Agent",
-    "apex-azure-pricing-create_budget",
-    "mcp__apex_azure_pricing__get_budget",
+    "apex-azure-cost-create_budget",
+    "mcp__apex_azure_cost__get_budget",
+    "apex-azure-pricing",
+    "mcp_apex_azure_documentation",
   ])
     assert.ok(matcher.test(name), name);
   for (const name of ["bash", "view", "apex-status", "tasks", "agent"]) assert.ok(!matcher.test(name), name);
@@ -294,17 +298,12 @@ test("plugin agents and skills carry the guidance the retired workspace copies c
     "apex/reconcile",
     "apex/inventory",
     "apex/diagnose",
-    "apex-azure-pricing/get_retail_prices",
-    "apex-azure-pricing/query_costs",
-    "apex-azure-pricing/query_aks_costs",
-    "apex-azure-pricing/forecast_costs",
-    "apex-azure-pricing/list_dimensions",
-    "apex-azure-pricing/list_budgets",
-    "apex-azure-pricing/get_budget",
-    "apex-azure-pricing/list_alerts",
-    "apex-azure-pricing/list_benefit_utilization",
-    "apex-azure-pricing/get_benefit_recommendations",
-    "apex-azure-pricing/list_reservation_transactions",
+    ...Object.keys((await readJson(join(root, "tools/registry/azure-mcp.v1.json"))).namespaces).map(
+      (tool) => `apex-azure/${tool}`,
+    ),
+    ...(
+      await readJson(join(root, "tools/registry/arm-mcp-cost-pricing.v1.json"))
+    ).managedPolicy.candidateReadAllowlist.map((tool) => `apex-azure-cost/${tool}`),
   ]);
   assert.doesNotMatch(apexAgent, /vscode\/askQuestions|handoffs:|agents:/u);
   assert.match(apexAgent, /## Client Mechanics/u);
@@ -325,7 +324,7 @@ test("plugin agents and skills carry the guidance the retired workspace copies c
   assert.match(apexNext, /^name: apex-next$/mu);
   assert.match(apexNext, /No `\/agent` switching/u);
   assert.match(await skill("apex-planning", "SKILL.md"), /kernel derives the canonical intent hash/u);
-  assert.match(await skill("apex-architecture", "SKILL.md"), /`apex-azure-pricing\/get_retail_prices`/u);
+  assert.match(await skill("apex-architecture", "SKILL.md"), /`apex-azure\/pricing`/u);
   assert.match(await skill("apex-azure-defaults", "references", "security-baseline.md"), /Core Controls/u);
   assert.match(
     await skill("apex-artifacts", "templates", "requirements.md"),
@@ -541,11 +540,11 @@ test("packaged hook commands run end to end through bash and PowerShell", async 
     }
     const registry = await readJson(join(root, "tools/registry/arm-mcp-cost-pricing.v1.json"));
     for (const tool of registry.managedPolicy.candidateReadAllowlist) {
-      const allowed = invoke(pricingPayload(`apex-azure-pricing-${tool}`));
+      const allowed = invoke(pricingPayload(`apex-azure-cost-${tool}`));
       assert.equal(allowed.status, 0, `${shell.name}: ${allowed.stderr}`);
       assert.equal(allowed.stdout.trim(), "", `${shell.name} allows read tool ${tool}`);
     }
-    for (const toolName of ["apex-azure-pricing-create_budget", "apex-azure-pricing-start_pricesheet_download"]) {
+    for (const toolName of ["apex-azure-cost-create_budget", "apex-azure-cost-start_pricesheet_download"]) {
       const denied = invoke(pricingPayload(toolName));
       assert.equal(denied.status, 0, `${shell.name}: ${denied.stderr}`);
       assert.deepEqual(
@@ -553,8 +552,8 @@ test("packaged hook commands run end to end through bash and PowerShell", async 
         {
           permissionDecision: "deny",
           permissionDecisionReason:
-            `APEX hook: "${toolName}" is not one of the read-only Azure pricing and cost tools. APEX uses only ` +
-            "read-only tools from the apex-azure-pricing server; write, operation and unrecognized tools on it are " +
+            `APEX hook: "${toolName}" is not one of the read-only Azure cost tools. APEX uses only ` +
+            "read-only tools from the apex-azure-cost server; write, operation and unrecognized tools on it are " +
             "blocked.",
         },
         shell.name,

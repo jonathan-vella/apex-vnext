@@ -7,47 +7,86 @@ runtime. `apex mcp serve` runs the same server over standard input/output from t
 Do not register it as a second MCP server in a client that already loads the plugin; one APEX server per session
 avoids duplicate tools and independent state.
 
-The `apex` plugin also declares `apex-azure-pricing`, the remote Azure Resource Manager MCP server with the
-`CostManagement` and `Pricing` toolsets. Agents reference its tools as `apex-azure-pricing/<tool>`. A managed
-`preToolUse` hook allows only the read-only tools in `managedPolicy.candidateReadAllowlist` of
-[`arm-mcp-cost-pricing.v1.json`](../../tools/registry/arm-mcp-cost-pricing.v1.json) and denies writes such as
-`create_budget`, operation tools and unknown tools on that server.
+## Azure MCP Server 3
 
-**This is the complete current MCP tool-provider surface.** APEX does not currently ship a general official Azure
-MCP Server (`@azure/mcp`) dependency. Imported skill references to `mcp_azure-mcp_*` tool names describe external
-usage patterns only and do not themselves grant tool access in this repository.
+[DECISION-038](../vnext/DECISIONS.md#decision-038-introduce-azure-mcp-server-3-as-a-managed-azure-tool-provider)
+and [CP-31](https://github.com/jonathan-vella/apex-vnext/issues/489) introduce three separate server identities.
+**IMPLEMENTED LOCAL; focused checks pass, integration qualification pending.**
+This is not a release or supported-client/live qualification claim.
 
-## Planned: Azure MCP Server 3
+| Server            | Provider                                                         | Managed role                                                                                    |
+| ----------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `apex`            | Bundled APEX MCP                                                 | Kernel-authorized workflow, evidence, reviews, gates and execution                              |
+| `apex-azure`      | Official `@azure/mcp@3.0.0`, namespace mode, `--read-only`       | Verified general Azure reads, metadata, diagnostics, documentation, guidance and retail pricing |
+| `apex-azure-cost` | Remote `https://mcp.management.azure.com`, `CostManagement` only | Ten existing ARM cost, forecast, budget, alert and commitment reads                             |
 
-[DECISION-038](../vnext/DECISIONS.md#decision-038-introduce-azure-mcp-server-3-as-a-managed-azure-tool-provider-planned)
-and [CP-31](https://github.com/jonathan-vella/apex-vnext/issues/489) plan to add the official Azure MCP Server
-(upstream GA `3.0.0`, commit `61715e6a9054d7922809b01e08a2efa85e032a6d`) as a separate, additional managed tool
-provider alongside APEX MCP and `apex-azure-pricing`. **None of the following is implemented yet**; it is the
-recorded target, not current behavior:
+The foreground APEX agent has explicit grants for the 44 verified namespace/direct tools in
+[`azure-mcp.v1.json`](../../tools/registry/azure-mcp.v1.json), including the actual `documentation` proxy, quota,
+policy, compute, monitoring and service guidance. Hidden workers do not receive broad Azure grants. The managed hook
+checks commands and parameters against the curated registry, not just namespace names or read-only annotations.
+Storage/Cosmos access is metadata-only; Deploy exposes guidance/log reads only. Secret values, app settings,
+data-plane content, local installers/extensions, file exports, inference/SRE workflows and unverified `azd`, `arm`
+and `foundry` proxies are excluded. A basic AKS namespace grant is not a separate AKS provider grant.
 
-- **Role.** A general Azure discovery/configuration/resource-query, diagnostics/health/logs, service/IaC-guidance and
-  retail-pricing provider for the foreground APEX agent — not a pricing-only server, and not a replacement for APEX's
-  own `@modelcontextprotocol/server` v2 SDK (DECISION-034), which is a separate product and dependency axis.
-- **Footprint.** Namespace mode is the initial tool-footprint _candidate_; real tool/namespace schemas must be
-  discovered against actual GA `3.0.0` server output before any grant is finalized. Conditional or proxied
-  capabilities (quota, policy) need individual availability validation — no invented tool names or assumed universal
-  availability. `--read-only` and explicit grants are the expected posture; tool annotations are not authorization,
-  and kernel authority for Azure state-changing operations is unaffected.
-- **Pricing migration.** Retail pricing moves from this document's `apex-azure-pricing` `Pricing` toolset
-  (`get_retail_prices`) to Azure MCP's pricing capability (`pricing_get` in GA source; the `azmcp_` documentation
-  prefix needs confirmation against the real `tools/list` name). The GA tool silently caps results at 5,000 rows with
-  no continuation or completeness field — a capped response must never be reported as complete. `include-savings-plan`
-  is a Consumption-nested option, not a `price-type` value.
-  The ten ARM MCP `CostManagement` read tools above are retained unchanged under their own identity; this is not a
-  pricing-only server migration.
-- **Version policy.** Track stable `3.x` through existing dependency automation, but execute and record an exact
-  tested `3.y.z` in a tracked dependency manifest; no floating `@azure/mcp@latest`/`@3`/`@3.x` runtime dependency and
-  no custom update/version-attestation service. A new major requires a separate explicit decision.
-- **Dependency lifecycle.** An `npx`-launched Azure MCP Server may download/cache platform packages on cold install.
-  This is a separate, explicitly documented external dependency lifecycle — it does not change or weaken APEX's own
-  bundled-plugin offline-startup guarantee (`CLIENT-029`). Per-client (Windows VS Code/Copilot app, Linux/WSL2 Copilot
-  CLI) discovery, schema and permission checks remain required before any qualification claim; public local schema
-  discovery is not itself authorized Azure/client/live execution evidence.
+Namespace schema discovery must use exactly `{intent: "", learn: true}`, with no `command` or `parameters`. Nonempty
+learn intent can execute sampling and is not learn-only. Read calls supply bounded intent, a verified command and its
+actual parameters; direct tools retain their own discovered schema. For example:
+
+```text
+apex-azure/pricing({
+  intent: "price chosen SKU",
+  command: "pricing_get",
+  parameters: {
+    service: "<catalog service>",
+    sku: "<verified SKU>",
+    region: "<billing region>",
+    currency: "<currency>",
+    "price-type": "Consumption",
+    "include-savings-plan": true
+  }
+})
+```
+
+The pricing result has a `prices` collection but no continuation or completeness field. GA `pricing_get` silently
+stops at 5,000 rows: **5,000 or more rows are incomplete evidence**, requiring a narrower query or explicit unpriced
+item, never an accepted priced line or fake zero. Savings-plan rates are nested Consumption data, not a `price-type`.
+Priced-line provenance records provider `Azure MCP Server`, actual `source.uri`, `priceId`, `retrievedAt` and
+`source.azureMcp` containing only the observed stable 3.x `toolVersion`, `returnedRowCount` (1–5000) and
+`paginationStatus` (`complete` or `partial`). A priced line requires count below 5000 and complete status.
+Metadata is declared evidence, not cryptographic attestation; the pricing provider identifier is `azure-mcp-server`. The
+[managed pricing contract](../../customizations/.github/skills/apex-azure-defaults/references/retail-pricing.md)
+owns parameter, meter-selection and evidence rules.
+
+The retained ARM reads are `query_costs`, `query_aks_costs`, `forecast_costs`, `list_dimensions`, `list_budgets`,
+`get_budget`, `list_alerts`, `list_benefit_utilization`, `get_benefit_recommendations` and
+`list_reservation_transactions`, each under `apex-azure-cost/<tool>`. Their read allowlist lives in
+[`arm-mcp-cost-pricing.v1.json`](../../tools/registry/arm-mcp-cost-pricing.v1.json); the historical filename does not
+restore the removed Pricing toolset. Budget writes, price-sheet downloads, operation tools and unknown names are denied.
+
+Stable `3.x` updates use dependency review and focused discovery/schema/grant tests; the executable version is the
+tracked exact `3.0.0`, never floating `latest`, `@3` or `@3.x`. A new major needs an explicit decision. Cold `npx`
+startup may download/cache external platform packages. This lifecycle is separate from APEX's own bundled offline
+startup guarantee (`CLIENT-029`) and needs per-client qualification on native Windows VS Code/Copilot app and
+Linux/WSL2 Copilot CLI. Credential-free local discovery is not authorized Azure/client/live evidence.
+
+APEX's SDK v2 and protocol remain unchanged (DECISION-034). External reads do not accept evidence, approve gates or
+authorize Azure mutations: the kernel and current human approval path remain authoritative.
+
+### Local Verification And CI
+
+- `npm run validate:azure-mcp` checks the exact package, launch configuration, captured schemas and explicit
+  namespace/command policy.
+- `npm run test:azure-mcp` runs policy regressions and
+  [`azure-mcp-capture.test.mjs`](../../tools/tests/vnext/azure-mcp-capture.test.mjs). The capture starts the exact
+  installed platform binary directly, without an npm-wrapper fallback, using isolated `HOME`, `TEMP` and
+  `AZURE_CONFIG_DIR`. It checks the final 44-tool inventory and 41 router schemas through initialization,
+  `tools/list` and exactly `{intent: "", learn: true}` calls, then cleans up. No Azure resource queries,
+  credentials, login or client sessions are required.
+- The repository validator graph has explicit `validate-azure-mcp` and `test-azure-mcp` nodes; both selectors also
+  belong to `validate:_node-core`. The real metadata-only capture is included in `test:vnext-pack` for integration
+  qualification and `test:plugin` for Windows plugin CI.
+- `npm run generate:docs-reference` regenerates the authoritative CLI/MCP inventories; it does not qualify a client,
+  authorize cloud operations or replace the separate human client/live checks.
 
 ## Server Instructions
 

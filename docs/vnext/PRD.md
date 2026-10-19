@@ -236,7 +236,8 @@ ask for confirmation with consequences. Recommendations never record answers or 
 
 Architecture must trace decisions to requirements, pricing, security, operations, performance, reliability and cost
 reasoning. Capture alternatives, consequences and rationale once so downstream documents can reuse them. Agents query
-Microsoft ARM MCP directly through explicit read-only Cost Management and Pricing tool allowlists. Separate unpriced
+official Azure MCP Server through explicit read-only namespace/command allowlists for general Azure observations and
+retail pricing, and Microsoft ARM MCP through a separate CostManagement-only allowlist for actual costs. Separate unpriced
 items from priced totals and retain source dates and uncertainty; never invent prices or confidence.
 
 Scope pricing tools to the roles that need them. Reuse matching rows from bounded current pricing evidence rather than
@@ -248,14 +249,15 @@ failover and capacity details may be described as assumptions or guidance, never
 Policy, security controls and deployment authorization remain binding. Native deployment failures require approved
 corrections, not silent substitutions.
 
-**Planned (not implemented):** [DECISION-038](DECISIONS.md#decision-038-introduce-azure-mcp-server-3-as-a-managed-azure-tool-provider-planned)
-and [CP-31](https://github.com/jonathan-vella/apex-vnext/issues/489) plan to migrate retail pricing from Microsoft ARM
-MCP's `get_retail_prices` to the official Azure MCP Server's pricing capability, while retaining the ten existing ARM
-MCP CostManagement read tools unchanged under their own server identity — no regression to actual costs, forecasts,
-budgets, alerts or commitments. Azure MCP Server is also planned to become a broader discovery/diagnostics/service-
-guidance provider for architecture work, subject to discovered real tool availability; see
-[docs/reference/mcp.md](../reference/mcp.md#planned-azure-mcp-server-3) for current-versus-planned detail. Until that
-migration ships and is qualified, the Microsoft ARM MCP acceptance above governs.
+Under [DECISION-038](DECISIONS.md#decision-038-introduce-azure-mcp-server-3-as-a-managed-azure-tool-provider) and
+[CP-31](https://github.com/jonathan-vella/apex-vnext/issues/489), `apex-azure` is a general Azure read-only provider
+for the foreground agent, not a pricing-only server. Retail pricing uses namespace `pricing`, command `pricing_get`;
+the ten existing ARM CostManagement reads remain unchanged under `apex-azure-cost` with no regression to actual
+costs, forecasts, budgets, alerts or commitments. Preserve observed version/row-count/completeness and actual source
+URI, price ID and retrieval-time provenance; this is declared evidence, not cryptographic attestation.
+A capped response (5,000 or more rows) requires narrowing or an explicit unpriced item, never successful zero-price
+fallback or an accepted priced line. See [MCP providers](../reference/mcp.md#azure-mcp-server-3).
+Local implementation verification and separately authorized per-client/live qualification remain distinct.
 
 ### REQ-GOV-001: Governance And Policy
 
@@ -523,8 +525,8 @@ receipt. Separately authorized maintenance remains bounded by its manifest and h
 The CLI MCP adapter exposes kernel-authorized operations, not a second workflow engine. Under DECISION-034 it uses
 the MCP TypeScript SDK v2 (`@modelcontextprotocol/server`) with a low-level `Server` served by `serveStdio` and
 targets protocol `2026-07-28`, which all supported Copilot clients negotiate. This requirement governs APEX's own
-server only. The planned official Azure MCP Server integration
-([DECISION-038](DECISIONS.md#decision-038-introduce-azure-mcp-server-3-as-a-managed-azure-tool-provider-planned),
+server only. The official Azure MCP Server integration
+([DECISION-038](DECISIONS.md#decision-038-introduce-azure-mcp-server-3-as-a-managed-azure-tool-provider),
 [CP-31](https://github.com/jonathan-vella/apex-vnext/issues/489)) is a separate external tool provider and dependency
 axis; it does not change this SDK, protocol version, or kernel authority, and its own tool contracts and grants are
 tracked by that decision, not by this requirement's acceptance below. Acceptance:

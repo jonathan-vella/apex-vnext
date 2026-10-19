@@ -120,6 +120,7 @@ function resultFor(scenario) {
       },
     ],
     totalAmount: 73,
+    sourceRowCount: 1,
     paginationStatus: "complete",
     ...(scenario.id === "PRICING-003-bulk"
       ? {
@@ -144,10 +145,10 @@ function evidenceFor(request, scenario) {
     requestId: request.requestId,
     requestHash: request.requestId,
     provenance: {
-      provider: "azure-resource-manager-mcp",
-      endpointId: "arm-pricing",
-      toolName: "pricing-read",
-      toolVersion: "1.0.0",
+      provider: "azure-mcp-server",
+      endpointId: "apex-azure",
+      toolName: "pricing_get",
+      toolVersion: "3.0.0",
       toolchainHash: hash("a"),
       toolsListHash: hash("b"),
       rawSourceDigest: hash("c"),
@@ -263,9 +264,13 @@ test("pricing evidence enforces target, disposition, freshness, and scenario sum
   tinyArithmeticDrift.result.records[0].projectedAmount = 0;
   tinyArithmeticDrift.result.totalAmount = 0;
   assert.equal(hasValidPricingEvidence(retailRequest, rehashEvidence(tinyArithmeticDrift), evaluatedAt), false);
-  const partialWithoutContinuation = structuredClone(retailEvidence);
-  partialWithoutContinuation.result.paginationStatus = "partial";
-  assert.equal(hasValidPricingEvidence(retailRequest, rehashEvidence(partialWithoutContinuation), evaluatedAt), false);
+  const cappedWithoutContinuation = structuredClone(retailEvidence);
+  cappedWithoutContinuation.result.sourceRowCount = 5000;
+  assert.equal(hasValidPricingEvidence(retailRequest, rehashEvidence(cappedWithoutContinuation), evaluatedAt), false);
+  cappedWithoutContinuation.result.paginationStatus = "partial";
+  assert.equal(hasValidPricingEvidence(retailRequest, rehashEvidence(cappedWithoutContinuation), evaluatedAt), true);
+  cappedWithoutContinuation.result.continuationCursorHash = hash("d");
+  assert.equal(hasValidPricingEvidence(retailRequest, rehashEvidence(cappedWithoutContinuation), evaluatedAt), false);
   const unrelatedRegionalSummary = structuredClone(retailEvidence);
   unrelatedRegionalSummary.result.regionalUnavailable = ["eastus"];
   assert.equal(hasValidPricingEvidence(retailRequest, rehashEvidence(unrelatedRegionalSummary), evaluatedAt), false);
@@ -321,7 +326,6 @@ test("pricing evidence enforces target, disposition, freshness, and scenario sum
   );
   const validPartial = structuredClone(retailEvidence);
   validPartial.result.paginationStatus = "partial";
-  validPartial.result.continuationCursorHash = hash("d");
   assert.equal(hasValidPricingEvidence(retailRequest, rehashEvidence(validPartial), evaluatedAt), true);
   const dateOnly = structuredClone(retailEvidence);
   dateOnly.collectedAt = "2026-07-29";
@@ -366,6 +370,26 @@ test("pricing evidence enforces target, disposition, freshness, and scenario sum
   hourlyMisprojection.result.records[0].projectedAmount = 73 * 730;
   hourlyMisprojection.result.totalAmount = 73 * 730;
   assert.equal(hasValidPricingEvidence(commitmentRequest, rehashEvidence(hourlyMisprojection), evaluatedAt), false);
+});
+
+test("savings-plan hourly pricing is normalized separately from reservation totals", () => {
+  const scenario = registry.scenarios.find(({ id }) => id === "PRICING-005-commitments");
+  const original = requestFor(scenario.id);
+  const { requestId: _requestId, ...content } = original;
+  content.commitment = { kind: "savings-plan", termMonths: 12, priceBasis: "hourly" };
+  const request = { ...content, requestId: calculatePricingRequestId(content) };
+  const evidence = evidenceFor(request, scenario);
+  const record = evidence.result.records[0];
+  record.priceType = "savings-plan";
+  record.commitment = { kind: "savings-plan", termMonths: 12, priceBasis: "hourly" };
+  record.unitPrice = 0.05;
+  record.projectedAmount = 36.5;
+  record.uncertainty.lowerAmount = 36.5;
+  record.uncertainty.upperAmount = 36.5;
+  evidence.result.totalAmount = 36.5;
+  assert.equal(hasValidPricingEvidence(request, rehashEvidence(evidence), "2026-07-29T08:30:00.000Z"), true);
+  record.currency = "EUR";
+  assert.equal(hasValidPricingEvidence(request, rehashEvidence(evidence), "2026-07-29T08:30:00.000Z"), false);
 });
 
 test("registry rejects incomplete replacement, raw payload permission, and negotiated defaults", () => {

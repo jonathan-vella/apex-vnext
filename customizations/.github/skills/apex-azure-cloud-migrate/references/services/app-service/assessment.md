@@ -152,7 +152,8 @@ Use the active task's allowed artifact and acceptance contract; do not write an 
 - [ ] Hand off to apex-azure-prepare for IaC generation
 ```
 
-> 💡 **Tip:** Use `mcp_azure-mcp_get_azure_bestpractices` tool to learn App Service best practices for the comparison.
+> Use `apex-azure/get_azure_bestpractices` with a bounded intent, `get_azure_bestpractices_get` and
+> `{resource: "general", action: "all"}` parameters; use `apex-azure/documentation` for App Service-specific guidance.
 
 ## Port Source
 

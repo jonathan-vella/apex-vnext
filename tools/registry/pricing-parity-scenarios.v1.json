@@ -1,13 +1,13 @@
 {
   "$schema": "schemas/pricing-parity-scenarios.schema.json",
   "schemaVersion": "1.0.0",
-  "currentAuthority": "azure-resource-manager-mcp",
+  "currentAuthority": "azure-mcp-server",
   "replacementStatus": "complete",
   "scenarios": [
     {
       "id": "PRICING-001-retail",
       "capability": "retail-lookup",
-      "sourceOwners": ["azure-resource-manager-mcp/get_retail_prices"],
+      "sourceOwners": ["apex-azure/pricing:pricing_get"],
       "expectedDisposition": "matched",
       "requiredSemantics": ["currency", "meter-id", "pagination-status", "price-id", "price-type"],
       "arithmeticPredicate": "unit-price-only",
@@ -16,7 +16,7 @@
     {
       "id": "PRICING-002-meter-aware",
       "capability": "meter-aware-projection",
-      "sourceOwners": ["agent-arithmetic", "azure-resource-manager-mcp/get_retail_prices"],
+      "sourceOwners": ["agent-arithmetic", "apex-azure/pricing:pricing_get"],
       "expectedDisposition": "matched",
       "requiredSemantics": ["meter-id", "unit-dimension", "unit-quantity", "usage-quantity"],
       "arithmeticPredicate": "projected-amount-equals-unit-price-times-usage-over-unit-quantity",
@@ -25,7 +25,7 @@
     {
       "id": "PRICING-003-bulk",
       "capability": "bulk-estimate",
-      "sourceOwners": ["agent-aggregation", "azure-resource-manager-mcp/get_retail_prices"],
+      "sourceOwners": ["agent-aggregation", "apex-azure/pricing:pricing_get"],
       "expectedDisposition": "matched",
       "requiredSemantics": ["deduplicated-specs", "line-items", "partial-failures", "reconciled-total"],
       "arithmeticPredicate": "total-equals-line-item-sum",
@@ -34,7 +34,7 @@
     {
       "id": "PRICING-004-regional",
       "capability": "regional-comparison",
-      "sourceOwners": ["agent-comparison", "azure-resource-manager-mcp/get_retail_prices"],
+      "sourceOwners": ["agent-comparison", "apex-azure/pricing:pricing_get"],
       "expectedDisposition": "matched",
       "requiredSemantics": ["currency", "meter-id", "per-region-unavailability", "price-type", "sku"],
       "arithmeticPredicate": "comparable-meter-basis",
@@ -43,7 +43,7 @@
     {
       "id": "PRICING-005-commitments",
       "capability": "commitment-pricing",
-      "sourceOwners": ["agent-arithmetic", "azure-resource-manager-mcp/get_retail_prices"],
+      "sourceOwners": ["agent-arithmetic", "apex-azure/pricing:pricing_get"],
       "expectedDisposition": "matched",
       "requiredSemantics": ["commitment-kind", "term-months", "total-versus-hourly", "unit-price"],
       "arithmeticPredicate": "commitment-term-bound",
@@ -52,10 +52,7 @@
     {
       "id": "PRICING-006-negotiated",
       "capability": "negotiated-pricing",
-      "sourceOwners": [
-        "azure-resource-manager-mcp/get_pricesheet_status",
-        "azure-resource-manager-mcp/start_pricesheet_download"
-      ],
+      "sourceOwners": ["unavailable:attested-negotiated-pricing"],
       "expectedDisposition": "unavailable",
       "requiredSemantics": ["attested-price-sheet", "negotiated-price-unavailable", "source-digest"],
       "arithmeticPredicate": "no-default-discount-substitution",
@@ -64,7 +61,7 @@
     {
       "id": "PRICING-007-ambiguity",
       "capability": "ambiguity",
-      "sourceOwners": ["azure-resource-manager-mcp/get_retail_prices"],
+      "sourceOwners": ["apex-azure/pricing:pricing_get"],
       "expectedDisposition": "ambiguous",
       "requiredSemantics": ["candidate-ids", "next-action-code", "reason-code"],
       "arithmeticPredicate": "no-first-result-selection",
@@ -73,7 +70,7 @@
     {
       "id": "PRICING-008-uncertainty",
       "capability": "uncertainty",
-      "sourceOwners": ["agent-arithmetic", "azure-resource-manager-mcp/get_retail_prices"],
+      "sourceOwners": ["agent-arithmetic", "apex-azure/pricing:pricing_get"],
       "expectedDisposition": "matched",
       "requiredSemantics": ["confidence", "lower-amount", "reason-codes", "upper-amount"],
       "arithmeticPredicate": "lower-less-than-or-equal-projected-less-than-or-equal-upper",
@@ -82,7 +79,7 @@
     {
       "id": "PRICING-009-throttling",
       "capability": "throttling",
-      "sourceOwners": ["azure-resource-manager-mcp/get_retail_prices"],
+      "sourceOwners": ["apex-azure/pricing:pricing_get"],
       "expectedDisposition": "unavailable",
       "requiredSemantics": ["attempt-count", "reason-throttled", "retry-at"],
       "arithmeticPredicate": "no-stale-success-after-retry-exhaustion",
@@ -91,7 +88,7 @@
     {
       "id": "PRICING-010-provenance",
       "capability": "provenance",
-      "sourceOwners": ["PricingEvidenceV1", "azure-resource-manager-mcp/get_retail_prices"],
+      "sourceOwners": ["PricingEvidenceV1", "apex-azure/pricing:pricing_get"],
       "expectedDisposition": "matched",
       "requiredSemantics": [
         "collection-time",

@@ -68,6 +68,7 @@ import {
   hasOnlyTypedSecretReferences,
   hasValidLiveQualification,
   hasValidCostArithmetic,
+  hasValidCostPricingSources,
   hasValidLogicalResourceReferences,
   hasValidPreviewApprovalBinding,
   calculatePricingEvidenceId,
@@ -1068,10 +1069,10 @@ describe("pricing evidence contracts", () => {
     requestId: request.requestId,
     requestHash: request.requestId,
     provenance: {
-      provider: "azure-resource-manager-mcp",
-      endpointId: "arm-pricing",
-      toolName: "pricing-read",
-      toolVersion: "1.0.0",
+      provider: "azure-mcp-server",
+      endpointId: "apex-azure",
+      toolName: "pricing_get",
+      toolVersion: "3.0.0",
       toolchainHash: hash,
       toolsListHash: otherHash,
       rawSourceDigest: "c".repeat(64),
@@ -1101,6 +1102,7 @@ describe("pricing evidence contracts", () => {
         },
       ],
       totalAmount: 73,
+      sourceRowCount: 1,
       paginationStatus: "complete",
     },
     qualifiesGate: false,
@@ -1126,6 +1128,84 @@ describe("pricing evidence contracts", () => {
     assert.equal(hasValidPricingEvidence(request, badArithmetic, expiry), false);
     assert.equal(Value.Check(PricingEvidenceV1Schema, { ...evidence, rawPayload: {} }), false);
     assert.equal(Value.Check(PricingEvidenceV1Schema, { ...evidence, qualifiesGate: true }), false);
+  });
+
+  it("does not invent a continuation cursor or completeness for a capped Azure MCP response", () => {
+    assert.equal(evidenceContent.result.status, "matched");
+    if (evidenceContent.result.status !== "matched") return;
+    const result = evidenceContent.result;
+    const make = (sourceRowCount: number, paginationStatus: "complete" | "partial"): PricingEvidenceV1 => {
+      const content = {
+        ...evidenceContent,
+        result: { ...result, sourceRowCount, paginationStatus },
+      };
+      return { ...content, evidenceId: calculatePricingEvidenceId(content) };
+    };
+    assert.equal(hasValidPricingEvidence(request, make(4999, "complete"), expiry), true);
+    assert.equal(hasValidPricingEvidence(request, make(5000, "complete"), expiry), false);
+    assert.equal(hasValidPricingEvidence(request, make(5000, "partial"), expiry), true);
+    assert.equal(hasValidPricingEvidence(request, make(5001, "partial"), expiry), false);
+    assert.equal(
+      Value.Check(PricingEvidenceV1Schema, {
+        ...evidence,
+        provenance: { ...evidence.provenance, provider: "azure-resource-manager-mcp" },
+      }),
+      false,
+    );
+  });
+
+  it("requires complete source metadata for Azure MCP cost lines, not just correct arithmetic", () => {
+    const estimate: CostEstimateV1 = {
+      schemaVersion: CONTRACT_VERSION,
+      projectId: request.projectId,
+      runId: request.runId,
+      currency: "USD",
+      pricingDate: "2026-07-13",
+      totalMonthlyCost: 73,
+      assumptions: [],
+      lineItems: [
+        {
+          id: "vm",
+          service: "Virtual Machines",
+          sku: "Standard_D2s_v5",
+          quantity: 1,
+          unitPrice: 0.1,
+          unitsPerMonth: 730,
+          monthlyCost: 73,
+          source: {
+            provider: "Azure MCP Server",
+            uri: "https://prices.azure.com/api/retail/prices",
+            retrievedAt: timestamp,
+            priceId: "compute-hour",
+            azureMcp: { toolVersion: "3.0.0", returnedRowCount: 4999, paginationStatus: "complete" },
+          },
+          uncertainty: {
+            lowerMonthlyCost: 73,
+            upperMonthlyCost: 73,
+            confidence: "high",
+            basis: "Returned retail meter",
+          },
+        },
+      ],
+    };
+    assert.equal(Value.Check(CostEstimateV1Schema, estimate), true);
+    assert.equal(hasValidCostPricingSources(estimate), true);
+    const source = estimate.lineItems[0]!.source;
+    source.azureMcp!.returnedRowCount = 5000;
+    assert.equal(hasValidCostArithmetic(estimate), true);
+    assert.equal(hasValidCostPricingSources(estimate), false);
+    source.azureMcp!.returnedRowCount = 1;
+    source.azureMcp!.paginationStatus = "partial";
+    assert.equal(hasValidCostPricingSources(estimate), false);
+    source.azureMcp!.paginationStatus = "complete";
+    delete source.priceId;
+    assert.equal(hasValidCostPricingSources(estimate), false);
+    delete source.azureMcp;
+    assert.equal(hasValidCostPricingSources(estimate), false);
+    source.provider = "Azure Retail Prices API";
+    assert.equal(hasValidCostPricingSources(estimate), true);
+    source.provider = "ARM MCP";
+    assert.equal(hasValidCostPricingSources(estimate), false);
   });
 });
 

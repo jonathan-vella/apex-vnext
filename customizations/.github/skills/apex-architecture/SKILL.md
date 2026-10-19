@@ -17,8 +17,9 @@ review or task.
 - Requirements and recorded architecture decisions are projected by `apex/taskContext`.
 - Governance findings are accepted or imported before Architecture; Architecture maps policies but does not collect
   baselines.
-- Pricing is retrieved directly through the declared read-only ARM MCP pricing tool. Kernel capability grants do not
-  represent ARM MCP availability.
+- Pricing is retrieved through `apex-azure/pricing` with command `pricing_get`, following the
+  [central pricing contract](../apex-azure-defaults/references/retail-pricing.md). Kernel capability grants do not
+  represent external MCP availability.
 
 ## Workflow
 
@@ -36,10 +37,11 @@ review or task.
 4. Keep identity, networking, diagnostics, recovery, data and lifecycle decisions explicit. For material alternatives,
    include decision records with stable IDs, context, decision, accepted requirement IDs, at least two alternatives,
    consequences, WAF impacts, compliance considerations and implementation notes.
-5. After selecting candidate SKUs, call `apex-azure-pricing/get_retail_prices` directly for every cost line.
+5. After selecting candidate SKUs, call `apex-azure/pricing` with command `pricing_get` for every distinct price query.
    Do not infer pricing unavailability from APEX task grants. A well-scoped no-result query becomes a partial estimate
    and `unpricedItems` entry with attempted timestamp and reason. Never submit synthetic zero prices, placeholders or
-   invented prices through `apex/architectureComplete`.
+   invented prices through `apex/architectureComplete`. A capped (5,000-row) or incomplete query is unpriced, never a
+   successful priced line; retain exact query/version/completeness provenance under the central pricing contract.
 6. Design against accepted governance. Every Architecture component lists the ARM resource types it deploys. Read
    relevant governance findings with `apex/readTaskInput` using the task-context input hash for those designed types.
    Map each applicable finding in `policyMappings` with assignment, definition, reference ID, effect, logical resource,
@@ -74,7 +76,8 @@ review or task.
 ## Boundaries
 
 The kernel is authoritative for accepted requirements, governance completeness, task state, review findings and gates.
-Write only through APEX MCP. ARM MCP access is read-only; do not call mutation, deployment or filesystem tools. Use
+Write only through APEX MCP. Azure MCP and ARM CostManagement access is read-only; do not call mutation, deployment
+or filesystem tools. Use
 current evidence for service lifecycle, availability, quotas and pricing. Generated review files are read-only
 projections of accepted state.
 

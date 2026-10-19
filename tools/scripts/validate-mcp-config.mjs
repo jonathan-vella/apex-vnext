@@ -5,6 +5,7 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { parseJsonc } from "./_lib/parse-jsonc.mjs";
 import { Reporter } from "./_lib/reporter.mjs";
+import { azureLaunchErrors } from "./_lib/mcp-contracts.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -14,7 +15,7 @@ const RETIRED_ASTRO_HOST = "mcp.docs.astro.build";
 const RETIRED_TERRAFORM_EXECUTABLE = "terraform-mcp-server";
 const RETIRED_DRAWIO_EXECUTABLE = "deno";
 const ARM_MCP_ENDPOINT = "https://mcp.management.azure.com";
-const ARM_MCP_TOOLSET = "CostManagement,Pricing";
+const ARM_MCP_TOOLSET = "CostManagement";
 
 function isRetiredAstroEndpoint(value) {
   if (typeof value !== "string") return false;
@@ -66,18 +67,24 @@ export function validateMcpConfig(mcpConfig) {
   }
   if (!servers.github) errors.push("Missing required MCP server: servers.github");
 
-  const armMcp = servers["azure-resource-manager-mcp"];
-  if (!armMcp) errors.push("Missing required MCP server: servers.azure-resource-manager-mcp");
-  else if (armMcp.type !== "http") errors.push('azure-resource-manager-mcp must use type: "http"');
+  const azure = servers["apex-azure"];
+  if (!azure) errors.push("Missing required MCP server: servers.apex-azure");
+  else errors.push(...azureLaunchErrors(azure, { development: true }));
+  const armMcp = servers["apex-azure-cost"];
+  if (!armMcp) errors.push("Missing required MCP server: servers.apex-azure-cost");
+  else if (armMcp.type !== "http") errors.push('apex-azure-cost must use type: "http"');
   else if (armMcp.url !== ARM_MCP_ENDPOINT) {
-    errors.push(`azure-resource-manager-mcp must use the managed endpoint: ${ARM_MCP_ENDPOINT}`);
-  } else if (armMcp.headers?.["x-mcp-toolset"] !== ARM_MCP_TOOLSET) {
-    errors.push(`azure-resource-manager-mcp must enable x-mcp-toolset: ${ARM_MCP_TOOLSET}`);
+    errors.push(`apex-azure-cost must use the managed endpoint: ${ARM_MCP_ENDPOINT}`);
+  } else if (JSON.stringify(armMcp.headers) !== JSON.stringify({ "x-mcp-toolset": ARM_MCP_TOOLSET })) {
+    errors.push(`apex-azure-cost must enable x-mcp-toolset: ${ARM_MCP_TOOLSET}`);
   }
 
   for (const [name, server] of Object.entries(servers)) {
     const serialized = JSON.stringify(server).toLowerCase().replaceAll("\\", "/");
-    if (name.toLowerCase() === "azure-pricing" || serialized.includes("azure_pricing_mcp")) {
+    if (
+      ["azure-pricing", "apex-azure-pricing", "azure-resource-manager-mcp"].includes(name.toLowerCase()) ||
+      serialized.includes("azure_pricing_mcp")
+    ) {
       errors.push(`Retired custom Azure Pricing MCP server must not be active: servers.${name}`);
     }
     if (name === "astro-docs" || isRetiredAstroEndpoint(server?.url)) {
@@ -121,8 +128,8 @@ function main() {
   r.tick();
   if (mcpConfig?.servers?.github) r.ok("MCP config includes required server: github");
   r.tick();
-  if (hasServerMap && !errors.some((error) => error.includes("azure-resource-manager-mcp"))) {
-    r.ok("MCP config includes Microsoft ARM MCP with Cost Management and Pricing");
+  if (hasServerMap && !errors.some((error) => error.includes("apex-azure"))) {
+    r.ok("MCP config includes official Azure MCP and ARM Cost Management-only");
   }
   r.tick();
   if (hasServerMap && !errors.some((error) => error.startsWith("Retired custom Azure Pricing MCP"))) {

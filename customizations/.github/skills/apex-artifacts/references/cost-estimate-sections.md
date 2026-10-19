@@ -19,7 +19,7 @@ Rules and enforcement live in the instruction file and templates.
 **Generated**: {YYYY-MM-DD}
 **Region**: {primary-region}
 **Environment**: {Production|Staging|Development}
-**MCP Tools Used**: {get_retail_prices, query_costs, forecast_costs}
+**MCP Tools Used**: {actual tools and commands used, e.g. apex-azure/pricing (pricing_get), apex-azure-cost/query_costs}
 **Architecture Reference**: {relative link to assessment doc}
 ```
 

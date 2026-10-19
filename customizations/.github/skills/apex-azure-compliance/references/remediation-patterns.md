@@ -411,10 +411,8 @@ foreach ($sa in $storageAccounts) {
 After the routed change deploys, re-run the azqr scan (a read-only operation, see
 [Azure Quick Review](azure-quick-review.md)) to confirm the findings are resolved:
 
-```text
-mcp_azure-mcp_extension_azqr
-  subscription: <subscription-id>
-```
+The managed MCP allowlist excludes the local-write azqr extension. Request a separately authorized scan report for the
+same subscription; do not invent a tool alias or bypass the restriction with a shell invocation.
 
 ## Additional Resources
 
