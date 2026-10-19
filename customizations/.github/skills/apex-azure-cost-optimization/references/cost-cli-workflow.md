@@ -1,8 +1,9 @@
 # Cost CLI Workflow
 
 Azure CLI procedure for cost optimization, ported from the upstream `workflow-steps.md`, `detailed-workflow-steps.md`,
-`tools-and-safety.md`, `azure-redis.md` and `best-practices-notes.md`. The `apex-azure-pricing` tools stay first for
-cost, forecast and price evidence; the CLI covers what they do not expose (inventory, utilization metrics, Redis
+`tools-and-safety.md`, `azure-redis.md` and `best-practices-notes.md`. The `apex-azure-cost` tools stay first for
+cost and forecast evidence; `apex-azure/pricing` (`pricing_get`) supplies retail prices. The CLI covers other
+observations (inventory, utilization metrics, Redis
 listings) and serves as a fallback when a required tool operation is unavailable.
 
 ## Command Routing
@@ -20,7 +21,8 @@ Read output is an observation. A finding still cites labeled evidence (see
 
 - Azure CLI signed in for the intended tenant (`az login`).
 - Azure CLI extensions `costmanagement` and `resource-graph`.
-- Azure Quick Review (azqr) for orphan discovery, through the Azure MCP server's azqr tool or the azqr CLI.
+- Separately authorized Azure Quick Review (azqr) observations for orphan discovery. Managed Azure MCP does not expose
+  the local-write azqr extension; an absent scan is a coverage gap, not permission to install or run it from APEX.
 - Roles: Cost Management Reader, Monitoring Reader, and Reader on the subscription or resource group.
 
 ```powershell
@@ -32,7 +34,8 @@ azqr version
 
 ## Tool Preference
 
-Use the `apex-azure-pricing` tools first. When a required operation is unavailable, use the matching fallback API through
+Use `apex-azure-cost` for Cost Management and `apex-azure/pricing` for retail prices first. When a required cost
+operation is unavailable, use the matching fallback API through
 the already signed-in Azure CLI (`az rest`) or Azure PowerShell (`Invoke-AzRestMethod`). Prefer a native command when it
 exposes the required fields. Do not fall back for invalid input, denied access, throttling or empty data.
 
@@ -41,7 +44,7 @@ exposes the required fields. Do not fall back for invalid input, denied access, 
 | Historical cost | Cost Management Query API |
 | Existing-scope forecast | Cost Management Forecast API |
 | AKS cost | Cost Management Query API for Kubernetes cost data |
-| Public SKU or meter price | Azure Retail Prices API |
+| Public SKU or meter price | No managed fallback; record missing or incomplete Azure MCP pricing as unpriced |
 | Resource inventory or changes | Azure Resource Graph Resources API |
 | Utilization metrics | Azure Monitor Metrics API |
 
@@ -77,11 +80,9 @@ never in an assessment.
 Run azqr against the approved scope to find orphan candidates (unattached disks, unused NICs, idle NAT gateways),
 over-provisioned settings (excessive retention, oversized SKUs) and missing cost tags. The scan is read-only.
 
-```text
-mcp_azure-mcp_extension_azqr
-  subscription: <subscription-id>
-  resource-group: <optional-rg-name>
-```
+The azqr MCP extension is unavailable in the managed allowlist because it writes local reports. Request separately
+produced observations for the same subscription/resource-group scope; do not invent an MCP replacement or bypass the
+hook through a shell.
 
 An azqr result is a candidate list, not savings evidence.
 
@@ -100,7 +101,7 @@ az resource list --subscription "<SUBSCRIPTION_ID>" --resource-group "<RESOURCE_
 
 ## Step 4: Query Actual Costs
 
-Query the last 30 days with `apex-azure-pricing/query_costs` first: `from` and `to` as `YYYY-MM-DD`, no time
+Query the last 30 days with `apex-azure-cost/query_costs` first: `from` and `to` as `YYYY-MM-DD`, no time
 granularity, grouped by `ResourceId`, `top` up to 5000, at subscription or resource-group scope. Label partial results.
 
 Only when `query_costs` is unavailable, use the Cost Management Query API. Create a unique run-owned scratch directory,
@@ -153,7 +154,7 @@ Keep the query and response as the audit trail for the evidence the task submits
 
 ## Step 5: Validate Pricing
 
-Validate unit prices with `apex-azure-pricing/get_retail_prices`, following the retail pricing guidance in
+Validate unit prices with `apex-azure/pricing`, command `pricing_get`, following the retail pricing guidance in
 `apex-azure-defaults`. Record the query parameters and the returned meter. Pricing pages are human references, not price
 evidence. Check free allowances; many services have free tiers that explain a zero cost.
 

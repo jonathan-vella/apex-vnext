@@ -6,10 +6,10 @@ function validConfig() {
   return {
     servers: {
       github: { type: "http", url: "https://api.githubcopilot.com/mcp/" },
-      "azure-resource-manager-mcp": {
+      "apex-azure-cost": {
         type: "http",
         url: "https://mcp.management.azure.com",
-        headers: { "x-mcp-toolset": "CostManagement,Pricing" },
+        headers: { "x-mcp-toolset": "CostManagement" },
       },
     },
   };
@@ -17,6 +17,82 @@ function validConfig() {
 
 test("accepts the active MCP contract without Astro", () => {
   assert.deepEqual(validateMcpConfig(validConfig()), []);
+});
+
+test("developer workspace rejects standalone Azure namespaces and tools even with --read-only", () => {
+  for (const [namespace, excludedCommand] of [
+    ["appservice", "appservice_webapp_settings_get-appsettings"],
+    ["azureterraform", "azureterraform_aztfexport_resource"],
+  ]) {
+    for (const selection of [
+      ["--namespace", namespace],
+      ["--tool", excludedCommand],
+    ]) {
+      const config = validConfig();
+      config.servers["apex-azure"] = {
+        type: "stdio",
+        command: "node",
+        args: ["${workspaceFolder}/node_modules/@azure/mcp/index.js", "server", "start", "--read-only", ...selection],
+      };
+      assert.deepEqual(
+        validateMcpConfig(config),
+        [
+          "Unguarded developer Azure MCP launch must not be active: servers.apex-azure; use the registry-guarded APEX plugin",
+        ],
+        excludedCommand,
+      );
+    }
+  }
+});
+
+test("renaming an official Azure MCP launch does not bypass developer workspace rejection", () => {
+  for (const server of [
+    {
+      type: "stdio",
+      command: "node",
+      args: ["${workspaceFolder}/node_modules/@azure/mcp/index.js", "server", "start"],
+    },
+    { type: "stdio", command: "npx", args: ["--yes", "@azure/mcp@3.0.0", "server", "start", "--read-only"] },
+    { type: "stdio", command: "azmcp", args: ["server", "start", "--read-only"] },
+    { type: "stdio", command: "C:\\tools\\azmcp.exe", args: ["server", "start", "--read-only"] },
+  ]) {
+    const config = validConfig();
+    config.servers.renamed = server;
+    assert.deepEqual(validateMcpConfig(config), [
+      "Unguarded developer Azure MCP launch must not be active: servers.renamed; use the registry-guarded APEX plugin",
+    ]);
+  }
+});
+
+test("Windows Node, native and npx launches cannot expose excluded commands under renamed servers", () => {
+  for (const excludedCommand of ["appservice_webapp_settings_get-appsettings", "azureterraform_aztfexport_resource"]) {
+    for (const [command, prefix] of [
+      ["node", ["C:\\repo\\node_modules\\@azure\\mcp\\index.js"]],
+      ["C:\\Program Files\\nodejs\\node.exe", ["C:\\repo\\node_modules\\@azure\\mcp\\index.js"]],
+      ["node", ["C:/repo/node_modules/@azure/mcp/index.js"]],
+      ["node", ["C:\\repo\\NODE_MODULES\\@AZURE\\MCP\\index.js"]],
+      ["node", ["\\\\buildhost\\repo\\node_modules\\@azure\\mcp\\index.js"]],
+      ["node", ["C:\\repo\\node_modules\\@azure\\\\mcp\\index.js"]],
+      ["C:\\tools\\azmcp.exe", []],
+      ["C:\\repo\\node_modules\\@azure\\mcp-win32-x64\\dist\\azmcp.exe", []],
+      ["npx.cmd", ["--yes", "@azure/mcp@3.0.0"]],
+      ["C:\\Program Files\\nodejs\\npx.cmd", ["--yes", "@azure/mcp@3.0.0"]],
+    ]) {
+      const config = validConfig();
+      config.servers.renamed = {
+        type: "stdio",
+        command,
+        args: [...prefix, "server", "start", "--read-only", "--tool", excludedCommand],
+      };
+      assert.deepEqual(
+        validateMcpConfig(JSON.parse(JSON.stringify(config))),
+        [
+          "Unguarded developer Azure MCP launch must not be active: servers.renamed; use the registry-guarded APEX plugin",
+        ],
+        `${command}: ${excludedCommand}`,
+      );
+    }
+  }
 });
 
 test("rejects Astro by legacy key or retired URL under another key", () => {
@@ -66,11 +142,11 @@ test("rejects Terraform MCP by key, executable, source, path, or toolset signatu
 
 test("requires GitHub and Microsoft ARM MCP", () => {
   const config = validConfig();
-  delete config.servers["azure-resource-manager-mcp"];
+  delete config.servers["apex-azure-cost"];
   delete config.servers.github;
   assert.deepEqual(validateMcpConfig(config), [
     "Missing required MCP server: servers.github",
-    "Missing required MCP server: servers.azure-resource-manager-mcp",
+    "Missing required MCP server: servers.apex-azure-cost",
   ]);
 });
 
@@ -104,16 +180,14 @@ test("rejects Draw.io server by key, executable signature, or embedded source pa
 
 test("rejects ARM MCP endpoint or toolset drift and custom pricing reactivation", () => {
   const wrongEndpoint = validConfig();
-  wrongEndpoint.servers["azure-resource-manager-mcp"].url = "https://example.invalid";
+  wrongEndpoint.servers["apex-azure-cost"].url = "https://example.invalid";
   assert.deepEqual(validateMcpConfig(wrongEndpoint), [
-    "azure-resource-manager-mcp must use the managed endpoint: https://mcp.management.azure.com",
+    "apex-azure-cost must use the managed endpoint: https://mcp.management.azure.com",
   ]);
 
   const wrongToolset = validConfig();
-  wrongToolset.servers["azure-resource-manager-mcp"].headers["x-mcp-toolset"] = "Pricing";
-  assert.deepEqual(validateMcpConfig(wrongToolset), [
-    "azure-resource-manager-mcp must enable x-mcp-toolset: CostManagement,Pricing",
-  ]);
+  wrongToolset.servers["apex-azure-cost"].headers["x-mcp-toolset"] = "Pricing";
+  assert.deepEqual(validateMcpConfig(wrongToolset), ["apex-azure-cost must enable x-mcp-toolset: CostManagement"]);
 
   const retired = validConfig();
   retired.servers.legacy = { type: "stdio", command: "python", args: ["-m", "azure_pricing_mcp"] };

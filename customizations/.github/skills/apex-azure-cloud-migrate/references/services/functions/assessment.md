@@ -164,8 +164,8 @@ The following upstream headings preserve useful assessment fields. They are not 
 - [ ] Hand off to apex-azure-prepare for IaC generation
 ```
 
-> 💡 **Tip:** Use `mcp_azure-mcp_get_azure_bestpractices` tool to learn Azure Functions project structure best practices
-> for the comparison.
+> Use `apex-azure/get_azure_bestpractices` with a bounded intent, command `get_azure_bestpractices_get` and
+> parameters `{resource: "azurefunctions", action: "all"}` for the comparison.
 
 ## Port Source
 

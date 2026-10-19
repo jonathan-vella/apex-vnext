@@ -35,6 +35,10 @@ updates:
   # ─── npm: repo root (validators, lint tooling) ─────────────────────────────
   - package-ecosystem: "npm"
     directory: "/"
+    versioning-strategy: increase
+    ignore:
+      - dependency-name: "@azure/mcp"
+        versions: [">=4.0.0"]
     schedule:
       interval: "weekly"
       day: "tuesday"

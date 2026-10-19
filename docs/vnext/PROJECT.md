@@ -96,18 +96,27 @@ Pending branch changes must be separated by relevance before integration: retain
 where needed for the active clients; park desktop-only runtime changes and evidence without deleting or shipping them
 as an implied support promise. Do not reset the dirty branch or overwrite prior test workspaces.
 
-### Azure MCP Server 3 Planning (2026-10-19)
+### Azure MCP Server 3 Local Implementation (2026-10-19)
 
-The maintainer recorded [DECISION-038](DECISIONS.md#decision-038-introduce-azure-mcp-server-3-as-a-managed-azure-tool-provider-planned)
+The maintainer recorded [DECISION-038](DECISIONS.md#decision-038-introduce-azure-mcp-server-3-as-a-managed-azure-tool-provider)
 and opened [CP-31](https://github.com/jonathan-vella/apex-vnext/issues/489), tracked under the client pivot
 [epic #387](https://github.com/jonathan-vella/apex-vnext/issues/387), to introduce the official Azure MCP Server as a
 general managed Azure tool provider, closing the DECISION-014 gap and migrating retail pricing from ARM MCP
 `get_retail_prices` to Azure MCP's pricing capability while preserving all ten ARM MCP CostManagement reads under
-their own server identity. **This is a documentation/planning update only: no server declaration, grant, registry
-change, dependency pin, or pricing migration has shipped.** Next work is tool/schema discovery against real Azure MCP
-Server `3.0.0` output, then an exact version pin, then one coherent implementation PR per the [CP-31
-plan](ROADMAP.md#azure-mcp-server-3-integration-plan-cp-31-planned). See [docs/reference/mcp.md](../reference/mcp.md#planned-azure-mcp-server-3)
-for current-versus-planned tool-provider scope.
+their own server identity. Planning merged in [PR #490](https://github.com/jonathan-vella/apex-vnext/pull/490) at
+`42d82a54`; **IMPLEMENTED LOCAL, focused checks passing**, not release or live qualification. Credential-free real
+`3.0.0` discovery grounds 44 explicit namespace/direct grants and curated read-only command schemas. `apex-azure`
+is the general provider; `apex-azure-cost` retains only ARM CostManagement. Exact pinning, cap-aware pricing provenance,
+hooks, skills and tests move together under the [CP-31 checkpoint](ROADMAP.md#azure-mcp-server-3-integration-cp-31).
+See [MCP providers](../reference/mcp.md#azure-mcp-server-3). The frozen `0.11.0-next.5` candidate evidence remains
+unchanged; per-client/live qualification and release require separate human authorization.
+
+Focused checks and credential-free discovery pass, including 55 skill/guidance/catalog tests and 52 HIGH-fix
+regressions. The `qualify:vnext` validation, workspace-test and validator stages passed; final packaging first failed
+solely on the missing host jq prerequisite. After restoring official jq `1.8.1` with its verified SHA, the
+`test:vnext-pack` rerun passed 131/131. Local qualification stages therefore pass; final-head CI and human
+client/authenticated Azure qualification remain pending. This does not advance the frozen candidate or substitute for
+authorized client evidence.
 
 ### Governance Native Validation Checkpoint
 

@@ -138,8 +138,11 @@ either Bicep or Terraform.
 Authenticate only to the intended subscription and confirm the required role before requesting a real deployment
 preview.
 
-APEX agents use only their explicit read-only ARM pricing and cost tools from the plugin's `apex-azure-pricing`
-server.
+Foreground APEX uses explicit verified reads from the plugin's general `apex-azure` provider and the ten retained
+ARM cost reads from `apex-azure-cost`; hidden workers receive no broad Azure grants. Retail pricing uses
+`apex-azure/pricing`, command `pricing_get`. Azure MCP's cold install/cache lifecycle is external to APEX's bundled
+offline startup guarantee; client/live qualification still requires separate human authorization. See
+[MCP providers](../reference/mcp.md#azure-mcp-server-3).
 
 ## Update Or Remove APEX
 

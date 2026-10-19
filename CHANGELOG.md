@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- CP-31 adds a general read-only Azure MCP Server `3.0.0` provider for foreground APEX, with verified namespace/command
+  grants and cap-aware retail-price provenance; the ten ARM CostManagement reads remain under `apex-azure-cost`.
+  Kernel approvals and APEX SDK v2/protocol are unchanged. Client/live qualification remains separately authorized.
 - Static Web Apps Bicep guidance no longer shows a Key Vault reference in the managed integrated API's application
   settings, which Managed Functions do not resolve; secrets belong on a linked bring-your-own Functions app (Refs #384).
   There is no runtime change.

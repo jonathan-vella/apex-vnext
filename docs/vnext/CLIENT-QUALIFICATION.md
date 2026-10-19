@@ -420,10 +420,10 @@ bootstrap, reload, update, rollback, uninstall, and reinstall scenarios for the 
 CLI projection. Its deterministic evidence is committed; live scenarios remain `not-run` until executed in a clean
 supported profile. Slice 8 retired the profile bootstrap agent scenario with the VS Code Local projection.
 
-## Planned: Azure MCP Server 3 Qualification (Not Yet Scheduled)
+## Azure MCP Server 3 Qualification (Human Authorization Pending)
 
-[DECISION-038](DECISIONS.md#decision-038-introduce-azure-mcp-server-3-as-a-managed-azure-tool-provider-planned) and
-[CP-31](https://github.com/jonathan-vella/apex-vnext/issues/489) plan to add the official Azure MCP Server as a
+[DECISION-038](DECISIONS.md#decision-038-introduce-azure-mcp-server-3-as-a-managed-azure-tool-provider) and
+[CP-31](https://github.com/jonathan-vella/apex-vnext/issues/489) locally implement the official Azure MCP Server as a
 separate managed tool provider. This does not add scenarios to the current candidate binding above, and does not
 retarget the frozen `0.11.0-next.5` evidence recorded there. Once CP-31's implementation PR lands, its own qualification
 will need, per supported client (VS Code Copilot harness and Copilot app on native Windows; Copilot CLI on Linux and
@@ -431,4 +431,8 @@ WSL2): confirmed discovery/negotiation of the real server, its granted tool/name
 registry, read-only enforcement for any non-granted or state-changing tool, and verification that the external
 server's own install/cache lifecycle is documented separately from the `CLIENT-029` bundled-plugin offline-startup
 guarantee. Public local schema discovery alone does not satisfy any of these; only authorized, recorded client runs do.
-No live run, discovery probe, or qualification claim exists yet for this provider.
+Credential-free local `3.0.0` tools/list discovery grounds the registry, not a supported-client qualification claim.
+Local qualification stages pass after restoring the missing jq prerequisite and rerunning packaging; final-head CI
+remains pending. This does not retarget the frozen candidate or satisfy human client/authenticated Azure qualification.
+No authorized client/live run or release is claimed. Verify general `apex-azure` namespace/command permissions and
+all ten retained `apex-azure-cost` reads; preserve APEX SDK v2/protocol and the kernel approval boundary unchanged.

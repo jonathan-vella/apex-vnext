@@ -77,17 +77,22 @@ deprecated.
 The plugin ships `com.github.copilot/hooks/hooks.json`, one dependency-free Node script, `apex-hook.mjs`, and the
 generated read-only APEX tool list `apex-mcp-tools.json`. The first `preToolUse` entry matches the subagent tool
 (`task` in Copilot CLI, `Task` or `Agent` in the VS Code payload format) and the tools of the plugin's
-`apex-azure-pricing` server. Every entry's `bash` command runs
+`apex-azure` and `apex-azure-cost` servers. Every entry's `bash` command runs
 `node "${PLUGIN_ROOT}/com.github.copilot/hooks/..."` and its `powershell` command (Windows PowerShell 5.1 or
 PowerShell 7) runs the same script from `$env:PLUGIN_ROOT`, so paths with spaces stay one argument. The client writes
 the hook payload to stdin; the script denies a `task` call whose `agent_type` names the user-facing APEX agent
-(`apex:apex`, `APEX`) with `permissionDecision: "deny"` and a reason. It also denies every `apex-azure-pricing` tool
-except the read-only pricing and cost tools, because a plugin cannot give a remote MCP server a tool allowlist and the
-server's toolsets include writes such as `create_budget`. Copilot CLI names these tools `apex-azure-pricing-<tool>`; the
-script also reads the `/`, `:`, `mcp__<server>__` and `mcp_<server>_` forms and denies names on that server it cannot
-read. `build-plugin.mjs` embeds the read allowlist from `managedPolicy.candidateReadAllowlist` in
-`tools/registry/arm-mcp-cost-pricing.v1.json`; an unbuilt script allows no pricing tool. Hidden workers such as
-`apex:apex-codegen`, built-in agents and every other tool get no output, so the normal permission flow applies.
+(`apex:apex`, `APEX`) with `permissionDecision: "deny"` and a reason. It denies ARM `apex-azure-cost` tools outside the
+ten-read allowlist, including writes such as `create_budget`, and validates `apex-azure` commands/parameters against
+the verified read-only registry. Copilot CLI names these tools `apex-azure-<namespace>` and `apex-azure-cost-<tool>`;
+the script also recognizes supported separator forms and denies ambiguous/unknown Azure names. `build-plugin.mjs`
+embeds the reviewed Azure/ARM policies from `tools/registry/azure-mcp.v1.json` and
+`tools/registry/arm-mcp-cost-pricing.v1.json`; an unbuilt script permits no Azure operation. Hidden workers have no
+broad Azure grants. Other tools still use the normal permission flow.
+
+`apex-azure` starts exact `@azure/mcp@3.0.0`; a cold `npx` launch may download/cache external platform packages.
+This does not weaken APEX's own bundled offline startup guarantee. Schema-only discovery uses exactly
+`{intent: "", learn: true}` without command/parameters; nonempty learn intent can execute sampling. See
+[MCP providers](../reference/mcp.md#azure-mcp-server-3) for safe reads and qualification boundaries.
 
 The other entries serve [rubber-duck reviews](../reference/mcp.md#rubber-duck-reviews): `postToolUse`, matched on the
 same subagent tool names, saves a kernel-requested rubber-duck answer, `subagentStart`, `subagentStop` and

@@ -44,6 +44,7 @@ import {
   hasOnlyTypedSecretReferences,
   hasValidInputRequestQuestions,
   hasValidCostArithmetic,
+  hasValidCostPricingSources,
   hasValidLogicalResourceReferences,
   hasValidPolicyValidation,
   isGovernanceObservationCurrent,
@@ -5067,15 +5068,21 @@ export class ApexService {
     costEstimate.lineItems.forEach((line, index) => {
       if (
         /\bunpriced\b/iu.test(line.sku) ||
-        line.source.uri.startsWith("urn:apex:arm-mcp:pricing-unavailable") ||
+        /^urn:apex:(?:arm-mcp|azure-mcp):pricing-unavailable/u.test(line.source.uri) ||
         /schema placeholder/iu.test(line.uncertainty.basis)
       )
         issues.push({
           path: `/costEstimate/lineItems/${index}`,
           message:
-            "Current ARM MCP pricing evidence is required; move an unpriced SKU to unpricedItems instead of a placeholder line",
+            "Current Azure MCP pricing evidence is required; move an unpriced SKU to unpricedItems instead of a placeholder line",
         });
     });
+    if (!hasValidCostPricingSources(costEstimate))
+      issues.push({
+        path: "/costEstimate/lineItems",
+        message:
+          "Azure MCP priced lines require a meter priceId, stable 3.x toolVersion and complete source metadata below the 5000-row cap; narrow the query or move the item to unpricedItems",
+      });
     const boundCostEstimate = {
       ...costEstimate,
       projectId: run.projectId,
@@ -9367,7 +9374,17 @@ export class ApexService {
             unitPrice: 0,
             unitsPerMonth: 1,
             monthlyCost: 0,
-            source: { provider: "ARM MCP", uri: "PRICING_SOURCE_URI", retrievedAt: this.clock().toISOString() },
+            source: {
+              provider: "Azure MCP Server",
+              uri: "PRICING_SOURCE_URI",
+              retrievedAt: this.clock().toISOString(),
+              priceId: "METER_ID",
+              azureMcp: {
+                toolVersion: "OBSERVED_STABLE_3_X_VERSION",
+                returnedRowCount: 1,
+                paginationStatus: "complete",
+              },
+            },
             uncertainty: { lowerMonthlyCost: 0, upperMonthlyCost: 0, confidence: "low", basis: "Pricing basis" },
           },
         ],
@@ -9378,7 +9395,7 @@ export class ApexService {
             sku: "SELECTED_SKU",
             quantity: 1,
             attemptedAt: this.clock().toISOString(),
-            reason: "A well-scoped ARM MCP query returned no matching retail row.",
+            reason: "A well-scoped Azure MCP pricing query returned no matching retail row.",
           },
         ],
         totalMonthlyCost: 0,
@@ -10017,6 +10034,13 @@ export class ApexService {
     }
     if (output.kind === "cost-estimate" && !hasValidCostArithmetic(output.value as CostEstimateV1)) {
       throw new ApexError("APEX_VALIDATION", "Cost estimate arithmetic does not reconcile", EXIT_CODES.validation);
+    }
+    if (output.kind === "cost-estimate" && !hasValidCostPricingSources(output.value as CostEstimateV1)) {
+      throw new ApexError(
+        "APEX_VALIDATION",
+        "Azure MCP pricing sources require complete uncapped query metadata and a meter priceId; narrow the query or record an unpriced item",
+        EXIT_CODES.validation,
+      );
     }
     if (
       output.kind === "logical-resource-manifest" &&

@@ -1,6 +1,7 @@
 # Pricing Evidence
 
-Price candidates with `apex-azure-pricing/get_retail_prices`. The general query, empty-result, and meter rules are owned
+Price candidates with `apex-azure/pricing`, command `pricing_get`. The general query, empty-result, and meter rules
+are owned
 by the retail pricing guidance in `apex-azure-defaults`; this reference adds the VM-specific rules. Match region,
 operating system, licensing, price type, meter, currency, and quantity before comparing prices.
 

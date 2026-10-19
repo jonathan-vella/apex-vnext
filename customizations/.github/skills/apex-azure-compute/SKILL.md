@@ -29,7 +29,8 @@ Ask for a missing user-owned input through the kernel input request rather than 
   unclear, a general-purpose family is the first candidate, not an automatic selection.
 - **Verify specifications.** Bind vCPU, memory, disk, accelerator, and Spot support to current documentation evidence
   for the intended region, never to memory.
-- **Price through the read-only tool.** Use `apex-azure-pricing/get_retail_prices`. A scale set adds no charge of its
+- **Price through the read-only tool.** Use `apex-azure/pricing` with command `pricing_get`. A scale set adds no charge
+  of its
   own: estimate per-instance price times the minimum and maximum instance counts.
 - **Commitments are review options.** Reservations or savings plans suit long-lived production capacity; present them
   next to pay-as-you-go, never as the default.
@@ -53,7 +54,7 @@ Ask for a missing user-owned input through the kernel input request rather than 
 
 - **Read and diagnostic** calls (Retail Prices API queries, and listings such as `az vm list-skus` or
   `az vm list-sizes`) may run directly. Their output is an observation; the recommendation still cites accepted
-  evidence, and `apex-azure-pricing/get_retail_prices` stays the price evidence source.
+  evidence, and `apex-azure/pricing` (`pricing_get`) stays the price evidence source under the central pricing contract.
 - **Commands that change Azure** (creating, resizing or scaling VMs and scale sets, autoscale rules) are never run by
   the agent. They reach Azure only through `apex preview`, the current runtime's Gate 4 decision and `apex deploy`
   (Bicep or Terraform). A CI-owned production run with human approval verified before apply is a planned target

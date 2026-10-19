@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.apexops.dev/azure-mcp-v1.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "package",
+    "capture",
+    "routerInputSchema",
+    "namespaces",
+    "exclusions",
+    "policy",
+    "safetyReviews"
+  ],
+  "properties": {
+    "$schema": { "const": "schemas/azure-mcp.schema.json" },
+    "schemaVersion": { "const": "1.0.0" },
+    "package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "binaryVersion"],
+      "properties": {
+        "name": { "const": "@azure/mcp" },
+        "version": { "type": "string", "pattern": "^3\\.\\d+\\.\\d+$" },
+        "binaryVersion": { "type": "string", "pattern": "^3\\.\\d+\\.\\d+\\+[0-9a-f]{40}$" }
+      }
+    },
+    "capture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "transport",
+        "handshakeProtocol",
+        "namespaceToolCount",
+        "allToolCount",
+        "method",
+        "azureOperationsExecuted",
+        "credentialsUsed",
+        "managedLaunch"
+      ],
+      "properties": {
+        "transport": { "const": "stdio" },
+        "handshakeProtocol": { "const": "2025-11-25" },
+        "namespaceToolCount": { "type": "integer", "minimum": 1 },
+        "allToolCount": { "type": "integer", "minimum": 1 },
+        "method": { "const": "tools/list" },
+        "azureOperationsExecuted": { "const": false },
+        "credentialsUsed": { "const": false },
+        "managedLaunch": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "serverVersion",
+            "managedNamespaceToolCount",
+            "managedToolNamesSha256",
+            "pureLearnToolCount",
+            "approvedCommandSchemasMatch"
+          ],
+          "properties": {
+            "serverVersion": { "type": "string", "pattern": "^3\\.\\d+\\.\\d+$" },
+            "managedNamespaceToolCount": { "type": "integer", "minimum": 1 },
+            "managedToolNamesSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "pureLearnToolCount": { "type": "integer", "minimum": 1 },
+            "approvedCommandSchemasMatch": { "const": true }
+          }
+        }
+      }
+    },
+    "routerInputSchema": { "type": "object" },
+    "namespaces": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "pattern": "^[a-z][a-z0-9_]*$" },
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "commands"],
+            "properties": {
+              "kind": { "const": "router" },
+              "commands": {
+                "type": "object",
+                "minProperties": 1,
+                "propertyNames": { "pattern": "^[a-z][a-z0-9_-]*$" },
+                "additionalProperties": { "$ref": "#/$defs/tool" }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "allOf": [
+              { "$ref": "#/$defs/toolFields" },
+              {
+                "properties": { "kind": { "const": "direct" } },
+                "required": ["kind"],
+                "type": "object"
+              }
+            ],
+            "unevaluatedProperties": false
+          }
+        ]
+      }
+    },
+    "exclusions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["commands", "reason"],
+        "properties": {
+          "commands": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+          "reason": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "policy": {
+      "const": {
+        "unknownToolDisposition": "deny-before-transport",
+        "unknownCommandDisposition": "deny-before-transport",
+        "learnOnly": { "intent": "", "learn": true, "command": "absent", "parameters": "absent" }
+      }
+    },
+    "safetyReviews": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["commands", "conclusion", "sourceRevision", "sources"],
+        "properties": {
+          "commands": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+          "conclusion": { "type": "string", "minLength": 1 },
+          "sourceRevision": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+          "sources": { "type": "array", "minItems": 1, "items": { "type": "string", "format": "uri" } }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "toolFields": {
+      "type": "object",
+      "required": ["inputSchema", "annotations", "capturedSchemaSha256"],
+      "properties": {
+        "inputSchema": { "type": "object" },
+        "annotations": { "const": { "readOnlyHint": true, "destructiveHint": false } },
+        "capturedSchemaSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "tool": {
+      "type": "object",
+      "$ref": "#/$defs/toolFields",
+      "unevaluatedProperties": false
+    }
+  }
+}

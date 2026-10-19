@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Validate the canonical ARM pricing replacement parity registry. */
+/** Validate the canonical Azure MCP pricing parity registry. */
 
 import fs from "node:fs";
 import { createHash } from "node:crypto";
@@ -9,7 +9,7 @@ import { PRICING_PARITY_SCENARIO_IDS } from "../../packages/contracts/dist/index
 
 const REGISTRY_PATH = "tools/registry/pricing-parity-scenarios.v1.json";
 const SCHEMA_PATH = "tools/registry/schemas/pricing-parity-scenarios.schema.json";
-const EXPECTED_REGISTRY_SHA256 = "e36012e2de5251f9187cef5e31f26f95e581daa9b223df448b2b3a7a7cf526e4";
+const EXPECTED_REGISTRY_SHA256 = "d257f7341691732fa4626efffda9007a512b41cde550498eca46fc499a9f20e4";
 const EXPECTED = {
   "PRICING-001-retail": ["retail-lookup", "matched", "unit-price-only"],
   "PRICING-002-meter-aware": [
@@ -39,15 +39,19 @@ function canonicalValue(value) {
   return value;
 }
 
+export function pricingParityDigest(registry) {
+  return createHash("sha256")
+    .update(JSON.stringify(canonicalValue(registry)))
+    .digest("hex");
+}
+
 export function validatePricingParity(registry, schema) {
   const errors = [];
   const ajv = new Ajv2020({ allErrors: true, strict: true });
   if (!ajv.validate(schema, registry)) {
     return (ajv.errors ?? []).map(({ instancePath, message }) => `${instancePath || "/"}: ${message}`);
   }
-  const registryHash = createHash("sha256")
-    .update(JSON.stringify(canonicalValue(registry)))
-    .digest("hex");
+  const registryHash = pricingParityDigest(registry);
   if (registryHash !== EXPECTED_REGISTRY_SHA256) {
     errors.push("canonical pricing parity registry content drifted");
   }
@@ -81,6 +85,10 @@ export function validatePricingParity(registry, schema) {
 
 function main() {
   const registry = JSON.parse(fs.readFileSync(REGISTRY_PATH, "utf8"));
+  if (process.argv.includes("--print-digest")) {
+    console.log(pricingParityDigest(registry));
+    return 0;
+  }
   const schema = JSON.parse(fs.readFileSync(SCHEMA_PATH, "utf8"));
   const errors = validatePricingParity(registry, schema);
   for (const error of errors) console.error(`❌ ${REGISTRY_PATH}: ${error}`);

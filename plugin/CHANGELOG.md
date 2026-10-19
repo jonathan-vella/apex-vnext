@@ -12,6 +12,10 @@ When you prepare a release, rename `## [Unreleased]` to the new version.
 
 ### Changed
 
+- Add exact Azure MCP Server `3.0.0` as the general read-only `apex-azure` provider, verified foreground grants and
+  guarded namespace commands; retain all ten ARM cost reads as `apex-azure-cost`. Pricing uses `pricing_get` with
+  explicit cap/provenance guidance. External install/cache and client/live qualification remain separate from APEX's
+  bundled offline startup and kernel approval guarantees.
 - Static Web Apps Bicep guidance no longer shows a Key Vault reference in the managed integrated API's application
   settings, which Managed Functions do not resolve; secrets belong on a linked bring-your-own Functions app.
 

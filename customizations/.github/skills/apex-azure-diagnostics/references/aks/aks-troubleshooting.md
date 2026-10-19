@@ -25,10 +25,10 @@ Primary AKS troubleshooting guide for incidents routed from [../../SKILL.md](../
 
 ## Tool Selection For Diagnostics
 
-When gathering AKS diagnostic evidence, prefer `mcp_azure-mcp_aks`, then the smallest discovered AKS-MCP tool that fits
-the read, then supporting Azure tools such as `mcp_azure-mcp_applens`, `mcp_azure-mcp_monitor`, or
-`mcp_azure-mcp_resourcehealth`. Use raw `az aks` and `kubectl` only when the AKS-MCP surface cannot perform the needed
-check.
+When gathering AKS diagnostic evidence, use the verified basic `apex-azure/aks` namespace, then supporting
+`apex-azure/applens`, `apex-azure/monitor`, or `apex-azure/resourcehealth` reads. Discover exact commands with
+`{intent: "", learn: true}` and no command/parameters. A separate AKS-MCP provider is not granted; missing capability
+is a coverage gap, not permission to invoke Kubernetes mutation tools or bypass the hook with a shell.
 
 When standard diagnostics do not reveal root cause, use **Inspektor Gadget** for real-time, low-level node and pod
 observability (DNS traces, TCP traces, process snapshots, file access traces). See

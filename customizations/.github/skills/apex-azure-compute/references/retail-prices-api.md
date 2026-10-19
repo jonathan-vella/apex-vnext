@@ -4,10 +4,11 @@ Direct Retail Prices API calls for VM pricing, ported from the upstream `retail-
 [Azure Retail Prices API](https://learn.microsoft.com/rest/api/cost-management/retail-prices/azure-retail-prices) is
 unauthenticated and read-only, so these calls may run directly.
 
-`apex-azure-pricing/get_retail_prices` stays the price evidence source for APEX decisions (see
-[pricing evidence](pricing-evidence.md)). Use a direct call only when that tool is unavailable, or to inspect the API
-shape. Label a direct result as a retail price from the direct API with its query and retrieval time; never mix it
-silently with tool results.
+`apex-azure/pricing`, command `pricing_get`, stays the price evidence source for managed APEX decisions (see
+[pricing evidence](pricing-evidence.md) and the [central pricing contract](../../apex-azure-defaults/references/retail-pricing.md)).
+These direct-API examples explain the upstream API shape, not an agent shell/fetch fallback or permission to bypass
+the managed hook. Missing or capped MCP evidence remains explicitly unpriced. Separately authorized direct API
+observations must be labeled with their actual provider, query and retrieval time, never as Azure MCP results.
 
 ## Endpoint
 

@@ -179,6 +179,7 @@
         ".github/skills/apex-azure-defaults/SKILL.md",
         ".github/skills/apex-azure-defaults/references/avm-binding-guidance.md",
         ".github/skills/apex-azure-defaults/references/azure-cli-and-azd.md",
+        ".github/skills/apex-azure-defaults/references/azure-mcp-tools.md",
         ".github/skills/apex-azure-defaults/references/baseline-fallbacks.md",
         ".github/skills/apex-azure-defaults/references/cost-monitoring.md",
         ".github/skills/apex-azure-defaults/references/decision-boundaries.md",

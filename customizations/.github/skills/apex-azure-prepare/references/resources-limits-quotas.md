@@ -1,5 +1,5 @@
-> MCP names in this reference are upstream pseudo-interfaces, not current vNext tool registrations.
-> Use only capabilities projected by the active task; unavailable tools are blockers, never substitutes.
+> Managed Azure reads use verified `apex-azure` namespaces and actual command schemas.
+> Other provider examples are conditional; absent tools never grant mutation or hook-bypass authority.
 
 <!-- ref:resources-limits-quotas-v1 -->
 
@@ -28,7 +28,8 @@ or `Unlimited` values are unknown evidence, not zero, unlimited quota or proof o
 
 Fixed service constraints (cannot be changed).
 
-**Check via**: `mcp_azure-mcp_documentation` with `command: "microsoft_docs_search"` (query the relevant Azure service
+**Check via**: `apex-azure/documentation` with a bounded `intent`, `command: "microsoft_docs_search"` and
+`parameters.query` (query the relevant Azure service
 docs) or the apex-azure-quotas skill
 
 **Examples**: Cosmos DB item size (2 MB), Container Apps HTTP timeout (240s), App Service Free tier deployment slots (0)

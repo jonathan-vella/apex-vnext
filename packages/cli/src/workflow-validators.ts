@@ -9,6 +9,7 @@ import {
   SECRET_FIELD_PATTERN,
   SECRET_VALUE_PATTERN,
   hasValidCostArithmetic,
+  hasValidCostPricingSources,
   isGovernanceObservationCurrent,
   type ApprovalEvidenceV1,
   type ArchitectureAvailabilityV1,
@@ -485,7 +486,10 @@ function wellArchitectedAssessmentComplete(value: unknown): ValidationIssue[] {
 
 function costArithmetic(value: unknown): ValidationIssue[] {
   const estimate = taskContext(value).outputs["cost-estimate"] as CostEstimateV1;
-  return hasValidCostArithmetic(estimate) ? [] : issue("/outputs/cost-estimate", "Cost arithmetic does not reconcile");
+  if (!hasValidCostArithmetic(estimate)) return issue("/outputs/cost-estimate", "Cost arithmetic does not reconcile");
+  return hasValidCostPricingSources(estimate)
+    ? []
+    : issue("/outputs/cost-estimate/lineItems", "Azure MCP pricing requires complete uncapped query metadata");
 }
 
 function workloadDecisionCoverage(value: unknown): ValidationIssue[] {

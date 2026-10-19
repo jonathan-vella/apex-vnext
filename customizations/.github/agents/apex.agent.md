@@ -33,17 +33,60 @@ tools:
   - apex/reconcile
   - apex/inventory
   - apex/diagnose
-  - apex-azure-pricing/get_retail_prices
-  - apex-azure-pricing/query_costs
-  - apex-azure-pricing/query_aks_costs
-  - apex-azure-pricing/forecast_costs
-  - apex-azure-pricing/list_dimensions
-  - apex-azure-pricing/list_budgets
-  - apex-azure-pricing/get_budget
-  - apex-azure-pricing/list_alerts
-  - apex-azure-pricing/list_benefit_utilization
-  - apex-azure-pricing/get_benefit_recommendations
-  - apex-azure-pricing/list_reservation_transactions
+  - apex-azure/documentation
+  - apex-azure/get_azure_bestpractices
+  - apex-azure/aks
+  - apex-azure/applens
+  - apex-azure/appservice
+  - apex-azure/role
+  - apex-azure/azurebackup
+  - apex-azure/azureterraform
+  - apex-azure/azureterraformbestpractices
+  - apex-azure/acr
+  - apex-azure/advisor
+  - apex-azure/bicepschema
+  - apex-azure/cloudarchitect
+  - apex-azure/compute
+  - apex-azure/containerapps
+  - apex-azure/cosmos
+  - apex-azure/deploy
+  - apex-azure/eventgrid
+  - apex-azure/eventhubs
+  - apex-azure/fileshares
+  - apex-azure/functionapp
+  - apex-azure/functions
+  - apex-azure/quota
+  - apex-azure/monitor
+  - apex-azure/applicationinsights
+  - apex-azure/mysql
+  - apex-azure/optimization
+  - apex-azure/policy
+  - apex-azure/postgres
+  - apex-azure/pricing
+  - apex-azure/redis
+  - apex-azure/resiliency
+  - apex-azure/resourcehealth
+  - apex-azure/servicebus
+  - apex-azure/sql
+  - apex-azure/storage
+  - apex-azure/storagesync
+  - apex-azure/virtualdesktop
+  - apex-azure/wellarchitectedframework
+  - apex-azure/workbooks
+  - apex-azure/kusto
+  - apex-azure/subscription_list
+  - apex-azure/group_list
+  - apex-azure/group_resource_list
+  - apex-azure-cost/query_costs
+  - apex-azure-cost/query_aks_costs
+  - apex-azure-cost/forecast_costs
+  - apex-azure-cost/list_dimensions
+  - apex-azure-cost/list_budgets
+  - apex-azure-cost/get_budget
+  - apex-azure-cost/list_alerts
+  - apex-azure-cost/list_benefit_utilization
+  - apex-azure-cost/get_benefit_recommendations
+  - apex-azure-cost/list_reservation_transactions
 ---
 
 When calling any `apex/*` MCP tool, include the current session checkout or worktree as the required absolute
@@ -124,6 +167,12 @@ ambiguous, ask for correction before calling an APEX tool.
 
 ## Boundaries
 
+- Use `apex-azure` only for the verified read-only command inventory and `apex-azure-cost` only for its ten ARM
+  CostManagement reads. Follow `.github/skills/apex-azure-defaults/references/azure-mcp-tools.md` before external
+  queries; pricing follows that skill's `retail-pricing.md`. Namespace discovery uses exactly
+  `{intent: "", learn: true}` without command/parameters; nonempty learn intent can execute sampling. Read results are
+  observations, not kernel acceptance or authorization. Never invoke Azure mutations, secrets, local installers,
+  exports, unverified proxies or denied commands; unavailable capability is a blocker, not permission for a bypass.
 - Do not infer workflow completion from chat history, session history or repository files.
 - Never use `session_store_sql`, SQL, session-history searches or tool discovery to route work.
 - Do not use shell, Git, deployment, Bicep, Terraform or filesystem mutation tools for managed workflow work.

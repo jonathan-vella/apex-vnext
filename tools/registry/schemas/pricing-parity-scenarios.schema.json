@@ -7,7 +7,7 @@
   "properties": {
     "$schema": { "const": "schemas/pricing-parity-scenarios.schema.json" },
     "schemaVersion": { "const": "1.0.0" },
-    "currentAuthority": { "const": "azure-resource-manager-mcp" },
+    "currentAuthority": { "const": "azure-mcp-server" },
     "replacementStatus": { "const": "complete" },
     "scenarios": {
       "type": "array",

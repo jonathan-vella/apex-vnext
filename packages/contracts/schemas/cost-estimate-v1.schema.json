@@ -41,6 +41,38 @@
           "source": {
             "additionalProperties": false,
             "properties": {
+              "azureMcp": {
+                "additionalProperties": false,
+                "properties": {
+                  "paginationStatus": {
+                    "anyOf": [
+                      {
+                        "const": "complete",
+                        "type": "string"
+                      },
+                      {
+                        "const": "partial",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "returnedRowCount": {
+                    "maximum": 5000,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "toolVersion": {
+                    "pattern": "^3\\.[0-9]+\\.[0-9]+$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "toolVersion",
+                  "returnedRowCount",
+                  "paginationStatus"
+                ],
+                "type": "object"
+              },
               "priceId": {
                 "minLength": 1,
                 "type": "string"

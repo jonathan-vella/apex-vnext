@@ -346,11 +346,19 @@ test("managed role projections retain required tools and exclude unrelated grant
         assert.match(content, /apex\/governanceImport/u, label);
       }
       const apexTools = requiredApex[role.id].map((tool) => `apex/${tool}`);
-      const armTools = requiredArm[role.id].map((tool) => `apex-azure-pricing/${tool}`);
+      const armTools = requiredArm[role.id].map((tool) => `apex-azure-cost/${tool}`);
+      const azureRegistry = JSON.parse(await readFile(join(root, "tools/registry/azure-mcp.v1.json"), "utf8"));
+      const azureTools =
+        role.id === "coordinator" ? Object.keys(azureRegistry.namespaces).map((tool) => `apex-azure/${tool}`) : [];
       assert.deepEqual(metadata.tools.filter((tool) => tool.startsWith("apex/")).sort(), apexTools.sort(), label);
       assert.deepEqual(
-        metadata.tools.filter((tool) => tool.startsWith("apex-azure-pricing/")).sort(),
+        metadata.tools.filter((tool) => tool.startsWith("apex-azure-cost/")).sort(),
         armTools.sort(),
+        label,
+      );
+      assert.deepEqual(
+        metadata.tools.filter((tool) => tool.startsWith("apex-azure/")).sort(),
+        azureTools.sort(),
         label,
       );
       const interactive = ["ask_user", "task"];
@@ -387,10 +395,17 @@ test("managed role projections retain required tools and exclude unrelated grant
         webTools[role.id] ?? [],
         `${label}: web tools`,
       );
-      const allowed = new Set([...apexTools, ...armTools, ...interactive, ...nativeRead, ...(webTools[role.id] ?? [])]);
+      const allowed = new Set([
+        ...apexTools,
+        ...armTools,
+        ...azureTools,
+        ...interactive,
+        ...nativeRead,
+        ...(webTools[role.id] ?? []),
+      ]);
       for (const tool of metadata.tools) assert.ok(allowed.has(tool), `${label}: unexpected tool ${tool}`);
       for (const tool of [...arm.managedPolicy.denyBeforeTransport, ...arm.managedPolicy.deferredTools]) {
-        assert.ok(!metadata.tools.includes(`apex-azure-pricing/${tool}`), `${label}: forbidden ARM tool ${tool}`);
+        assert.ok(!metadata.tools.includes(`apex-azure-cost/${tool}`), `${label}: forbidden ARM tool ${tool}`);
       }
       if (role.interactionType === "autonomous-subagent") {
         assert.equal(metadata["user-invocable"], false, label);

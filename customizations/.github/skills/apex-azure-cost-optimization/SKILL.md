@@ -25,13 +25,14 @@ evidence informs findings, and the kernel decides whether a later task may autho
 
 | Question | Evidence |
 | --- | --- |
-| What did we spend, and on what? | `apex-azure-pricing/query_costs`; `query_aks_costs` for AKS cluster or namespace breakdowns |
-| What will we spend? | `apex-azure-pricing/forecast_costs` |
-| What would a different SKU or tier cost? | `apex-azure-pricing/get_retail_prices` |
-| Are commitments used well? | `list_benefit_utilization`, `get_benefit_recommendations`, `list_reservation_transactions` |
+| What did we spend, and on what? | `apex-azure-cost/query_costs`; `apex-azure-cost/query_aks_costs` for AKS cluster or namespace breakdowns |
+| What will we spend? | `apex-azure-cost/forecast_costs` |
+| What would a different SKU or tier cost? | `apex-azure/pricing`, command `pricing_get`, under the [central pricing contract](../apex-azure-defaults/references/retail-pricing.md) |
+| Are commitments used well? | `apex-azure-cost/list_benefit_utilization`, `apex-azure-cost/get_benefit_recommendations`, `apex-azure-cost/list_reservation_transactions` |
 | Where can we save? | The assessment workflow below |
 
-Use the read-only `apex-azure-pricing` tools the active agent declares first, within the limits in
+Use the read-only `apex-azure-cost` tools for spend and commitments and `apex-azure/pricing` for retail prices,
+within the limits in
 [cost tool guardrails](references/cost-tool-guardrails.md). Never call `create_budget` or price-sheet download tools.
 Resource inventory, utilization metrics, Redis listings and advisor recommendations come from the read-only Azure CLI
 commands in [cost CLI workflow](references/cost-cli-workflow.md) and

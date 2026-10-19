@@ -10,8 +10,8 @@ as evidence, and every fix it suggests changes Azure and is routed (see
 - Azure authentication for the intended tenant: Azure CLI (`az login`), or a service principal or managed identity in
   a pipeline.
 - `Reader` at least on the target subscription or management group.
-- azqr, through the Azure MCP server's azqr tool when the client provides it, or the
-  [azqr CLI](https://azure.github.io/azqr/docs/).
+- Separately authorized observations from the [azqr CLI](https://azure.github.io/azqr/docs/). The managed Azure MCP
+  allowlist excludes the azqr extension because it writes local reports; APEX cannot install or invoke it.
 
 ## Step 1: Determine the Scan Scope
 
@@ -26,16 +26,9 @@ Take the scope from the task context; never widen it.
 
 ## Step 2: Run the Scan
 
-With the Azure MCP server's azqr tool:
-
-```text
-mcp_azure-mcp_extension_azqr
-  subscription: <subscription-id>
-  resource-group: <optional-rg-name>
-```
-
-Or run `azqr scan` with the same subscription and resource group scope; see the azqr documentation for the current scope
-flags. Both forms are read-only.
+Request a separately produced `azqr scan` report for the same subscription and resource-group scope; see the azqr
+documentation for its current scope flags. It reads Azure but writes a local workbook, so it is not a managed MCP
+read. Missing producer capability is a coverage gap, never permission for a shell workaround.
 
 ## Step 3: Analyze the Results
 
