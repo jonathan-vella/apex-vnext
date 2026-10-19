@@ -4,15 +4,17 @@
 
 ## Shipped Configuration
 
-| Path                                | Ownership                                                                                |
-| ----------------------------------- | ---------------------------------------------------------------------------------------- |
-| `config/workflow.v1.json`           | Nodes, gates, dependencies, invalidation, and Bicep/Terraform routing                    |
-| `config/defaults.v1.json`           | Security invariants, evidence budgets, task limits, preview TTLs, and telemetry defaults |
-| `config/toolchain.v1.json`          | Supported toolchain selection and client qualification policy                            |
-| `config/capability-packs.v1.json`   | Lazy optional runtime packs and absent behavior                                          |
-| `config/runtime-bundle.v1.json`     | Runtime bundle identity and source composition                                           |
-| `config/quality-scorecard.v1.json`  | Deterministic quality measurements and thresholds                                        |
-| `config/improvement-policy.v1.json` | Bounded observation and proposal policy                                                  |
+| Path                                  | Ownership                                                                                |
+| ------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `config/workflow.v1.json`             | Nodes, gates, dependencies, invalidation, and Bicep/Terraform routing                    |
+| `config/defaults.v1.json`             | Security invariants, evidence budgets, task limits, preview TTLs, and telemetry defaults |
+| `config/governance-reference.v1.json` | Shipped ALZ Corp reference policy baseline for local and pre-baseline discovery          |
+| `config/toolchain.v1.json`            | Supported toolchain selection and client qualification policy                            |
+| `config/capability-packs.v1.json`     | Lazy optional runtime packs and absent behavior                                          |
+| `config/recipe-packs.v1.json`         | Shipped recipe pack declarations and bindings                                            |
+| `config/runtime-bundle.v1.json`       | Runtime bundle identity and source composition                                           |
+| `config/quality-scorecard.v1.json`    | Deterministic quality measurements and thresholds                                        |
+| `config/improvement-policy.v1.json`   | Bounded observation and proposal policy                                                  |
 
 The packaged CLI embeds verified copies under `packages/cli/assets/config/`. Source and packaged assets must match.
 
@@ -24,10 +26,10 @@ shapes, stale evidence, unsafe paths, and unsupported contract versions.
 Important families include project/run state, task envelopes, requirements, architecture, governance, implementation
 intent, IaC binding, previews, approvals, operations, inventory, diagnosis, quality, and evidence manifests.
 
-Requirements intake contracts define the ordered input requests returned before a requirements task. The kernel question
-catalog supplies the round names and questions; the contracts bind their stable IDs, ordinal, total, request identity,
-journal head, owner epoch, and answer shape. See [Maintain requirements intake](../how-to/maintain-requirements-intake.md)
-for change and replay rules.
+Requirements intake contracts define the ordered input requests returned before a requirements task. The kernel
+question catalog supplies the round names and questions; the contracts bind their stable IDs, ordinal, total, request
+identity, journal head, owner epoch, and answer shape. See
+[Maintain requirements intake](../how-to/maintain-requirements-intake.md) for change and replay rules.
 
 ## Project State
 

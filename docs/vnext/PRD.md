@@ -5,13 +5,13 @@ engineering intent into governed Azure workload infrastructure, code, and useful
 It sits between an existing platform landing zone and separately developed application code, and also supports
 standalone single-subscription labs and demos from day one.
 
-Under [DECISION-036](DECISIONS.md#decision-036-deliver-non-production-first-with-purpose-bound-approval), APEX is
-open source and initially delivers non-production workloads. Production is an opt-in capability with separately
-qualified readiness, approval and execution; it is not an installation or initial non-production release prerequisite.
+Under [DECISION-036](DECISIONS.md#decision-036-deliver-non-production-first-with-purpose-bound-approval), APEX is open
+source and initially delivers non-production workloads. Production is an opt-in capability with separately qualified
+readiness, approval and execution; it is not an installation or initial non-production release prerequisite.
 
-The existing TypeScript runtime, npm CLI, and managed Copilot clients are foundations, not reasons to expand the product.
-This document defines the target contract; [PROJECT.md](PROJECT.md) distinguishes implemented behavior from remaining
-work. Updating this plan does not implement new commands or authorize live operations.
+The existing TypeScript runtime, npm CLI, and managed Copilot clients are foundations, not reasons to expand the
+product. This document defines the target contract; [PROJECT.md](PROJECT.md) distinguishes implemented behavior from
+remaining work. Updating this plan does not implement new commands or authorize live operations.
 
 ## Goals
 
@@ -24,7 +24,8 @@ work. Updating this plan does not implement new commands or authorize live opera
 - Keep one authoritative location per fact, reuse existing contracts and parameters, and avoid parallel frameworks.
 - Preserve durable state, human gates, Azure Policy precedence, security, and equivalent Bicep/Terraform outcomes.
 - Reduce non-production approval prompts without removing required validation, reviews or deployment confirmation.
-- Provide reviewable production setup guidance and automation without claiming production support before qualification.
+- Provide reviewable production setup guidance and automation without claiming production support before
+  qualification.
 
 Input efficiency is a design goal. No token baseline, comparative benchmark, new telemetry framework, or claimed
 percentage reduction is required now. Existing correctness and safety checks remain in force.
@@ -50,29 +51,29 @@ do not infer it from subscription count or an environment name such as `dev`.
 
 For non-lab work, missing platform inputs require clarification, not permission to create replacements. Any departure
 from the supplied-resource default must be explicit and policy-compliant. Shared platform resources must not be
-modified or deleted as if workload-owned. Labs do not build an ALZ platform or waive security, policy, cost visibility,
-ownership, or deployment approval. No ALZ does not imply that no Azure Policy is assigned.
+modified or deleted as if workload-owned. Labs do not build an ALZ platform or waive security, policy, cost
+visibility, ownership, or deployment approval. No ALZ does not imply that no Azure Policy is assigned.
 
-APEX does not develop application code or deploy foundation landing zones. It provisions the workload into the assigned
-subscription so the application team can deploy its existing code.
+APEX does not develop application code or deploy foundation landing zones. It provisions the workload into the
+assigned subscription so the application team can deploy its existing code.
 
 ### Deployment Purpose
 
 Deployment purpose is independent of the foundation profiles above. Every run carries a typed `purpose` of `lab`
-(non-production) or `production`. Preselect `lab` for new projects and
-confirm purpose and actual Azure target; do not infer either from a `dev` name, subscription count or repository
-visibility. An ALZ-backed workload may be non-production, and a standalone foundation is not permission for production.
+(non-production) or `production`. Preselect `lab` for new projects and confirm purpose and actual Azure target; do not
+infer either from a `dev` name, subscription count or repository visibility. An ALZ-backed workload may be
+non-production, and a standalone foundation is not permission for production.
 
 | Purpose        | Target experience                                                                                  | Release boundary                                         |
 | -------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
 | Non-production | Confirm workload intent once, retain required reviews/checks, approve the final deployment preview | Initial delivery; no production CI setup required        |
 | Production     | Explicit opt-in, verified setup, CI-owned execution and bound human approval before apply          | Deferred until the new path is implemented and qualified |
 
-Changing purpose or target creates a new purpose-bound run and invalidates affected preview/approval authority.
-Lab approval cannot promote to production. This plan does not synthesize approvals or bypass current controls.
+Changing purpose or target creates a new purpose-bound run and invalidates affected preview/approval authority. Lab
+approval cannot promote to production. This plan does not synthesize approvals or bypass current controls.
 
-Current implementation: `purpose` is a required run field, project and run creation default it to `lab`, and it is part
-of the dependency revision. `production` is a valid contract value but fails closed with a stable error until
+Current implementation: `purpose` is a required run field, project and run creation default it to `lab`, and it is
+part of the dependency revision. `production` is a valid contract value but fails closed with a stable error until
 `REQ-PRODUCTION-001` (CP-28/CP-29) ships. A run's purpose cannot change; promotion keeps it. Gate 1 binds purpose and
 target.
 
@@ -108,105 +109,111 @@ Provide `apex-install` and `apex-bootstrap` terminal entry points with guided Co
 deterministic implementation. These are setup operations, not another infrastructure workflow or source of approval.
 
 `apex-install` starts from a supported host (Windows 11 for VS Code and the Copilot app; Linux or WSL2 Ubuntu for
-Copilot CLI) without assuming Node, npm or APEX exists. Detect missing or incompatible prerequisites for all three supported
-clients and both IaC tracks, show one installation plan, and obtain confirmation before installing prerequisites and
-APEX. Preserve compatible installations; require separate confirmation for incompatible replacement or privileged
-actions. Authentication remains interactive with credentials outside model-visible inputs. Verify installed versions and
-report remaining host or account prerequisites. Installing Windows, WSL or the clients themselves remains outside this
-scope; guide users when the required host setup is absent. No source checkout or devcontainer is required.
+Copilot CLI) without assuming Node, npm or APEX exists. Detect missing or incompatible prerequisites for all three
+supported clients and both IaC tracks, show one installation plan, and obtain confirmation before installing
+prerequisites and APEX. Preserve compatible installations; require separate confirmation for incompatible replacement
+or privileged actions. Authentication remains interactive with credentials outside model-visible inputs. Verify
+installed versions and report remaining host or account prerequisites. Installing Windows, WSL or the clients
+themselves remains outside this scope; guide users when the required host setup is absent. No source checkout or
+devcontainer is required.
 
 `apex-bootstrap` configures new, existing or cloned repositories and writes the thin workspace projection and plugin
-settings that the supported clients install from (`REQ-DIST-001`). Inspect existing state before proposing changes. Ask
-whether to copy from a COE and request its remote repository URL during setup. Permit one or more selected archetypes
-from that remote, pinned to exact commits, as independent workloads in separate folders with separate project state. Do
-not compose their infrastructure automatically. Show differences and obtain confirmation before adopting organization
-defaults or reusable decisions. Existing choices, manual files and unrelated content remain protected; Azure Policy and
-mandatory security constraints stay authoritative.
+settings that the supported clients install from (`REQ-DIST-001`). Inspect existing state before proposing changes.
+Ask whether to copy from a COE and request its remote repository URL during setup. Permit one or more selected
+archetypes from that remote, pinned to exact commits, as independent workloads in separate folders with separate
+project state. Do not compose their infrastructure automatically. Show differences and obtain confirmation before
+adopting organization defaults or reusable decisions. Existing choices, manual files and unrelated content remain
+protected; Azure Policy and mandatory security constraints stay authoritative.
 
 Bootstrap configures the repository, runtime, clients and governance prerequisites without requiring or inventing a
 project ID, project environment, workload target or IaC choice. A configured workspace with zero projects is a valid
 ready-to-start state. Only after setup does the APEX agent gather workload details and create the first project
 through the kernel-owned project operation. Empty-workspace status and health checks must not require a selected run.
 
-Project creation preselects non-production purpose but confirms the workload target; it does not default the independent
-foundation choice. Production setup is optional and follows `REQ-PRODUCTION-001`, not ordinary installation.
+Project creation preselects non-production purpose but confirms the workload target; it does not default the
+independent foundation choice. Production setup is optional and follows `REQ-PRODUCTION-001`, not ordinary
+installation.
 
 After confirming repository identity and workload choices, configure APEX and the selected clients. When no usable
 GitHub remote exists, offer repository creation and a reviewed push, showing owner, visibility and exact changes.
 Default new repositories to private. Never force-push or include unrelated changes implicitly.
 
 For consumer-owned policy discovery, preview the exact GitHub environment, variables, workflow, Azure identity,
-federation and read-only role assignments. Reuse an approved identity or offer creation of a dedicated one after explicit
-confirmation. Keep discovery permissions separate from deployment permissions and use no client secret. Missing rights
-produce actionable administrator steps, not privilege escalation or a false success. Enable and dispatch collection only
-after approval; successful setup includes repository/client health checks and the first policy-baseline review PR.
-That PR means governance review is pending, not deployment readiness. Baseline review, merge and acceptance remain human
-and kernel-controlled. Do not automatically merge the baseline or grant workflow gates.
+federation and read-only role assignments. Reuse an approved identity or offer creation of a dedicated one after
+explicit confirmation. Keep discovery permissions separate from deployment permissions and use no client secret.
+Missing rights produce actionable administrator steps, not privilege escalation or a false success. Enable and
+dispatch collection only after approval; successful setup includes repository/client health checks and the first
+policy-baseline review PR. That PR means governance review is pending, not deployment readiness. Baseline review,
+merge and acceptance remain human and kernel-controlled. Do not automatically merge the baseline or grant workflow
+gates.
 
 When an existing central collector is selected, verify and import its current reviewed baseline, including target
 coverage and freshness, instead of duplicating the collector or identity. Missing or stale evidence leaves governance
-pending. All setup paths report explicit ready, pending or blocked outcomes and resume completed steps without duplicate
-imports, repositories, identities or role assignments. Preserve partial progress and evidence; do not claim success while
-required actions remain pending. Implementing this feature does not itself authorize live Azure or GitHub mutations.
+pending. All setup paths report explicit ready, pending or blocked outcomes and resume completed steps without
+duplicate imports, repositories, identities or role assignments. Preserve partial progress and evidence; do not claim
+success while required actions remain pending. Implementing this feature does not itself authorize live Azure or
+GitHub mutations.
 
 ### REQ-HOST-001: Supported Hosts And Clients
 
 Under DECISION-033, the supported and qualified clients are the VS Code Copilot harness (Agent Host) and the GitHub
-Copilot app on native Windows, and GitHub Copilot CLI on Linux and WSL2. Windows means the latest Windows 11 release and
-the one before it (25H2 and 24H2), or any build where the client reports local sandboxing as supported. Native-Windows
-Copilot CLI and the VS Code Local harness are unsupported; VS Code and the app on macOS or Linux desktop are best effort
-and not qualified. Each workspace uses one host; runs do not move between a Windows client and the WSL CLI.
+Copilot app on native Windows, and GitHub Copilot CLI on Linux and WSL2. Windows means the latest Windows 11 release
+and the one before it (25H2 and 24H2), or any build where the client reports local sandboxing as supported.
+Native-Windows Copilot CLI and the VS Code Local harness are unsupported; VS Code and the app on macOS or Linux
+desktop are best effort and not qualified. Each workspace uses one host; runs do not move between a Windows client and
+the WSL CLI.
 
 Client local sandboxing is a documented prerequisite. APEX assumes it is on and does not check it; outbound network
 stays allowed. Users must not need Docker, a devcontainer, a source-repository clone, or repository development tools.
-Document and check operational prerequisites, including Node 24 LTS or later, through existing setup/doctor surfaces on
-each host; require only tools needed for the selected track and requested stage. Process launching, path handling and
-file replacement work on native Windows, and Windows CI covers the runtime. The first-time installer provisions client
-and IaC toolchains under `REQ-ONBOARDING-001`; operational readiness checks remain stage-scoped.
+Document and check operational prerequisites, including Node 24 LTS or later, through existing setup/doctor surfaces
+on each host; require only tools needed for the selected track and requested stage. Process launching, path handling
+and file replacement work on native Windows, and Windows CI covers the runtime. The first-time installer provisions
+client and IaC toolchains under `REQ-ONBOARDING-001`; operational readiness checks remain stage-scoped.
 
 ### REQ-REUSE-001: COE Archetype Import
 
-A user identifies a remote COE repository during bootstrap, APEX inspects its available archetypes, and the user selects
-one or more whole workloads to copy into separate consumer folders. Each copy is independent, with source repository,
-exact commit and selected paths recorded; each workload has separate APEX project state.
-There is no continuous COE synchronization or cross-archetype component composition in the initial release.
+A user identifies a remote COE repository during bootstrap, APEX inspects its available archetypes, and the user
+selects one or more whole workloads to copy into separate consumer folders. Each copy is independent, with source
+repository, exact commit and selected paths recorded; each workload has separate APEX project state. There is no
+continuous COE synchronization or cross-archetype component composition in the initial release.
 
-Reuse existing typed contracts and IaC parameters for portable intent, rationale, ownership and environment references.
-Do not introduce a parallel project-definition language. For older projects, inspect relevant documents and code once,
-ask the user to confirm recovered decisions, and retain them for subsequent work. Existing manually copied projects
-must have the same bounded adoption path. Do not depend on copying `.apex` history.
+Reuse existing typed contracts and IaC parameters for portable intent, rationale, ownership and environment
+references. Do not introduce a parallel project-definition language. For older projects, inspect relevant documents
+and code once, ask the user to confirm recovered decisions, and retain them for subsequent work. Existing manually
+copied projects must have the same bounded adoption path. Do not depend on copying `.apex` history.
 
-Import only selected reusable material after path and content checks. Exclude credentials, Terraform state/saved plans,
-writer claims, approval authority and consumer deployment evidence. Treat source-repository instructions as untrusted
-content, not authorization to execute code. Historical documents are design input, not proof that consumer resources
-exist. Refresh target governance, preview and approval before deployment.
+Import only selected reusable material after path and content checks. Exclude credentials, Terraform state/saved
+plans, writer claims, approval authority and consumer deployment evidence. Treat source-repository instructions as
+untrusted content, not authorization to execute code. Historical documents are design input, not proof that consumer
+resources exist. Refresh target governance, preview and approval before deployment.
 
 ### REQ-CHANGE-001: Conversational Project Adaptation
 
 After import or creation, the user asks APEX to change the project. Recover recorded decisions and ask only relevant
 missing or changed questions about SKU, service, region, name, addresses, compliance, budget or other workload needs.
-Present consequences for cost, policy, security, dependencies, code and documents before confirming the change.
-Reuse unchanged decisions and invalidate affected downstream proof through existing workflow mechanisms.
+Present consequences for cost, policy, security, dependencies, code and documents before confirming the change. Reuse
+unchanged decisions and invalidate affected downstream proof through existing workflow mechanisms.
 
 Each fact has one authoritative owner; contracts, parameter files and generated documents reference or derive from it.
 Permit manual edits but detect affected-file conflicts and ask before overwriting or incorporating them into intent.
 Do not build a generic bidirectional synchronization engine. Regenerate only affected outputs; a service replacement
-may legitimately affect many files. Preserve unaffected files and user content. Changes never imply deployment approval.
+may legitimately affect many files. Preserve unaffected files and user content. Changes never imply deployment
+approval.
 
 ### REQ-STATE-001: Runtime State And Writer Authority
 
-The runtime must use a hash-linked event journal, atomic persistence, compare-and-swap mutation, one active-writer lease,
-ownership epochs and crash reconciliation. Production CI originates and owns its execution run and preview; reviewed
-authoring intent/source may be supplied, but no developer-to-CI plan, decryption key or writer transfer is required.
-Bind CI authority to repository, workflow/run/attempt, commit, target and expiry. Existing cross-boundary transfer
-remains validated where used in the current qualification path; retain its audit evidence without making it a
+The runtime must use a hash-linked event journal, atomic persistence, compare-and-swap mutation, one active-writer
+lease, ownership epochs and crash reconciliation. Production CI originates and owns its execution run and preview;
+reviewed authoring intent/source may be supplied, but no developer-to-CI plan, decryption key or writer transfer is
+required. Bind CI authority to repository, workflow/run/attempt, commit, target and expiry. Existing cross-boundary
+transfer remains validated where used in the current qualification path; retain its audit evidence without making it a
 production prerequisite.
 
 ### REQ-CONTRACT-001: Persisted Contracts And Compatibility
 
 Persisted data and capability messages must use schema-first versioned contracts with deterministic serialization,
-metadata coverage, strict validation, secret-reference support, upcast policy, and precise refusal of incompatible major
-versions.
+metadata coverage, strict validation, secret-reference support, upcast policy, and precise refusal of incompatible
+major versions.
 
 ### REQ-WORKFLOW-001: Workflow And Gates
 
@@ -214,12 +221,12 @@ A data-only workflow manifest must be routing authority. A run targets one envir
 track and confirmed deployment purpose. Requirements, Architecture and Cost, Implementation Plan, and Deployment
 Preview remain the stage boundaries. For non-production, one confirmed workload intent and final deployment approval
 replace separate Gate 1 through 3 prompts; those stages are readiness checkpoints, not fabricated human decisions.
-Required deterministic validation and reviews remain blocking preconditions. Production execution approval is
-verified in CI under `REQ-APPROVAL-001`; changes and risk decisions still require affected human confirmation.
+Required deterministic validation and reviews remain blocking preconditions. Production execution approval is verified
+in CI under `REQ-APPROVAL-001`; changes and risk decisions still require affected human confirmation.
 
-Retain requirements-review, architecture-review (which also covers the policy map) and plan-review. Each must
-complete against its current subject and required dependencies before the corresponding gate can proceed. Both clients
-must handle `needs_input`, `needs_review` and `task` explicitly; a missing worker is not evidence that a review ran.
+Retain requirements-review, architecture-review (which also covers the policy map) and plan-review. Each must complete
+against its current subject and required dependencies before the corresponding gate can proceed. Both clients must
+handle `needs_input`, `needs_review` and `task` explicitly; a missing worker is not evidence that a review ran.
 
 ### REQ-REQUIREMENTS-001: Requirements And Intent
 
@@ -227,18 +234,19 @@ Requirements capture must use bounded user interaction, preserve unresolved assu
 requirements and SKU intent, and prevent later stages from silently changing approved product intent.
 
 Reuse confirmed intake data without requiring the model to repeat unchanged fields. A bounded amendment path must bind
-the base revision, preserve stable requirement IDs, unknowns, deferrals and ownership, and validate the merged artifact
-through the same completeness, contradiction and traceability checks as full-document submission. Keep full-document
-submission available. Reuse confirmed network intent only when it answers the current Architecture decision; otherwise
-ask for confirmation with consequences. Recommendations never record answers or accept risk without human confirmation.
+the base revision, preserve stable requirement IDs, unknowns, deferrals and ownership, and validate the merged
+artifact through the same completeness, contradiction and traceability checks as full-document submission. Keep
+full-document submission available. Reuse confirmed network intent only when it answers the current Architecture
+decision; otherwise ask for confirmation with consequences. Recommendations never record answers or accept risk
+without human confirmation.
 
 ### REQ-ARCH-001: Architecture, Cost, And Assumptions
 
 Architecture must trace decisions to requirements, pricing, security, operations, performance, reliability and cost
 reasoning. Capture alternatives, consequences and rationale once so downstream documents can reuse them. Agents query
 official Azure MCP Server through explicit read-only namespace/command allowlists for general Azure observations and
-retail pricing, and Microsoft ARM MCP through a separate CostManagement-only allowlist for actual costs. Separate unpriced
-items from priced totals and retain source dates and uncertainty; never invent prices or confidence.
+retail pricing, and Microsoft ARM MCP through a separate CostManagement-only allowlist for actual costs. Separate
+unpriced items from priced totals and retain source dates and uncertainty; never invent prices or confidence.
 
 Scope pricing tools to the roles that need them. Reuse matching rows from bounded current pricing evidence rather than
 querying again per line item. Broader queries require a supported provider interface, bounded responses and exact
@@ -252,34 +260,36 @@ corrections, not silent substitutions.
 Under [DECISION-038](DECISIONS.md#decision-038-introduce-azure-mcp-server-3-as-a-managed-azure-tool-provider) and
 [CP-31](https://github.com/jonathan-vella/apex-vnext/issues/489), `apex-azure` is a general Azure read-only provider
 for the foreground agent, not a pricing-only server. Retail pricing uses namespace `pricing`, command `pricing_get`;
-the ten existing ARM CostManagement reads remain unchanged under `apex-azure-cost` with no regression to actual
-costs, forecasts, budgets, alerts or commitments. Preserve observed version/row-count/completeness and actual source
-URI, price ID and retrieval-time provenance; this is declared evidence, not cryptographic attestation.
-A capped response (5,000 or more rows) requires narrowing or an explicit unpriced item, never successful zero-price
-fallback or an accepted priced line. See [MCP providers](../reference/mcp.md#azure-mcp-server-3).
-Local implementation verification and separately authorized per-client/live qualification remain distinct.
+the ten existing ARM CostManagement reads remain unchanged under `apex-azure-cost` with no regression to actual costs,
+forecasts, budgets, alerts or commitments. Preserve observed version/row-count/completeness and actual source URI,
+price ID and retrieval-time provenance; this is declared evidence, not cryptographic attestation. A capped response
+(5,000 or more rows) requires narrowing or an explicit unpriced item, never successful zero-price fallback or an
+accepted priced line. See [MCP providers](../reference/mcp.md#azure-mcp-server-3). Local implementation verification
+and separately authorized per-client/live qualification remain distinct.
 
 ### REQ-GOV-001: Governance And Policy
 
-Azure Policy always wins in both profiles. Follow [issue #344](https://github.com/jonathan-vella/apex-vnext/issues/344):
-a scheduled/manual GitHub Actions collector exports effective management-group policy, including inheritance and
-exemptions, to one reviewed committed JSON baseline. Resolve the subscription from the run scope, import only its entry.
-Governance discovery runs after Gate 1 and before Architecture ([DECISION-030](DECISIONS.md)); the Architect maps every
-enforcing finding inside Architecture, the Architecture review checks the map, then Gate 2.
+Azure Policy always wins in both profiles. Follow
+[issue #344](https://github.com/jonathan-vella/apex-vnext/issues/344): a scheduled/manual GitHub Actions collector
+exports effective management-group policy, including inheritance and exemptions, to one reviewed committed JSON
+baseline. Resolve the subscription from the run scope, import only its entry. Governance discovery runs after Gate 1
+and before Architecture ([DECISION-030](DECISIONS.md)); the Architect maps every enforcing finding inside
+Architecture, the Architecture review checks the map, then Gate 2.
 
 When no reviewed subscription baseline exists, discovery imports the shipped ALZ Corp reference baseline, generated
 from a pinned Azure Landing Zones Library release (root, landing zones and corp archetypes) in the collector's finding
 format. Local targets always use it. For a subscription target it supports design, pricing and Gate 2 (for example
-pre-sales without Azure access) but cannot authorize planning. After Gate 2 the reviewed subscription baseline replaces
-it; matching mappings carry over, only new or changed findings need Architect decisions, and Gate 2 reopens only for a
-`blocked` conflict. Findings whose resource types match no designed component are marked `not-applicable` by the
-kernel; any other `not-applicable` disposition needs a factual reason.
+pre-sales without Azure access) but cannot authorize planning. After Gate 2 the reviewed subscription baseline
+replaces it; matching mappings carry over, only new or changed findings need Architect decisions, and Gate 2 reopens
+only for a `blocked` conflict. Findings whose resource types match no designed component are marked `not-applicable`
+by the kernel; any other `not-applicable` disposition needs a factual reason.
 
 The consumer repository owns the collection workflow, variables and GitHub Secrets/environment settings. Prefer OIDC
 with a read-only collection identity separate from deployment authority; never commit credentials. Azure remains the
 policy source of truth. The JSON is observed evidence, not a policy override. Include referenced definitions,
-initiative members, effective parameters, inherited and target-scope applicability, exclusions and exemptions; preserve
-unsupported semantics as blockers rather than silently dropping them. No valid target snapshot means no IaC planning.
+initiative members, effective parameters, inherited and target-scope applicability, exclusions and exemptions;
+preserve unsupported semantics as blockers rather than silently dropping them. No valid target snapshot means no IaC
+planning.
 
 Freshness is measured in UTC elapsed time since successful Azure collection: age below 30 days permits reuse; at
 exactly 30 days or older refresh is mandatory before IaC planning or a new deployment approval. Below 30 days show the
@@ -288,53 +298,54 @@ run instead of asking at each stage. Refresh is optional below the threshold, in
 optional refresh does not erase valid prior evidence. Missing, incomplete, future-dated or wrong-scope evidence is
 unusable regardless of age. Legacy collector TTL values cannot shorten or extend this age rule.
 
-A successful unchanged refresh renews collection time, not policy-content identity. Keep observation freshness separate
-from normalized policy-content hashes so timestamp-only renewal does not invalidate approved plans. Material constraint
-changes require reconciliation and affected approval renewal. Native preflight and live Azure enforcement always apply;
-known policy violations cannot be bypassed by choosing a cached snapshot. APEX must reconcile denial or partial outcomes
-without weakening policy. Audit and delayed policy-managed outcomes are not assumed compliant merely because apply succeeds.
+A successful unchanged refresh renews collection time, not policy-content identity. Keep observation freshness
+separate from normalized policy-content hashes so timestamp-only renewal does not invalidate approved plans. Material
+constraint changes require reconciliation and affected approval renewal. Native preflight and live Azure enforcement
+always apply; known policy violations cannot be bypassed by choosing a cached snapshot. APEX must reconcile denial or
+partial outcomes without weakening policy. Audit and delayed policy-managed outcomes are not assumed compliant merely
+because apply succeeds.
 
 Reuse the baseline schema, parser, artifacts, object store, validators and gate. Add only a deterministic importer and
-path-only CLI/MCP operation. Carry Deny, Modify and DeployIfNotExists mappings into planning and code validation; other
-applicable effects need a mapped or explicit disposition. Missing, stale, unmapped or mismatched baseline evidence must
-be surfaced under existing governance checks, never interpreted as no policy.
+path-only CLI/MCP operation. Carry Deny, Modify and DeployIfNotExists mappings into planning and code validation;
+other applicable effects need a mapped or explicit disposition. Missing, stale, unmapped or mismatched baseline
+evidence must be surfaced under existing governance checks, never interpreted as no policy.
 
 The same collector/import contract must represent a standalone subscription's effective policies or an evidenced empty
 result; labs do not require an ALZ hierarchy. The reference baseline is an assumption, not evidence of a consumer's
-policy. No new Governance agent, hidden worker, local live discovery path,
-capability-pack execution, external storage, GitHub artifact delivery or new gate. The full baseline stays outside MCP
-payloads, task/model context and journals. Copied COE policy is not consumer authority. A baseline does not guarantee
-that Azure Policy will remain unchanged at deployment time.
+policy. No new Governance agent, hidden worker, local live discovery path, capability-pack execution, external
+storage, GitHub artifact delivery or new gate. The full baseline stays outside MCP payloads, task/model context and
+journals. Copied COE policy is not consumer authority. A baseline does not guarantee that Azure Policy will remain
+unchanged at deployment time.
 
 ### REQ-PLAN-001: Track-Neutral Planning
 
-Planning must separate implementation intent from Bicep or Terraform binding, maintain an acyclic dependency graph, map
-all requirements and governance constraints, and produce environment inputs without embedding secrets.
+Planning must separate implementation intent from Bicep or Terraform binding, maintain an acyclic dependency graph,
+map all requirements and governance constraints, and produce environment inputs without embedding secrets.
 
 ### REQ-IAC-001: Dual-Track IaC
 
-Bicep and Terraform must derive from the same approved intent, preserve logical resource parity, use exact tool and module
-pins, enforce the security baseline, and pass a thin dual-track proof before broader scenario claims.
+Bicep and Terraform must derive from the same approved intent, preserve logical resource parity, use exact tool and
+module pins, enforce the security baseline, and pass a thin dual-track proof before broader scenario claims.
 
 ### REQ-BICEP-001: Bicep Lifecycle
 
 Bicep preview, apply, inventory, reconciliation, and destroy run only through azd (`azd provision --preview`,
 `azd provision`, `azd down`). Azure Deployment Stacks are out of scope, so there is no stack ownership, deny-settings
-protection or unmanage cleanup. A resource belongs to the azd environment through the `azd-env-name` tag of the approved
-resource group and the kernel's logical-resource manifest; the destroy preview lists the resources Azure reports in
-that group (child resources it omits are deleted with their parents and the approval says so)
-because `azd down` deletes it whole, and the approval binds that list. Each of preview, apply and destroy is its own
-bound operation with its own approval, and APEX never runs `azd up`.
+protection or unmanage cleanup. A resource belongs to the azd environment through the `azd-env-name` tag of the
+approved resource group and the kernel's logical-resource manifest; the destroy preview lists the resources Azure
+reports in that group (child resources it omits are deleted with their parents and the approval says so) because
+`azd down` deletes it whole, and the approval binds that list. Each of preview, apply and destroy is its own bound
+operation with its own approval, and APEX never runs `azd up`.
 
 The Bicep execution path is a bounded azd executor, not a third IaC language. Bind source, resolved parameters,
 environment, azd version and the approved cloud, tenant and subscription to the approved what-if. Hooks and extensions
 are trusted under ALZ guardrails (DECISION-037): they are listed in the preview with a warning that they run with the
-user's credentials and are not described by the what-if, not bound or scanned; production must re-evaluate this. What-if
-remains a prediction against mutable Azure state, not an immutable Terraform plan. Provisioning and approved
+user's credentials and are not described by the what-if, not bound or scanned; production must re-evaluate this.
+What-if remains a prediction against mutable Azure state, not an immutable Terraform plan. Provisioning and approved
 application-package deployment are separate operations. The azd binding contract (`azd-binding-v1`), its deterministic
-project inspection, the exact-version azd prerequisite (a failing doctor check and a fail-closed executor), the identity
-preflight before every provision and destroy, and the azd executor are implemented. Bicep live runs stay unavailable
-until CP-30 qualifies the executor, and `azd deploy` application packages are not available.
+project inspection, the exact-version azd prerequisite (a failing doctor check and a fail-closed executor), the
+identity preflight before every provision and destroy, and the azd executor are implemented. Bicep live runs stay
+unavailable until CP-30 qualifies the executor, and `azd deploy` application packages are not available.
 
 ### REQ-TERRAFORM-001: Terraform Lifecycle
 
@@ -344,20 +355,20 @@ inputs, commit, recipient, and expiry. Use native Terraform CLI rather than azd'
 state locking and do not replan or upgrade dependencies after approval. Production CI apply remains blocked until
 CI-owned runs, protected artifacts and pre-apply human approval verification are implemented and qualified under
 `REQ-PRODUCTION-001` and `REQ-APPROVAL-001`. Native Terraform CLI and provider interfaces remain lifecycle
-authorities; Terraform or Azure MCP tools may
-assist discovery and guidance but cannot own initialization, schemas, state, plans, imports, apply, or destroy.
+authorities; Terraform or Azure MCP tools may assist discovery and guidance but cannot own initialization, schemas,
+state, plans, imports, apply, or destroy.
 
 ### REQ-APPROVAL-001: Preview And Approval Binding
 
 Deployment Preview is the deployment approval ceremony. Approval must bind actor and run identity, target, operation,
-inputs, IaC tree, policy envelope, preview, commit, owner epoch, recipient, and expiry. Stale, substituted, incomplete,
-or rejected evidence must fail closed. The kernel owns acceptance of approval evidence, not its physical location.
-Non-production uses local operation-specific confirmation. Production uses an authenticated human review through a
-supported GitHub approval adapter; the kernel validates its candidate-bound receipt before apply. Bind actual reviewer,
-repository, workflow/run/attempt, source commit, environment, target, operation, preview/plan digest, writer and expiry.
-An OIDC triggering actor, generic PR approval, automated workflow or unbound environment pause is not that receipt.
-Unavailable protection features, missing approval or a changed candidate block production without a lab fallback.
-Current local Gate 4 and qualification-transfer checks remain enforced until the replacement is tested.
+inputs, IaC tree, policy envelope, preview, commit, owner epoch, recipient, and expiry. Stale, substituted,
+incomplete, or rejected evidence must fail closed. The kernel owns acceptance of approval evidence, not its physical
+location. Non-production uses local operation-specific confirmation. Production uses an authenticated human review
+through a supported GitHub approval adapter; the kernel validates its candidate-bound receipt before apply. Bind
+actual reviewer, repository, workflow/run/attempt, source commit, environment, target, operation, preview/plan digest,
+writer and expiry. An OIDC triggering actor, generic PR approval, automated workflow or unbound environment pause is
+not that receipt. Unavailable protection features, missing approval or a changed candidate block production without a
+lab fallback. Current local Gate 4 and qualification-transfer checks remain enforced until the replacement is tested.
 
 ### REQ-PRODUCTION-001: Optional Production Readiness And Setup
 
@@ -367,68 +378,71 @@ read-only, generate reviewable workflow/IaC and operator instructions, apply onl
 then verify ready, missing or blocked outcomes. Missing privileges produce administrator guidance, not escalation.
 
 Check actual consumer repository approval features and branch/environment protection, scoped OIDC trust and role
-assignments, target governance, backend locking/networking and sensitive-artifact access, retention and cleanup.
-Use full-commit-SHA Action pins. Separate setup administration from deployment rights; planning still needs normal
-backend locking permissions. CI-to-CI plans/state require protected encrypted storage and integrity checks, never
-public saved-plan artifacts or committed secrets. Do not assume an open-source tool's consumers have public repositories
-or GitHub plans with identical controls. Successful configuration is not qualification or deployment approval.
+assignments, target governance, backend locking/networking and sensitive-artifact access, retention and cleanup. Use
+full-commit-SHA Action pins. Separate setup administration from deployment rights; planning still needs normal backend
+locking permissions. CI-to-CI plans/state require protected encrypted storage and integrity checks, never public
+saved-plan artifacts or committed secrets. Do not assume an open-source tool's consumers have public repositories or
+GitHub plans with identical controls. Successful configuration is not qualification or deployment approval.
 
 ### REQ-OPS-001: Operations, Promotion, And Diagnosis
 
-Operations must be read-first and journaled. Environment promotion creates a linked run, inherits only unchanged neutral
-gates, refreshes environment-specific preview and approval, and never inherits Gate 4. Diagnosis, reconciliation,
-inventory, and destroy must preserve operation ownership and evidence.
+Operations must be read-first and journaled. Environment promotion creates a linked run, inherits only unchanged
+neutral gates, refreshes environment-specific preview and approval, and never inherits Gate 4. Diagnosis,
+reconciliation, inventory, and destroy must preserve operation ownership and evidence.
 
 ### REQ-QUALITY-001: Quality And Evidence
 
 Retain deterministic validation, evidence hashes, provenance, redaction, restart/fault and cache-correctness checks.
-Use the [Output Quality Reference](#output-quality-reference) for human review of usefulness and completeness.
-Human judgments must be labeled and cannot satisfy deterministic security or deployment gates. No new token baseline
-or token-reduction release gate is required now; existing measurement utilities need not be removed.
+Use the [Output Quality Reference](#output-quality-reference) for human review of usefulness and completeness. Human
+judgments must be labeled and cannot satisfy deterministic security or deployment gates. No new token baseline or
+token-reduction release gate is required now; existing measurement utilities need not be removed.
 
 ### REQ-CAPABILITY-001: Capabilities And Optional Packs
 
 External operations must pass through a versioned capability protocol with grants, roles, expiry, bounded output,
-timeouts, redaction, and safe argv execution. Astro, Terraform, and custom Azure Pricing MCP servers must not be active
-dependencies. Supported clients must connect directly to Microsoft ARM MCP with explicit read-only tool grants; managed
-agents must not receive deployment, budget-write, pricesheet-operation, unknown, or renamed tools. APEX remains the
-authority for workflow state, evidence acceptance, and gates. The target governance path is `REQ-GOV-001`, not
-capability-pack execution. Existing unrelated packs retain their locks and safety boundaries; this plan does not
-authorize their removal or a broader pack framework.
+timeouts, redaction, and safe argv execution. Astro, Terraform, and custom Azure Pricing MCP servers must not be
+active dependencies. Under
+[DECISION-038](DECISIONS.md#decision-038-introduce-azure-mcp-server-3-as-a-managed-azure-tool-provider), supported
+clients connect to the official Azure MCP Server (`apex-azure`, `@azure/mcp@3.0.0`) with explicit read-only
+namespace/command allowlists for general Azure discovery and retail pricing, and directly to Microsoft ARM MCP
+(`apex-azure-cost`) with the ten-tool CostManagement-only allowlist; managed agents must not receive deployment,
+budget-write, pricesheet-operation, unknown, or renamed tools. APEX remains the authority for workflow state, evidence
+acceptance, and gates. The target governance path is `REQ-GOV-001`, not capability-pack execution. Existing unrelated
+packs retain their locks and safety boundaries; this plan does not authorize their removal or a broader pack
+framework.
 
 ### REQ-SECURITY-001: Security And Supply Chain
 
 Agents must not self-approve, deploy models, or bypass kernel authorization. The release must provide least-privilege
-roles, secret and PII redaction, symlink and traversal defenses, immutable dependency pins, release manifest, CycloneDX
-SBOM, provenance, and no high or critical unresolved security finding. The SBOM covers released APEX runtime,
-customization, and capability deliverables; generated IaC projects do not require an SBOM unless their requirements say
-otherwise.
+roles, secret and PII redaction, symlink and traversal defenses, immutable dependency pins, release manifest,
+CycloneDX SBOM, provenance, and no high or critical unresolved security finding. The SBOM covers released APEX
+runtime, customization, and capability deliverables; generated IaC projects do not require an SBOM unless their
+requirements say otherwise.
 
 ### REQ-CUSTOMIZATION-001: Managed Copilot Experiences
 
 APEX ships one plugin under DECISION-033 with one user-facing `APEX` agent (DECISION-032) and the hidden CodeGen and
 Validator workers. Every supported client must produce the same typed workflow outcomes, state and resume behavior,
 authorization decisions, gates and evidence. The VS Code Local projection, `vscode/askQuestions`, handoff frontmatter
-and `.vscode/mcp.json` stay retired. Every client must resolve the kernel-owned `needs_input` contract and record typed
-answers without relying on chat history.
+and `.vscode/mcp.json` stay retired. Every client must resolve the kernel-owned `needs_input` contract and record
+typed answers without relying on chat history.
 
 - The APEX agent asks all human questions in chat with `ask_user`, including the Gate 1 intent confirmation. Guidance
-  never prescribes
-  `ask_user` argument names, because the CLI and the VS Code and app clients use different shapes. When a request needs
-  several values, use the tool's native checkboxes where offered; otherwise present the options numbered in kernel
-  order. The kernel validates the resolved values; confirmation, correction and cancellation follow
+  never prescribes `ask_user` argument names, because the CLI and the VS Code and app clients use different shapes.
+  When a request needs several values, use the tool's native checkboxes where offered; otherwise present the options
+  numbered in kernel order. The kernel validates the resolved values; confirmation, correction and cancellation follow
   [CLIENT-QUALIFICATION](CLIENT-QUALIFICATION.md#multiple-selection-input). The agent uses project values the user
   already stated, asks only for missing ones, and never invents or defaults them.
 - Stage guidance lives in skills the APEX agent loads per kernel task. `apex-next` reads status and the next task and
-  continues in the same agent, without agent switches or scope prompts. It carries the user's requested outcome to
-  the next stop point and stops while a human gate (Gate 1 or Gate 4) is pending; it never prompts for the Gate 2 and 3
+  continues in the same agent, without agent switches or scope prompts. It carries the user's requested outcome to the
+  next stop point and stops while a human gate (Gate 1 or Gate 4) is pending; it never prompts for the Gate 2 and 3
   readiness checkpoints that the kernel records in a lab run.
-- Hidden workers never ask the user questions. Their task prompts carry everything they need, because a subagent cannot
-  see the calling agent's file.
+- Hidden workers never ask the user questions. Their task prompts carry everything they need, because a subagent
+  cannot see the calling agent's file.
 - The built-in `rubber-duck` agent performs the requirements, architecture and plan reviews under DECISION-031, and a
   managed hook captures its output for the kernel. A `preToolUse` hook denies APEX state-changing MCP tools during
-  rubber-duck calls. Other built-in helpers are advisory and never produce kernel
-  evidence, completion or approval. A managed `preToolUse` hook denies the APEX agent as a `task` target.
+  rubber-duck calls. Other built-in helpers are advisory and never produce kernel evidence, completion or approval. A
+  managed `preToolUse` hook denies the APEX agent as a `task` target.
 - Agent files carry no `model`, `model-policy` or `reasoning-effort`; the user selects the session model.
   State-changing MCP tools are safe to call twice with the same input: while the run is unchanged, the kernel answers
   an identical repeat with the original result, and convergent tools that change state outside the run reach the same
@@ -443,8 +457,8 @@ import/change workflows on each supported client.
 **Active again under DECISION-033**; it was deferred on 2026-09-21. The
 [GitHub Copilot app](https://github.com/github/app) on native Windows is a supported client. It installs the APEX
 plugin from the shared Copilot CLI store and runs sessions in app-created git worktrees by default; APEX supports them
-through the explicit workspace path and the shared `.apex/` in the main checkout. Users turn on local sandboxing in the
-app's project settings, because no repository file can set it. The app does not apply per-agent `model` pins
+through the explicit workspace path and the shared `.apex/` in the main checkout. Users turn on local sandboxing in
+the app's project settings, because no repository file can set it. The app does not apply per-agent `model` pins
 (github/app#4097), and APEX no longer pins models. It does not enforce per-parent subagent limits (github/app#4098); a
 managed hook denies the APEX agent as a subagent target, and kernel authorization still owns state changes. Historical
 desktop probes and the parked desktop plan are provenance, not qualification evidence.
@@ -452,19 +466,20 @@ desktop probes and the parked desktop plan are provenance, not qualification evi
 ### REQ-GUIDANCE-001: Skill And Instruction Capability Parity
 
 The release must preserve required Azure domain behavior in managed vNext skills, scoped instructions, executable
-capabilities, contracts, or explicit retirements. Every source must have a target owner,
-consumer map, disposition, replacement proof, rollback or removal gate, and supported-client qualification scenario.
-Concise role skills may route work, but must not silently replace Azure architecture, WAF, ADR, pricing, security,
-governance, IaC pattern, validation, deployment, or diagnostic knowledge with generic model reasoning. Deterministic
-authority belongs in the kernel and capability code; non-deterministic domain guidance must remain discoverable on
-demand. Use progressive disclosure, bounded task inputs, shared references and removal of redundant reads while
-preserving semantic quality. Do not repeatedly feed full documents, policy baselines or the quality-reference corpus
-into model context. No token baseline or measurement project is required at this stage.
+capabilities, contracts, or explicit retirements. Every source must have a target owner, consumer map, disposition,
+replacement proof, rollback or removal gate, and supported-client qualification scenario. Concise role skills may
+route work, but must not silently replace Azure architecture, WAF, ADR, pricing, security, governance, IaC pattern,
+validation, deployment, or diagnostic knowledge with generic model reasoning. Deterministic authority belongs in the
+kernel and capability code; non-deterministic domain guidance must remain discoverable on demand. Use progressive
+disclosure, bounded task inputs, shared references and removal of redundant reads while preserving semantic quality.
+Do not repeatedly feed full documents, policy baselines or the quality-reference corpus into model context. No token
+baseline or measurement project is required at this stage.
 
 Keep sequencing in the owning agent and domain knowledge in on-demand skills. Consolidate only demonstrated duplicate
 guidance; preserve distinct operational checklists and essential worker safety rules. A shared reference must remain
 available in both client projections without requiring speculative skill reads. Tool descriptions must explain each
-operation's purpose and boundary, and role/client allowlists must retain required tools while excluding irrelevant ones.
+operation's purpose and boundary, and role/client allowlists must retain required tools while excluding irrelevant
+ones.
 
 ### REQ-DETERMINISM-001: Deterministic Packaging And Validation
 
@@ -477,21 +492,22 @@ changing required check names, permissions, triggers, diagnostics, release autho
 
 For each changed concern, identify its existing owner, consumers, diagnostics and security boundary before editing.
 Prefer one authoritative fact, focused changes and existing helpers over new schemas, agents, render pipelines or
-frameworks. DRY means removing duplicate ownership, not merging unrelated responsibilities. Preserve native validation,
-required checks and useful audience-specific guidance. Do not launch repository-wide cleanup as a prerequisite for a
-bounded feature; retain historical characterization and existing safety tests.
+frameworks. DRY means removing duplicate ownership, not merging unrelated responsibilities. Preserve native
+validation, required checks and useful audience-specific guidance. Do not launch repository-wide cleanup as a
+prerequisite for a bounded feature; retain historical characterization and existing safety tests.
 
 ### REQ-OPTIMIZATION-001: Bounded Input Efficiency
 
 Reduce unnecessary model input as part of each feature: compact authoritative context, relevant questions, unchanged
-decision reuse, deterministic filtering and selective regeneration. Preserve rich output and explicit reasoning.
-Do not add a token baseline, percentage target, new measurement framework or whole-repository optimization campaign now.
+decision reuse, deterministic filtering and selective regeneration. Preserve rich output and explicit reasoning. Do
+not add a token baseline, percentage target, new measurement framework or whole-repository optimization campaign now.
 
 Acceptance for the first delivery batch:
 
 1. Task inputs contain the current accepted revisions required by that task, not every historical completion. Exclude
    superseded and invalidated artifacts from ordinary execution inputs; an explicit revision comparison must identify
-   its historical sources separately. Prove that both code-generation tracks select the replacement intent after change.
+   its historical sources separately. Prove that both code-generation tracks select the replacement intent after
+   change.
 2. Bounded input reads resolve every review subject to its canonical artifact kind, including plan-review to
    `implementation-intent`. Test missing and stale references, pagination boundaries and complete reconstruction.
 3. Context uses deterministic task-specific projections with required dependency evidence and explicit retrieval
@@ -500,20 +516,23 @@ Acceptance for the first delivery batch:
 4. Enforce input and output byte limits from the run's locked configuration and test the applicable context-size
    contract. Include large fixtures and multibyte content; no silent truncation or claim of measured token savings.
 5. Reviewer packs contain the subject, necessary upstream evidence and dispositions, criteria and the exact receipt
-   contract. Preserve all review passes and stage-specific reasoning without irrelevant history or full policy baselines.
+   contract. Preserve all review passes and stage-specific reasoning without irrelevant history or full policy
+   baselines.
 6. Remove redundant context loading within a request, including subject-only review reads. Preserve task freshness,
    ownership, expiry and journal-integrity checks; this does not authorize persistent snapshots or cross-call caches.
-7. Correct next-task guidance, describe registered tools, and test role/client tool coverage. Narrow ARM access by actual
-   workflow need; retain legitimate pricing and operational cost paths without granting writes or unsupported tools.
+7. Correct next-task guidance, describe registered tools, and test role/client tool coverage. Narrow ARM access by
+   actual workflow need; retain legitimate pricing and operational cost paths without granting writes or unsupported
+   tools.
 8. Remove proven prompt duplication only with named owners and consumer checks. Keep essential worker boundaries,
    domain-specific guidance and supported output quality; installed file size is not a model-token measurement.
 
 Follow-on acceptance covers bounded requirements amendments and confirmed-decision reuse under `REQ-REQUIREMENTS-001`,
 pricing-row reuse under `REQ-ARCH-001`, and supported-client outcomes under `REQ-CUSTOMIZATION-001`. The
-[roadmap](ROADMAP.md#optimization-recommendation-dispositions) records the disposition of each reviewed recommendation.
-Changes to model routing, transport representation, rendering lifecycle, review concurrency or invalidation semantics
-need their stated evidence and authority checks before becoming implementation work. Byte reduction alone cannot
-justify weaker review, missing human-readable packages, stale approval reuse or unsupported client mechanics.
+[roadmap](ROADMAP.md#optimization-recommendation-dispositions) records the disposition of each reviewed
+recommendation. Changes to model routing, transport representation, rendering lifecycle, review concurrency or
+invalidation semantics need their stated evidence and authority checks before becoming implementation work. Byte
+reduction alone cannot justify weaker review, missing human-readable packages, stale approval reuse or unsupported
+client mechanics.
 
 This supersedes the blanket product requirement to finish repository-wide optimization before client learning.
 Existing executable optimization gates and receipts remain unchanged by documentation edits. Reconcile any blocking
@@ -522,10 +541,10 @@ receipt. Separately authorized maintenance remains bounded by its manifest and h
 
 ### REQ-MCP-001: Predictable Tool Contracts
 
-The CLI MCP adapter exposes kernel-authorized operations, not a second workflow engine. Under DECISION-034 it uses
-the MCP TypeScript SDK v2 (`@modelcontextprotocol/server`) with a low-level `Server` served by `serveStdio` and
-targets protocol `2026-07-28`, which all supported Copilot clients negotiate. This requirement governs APEX's own
-server only. The official Azure MCP Server integration
+The CLI MCP adapter exposes kernel-authorized operations, not a second workflow engine. Under DECISION-034 it uses the
+MCP TypeScript SDK v2 (`@modelcontextprotocol/server`) with a low-level `Server` served by `serveStdio` and targets
+protocol `2026-07-28`, which all supported Copilot clients negotiate. This requirement governs APEX's own server only.
+The official Azure MCP Server integration
 ([DECISION-038](DECISIONS.md#decision-038-introduce-azure-mcp-server-3-as-a-managed-azure-tool-provider),
 [CP-31](https://github.com/jonathan-vella/apex-vnext/issues/489)) is a separate external tool provider and dependency
 axis; it does not change this SDK, protocol version, or kernel authority, and its own tool contracts and grants are
@@ -533,8 +552,9 @@ tracked by that decision, not by this requirement's acceptance below. Acceptance
 
 1. Every successful tool result validates through the supported SDK. Preserve existing object responses; wrap Markdown
    and lists in named objects. Retain serialized text alongside structured results for compatible clients.
-2. Execution failures return `isError: true` and a stable, sanitized APEX code/message. Unexpected diagnostics, stacks,
-   raw provider errors and unreviewed details must not reach the model. Test stale, validation and internal failures.
+2. Execution failures return `isError: true` and a stable, sanitized APEX code/message. Unexpected diagnostics,
+   stacks, raw provider errors and unreviewed details must not reach the model. Test stale, validation and internal
+   failures.
 3. Publish output schemas, starting with intake, task context and bounded reads, reusing canonical contracts. Reject
    unexpected arguments and ambiguous staging forms before mutation. Test every registered tool's response shape.
 4. Describe side effects truthfully and supply behavior annotations without treating them as authorization. Do not
@@ -548,17 +568,17 @@ tracked by that decision, not by this requirement's acceptance below. Acceptance
 
 Progressive discovery, definition caching and programmatic tool calling belong to the host. Do not add a server-side
 search platform, arbitrary script execution or generic dispatch to implement client advice. Keep role-scoped tools.
-Kernel-enforced intake-only operation scopes need a separate authority design; prompt handoffs and `confirm: true`
-are not proof of such enforcement. Protocol caching hints must never substitute for kernel evidence freshness.
+Kernel-enforced intake-only operation scopes need a separate authority design; prompt handoffs and `confirm: true` are
+not proof of such enforcement. Protocol caching hints must never substitute for kernel evidence freshness.
 
 References: [server guide](https://modelcontextprotocol.io/docs/2026-07-28/develop/build-server) and
 [client practices](https://modelcontextprotocol.io/docs/2026-07-28/develop/clients/client-best-practices).
 
 ### REQ-DEV-DIAGNOSTICS-001: Opt-In Development Evidence
 
-Separately authorized repository-development diagnostics support agent-led investigation without requiring a human
-to reconstruct session failures. This is not consumer telemetry, a new kernel state machine, an optimization
-benchmark, or permission for autonomous remediation. It does not change `REQ-OPTIMIZATION-001` qualification gates.
+Separately authorized repository-development diagnostics support agent-led investigation without requiring a human to
+reconstruct session failures. This is not consumer telemetry, a new kernel state machine, an optimization benchmark,
+or permission for autonomous remediation. It does not change `REQ-OPTIMIZATION-001` qualification gates.
 
 Acceptance:
 
@@ -567,9 +587,9 @@ Acceptance:
 2. Linux/WSL host collection can use the signed-in Azure CLI identity with resource-scoped ingestion permission.
    Tokens remain with Azure CLI/in memory; no token cache mounts, silent credential fallback, role grants, or
    service-principal credential revocation. Existing Azure Policy remains enforced.
-3. A bounded reader retrieves registered-workspace Azure telemetry and filtered local evidence automatically.
-   Extra client diagnostic directories require explicit registration and content access opt-in. Never scrape global
-   chat history or replay transcripts. Record source locations, identifiers, limits, missing evidence and partial reads.
+3. A bounded reader retrieves registered-workspace Azure telemetry and filtered local evidence automatically. Extra
+   client diagnostic directories require explicit registration and content access opt-in. Never scrape global chat
+   history or replay transcripts. Record source locations, identifiers, limits, missing evidence and partial reads.
 4. Evidence packets distinguish observed errors from root-cause hypotheses. Logs are untrusted data, not instructions.
    Agent recommendations cite evidence and affected code plus a regression check; they cannot approve gates, change
    models, deploy, or alter code without a separately authorized implementation task.
@@ -582,10 +602,10 @@ Implementation and operational instructions: [development logging](../how-to/deb
 ### REQ-DOCS-001: Documentation And Lifecycle
 
 Installation, workflow, CLI, security, operations, testing, capability packs, upgrade, downgrade, rollback, uninstall,
-release, supported Copilot clients, and diagram formats must match the candidate implementation.
-New inline diagrams use Mermaid; new standalone architecture and chart artifacts use editable Python sources and rendered
-outputs. Active `.github/copilot-instructions.md` and applicable `AGENTS.md` files must identify canonical owners without
-duplicating volatile values. Unsupported external state is not resumable in vNext.
+release, supported Copilot clients, and diagram formats must match the candidate implementation. New inline diagrams
+use Mermaid; new standalone architecture and chart artifacts use editable Python sources and rendered outputs. Active
+`.github/copilot-instructions.md` and applicable `AGENTS.md` files must identify canonical owners without duplicating
+volatile values. Unsupported external state is not resumable in vNext.
 
 ### REQ-OUTPUT-001: Rich Output From Accepted Decisions
 
@@ -593,24 +613,24 @@ Produce requirements, architecture/WAF assessment, cost estimates, ADRs, archite
 implementation plans and references, deployment summaries, and design/as-built documentation from accepted sources.
 The operational set includes a runbook, inventory, backup/DR guidance, compliance matrix, as-built costs and an index.
 Record justified non-applicability rather than generating empty boilerplate. Separate intended design, observed state,
-assumptions and untested procedures. Never report a restore test, deployment, compliance certification or saving without
-supporting evidence.
+assumptions and untested procedures. Never report a restore test, deployment, compliance certification or saving
+without supporting evidence.
 
 Reuse existing contracts and renderers. Preserve rationale in accepted design data; a renderer formats reasoning, it
 does not invent it. Extend an owning contract only for a demonstrated information gap. Render only affected documents
 and figures after changes, preserving source lineage and the conflict handling in `REQ-CHANGE-001`.
 
 Use readable summaries, consistent headings and navigation, decision/alternatives tables, clear units and currency,
-labelled diagrams and accessible status text. Diagrams must reflect the same accepted data as tables and prose.
-Prefer useful structure over badges, decoration or arbitrary length. Editable sources and rendered images should agree
+labelled diagrams and accessible status text. Diagrams must reflect the same accepted data as tables and prose. Prefer
+useful structure over badges, decoration or arbitrary length. Editable sources and rendered images should agree
 semantically; never execute imported diagram code merely to inspect an archetype.
 
 ### REQ-HANDOFF-001: Application And Operations Handoff
 
 Initial scope requires infrastructure outputs and a deployment guide plus operational readiness documentation. Include
 service/resource identifiers, endpoints, configuration names, identity/access prerequisites, ownership boundaries,
-health checks, monitoring, incident response, rollback and recovery guidance. Reference secrets without embedding them.
-The application team supplies its code; APEX does not develop that application.
+health checks, monitoring, incident response, rollback and recovery guidance. Reference secrets without embedding
+them. The application team supplies its code; APEX does not develop that application.
 
 Ready-to-use application GitHub Actions pipelines and platform-specific application deployment configuration, such as
 Helm values or application manifests, are optional follow-on work after vNext is working. This does not defer the IaC
@@ -619,19 +639,20 @@ bindings, platform configuration or infrastructure validation needed to provisio
 ### REQ-IMPROVE-001: Bounded Improvement
 
 The quality and evidence lifecycle may store redacted structured observations, detect deterministic recurrence, and
-produce inert proposals. A deterministic adapter may ingest allowlisted journal and evidence outcomes, but not raw chat
-transcripts or model prose. Human decisions and the normal issue and pull-request flow remain mandatory. Observations and
-proposals cannot inject context or autonomously edit policy, prompts, agents, skills, code, issues, pull requests,
-releases, or deployments. Release acceptance requires measured precision, duplication, quarantine, recurrence, storage,
-and triage outcomes; a noisy automatic adapter remains disabled without weakening manual observation.
+produce inert proposals. A deterministic adapter may ingest allowlisted journal and evidence outcomes, but not raw
+chat transcripts or model prose. Human decisions and the normal issue and pull-request flow remain mandatory.
+Observations and proposals cannot inject context or autonomously edit policy, prompts, agents, skills, code, issues,
+pull requests, releases, or deployments. Release acceptance requires measured precision, duplication, quarantine,
+recurrence, storage, and triage outcomes; a noisy automatic adapter remains disabled without weakening manual
+observation.
 
 ## Output Quality Reference
 
-The human quality reference is `agent-output/apex-aks` in the GitHub repository `jonathan-vella/aks-basic`.
-Access requires an authorized GitHub session; anonymous link validation returns 404. Reviewers can use authenticated
-GitHub access to that repository without making its contents public or copying the corpus into ordinary task context.
-Record the inspected revision and selected artifacts when reviewing a candidate. It is an example of useful output,
-not a universal workload template or an authority for current prices, resource choices or compliance claims.
+The human quality reference is `agent-output/apex-aks` in the GitHub repository `jonathan-vella/aks-basic`. Access
+requires an authorized GitHub session; anonymous link validation returns 404. Reviewers can use authenticated GitHub
+access to that repository without making its contents public or copying the corpus into ordinary task context. Record
+the inspected revision and selected artifacts when reviewing a candidate. It is an example of useful output, not a
+universal workload template or an authority for current prices, resource choices or compliance claims.
 
 | Area                          | Review criterion                                                                               |
 | ----------------------------- | ---------------------------------------------------------------------------------------------- |
@@ -650,20 +671,22 @@ does not become the default for other workloads. Human quality review complement
 
 - **Current contracts:** Supported vNext contracts and installation upgrades are exact-versioned. Unsupported state is
   rejected without mutation; users start a current run rather than receiving an implicit migration.
-- **Security:** Kernel authorization and deterministic validators fail closed on missing, stale, malformed, secret-bearing,
-  or substituted state.
-- **Reliability:** Runs survive restart at each gate, reject stale writers, reconcile partial commits, and retain evidence.
-- **Performance:** Release measurements meet [quality-scorecard.v1.json](../../config/quality-scorecard.v1.json) targets,
-  tolerances, minimum samples, and unavailable-data rules.
+- **Security:** Kernel authorization and deterministic validators fail closed on missing, stale, malformed,
+  secret-bearing, or substituted state.
+- **Reliability:** Runs survive restart at each gate, reject stale writers, reconcile partial commits, and retain
+  evidence.
+- **Performance:** Release measurements meet [quality-scorecard.v1.json](../../config/quality-scorecard.v1.json)
+  targets, tolerances, minimum samples, and unavailable-data rules.
 - **Portability:** The VS Code Copilot harness and the GitHub Copilot app run on native Windows; Copilot CLI runs on
   Linux and WSL2. Consumer use requires neither Docker nor a devcontainer and must not depend on unpublished
   source-workspace state.
 - **Accessibility:** User-facing CLI and documentation provide clear text status, actionable diagnostics, and no
   color-only meaning.
-- **Privacy:** Telemetry is separate, optional, exportable, and deletable; raw chat history is never scraped or replayed.
+- **Privacy:** Telemetry is separate, optional, exportable, and deletable; raw chat history is never scraped or
+  replayed.
 - **Maintainability:** Repository guidance and automation have one canonical owner per concern; generated views are
-  validated derivatives rather than parallel editable sources. Managed skills and
-  instructions use progressive disclosure without removing required domain capability.
+  validated derivatives rather than parallel editable sources. Managed skills and instructions use progressive
+  disclosure without removing required domain capability.
 
 ## Exclusions
 
@@ -679,8 +702,8 @@ does not become the default for other workloads. Human quality review complement
 - ALZ foundation deployment, application development, and hosts beyond `REQ-HOST-001`.
 - Token-baseline or comparative-token benchmarking work for now.
 - Application deployment pipelines and application-specific deployment configuration until follow-on work.
-- Autonomous issue creation, repository edits, pull requests, approvals, releases, or deployments from improvement data
-  or the APEX runtime. The separately authorized local pre-agent maintenance controller is limited by
+- Autonomous issue creation, repository edits, pull requests, approvals, releases, or deployments from improvement
+  data or the APEX runtime. The separately authorized local pre-agent maintenance controller is limited by
   `REQ-OPTIMIZATION-001`.
 - Transcript scraping or direct promotion of observations into instructions, agents, skills, or code.
 - Azure Resource Manager MCP deployment, cancellation, or budget-write tools in managed APEX workflows.
@@ -691,14 +714,14 @@ does not become the default for other workloads. Human quality review complement
 
 ## Release Metrics
 
-The exact metric contract is [quality-scorecard.v1.json](../../config/quality-scorecard.v1.json). Blocking metrics include
-setup completion, first-task success, workflow elapsed time, restart and resume, deterministic validation escape,
-capability failure, context size, and cache correctness. Gate-revision loops may omit a claim when unavailable; all other
-unavailable blocking measurements block release.
+The exact metric contract is [quality-scorecard.v1.json](../../config/quality-scorecard.v1.json). Blocking metrics
+include setup completion, first-task success, workflow elapsed time, restart and resume, deterministic validation
+escape, capability failure, context size, and cache correctness. Gate-revision loops may omit a claim when
+unavailable; all other unavailable blocking measurements block release.
 
-These existing deterministic measurements are not a comparative input-token baseline. Retain their current
-executable semantics until any needed alignment is separately implemented and tested. Do not report token savings from
-document size alone or add a token measurement prerequisite to the roadmap.
+These existing deterministic measurements are not a comparative input-token baseline. Retain their current executable
+semantics until any needed alignment is separately implemented and tested. Do not report token savings from document
+size alone or add a token measurement prerequisite to the roadmap.
 
 ## Cutover Acceptance
 
@@ -723,15 +746,15 @@ Cutover requires all of the following on the exact candidate head:
   outcomes and client-specific authority boundaries.
 - Astro, Terraform, custom pricing, and Draw.io MCP dependencies are absent from active discovery only after their
   applicable replacement gates pass.
-- ARM pricing and Python diagram replacements satisfy their measured compatibility, reliability, security, and
-  maintainability gates.
+- Azure MCP retail pricing (`apex-azure`), ARM CostManagement (`apex-azure-cost`), and Python diagram replacements
+  satisfy their measured compatibility, reliability, security, and maintainability gates.
 - Automatic improvement ingestion meets its precision and privacy thresholds while proposals remain inert.
-- Changed guidance and automation have identified consumers, behavior, diagnostics, security boundaries and proof tests.
-  Any executable gate alignment required by this revised plan is complete; no existing check is bypassed.
+- Changed guidance and automation have identified consumers, behavior, diagnostics, security boundaries and proof
+  tests. Any executable gate alignment required by this revised plan is complete; no existing check is bypassed.
 - Bicep and Terraform preview, approval, apply, inventory, diagnosis, destroy, and recovery scenarios are qualified.
 - Non-production local deployment approval and purpose separation are proven. Production requirements remain deferred
-  until CI-owned runs, OIDC, artifact protection, actual human approval receipts and readiness are qualified; an initial
-  non-production release does not claim production support.
+  until CI-owned runs, OIDC, artifact protection, actual human approval receipts and readiness are qualified; an
+  initial non-production release does not claim production support.
 - Scorecard sample requirements and unavailable-data dispositions are satisfied.
 - Release and rollback rehearsals, documentation audit, and `npm run validate:all` pass.
 - Every open risk has an owner and acceptable release disposition.

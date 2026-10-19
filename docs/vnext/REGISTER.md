@@ -10,8 +10,8 @@ and the repository archives.
 - **Mitigation:** Bind observed client versions and hashes; run the complete client matrix on the exact candidate.
 - **State:** Open
 - **Closure proof:** Exact-candidate standalone Copilot CLI and VS Code Copilot harness evidence satisfies
-  [CLIENT-QUALIFICATION.md](CLIENT-QUALIFICATION.md). The slice 1 probes only characterize the clients, and the harness
-  cannot qualify until picked agents apply.
+  [CLIENT-QUALIFICATION.md](CLIENT-QUALIFICATION.md). The slice 1 probes only characterize the clients, and the
+  harness cannot qualify until picked agents apply.
 
 ## RISK-002: Live Cloud Behavior Can Differ From Deterministic Providers
 
@@ -26,19 +26,22 @@ and the repository archives.
 
 - **Owner:** Release engineering
 - **Impact:** Registry, lockfile, generated assets, SBOM, or package contents may differ from reviewed source.
-- **Mitigation:** Exact locks, reproducible pack tests, clean installation, source/generated validation, CodeQL, secret
-  scanning, SBOM, and provenance.
+- **Mitigation:** Exact locks, reproducible pack tests, clean installation, source/generated validation, CodeQL,
+  secret scanning, SBOM, and provenance.
 - **State:** Open until release
 - **Closure proof:** Exact-head package and security evidence is included in the release receipt.
 
 ## RISK-004: Documentation Can Overstate Support
 
 - **Owner:** Documentation and product maintainers
-- **Impact:** Users may treat implementation, historical evidence, or local tests as production qualification.
-- **Mitigation:** Generate support/reference data where possible; distinguish implemented, deterministic, client, live,
-  and release evidence; validate navigation and stale references.
+- **Impact:** Users may treat implementation, historical evidence, or local tests as production qualification, or read
+  contradictory status claims across root and project-control documents.
+- **Mitigation:** Generate support/reference data where possible; distinguish implemented, deterministic, client,
+  live, and release evidence; validate navigation and stale references; reconcile cross-document drift identified in
+  [AUDIT-REPORT.md](AUDIT-REPORT.md) (`F-006`, `F-017`).
 - **State:** Open until release
-- **Closure proof:** Documentation inventory is complete and every blocking claim links to current authority.
+- **Closure proof:** Documentation inventory is complete, cross-document contradictions (`F-006`, `F-017`) are
+  resolved, and every blocking claim links to current authority.
 
 ## RISK-005: Approval Or Handoff Evidence Can Become Stale
 
@@ -59,16 +62,17 @@ and the repository archives.
   Unsupported consumer approval controls block production with guidance.
 - **State:** Accepted design; implementation and qualification pending
 - **Closure proof:** Wrong-purpose, wrong-reviewer/run/attempt/target, replay, expiry and artifact-substitution tests,
-  plus exact-candidate separately authorized live readiness and cleanup evidence. Non-production release claims
-  remain distinct from deferred production acceptance.
+  plus exact-candidate separately authorized live readiness and cleanup evidence. Non-production release claims remain
+  distinct from deferred production acceptance.
 
 ### Governance Snapshot Freshness
 
 - **Owner:** Governance and kernel maintainers
-- **Impact:** Azure policy can change while a snapshot remains eligible for reuse below 30 days; collection failures or
-  timestamp churn can also masquerade as fresh policy or invalidate unchanged plans unnecessarily.
-- **Mitigation:** Apply [REQ-GOV-001](PRD.md#req-gov-001-governance-and-policy), display observation age, separate content
-  identity from freshness, fail closed at 30 days, and preserve live enforcement without bypassing policy on denial.
+- **Impact:** Azure policy can change while a snapshot remains eligible for reuse below 30 days; collection failures
+  or timestamp churn can also masquerade as fresh policy or invalidate unchanged plans unnecessarily.
+- **Mitigation:** Apply [REQ-GOV-001](PRD.md#req-gov-001-governance-and-policy), display observation age, separate
+  content identity from freshness, fail closed at 30 days, and preserve live enforcement without bypassing policy on
+  denial.
 - **State:** Open; distribution, persisted choices and unchanged renewal have deterministic coverage; consumer OIDC
   setup, live collection, material reconciliation and exact-client interaction still require qualification
 - **Closure proof:** Both tracks cover exact age boundaries, unchanged refresh, material drift and delayed outcomes.
@@ -86,15 +90,18 @@ and the repository archives.
 
 - **Owner:** Workload planning and operations
 - **Impact:** A workload could modify shared ALZ resources or a lab could bypass policy by assuming an empty baseline.
-- **Mitigation:** Explicit profiles, supplied-resource defaults outside labs, evidenced policy results and owned cleanup.
+- **Mitigation:** Explicit profiles, supplied-resource defaults outside labs, evidenced policy results and owned
+  cleanup.
 - **State:** Open
-- **Closure proof:** Both tracks protect platform references and support standalone policies through the same workflow.
+- **Closure proof:** Both tracks protect platform references and support standalone policies through the same
+  workflow.
 
 ## RISK-008: Reuse Can Lose Quality Or User Edits
 
 - **Owner:** Artifacts and project adaptation
 - **Impact:** Generated documents become shallow, contradictory, stale or overwrite manually maintained content.
-- **Mitigation:** One owner per fact, retained decision rationale, affected-output regeneration and conflict confirmation.
+- **Mitigation:** One owner per fact, retained decision rationale, affected-output regeneration and conflict
+  confirmation.
 - **State:** Open
 - **Closure proof:** Human review against the PRD quality reference plus selective-update and conflict tests.
 
@@ -104,17 +111,21 @@ and the repository archives.
 - **Impact:** A plugin update could launch the wrong MCP runtime, select the wrong workspace or alter an active run.
 - **Mitigation:** DECISION-033 selects one Agent Plugin with the bundled runtime, pinned to a commit SHA and installed
   through one channel; `apex init` writes only the thin projection. Preserve state and avoid competing updaters.
-- **State:** Open; plugin delivery selected, not yet implemented
+- **State:** Open; plugin package and thin `apex init` projection implemented (`0.11.0-next.5`); supported-client
+  lifecycle qualification pending
 - **Closure proof:** The plugin lifecycle (install, update, rollback, uninstall) passes in all three supported clients
   on their hosts without disturbing an active run.
 
 ## RISK-010: Revised Plans Can Outrun Executable Controls
 
 - **Owner:** Repository maintainers
-- **Impact:** Older optimization, guidance or release validators may block the new delivery order or overstate support.
-- **Mitigation:** Keep current checks intact; align affected owners in focused tested changes, not fabricated receipts.
+- **Impact:** Older optimization, guidance or release validators may block the new delivery order or overstate
+  support.
+- **Mitigation:** Keep current checks intact; align affected owners in focused tested changes, not fabricated
+  receipts.
 - **State:** Open
-- **Closure proof:** Required checks reflect the accepted scope and documentation distinguishes targets from implementation.
+- **Closure proof:** Required checks reflect the accepted scope and documentation distinguishes targets from
+  implementation.
 
 ## RISK-011: Task Context Can Select Obsolete Or Incomplete Inputs
 
@@ -144,26 +155,26 @@ and the repository archives.
 - **Owner:** CLI adapter and client experience maintainers
 - **Impact:** SDK-incompatible results fail after work runs; missing error codes impede safe recovery. A protocol
   upgrade or misleading read-only metadata can change permission, retry and freshness behavior.
-- **Mitigation:** Implement [REQ-MCP-001](PRD.md#req-mcp-001-predictable-tool-contracts) in the roadmap order. Preserve
-  stdio, explicit tools, stable errors and kernel authority; migrate protocol versions separately.
-- **State:** Open for exact-client evidence; all-tool schema, safe-error, input-boundary, queue/cancellation and real
-  stdio regressions cover the current SDK. Protocol migration is separately pending.
-- **Closure proof:** All registered results validate, cancellation/retry tests preserve committed-state semantics,
-  and all three supported clients have evidence for the exact negotiated protocol and candidate.
+- **Mitigation:** Implement [REQ-MCP-001](PRD.md#req-mcp-001-predictable-tool-contracts) in the roadmap order.
+  Preserve stdio, explicit tools, stable errors and kernel authority; migrate protocol versions separately.
+- **State:** Open for exact-client evidence; SDK v2 and `2026-07-28` protocol migration (`DECISION-034`, `CP-23`) are
+  implemented with all-tool schema, safe-error, input-boundary, queue/cancellation and real stdio regressions.
+- **Closure proof:** All registered results validate, cancellation/retry tests preserve committed-state semantics, and
+  all three supported clients have evidence for the exact negotiated protocol and candidate.
 
 ## RISK-014: Retiring The VS Code Local Projection Can Strand Consumers Or Lose Mechanics
 
 - **Owner:** Client experience and CLI lifecycle maintainers
-- **Impact:** Existing VS Code installations lose their managed agents. Handoff buttons, native multi-select, per-parent
-  agent allowlists and `.vscode/mcp.json` servers disappear, and the VS Code Agent Host does not forward servers that
-  need interactive `${input:...}` values.
+- **Impact:** Existing VS Code installations lose their managed agents. Handoff buttons, native multi-select,
+  per-parent agent allowlists and `.vscode/mcp.json` servers disappear, and the VS Code Agent Host does not forward
+  servers that need interactive `${input:...}` values.
 - **Mitigation:** Apply [DECISION-029](DECISIONS.md#decision-029-ship-one-copilot-cli-projection) through DECISION-015
   gates. Retired client values fail validation with reason `CLIENT_PROJECTION_RETIRED`; there is no automatic
-  migration, and only an explicit `apex init --client github-copilot-cli` swaps the managed files. Replace
-  handoffs with `apex-next`, multi-select with native checkboxes or kernel-validated numbered selection, and allowlists
-  with kernel task ownership and scoped tools. The archive under [archive catalog](../../.archive/CATALOG.json)
-  (entry `.archive/vscode-projection/ROLLBACK.md`) records rollback notes,
-  stays out of packaging, and `retired-paths.v1.json` keeps the former live paths absent.
+  migration, and only an explicit `apex init --client github-copilot-cli` swaps the managed files. Replace handoffs
+  with `apex-next`, multi-select with native checkboxes or kernel-validated numbered selection, and allowlists with
+  kernel task ownership and scoped tools. The archive under [archive catalog](../../.archive/CATALOG.json) (entry
+  `.archive/vscode-projection/ROLLBACK.md`) records rollback notes, stays out of packaging, and
+  `retired-paths.v1.json` keeps the former live paths absent.
 - **State:** Open; standalone CLI partially qualified in slice 11; VS Code harness blocked on WSL
 - **Closure proof:** Rejection and reintroduction tests pass, archive provenance and rollback notes are recorded, and
   standalone CLI and VS Code Copilot harness qualification passes on the same candidate.
@@ -173,15 +184,17 @@ and the repository archives.
 - **Owner:** Managed customization and kernel maintainers
 - **Impact:** Explore, Rubber-duck, Code-review, Security-review, built-in Task or Research output could be treated as
   review completion, validation evidence or approval. Built-in models are set per user and add cost.
-- **Mitigation:** Keep helpers advisory. Managed agents use only Explore, which receives just `view`, `glob` and
-  `rg`. Rubber-duck, Code-review and Security-review inherit the caller's APEX completion and disposition tools, so
-  they stay out until the CLI scopes helper tools. Validator has no shell. The owning APEX agent restates findings as
-  typed kernel input with verified file and line references. The kernel continues to reject unexecuted or simulated
-  evidence. Document per-user model overrides.
-- **State:** Open; standalone CLI partially qualified in slice 11; VS Code harness blocked on WSL
-- **Closure proof:** Projection tests cover helper grants, negative tests show helper output alone cannot complete a
-  task or open a gate, and CLI probes cover each granted helper path. Slice 6 covers Explore; the other helpers need
-  CLI tool scoping first.
+- **Mitigation:** Keep general helpers advisory. Under
+  [DECISION-031](DECISIONS.md#decision-031-replace-the-apex-reviewer-with-captured-rubber-duck-reviews) (`CP-16`),
+  `rubber-duck` performs the requirements, architecture and plan reviews with `postToolUse` output capture,
+  `preToolUse` mutation denial, and kernel `APEX_REVIEW_PENDING` guards (`F-003` tracks centralizing the MCP dispatch
+  guard). Explore remains read-only (`view`, `glob`, `rg`); Code-review and Security-review stay out of managed
+  workflows. Validator has no shell. The kernel continues to reject unexecuted or simulated evidence.
+- **State:** Open; deterministic hook/capture/guard tests pass; supported-client qualification pending (`CLIENT-024`,
+  `CLIENT-033`)
+- **Closure proof:** Projection and hook tests cover helper grants and rubber-duck capture/denial, negative tests show
+  uncaptured helper output alone cannot complete a task or open a gate, and supported-client qualification passes on
+  the exact candidate.
 
 ## RISK-016: External Azure MCP Server Dependency Can Weaken Offline Guarantees Or Pricing Completeness
 
@@ -196,30 +209,54 @@ and the repository archives.
   corresponding APEX release.
 - **Mitigation:** Document and qualify the external server's install/cache/discovery lifecycle separately from
   CLIENT-029 per supported client. Record and test an exact pinned `3.y.z` version in a tracked dependency manifest
-  rather than a floating range; require focused discovery/schema/grant tests on updates. Never report a capped
-  pricing response as complete; preserve timestamps, source and uncertainty on every pricing result.
+  rather than a floating range; require focused discovery/schema/grant tests on updates. Never report a capped pricing
+  response as complete; preserve timestamps, source and uncertainty on every pricing result.
 - **State:** Open; IMPLEMENTED LOCAL with local qualification stages passing after restoring jq; final-head CI and
   human client/authenticated Azure qualification pending
 - **Closure proof:** CP-31 ships discovered real tool/schema evidence, an exact version pin in a tracked manifest,
   cap-aware pricing handling with a passing regression, and per-client dependency-lifecycle documentation distinct
   from CLIENT-029, before any qualification or release claim.
 
+## RISK-017: Runtime, Workflow, Renderer, And Validator Edge-Case Gaps Identified In End-To-End Audit
+
+- **Owner:** Kernel, CLI, renderer and tooling maintainers
+- **Impact:** Concurrent `prepare-assets.mjs` runs can delete a newly acquired lock after an expired-lock TOCTOU race
+  (`F-001`); rejected human gates record `state: "rejected"` without mapping to the workflow's `approval-rejected`
+  blocked state (`F-002`); `MCP_TOOL_REVIEW_GUARDS` relies on manual `service.ts` calls rather than central MCP
+  dispatch enforcement (`F-003`); duplicate `(metric, scenario)` scorecard measurements overwrite silently (`F-004`);
+  `fetch-azure-deprecations.mjs` exits `0` on unhandled rejections (`F-005`); `WorkflowEngine` ignores edge `event`
+  and `edgeSelection` metadata (`F-007`); `apex-next` omits explicit `user-invocable` frontmatter (`F-014`); and
+  validator-graph CI consumer checks rely on substring matching (`F-015`). See [AUDIT-REPORT.md](AUDIT-REPORT.md).
+- **Mitigation:** Execute the four remediation slices in
+  [AUDIT-REPORT.md](AUDIT-REPORT.md#prioritized-remediation-plan-and-closure-proof): atomic lock quarantine in
+  `prepare-assets.mjs`, explicit `approval-rejected` routing, centralized MCP review-pending enforcement,
+  duplicate-measurement rejection in `scorecard.ts`, non-zero error exit in `fetch-azure-deprecations.mjs`, explicit
+  `user-invocable: true` on `apex-next`, and YAML-parsed validator consumer checks.
+- **State:** Remediated on `fix/cp-32-audit-remediation`
+  ([CP-32](https://github.com/jonathan-vella/apex-vnext/issues/495): `c49fb45d`, `9a2bd31c`, `304372cb`, and
+  documentation closure slice); open until PR merge to `main`
+- **Closure proof:** Focused unit/validator regressions, `npm run validate:_node-core`, and `npm run qualify:vnext`
+  pass with all 22 findings in [AUDIT-REPORT.md](AUDIT-REPORT.md) resolved and the `skill-validation-baseline.json`
+  suppression removed.
+
 ## ASSUMPTION-001: Supported Clients Can Share Typed Outcomes
 
 ### Active Scope And CLI Worker Evidence
 
 As of 2026-10-05, DECISION-033 makes the VS Code Copilot harness and the GitHub Copilot app on native Windows and
-Copilot CLI on Linux and WSL2 the target release clients, delivered as one Agent Plugin; until it ships, `apex init`
-installs the CLI projection. Historical desktop probes remain provenance ([superseded
-plan](ROADMAP.md#superseded-standalone-copilot-desktop-plan)) and do not show CLI parity. CLI CodeGen, Reviewer and
-Validator ship since adapter `1.6.0` under revised ADR-0006; kernel checks, not profile visibility, remain the security
-boundary. This does not authenticate independent reviewers or qualify every production worker path. Owner: client
-experience and kernel maintainers. Closure requires actual generation/review/validation and parent-routing evidence with
-unchanged scoped permissions. Generic delegation and visibility-only probes are not closure.
+Copilot CLI on Linux and WSL2 the target release clients, delivered as one Agent Plugin with a thin `apex init`
+workspace projection (`0.11.0-next.5`). Historical desktop probes remain provenance
+([superseded plan](ROADMAP.md#superseded-standalone-copilot-desktop-plan)) and do not show CLI parity. One foreground
+`APEX` agent and hidden `APEX CodeGen` and `APEX Validator` workers ship under DECISION-032 and revised ADR-0006,
+while captured `rubber-duck` reviews replace `APEX Reviewer` (DECISION-031); kernel checks, not profile visibility,
+remain the security boundary. This does not authenticate independent reviewers or qualify every production worker
+path. Owner: client experience and kernel maintainers. Closure requires actual generation/review/validation and
+parent-routing evidence with unchanged scoped permissions. Generic delegation and visibility-only probes are not
+closure.
 
 - **Owner:** Client experience
-- **Assumption:** The VS Code Copilot harness and the GitHub Copilot app on native Windows and Copilot CLI on Linux and
-  WSL2 produce equivalent kernel outcomes from the same plugin agents.
+- **Assumption:** The VS Code Copilot harness and the GitHub Copilot app on native Windows and Copilot CLI on Linux
+  and WSL2 produce equivalent kernel outcomes from the same plugin agents.
 - **Constraint:** A shared plugin does not prove per-client behavior; each client and host is qualified separately.
   Unavailable mechanics cannot be inferred as passing.
 - **State:** Pending current-candidate proof
@@ -227,8 +264,8 @@ unchanged scoped permissions. Generic delegation and visibility-only probes are 
 ## ASSUMPTION-002: Equal IaC Support Means Equivalent Governed Outcomes
 
 - **Owner:** IaC maintainers
-- **Assumption:** Bicep and Terraform can share requirements, intent, gates, evidence, and inventory contracts while using
-  different native mechanics.
+- **Assumption:** Bicep and Terraform can share requirements, intent, gates, evidence, and inventory contracts while
+  using different native mechanics.
 - **Constraint:** Equality does not require identical commands, state models, preview TTLs, or provider metadata.
 - **State:** Deterministically supported; live proof pending
 
@@ -237,7 +274,8 @@ unchanged scoped permissions. Generic delegation and visibility-only probes are 
 - **Owner:** Workload architect and consumer
 - **Assumption:** Selected services/SKUs are available with sufficient quota in the requested region.
 - **Constraint:** This is intentional, not an Architecture evidence gate. Policy still wins, and actual deployment
-  failures require visible recovery or approved design changes. No successful deployment or capacity claim is inferred.
+  failures require visible recovery or approved design changes. No successful deployment or capacity claim is
+  inferred.
 - **State:** Accepted product behavior
 
 ## Release Rule
@@ -245,5 +283,5 @@ unchanged scoped permissions. Generic delegation and visibility-only probes are 
 No open risk is silently waived. A release-blocking item must be closed by evidence or accepted through an explicit,
 auditable maintainer decision that names scope, rationale, owner, expiry, and rollback.
 
-Historical archive entries are indexed in the [catalog](../../.archive/CATALOG.json);
-the [restore guide](../../.archive/RESTORE.md) grants no runtime, release or deployment authority.
+Historical archive entries are indexed in the [catalog](../../.archive/CATALOG.json); the
+[restore guide](../../.archive/RESTORE.md) grants no runtime, release or deployment authority.
