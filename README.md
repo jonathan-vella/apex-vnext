@@ -7,7 +7,7 @@ constraints, Bicep or Terraform, validation evidence and a deployment preview. Y
 A deterministic runtime, not the model, owns the state, the gates and the evidence.
 
 > [!WARNING]
-> **Preview software.** The current release is `0.11.0-next.2`, published under the `next` tag. It targets
+> **Preview software.** The current release is `0.11.0-next.5`, published under the `next` tag. It targets
 > **non-production** use: labs, demos and learning. Production deployment is blocked by design until its own approval
 > and execution model ships. Live qualification of the supported clients is still pending. See
 > [Project status](#project-status).
@@ -105,7 +105,7 @@ governance collection uses. Deployments to Azure always go through an approved p
 
 | Area                           | State                                                                                          |
 | ------------------------------ | ---------------------------------------------------------------------------------------------- |
-| Runtime, CLI and agent plugin  | Preview `0.11.0-next.2`, published to npm (`next`) and the `apex-plugins` marketplace           |
+| Runtime, CLI and agent plugin  | Preview `0.11.0-next.5`, published to npm (`next`) and the `apex-plugins` marketplace           |
 | Lab approval flow              | Implemented: one intent confirmation, kernel readiness checkpoints, final preview approval     |
 | Bicep and Terraform tracks     | Implemented with native tooling. Bicep moves to an `azd` executor in a coming release           |
 | Supported-client qualification | Pending. Live runs in the three clients are still to be recorded                                |

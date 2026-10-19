@@ -12,7 +12,7 @@ adaptation experience is [planned work](../explanation/workflow-and-gates.md#pla
 init flag.
 
 > [!IMPORTANT]
-> The plugin and CLI ship preview `0.11.0-next.2`; live qualification is still pending. That release predates #431.
+> The plugin and CLI ship preview `0.11.0-next.5`; live qualification is still pending.
 > These steps describe the published flow. For source changes, use a
 > [local candidate](../how-to/manage-installation.md#install-a-local-candidate) and the
 > [human-run qualification kit](../how-to/qualify-live-clients.md); do not mix same-version source and registry bytes.
