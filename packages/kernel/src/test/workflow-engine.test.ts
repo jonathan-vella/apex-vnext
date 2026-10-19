@@ -135,6 +135,81 @@ test("workflow engine maps rejected gates to approval-rejected and enforces non-
   assert.equal(rejected.nextTask, null);
   assert.deepEqual(rejected.blockers, ["approval-rejected", "gate-1:rejected"]);
 
+  // A rejected Gate 4 still allows routing to preview-<track> so a replacement preview can reopen Gate 4,
+  // while blocking Gate 4 and deployment when preview-<track> is already completed.
+  for (const track of ["bicep", "terraform"] as const) {
+    const previewReady = engine.route({
+      run: { iacTool: track, purpose: "lab", targetScope: "local" },
+      artifacts: {
+        "implementation-intent-v1": {},
+        "iac-binding-v1": {},
+        "environment-inputs-v1": {},
+        "policy-property-map-v1": {},
+        "governance-constraints-v1": {},
+        "validation-evidence-v1": {},
+        "quota-evidence-current": {},
+        "runtime-bundle": {},
+        toolchain: {},
+        ...(track === "bicep"
+          ? { "bicep-tree": {} }
+          : { "terraform-tree": {}, "terraform-lockfile": {}, "terraform-state-lineage-and-serial": {} }),
+      },
+      completedNodes: [
+        "requirements",
+        "gate-1",
+        "governance-discovery",
+        "architecture",
+        "gate-2",
+        "plan",
+        "gate-3",
+        `codegen-${track}`,
+        `validation-${track}`,
+      ],
+      gateStates: { "gate-1": "approved", "gate-2": "approved", "gate-3": "approved", "gate-4": "rejected" },
+    });
+    assert.equal(previewReady.nextTask, `preview-${track}`);
+
+    const gateBlocked = engine.route({
+      run: { iacTool: track, purpose: "lab", targetScope: "local" },
+      artifacts: {
+        "implementation-intent-v1": {},
+        "iac-binding-v1": {},
+        "environment-inputs-v1": {},
+        "policy-property-map-v1": {},
+        "governance-constraints-v1": {},
+        "validation-evidence-v1": {},
+        "quota-evidence-current": {},
+        "deployment-preview-v1": {},
+        "execution-plan-attestation-v1": {},
+        "runtime-bundle": {},
+        toolchain: {},
+        ...(track === "bicep"
+          ? { "bicep-tree": {} }
+          : {
+              "terraform-tree": {},
+              "terraform-lockfile": {},
+              "terraform-state-lineage-and-serial": {},
+              "protected-saved-plan-local-reference": {},
+            }),
+      },
+      completedNodes: [
+        "requirements",
+        "gate-1",
+        "governance-discovery",
+        "architecture",
+        "gate-2",
+        "plan",
+        "gate-3",
+        `codegen-${track}`,
+        `validation-${track}`,
+        `preview-${track}`,
+      ],
+      gateStates: { "gate-1": "approved", "gate-2": "approved", "gate-3": "approved", "gate-4": "rejected" },
+    });
+    assert.equal(gateBlocked.currentNode, "approval-rejected");
+    assert.deepEqual(gateBlocked.blockers, ["approval-rejected", "gate-4:rejected"]);
+  }
+
   const invalidEvent = structuredClone(manifest) as any;
   invalidEvent.edges[0].event = "invalid-event";
   assert.throws(() => new WorkflowEngine(invalidEvent), /Unsupported workflow edge event invalid-event/);
@@ -142,4 +217,13 @@ test("workflow engine maps rejected gates to approval-rejected and enforces non-
   const ambiguous = structuredClone(manifest) as any;
   ambiguous.edges.push({ from: "requirements", to: "architecture", event: "completed" });
   assert.throws(() => new WorkflowEngine(ambiguous), /Ambiguous non-fanout workflow edges from requirements/);
+
+  const overlappingPredicates = structuredClone(manifest) as any;
+  overlappingPredicates.edges.push({
+    from: "gate-3",
+    to: "gate-4",
+    event: "approved",
+    condition: { exists: { path: "run.iacTool" } },
+  });
+  assert.throws(() => new WorkflowEngine(overlappingPredicates), /Ambiguous non-fanout workflow edges from gate-3/);
 });

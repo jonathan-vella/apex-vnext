@@ -33,7 +33,15 @@ function hasScriptToken(text, script) {
 }
 
 function isActiveYamlCondition(condition) {
-  return condition !== false && condition !== "false";
+  if (condition === false) return false;
+  if (typeof condition !== "string") return true;
+  let expr = condition.trim();
+  const match = /^\$\{\{\s*([\s\S]*?)\s*\}\}$/u.exec(expr);
+  if (match !== null) expr = match[1].trim();
+  while (expr.startsWith("(") && expr.endsWith(")")) {
+    expr = expr.slice(1, -1).trim();
+  }
+  return expr.toLowerCase() !== "false";
 }
 
 function unique(errors, values, label) {

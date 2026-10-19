@@ -97,29 +97,44 @@ export class WorkflowEngine {
         terminal: false,
       };
     }
-    const rejectedGate = [1, 2, 3, 4]
-      .map((gate) => `gate-${gate}`)
-      .find((gateId) => state.gateStates?.[gateId] === "rejected");
-    if (rejectedGate !== undefined && this.manifest.blockedStates.includes("approval-rejected")) {
-      const blocked = this.nodes.get("blocked");
-      return {
-        currentNode: "approval-rejected",
-        nextTask: null,
-        ownerRole: blocked?.ownerRole ?? null,
-        blockers: ["approval-rejected", `${rejectedGate}:rejected`],
-        terminal: false,
-      };
-    }
+    this.assertNoMultipleEligibleEdges(state);
     const completed = new Set(state.completedNodes ?? []);
     for (const node of this.manifest.nodes) {
       if (node.kind === "terminal" || completed.has(node.id) || !evaluateCondition(node.condition, state)) {
         continue;
+      }
+      if (
+        node.kind === "gate" &&
+        state.gateStates?.[node.id] === "rejected" &&
+        this.manifest.blockedStates.includes("approval-rejected")
+      ) {
+        const blocked = this.nodes.get("blocked");
+        return {
+          currentNode: "approval-rejected",
+          nextTask: null,
+          ownerRole: blocked?.ownerRole ?? null,
+          blockers: ["approval-rejected", `${node.id}:rejected`],
+          terminal: false,
+        };
       }
       const blockers = node.sourceDependencies.filter(
         (dependency) => !this.dependencySatisfied(dependency, state, completed),
       );
       if (blockers.length === 0) {
         return { currentNode: node.id, nextTask: node.id, ownerRole: node.ownerRole, blockers: [], terminal: false };
+      }
+      const rejectedDependency = blockers
+        .map((dependency) => dependency.split(".")[0] ?? dependency)
+        .find((root) => root.startsWith("gate-") && state.gateStates?.[root] === "rejected");
+      if (rejectedDependency !== undefined && this.manifest.blockedStates.includes("approval-rejected")) {
+        const blocked = this.nodes.get("blocked");
+        return {
+          currentNode: "approval-rejected",
+          nextTask: null,
+          ownerRole: blocked?.ownerRole ?? null,
+          blockers: ["approval-rejected", `${rejectedDependency}:rejected`],
+          terminal: false,
+        };
       }
       const hasActivePredecessor = this.manifest.edges.some(
         (edge) => edge.to === node.id && completed.has(edge.from) && evaluateCondition(edge.condition, state),
@@ -180,6 +195,23 @@ export class WorkflowEngine {
       getPath({ run: state.run, artifacts: state.artifacts }, `artifacts.${dependency}`) !== undefined ||
       getPath({ run: state.run, artifacts: state.artifacts }, dependency) !== undefined
     );
+  }
+
+  private assertNoMultipleEligibleEdges(state: WorkflowState): void {
+    const byFrom = new Map<string, WorkflowEdge[]>();
+    for (const edge of this.manifest.edges) {
+      if (edge.fanout === true) continue;
+      const list = byFrom.get(edge.from) ?? [];
+      list.push(edge);
+      byFrom.set(edge.from, list);
+    }
+    for (const [from, outgoing] of byFrom.entries()) {
+      if (outgoing.length < 2) continue;
+      const eligible = outgoing.filter((edge) => evaluateCondition(edge.condition, state));
+      if (eligible.length > 1) {
+        throw new Error(`Multiple eligible non-fanout workflow edges from ${from}`);
+      }
+    }
   }
 }
 
@@ -284,6 +316,32 @@ function parseReturnRoute(value: unknown): WorkflowReturnRoute {
   };
 }
 
+function isComplementaryPair(first: WorkflowCondition | undefined, second: WorkflowCondition | undefined): boolean {
+  if (first === undefined || second === undefined) return false;
+  if ("not" in first && sha256Json(first.not as unknown as JsonValue) === sha256Json(second as unknown as JsonValue)) {
+    return true;
+  }
+  if ("not" in second && sha256Json(second.not as unknown as JsonValue) === sha256Json(first as unknown as JsonValue)) {
+    return true;
+  }
+  return false;
+}
+
+function isDisjointEqualsPartition(outgoing: WorkflowEdge[]): boolean {
+  let sharedPath: string | undefined;
+  const seenValues = new Set<string>();
+  for (const edge of outgoing) {
+    if (edge.condition === undefined || !("equals" in edge.condition)) return false;
+    const [target, literal] = edge.condition.equals;
+    if (sharedPath === undefined) sharedPath = target.path;
+    else if (sharedPath !== target.path) return false;
+    const valueDigest = sha256Json(literal);
+    if (seenValues.has(valueDigest)) return false;
+    seenValues.add(valueDigest);
+  }
+  return sharedPath !== undefined;
+}
+
 function assertNonAmbiguousOutgoingEdges(edges: WorkflowEdge[]): void {
   const byFrom = new Map<string, WorkflowEdge[]>();
   for (const edge of edges) {
@@ -294,18 +352,9 @@ function assertNonAmbiguousOutgoingEdges(edges: WorkflowEdge[]): void {
   }
   for (const [from, outgoing] of byFrom.entries()) {
     if (outgoing.length < 2) continue;
-    const conditionFingerprints = new Set<string>();
-    for (const edge of outgoing) {
-      const fingerprint =
-        edge.condition === undefined ? "unconditional" : sha256Json(edge.condition as unknown as JsonValue);
-      if (
-        fingerprint === "unconditional" ||
-        conditionFingerprints.has("unconditional") ||
-        conditionFingerprints.has(fingerprint)
-      ) {
-        throw new Error(`Ambiguous non-fanout workflow edges from ${from}`);
-      }
-      conditionFingerprints.add(fingerprint);
+    const complementary = outgoing.length === 2 && isComplementaryPair(outgoing[0]?.condition, outgoing[1]?.condition);
+    if (!complementary && !isDisjointEqualsPartition(outgoing)) {
+      throw new Error(`Ambiguous non-fanout workflow edges from ${from}`);
     }
   }
 }

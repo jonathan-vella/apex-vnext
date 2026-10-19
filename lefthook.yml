@@ -9,7 +9,7 @@ pre-commit:
       glob: "*.md"
       run: |
         # Get staged markdown files
-        STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM)
+        STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM) || exit $?
         STAGED_MD=$(printf '%s\n' "$STAGED_FILES" | grep '\.md$' || true)
         if [ -n "$STAGED_MD" ]; then
           COUNT=$(echo "$STAGED_MD" | wc -l | tr -d ' ')
@@ -27,7 +27,8 @@ pre-commit:
       glob: "docs/{tutorials,how-to,explanation,reference}/**/*.md"
       run: |
         # Get staged user-guide Markdown files
-        STAGED_DOCS=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^docs/(tutorials|how-to|explanation|reference)/.*\.md$' || true)
+        STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM) || exit $?
+        STAGED_DOCS=$(printf '%s\n' "$STAGED_FILES" | grep -E '^docs/(tutorials|how-to|explanation|reference)/.*\.md$' || true)
         if [ -n "$STAGED_DOCS" ]; then
           echo "🔗 Checking links in $(echo "$STAGED_DOCS" | wc -l | tr -d ' ') doc file(s)..."
           # Use npx to run from local node_modules (avoids Node.js 24 global install bug)

@@ -109,6 +109,18 @@ test("ignores workflow consumers where npm run appears only in YAML comments or 
     () => "jobs:\n  ci:\n    name: ci\n    steps:\n      - if: false\n        run: npm run validate:_node-ci\n",
   );
   assert.deepEqual(disabledEvidence, { "ci-main": null });
+
+  const expressionDisabledStep = collectConsumerEvidence(
+    graph,
+    () => "jobs:\n  ci:\n    name: ci\n    steps:\n      - if: ${{ false }}\n        run: npm run validate:_node-ci\n",
+  );
+  assert.deepEqual(expressionDisabledStep, { "ci-main": null });
+
+  const expressionDisabledJob = collectConsumerEvidence(
+    graph,
+    () => "jobs:\n  ci:\n    name: ci\n    if: ${{ (false) }}\n    steps:\n      - run: npm run validate:_node-ci\n",
+  );
+  assert.deepEqual(expressionDisabledJob, { "ci-main": null });
 });
 
 test("rejects unaccounted-for validate:* or lint:* scripts in package.json unless excluded", () => {

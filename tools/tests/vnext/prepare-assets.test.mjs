@@ -865,12 +865,17 @@ test("plugin skills include operational references", async () => {
   }
 });
 
-test("asset generation lock prevents stale-reclaim and late-release TOCTOU races", async () => {
+test("asset generation lock prevents stale-reclaim, late-release, and expired-publication races", async () => {
   const scratch = await mkdtemp(join(tmpdir(), "apex-asset-lock-"));
   const lockPath = join(scratch, ".prepare-assets.lock");
+  const targetAssets = join(scratch, "assets");
   let currentNow = 1_000;
+  let expiredOwner;
+  let contenderreplacementOwner;
+  let staleReclaimer;
+  let secondOwner;
   try {
-    const expiredOwner = await acquireAssetGenerationLock({
+    expiredOwner = await acquireAssetGenerationLock({
       lockPath,
       ttlMs: 100,
       retryMs: 5,
@@ -880,38 +885,86 @@ test("asset generation lock prevents stale-reclaim and late-release TOCTOU races
     currentNow = 1_200;
     await assert.rejects(() => expiredOwner.assertHeld(), /expired before completion/u);
 
-    let contenderreplacementOwner;
-    const staleReclaimer = acquireAssetGenerationLock({
+    const {
+      promise: staleCallbackDone,
+      resolve: markStaleCallbackDone,
+      reject: failStaleCallback,
+    } = Promise.withResolvers();
+    staleReclaimer = acquireAssetGenerationLock({
       lockPath,
       ttlMs: 1_000,
       retryMs: 5,
       now: () => currentNow,
       onStaleRead: async () => {
-        // Simulate another contender reclaiming the expired lock and acquiring a fresh lock first.
-        await rm(lockPath, { recursive: true, force: true });
-        contenderreplacementOwner = await acquireAssetGenerationLock({
-          lockPath,
-          ttlMs: 1_000,
-          retryMs: 5,
-          now: () => currentNow,
-        });
+        try {
+          // Simulate another contender reclaiming the expired lock and acquiring a fresh lock first.
+          await rm(lockPath, { recursive: true, force: true });
+          contenderreplacementOwner = await acquireAssetGenerationLock({
+            lockPath,
+            ttlMs: 1_000,
+            retryMs: 5,
+            now: () => currentNow,
+          });
+          markStaleCallbackDone();
+        } catch (error) {
+          failStaleCallback(error);
+          throw error;
+        }
       },
     });
-    // Wait briefly so staleReclaimer executes its guarded reclaim check and sees contenderreplacementOwner's fresh token.
-    await new Promise((done) => setTimeout(done, 25));
+    await staleCallbackDone;
     assert.ok(contenderreplacementOwner, "replacement owner acquired the lock");
     await contenderreplacementOwner.assertHeld();
+
+    // Replacement owner publishes its staged output to targetAssets.
+    const replacementStaging = join(scratch, `staging-${contenderreplacementOwner.token}`);
+    await mkdir(replacementStaging, { recursive: true });
+    await writeFile(join(replacementStaging, "manifest.json"), '{"owner":"replacement"}\n');
+    await contenderreplacementOwner.publish(replacementStaging, targetAssets);
+    assert.equal(await readFile(join(targetAssets, "manifest.json"), "utf8"), '{"owner":"replacement"}\n');
+
+    // Expired owner finishes generating into its own staging directory and attempts to publish; fenced publish rejects
+    // and leaves the replacement owner's published files untouched.
+    const expiredStaging = join(scratch, `staging-${expiredOwner.token}`);
+    await mkdir(expiredStaging, { recursive: true });
+    await writeFile(join(expiredStaging, "manifest.json"), '{"owner":"expired"}\n');
+    await assert.rejects(
+      () => expiredOwner.publish(expiredStaging, targetAssets),
+      /ownership changed before completion/u,
+    );
+    assert.equal(await readFile(join(targetAssets, "manifest.json"), "utf8"), '{"owner":"replacement"}\n');
 
     // Late release by the original expired owner must not delete the replacement owner's active lock.
     await expiredOwner();
     await contenderreplacementOwner.assertHeld();
 
+    // A waiter timing out on the guard must not delete an active guard directory.
+    const guardPath = `${lockPath}.guard`;
+    await mkdir(guardPath);
+    let waiterNow = 2_200;
+    const guardWaiter = acquireAssetGenerationLock({
+      lockPath,
+      ttlMs: 50,
+      retryMs: 1,
+      now: () => {
+        waiterNow += 20;
+        return waiterNow;
+      },
+    });
+    await assert.rejects(guardWaiter, /Timed out waiting for asset generation lock guard/u);
+    assert.ok(
+      (await readdir(scratch)).includes(".prepare-assets.lock.guard"),
+      "guard remains intact after waiter timeout",
+    );
+    await rm(guardPath, { recursive: true, force: true });
+
     // Once the replacement owner releases, the waiting staleReclaimer acquires the lock cleanly.
     await contenderreplacementOwner();
-    const secondOwner = await staleReclaimer;
+    secondOwner = await staleReclaimer;
     await secondOwner.assertHeld();
     await secondOwner();
   } finally {
+    await Promise.allSettled([staleReclaimer, secondOwner?.(), contenderreplacementOwner?.(), expiredOwner?.()]);
     await rm(scratch, { recursive: true, force: true });
   }
 });
