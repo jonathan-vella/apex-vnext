@@ -65,8 +65,19 @@ async function readManifest() {
 test("plugin build is byte reproducible with fixed mtimes", async (context) => {
   const first = await buildInto(context, "first");
   const second = await buildInto(context, "second");
+  const expectedCustomizationDigest = createHash("sha256")
+    .update((await readFile(join(root, "customizations/manifest.json"), "utf8")).replace(/\r\n/g, "\n"))
+    .digest("hex");
+  const customizationManifest = await readJson(join(root, "customizations/manifest.json"));
   assert.match(first.sha256, /^[0-9a-f]{64}$/u);
   assert.equal(first.sha256, second.sha256);
+  assert.equal(first.customizationManifestSha256, expectedCustomizationDigest);
+  assert.deepEqual(first.customizationManifest, {
+    path: "customizations/manifest.json",
+    version: customizationManifest.version,
+    sha256: expectedCustomizationDigest,
+  });
+  assert.deepEqual(first.customizationManifest, second.customizationManifest);
   assert.deepEqual(first.files, second.files);
   assert.deepEqual(first.bundle, second.bundle);
   assert.deepEqual(first.native, second.native);
@@ -342,6 +353,20 @@ test("plugin validators reject drift from the Agent Plugins 1.0 and APEX contrac
   assert.throws(() => validatePluginJson({ ...plugin, extensions: null }), /extensions/u);
   assert.throws(() => validatePluginJson({ ...plugin, extensions: [{}] }), /extensions/u);
   validatePluginJson({ ...plugin, extensions: { "com.github.copilot": {} } });
+  const customizationManifest = await readJson(join(root, "customizations/manifest.json"));
+  validatePluginJson({ ...plugin, version: customizationManifest.version }, customizationManifest);
+  assert.throws(
+    () => validatePluginJson({ ...plugin, version: "0.0.0-mismatch" }, customizationManifest),
+    /plugin\.json version \(0\.0\.0-mismatch\) must match customizations\/manifest\.json version/u,
+  );
+  await assert.rejects(
+    build({
+      manifestPath,
+      outputDirectory: join(await temporaryDirectory(context, "version-drift"), "plugin"),
+      customizationManifest: { ...customizationManifest, version: "0.0.0-drift" },
+    }),
+    /plugin\.json version .* must match customizations\/manifest\.json version \(0\.0\.0-drift\)/u,
+  );
   const server = (overrides) => ({ ...mcp, mcpServers: { apex: { ...mcp.mcpServers.apex, ...overrides } } });
   assert.throws(() => validateMcpJson(server({ command: "npx" }), manifest), /must run node/u);
   assert.throws(() => validateMcpJson(server({ args: ["./mcp/apex.mjs"] }), manifest), /must run node/u);

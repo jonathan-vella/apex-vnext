@@ -89,8 +89,24 @@ fig.savefig(SPEC["kind"] + ".png", dpi=150)
 `;
 }
 
+function assertNonNegativeFinite(value: number, label: string): number {
+  if (!Number.isFinite(value) || value < 0) {
+    throw new Error(`Invalid ${label}: expected a finite non-negative number`);
+  }
+  return value;
+}
+
 function source(spec: DiagramSpec, svg: string): DiagramSource {
   if (spec.rows.length > MAX_DIAGRAM_ROWS) throw new Error(`Diagram exceeds ${MAX_DIAGRAM_ROWS} rows`);
+  for (const row of spec.rows) {
+    for (const [field, value] of [
+      ["value", row.value],
+      ["lower", row.lower],
+      ["upper", row.upper],
+    ] as const) {
+      if (value !== undefined) assertNonNegativeFinite(value, `diagram row '${row.id}' ${field}`);
+    }
+  }
   return { svg, python: pythonSource(spec) };
 }
 
@@ -166,7 +182,11 @@ export function renderWafAssessmentDiagram(architecture: ArchitectureV1): Diagra
 
 export function renderCostBreakdownDiagram(cost: CostEstimateV1): DiagramSource {
   const rows = cost.lineItems
-    .map(({ id, service, sku, monthlyCost }) => ({ id, label: `${service} / ${sku}`, value: monthlyCost }))
+    .map(({ id, service, sku, monthlyCost }) => ({
+      id,
+      label: `${service} / ${sku}`,
+      value: assertNonNegativeFinite(monthlyCost, `cost line item '${id}' monthlyCost`),
+    }))
     .sort((left, right) => compare(left.id, right.id));
   const maximum = Math.max(1, ...rows.map(({ value }) => value ?? 0));
   const notes = (cost.unpricedItems ?? []).map(({ service, sku }) => `Unpriced: ${service} / ${sku}`).sort(compare);
@@ -196,9 +216,9 @@ export function renderCostUncertaintyDiagram(cost: CostEstimateV1): DiagramSourc
     .map(({ id, service, sku, monthlyCost, uncertainty }) => ({
       id,
       label: `${service} / ${sku}`,
-      value: monthlyCost,
-      lower: uncertainty.lowerMonthlyCost,
-      upper: uncertainty.upperMonthlyCost,
+      value: assertNonNegativeFinite(monthlyCost, `cost line item '${id}' monthlyCost`),
+      lower: assertNonNegativeFinite(uncertainty.lowerMonthlyCost, `cost line item '${id}' lowerMonthlyCost`),
+      upper: assertNonNegativeFinite(uncertainty.upperMonthlyCost, `cost line item '${id}' upperMonthlyCost`),
     }))
     .sort((left, right) => compare(left.id, right.id));
   const maximum = Math.max(1, ...rows.map(({ upper }) => upper));

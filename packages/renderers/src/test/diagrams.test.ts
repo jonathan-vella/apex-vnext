@@ -111,3 +111,51 @@ test("WAF and cost diagrams preserve qualitative and partial pricing semantics",
     assert.ok(rasterizeDiagram(output.svg).byteLength > 100);
   }
 });
+
+test("cost diagram renderers reject NaN, Infinity, and negative cost values", () => {
+  const baseItem = cost.lineItems[0]!;
+  for (const invalid of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, -1]) {
+    assert.throws(
+      () =>
+        renderCostBreakdownDiagram({
+          ...cost,
+          lineItems: [{ ...baseItem, monthlyCost: invalid }],
+        }),
+      /Invalid cost line item 'api' monthlyCost/u,
+    );
+    assert.throws(
+      () =>
+        renderCostUncertaintyDiagram({
+          ...cost,
+          lineItems: [{ ...baseItem, monthlyCost: invalid }],
+        }),
+      /Invalid cost line item 'api' monthlyCost/u,
+    );
+    assert.throws(
+      () =>
+        renderCostUncertaintyDiagram({
+          ...cost,
+          lineItems: [
+            {
+              ...baseItem,
+              uncertainty: { ...baseItem.uncertainty, lowerMonthlyCost: invalid },
+            },
+          ],
+        }),
+      /Invalid cost line item 'api' lowerMonthlyCost/u,
+    );
+    assert.throws(
+      () =>
+        renderCostUncertaintyDiagram({
+          ...cost,
+          lineItems: [
+            {
+              ...baseItem,
+              uncertainty: { ...baseItem.uncertainty, upperMonthlyCost: invalid },
+            },
+          ],
+        }),
+      /Invalid cost line item 'api' upperMonthlyCost/u,
+    );
+  }
+});

@@ -457,7 +457,7 @@ export async function renderPluginAgents(sourceRoot) {
   return rendered;
 }
 
-function validatePluginJson(plugin) {
+function validatePluginJson(plugin, customizationManifest) {
   assertKeys(
     "plugin.json",
     plugin,
@@ -482,6 +482,20 @@ function validatePluginJson(plugin) {
   for (const field of ["version", "description", "homepage", "repository", "license"]) {
     if (plugin[field] !== undefined && typeof plugin[field] !== "string")
       throw new Error(`plugin.json ${field} must be a string`);
+  }
+  if (customizationManifest !== undefined) {
+    if (
+      !isPlainObject(customizationManifest) ||
+      typeof customizationManifest.version !== "string" ||
+      customizationManifest.version.length === 0
+    ) {
+      throw new Error("customizations/manifest.json version must be a non-empty string");
+    }
+    if (typeof plugin.version !== "string" || plugin.version !== customizationManifest.version) {
+      throw new Error(
+        `plugin.json version (${String(plugin.version)}) must match customizations/manifest.json version (${customizationManifest.version})`,
+      );
+    }
   }
   if (plugin.author !== undefined) {
     assertKeys("plugin.json author", plugin.author, ["name", "email", "url"], []);
@@ -1036,18 +1050,33 @@ async function hashTree(root) {
 }
 
 async function build(
-  { manifestPath, outputDirectory: outputDirectoryOverride } = parseArguments(process.argv.slice(2)),
+  {
+    manifestPath,
+    outputDirectory: outputDirectoryOverride,
+    customizationManifest: customizationManifestOverride,
+  } = parseArguments(process.argv.slice(2)),
 ) {
   const { manifest, outputDirectory } = await readManifest(manifestPath, outputDirectoryOverride);
   await clearOutputDirectory(outputDirectory);
 
+  const customizationManifestBytes = await readSourceFile(join(repositoryRoot, "customizations/manifest.json"));
+  const customizationManifest =
+    customizationManifestOverride ?? JSON.parse(customizationManifestBytes.toString("utf8"));
+  const customizationManifestSha256 = createHash("sha256").update(customizationManifestBytes).digest("hex");
+
   const plugin = await readJson(join(repositoryRoot, manifest.plugin.source));
   const { version } = await readJson(join(repositoryRoot, manifest.plugin.versionFrom));
+  const { version: rootPackageVersion } = await readJson(join(repositoryRoot, "package.json"));
   if (Object.hasOwn(plugin, "version"))
     throw new Error(`${manifest.plugin.source} must not set version; it comes from ${manifest.plugin.versionFrom}`);
+  if (version !== rootPackageVersion) {
+    throw new Error(
+      `package.json version (${String(rootPackageVersion)}) must match ${manifest.plugin.versionFrom} version (${String(version)})`,
+    );
+  }
   const { $schema, name, ...rest } = plugin;
   const packagedPlugin = { $schema, name, version, ...rest };
-  validatePluginJson(packagedPlugin);
+  validatePluginJson(packagedPlugin, customizationManifest);
   await writeJsonOutput(outputDirectory, manifest.plugin.target, packagedPlugin);
 
   const mcp = await readJson(join(repositoryRoot, manifest.mcp.source));
@@ -1077,6 +1106,16 @@ async function build(
     await writeJsonOutput(outputDirectory, `${manifest.hooks.targetRoot}/${manifest.hooks.toolPolicy}`, policy);
   }
   await copyDirectory(manifest.assets.sourceRoot, outputDirectory, manifest.assets.targetRoot);
+  const bundledAssetManifest = await readJson(join(outputDirectory, manifest.assets.targetRoot, "manifest.json"));
+  const bundledCustomizationManifest = Array.isArray(bundledAssetManifest.files)
+    ? bundledAssetManifest.files.find((entry) => entry?.path === "customizations/manifest.json")
+    : undefined;
+  if (
+    bundledAssetManifest.sources?.customizations !== customizationManifest.version ||
+    bundledCustomizationManifest?.sha256 !== customizationManifestSha256
+  ) {
+    throw new Error("Bundled assets/manifest.json is out of sync with customizations/manifest.json");
+  }
 
   await validatePackagedAgents(outputDirectory, manifest.agents.targetRoot);
   await validatePackagedSkills(outputDirectory, manifest.skills.targetRoot);
@@ -1084,7 +1123,18 @@ async function build(
   await setDirectoryTimes(outputDirectory);
   const tree = await hashTree(outputDirectory);
   await writeFile(`${outputDirectory}.sha256`, `${tree.sha256}  ${basename(outputDirectory)}\n`);
-  return { outputDirectory, bundle, native: nativeTable, ...tree };
+  return {
+    outputDirectory,
+    bundle,
+    native: nativeTable,
+    customizationManifestSha256,
+    customizationManifest: {
+      path: "customizations/manifest.json",
+      version: customizationManifest.version,
+      sha256: customizationManifestSha256,
+    },
+    ...tree,
+  };
 }
 
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
@@ -1096,6 +1146,7 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(p
           outputDirectory: portablePath(relative(repositoryRoot, result.outputDirectory)),
           files: result.files.length,
           sha256: result.sha256,
+          customizationManifestSha256: result.customizationManifestSha256,
           bundle: result.bundle,
         },
         null,
