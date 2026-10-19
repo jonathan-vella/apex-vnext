@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0-next.5] — Preview
+
+This release moves Bicep execution onto azd (CP-26, PR B) and ships the skill guidance corrections from the
+0.11.0-next.4 marketplace review. Bicep live runs stay unavailable until CP-30 qualifies the azd executor.
+
 ### Changed
 
 - Run Bicep only through azd and remove the Deployment Stack path (CP-26, PR B). `azd provision --preview` is the

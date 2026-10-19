@@ -10,6 +10,11 @@ When you prepare a release, rename `## [Unreleased]` to the new version.
 
 ## [Unreleased]
 
+## [0.11.0-next.5] - 2026-10-19
+
+This release bundles the azd Bicep executor (CP-26, PR B) and skill guidance corrections from the 0.11.0-next.4
+marketplace review. Bicep live runs stay unavailable until CP-30 qualifies the azd executor.
+
 - Skill guidance corrections from the 0.11.0-next.4 marketplace review (Refs #384): Terraform verification no longer
   builds `https://https://` URLs from the shipped `api_url` output; supporting-resource tables show optional
   integrations (AKS, Logic Apps, Container Apps and others) as conditional instead of required; permission-denied
