@@ -11,6 +11,14 @@
 
 # Azure Region Availability Reference
 
+## Navigation
+
+- How to Use
+- MCP Tools Used
+- Services with LIMITED Region Availability
+- Services Available in Most Regions
+- Common Architecture Patterns
+
 > **DISCOVERY INDEX** — Consult this file BEFORE recommending any region. This static page is not evidence:
 > recommendations still need accepted current service/model/SKU availability and quota evidence for the target.
 >

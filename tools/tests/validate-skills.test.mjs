@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import test from "node:test";
@@ -7,12 +9,15 @@ import { loadValidator } from "../scripts/_lib/ajv-validator.mjs";
 import { parseFrontmatter } from "../scripts/_lib/parse-frontmatter.mjs";
 import {
   applyBaseline,
+  checkReferenceTocs,
   checkRetiredSkillConfig,
   collectModelLoadedSkills,
   findRetiredReferences,
   hasBlockingErrors,
+  hasEarlyContentsHeading,
   loadBaseBaseline,
   loadRepositoryInputs,
+  markdownHeadingsOutsideFences,
   runSkillValidation,
 } from "../scripts/validate-skills.mjs";
 
@@ -20,6 +25,97 @@ const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
 const validateSchema = loadValidator(
   path.join(repoRoot, "tools/registry/schemas/skill-validation-baseline.schema.json"),
 );
+
+test("shipped metadata rejects personal voice, XML and invalid names but accepts natural trigger quotes", () => {
+  const { findings } = run({
+    shipped: shippedSkills([
+      skill("apex-style", 'description: "Helps you <tool> tasks."\nuser-invocable: false'),
+      skill("apex_bad", `${description}\nuser-invocable: false`),
+      skill(
+        "apex-triggers",
+        'description: \'Guides bounded work. WHEN: "validate my app". DO NOT USE FOR: "what did we spend".\'\nuser-invocable: false',
+      ),
+    ]),
+  });
+  assert.ok(findings.some(({ rule, skill }) => rule === "skill-name-syntax" && skill === "apex_bad"));
+  assert.ok(findings.some(({ rule }) => rule === "skill-description-third-person"));
+  assert.ok(findings.some(({ rule }) => rule === "skill-description-no-xml"));
+  assert.equal(
+    findings.some(({ skill }) => skill === "apex-triggers"),
+    false,
+  );
+});
+
+test("shipped names enforce the exact length limit and reserved vendor boundary", () => {
+  for (const [name, rejected] of [
+    ["a".repeat(64), false],
+    ["a".repeat(65), true],
+    ["apex-claude-helper", true],
+    ["apex-anthropic", true],
+  ]) {
+    const { findings } = run({ shipped: shippedSkills([skill(name, `${description}\nuser-invocable: false`)]) });
+    assert.equal(
+      findings.some(({ rule }) => rule === "skill-name-syntax"),
+      rejected,
+      name,
+    );
+  }
+});
+
+test("shipped entrypoint cap counts exact physical lines and does not extend to authoring", () => {
+  const body = "line\n".repeat(495);
+  const accepted = run({
+    shipped: shippedSkills([
+      skill("apex-limit", `${description}\nuser-invocable: false`, { body, refFiles: ["topic.md"] }),
+    ]),
+  });
+  const rejected = run({
+    shipped: shippedSkills([
+      skill("apex-limit", `${description}\nuser-invocable: false`, { body: `${body}line\n`, refFiles: ["topic.md"] }),
+    ]),
+  });
+  assert.equal(
+    accepted.findings.some(({ rule }) => rule === "skill-body-max-lines"),
+    false,
+  );
+  assert.equal(
+    rejected.findings.some(({ rule }) => rule === "skill-body-max-lines"),
+    true,
+  );
+  assert.equal(
+    run({ authoring: new Map([skill("authoring-long", description, { body: "line\n".repeat(501) })]) }).findings.some(
+      ({ rule }) => rule === "skill-body-max-lines",
+    ),
+    false,
+  );
+});
+
+test("reference navigation ignores nested fence markers, indented examples and late contents", () => {
+  assert.equal(hasEarlyContentsHeading("````markdown\n```\n## Contents\n```\n````\n"), false);
+  assert.equal(hasEarlyContentsHeading("~~~md\n## Contents\n~~~\n## Contents\n- Topic\n"), true);
+  assert.equal(hasEarlyContentsHeading("    ## Contents\n"), false);
+  assert.equal(hasEarlyContentsHeading(`${"\n".repeat(40)}## Contents\n`), false);
+  assert.deepEqual(
+    markdownHeadingsOutsideFences("# Topic\n```md\n## Example\n```\n## Details\n").map(({ text }) => text),
+    ["Topic", "Details"],
+  );
+});
+
+test("navigation is required recursively only above 100 reference lines", (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "apex-skill-toc-"));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const nested = path.join(directory, "references", "nested");
+  fs.mkdirSync(nested, { recursive: true });
+  const reference = path.join(nested, "topic.md");
+  const skills = new Map([["apex-toc", { dir: directory, hasRefs: true }]]);
+  fs.writeFileSync(reference, "line\n".repeat(100));
+  assert.deepEqual(checkReferenceTocs("shipped", skills), []);
+  fs.appendFileSync(reference, "line\n");
+  assert.equal(checkReferenceTocs("shipped", skills)[0].rule, "skill-reference-toc-required");
+  assert.deepEqual(checkReferenceTocs("authoring", skills), []);
+  fs.writeFileSync(reference, `# Topic\n\n## Contents\n- Details\n\n${"line\n".repeat(101)}`);
+  assert.deepEqual(checkReferenceTocs("shipped", skills), []);
+});
 
 function skill(name, frontmatter, { body = "Body.\n", refFiles = [] } = {}) {
   const content = `---\nname: ${name}\n${frontmatter}\n---\n${body}`;

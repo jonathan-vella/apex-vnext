@@ -1,6 +1,6 @@
 ---
 name: apex-workflow
-description: "Provides internal APEX workflow routing for status, resume, project selection, and next tasks."
+description: "Orients the foreground APEX agent for status, resume, missing-project selection and kernel-routed continuation. Refreshes stale context and follows apex-next only when work is runnable. Not an independent state machine, repository maintenance or permission to create a project by default."
 user-invocable: false
 ---
 
@@ -47,3 +47,11 @@ and stale conditions are represented by status or stable kernel errors; do not i
 ## Output
 
 Report the project, run, environment, current state, blockers, and one kernel-provided next action.
+
+## Examples
+
+| Request or state | Required response |
+| --- | --- |
+| Status in a configured workspace with zero projects | Report the kernel's missing-project state; do not manufacture a workload |
+| Resume after chat restart | Read current kernel status, not conversation history or generated-file appearance |
+| `runtime_mismatch` or stale request | Report remediation/fresh status and stop using old task IDs and ownership data |

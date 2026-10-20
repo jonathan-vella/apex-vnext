@@ -52,6 +52,11 @@ export const RULES = {
   "skill-description-recommended-length": { severity: "warn", roots: ALL_ROOTS, baselinable: false },
   "skill-description-too-short": { severity: "warn", roots: ALL_ROOTS, baselinable: false },
   "skill-name-mismatch": { severity: "error", roots: ALL_ROOTS, baselinable: true },
+  "skill-name-syntax": { severity: "error", roots: SHIPPED_ONLY, baselinable: false },
+  "skill-description-third-person": { severity: "error", roots: SHIPPED_ONLY, baselinable: false },
+  "skill-description-no-xml": { severity: "error", roots: SHIPPED_ONLY, baselinable: false },
+  "skill-body-max-lines": { severity: "error", roots: SHIPPED_ONLY, baselinable: false },
+  "skill-reference-toc-required": { severity: "error", roots: SHIPPED_ONLY, baselinable: false },
   "skill-deprecated-pattern": { severity: "warn", roots: ALL_ROOTS, baselinable: false },
   "skill-deprecated-json": { severity: "warn", roots: ALL_ROOTS, baselinable: false },
   "skill-size-without-references": { severity: "error", roots: ALL_ROOTS, baselinable: true },
@@ -142,6 +147,67 @@ function listSkillJsonFiles(skill) {
 // ============================================================================
 
 /** Frontmatter, description, deprecated-pattern and size rules (all roots). */
+function physicalLineCount(content) {
+  return content.split("\n").length - Number(content.endsWith("\n"));
+}
+
+export function markdownHeadingsOutsideFences(content) {
+  const headings = [];
+  let fence;
+  for (const [index, line] of content.split("\n").entries()) {
+    if (fence) {
+      const closing = /^ {0,3}(`{3,}|~{3,})\s*$/u.exec(line);
+      if (closing && closing[1][0] === fence[0] && closing[1].length >= fence.length) fence = undefined;
+      continue;
+    }
+    const opening = /^ {0,3}(`{3,}|~{3,})/u.exec(line);
+    if (opening) {
+      fence = opening[1];
+      continue;
+    }
+    const heading = /^ {0,3}(#{1,6})\s+(.+?)(?:\s+#+)?\s*$/u.exec(line);
+    if (heading) headings.push({ depth: heading[1].length, text: heading[2], line: index + 1 });
+  }
+  return headings;
+}
+
+export function hasEarlyContentsHeading(content) {
+  return markdownHeadingsOutsideFences(content).some(
+    ({ text, line }) => line <= 40 && /^(?:contents|table of contents|navigation)$/iu.test(text),
+  );
+}
+
+export function checkReferenceTocs(rootId, skills) {
+  const findings = [];
+  if (rootId !== "shipped") return findings;
+  for (const [skillName, info] of skills) {
+    if (!info.dir || !info.hasRefs) continue;
+    const directories = [path.join(info.dir, "references")];
+    while (directories.length) {
+      const directory = directories.pop();
+      for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+        const file = path.join(directory, entry.name);
+        if (entry.isDirectory()) directories.push(file);
+        else if (entry.isFile() && entry.name.endsWith(".md")) {
+          const content = fs.readFileSync(file, "utf8");
+          if (physicalLineCount(content) > 100 && !hasEarlyContentsHeading(content)) {
+            findings.push(
+              finding(
+                "skill-reference-toc-required",
+                rootId,
+                skillName,
+                `${path.relative(info.dir, file)} exceeds 100 lines and needs Contents within the first 40 lines`,
+                file,
+              ),
+            );
+          }
+        }
+      }
+    }
+  }
+  return findings;
+}
+
 export function checkFormat(rootId, skills) {
   const findings = [];
   for (const [skillName, skill] of skills) {
@@ -157,6 +223,57 @@ export function checkFormat(rootId, skills) {
       findings.push(
         finding("skill-description-missing", rootId, skillName, "Missing required frontmatter field 'description'"),
       );
+    }
+
+    if (rootId === "shipped") {
+      if (
+        typeof frontmatter.name !== "string" ||
+        !/^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(frontmatter.name ?? "") ||
+        frontmatter.name.length > 64 ||
+        /(?:anthropic|claude)/iu.test(frontmatter.name)
+      ) {
+        findings.push(
+          finding(
+            "skill-name-syntax",
+            rootId,
+            skillName,
+            "Name must be <=64 lowercase letters, digits or hyphens without reserved vendor names",
+            file,
+          ),
+        );
+      }
+      if (typeof frontmatter.description === "string") {
+        const prose = frontmatter.description
+          .replace(/\bWHEN:\s*.*?(?=\s+DO NOT USE FOR:|$)/giu, "")
+          .replace(/\bDO NOT USE FOR:\s*.*$/giu, "");
+        if (/\b(?:I|me|my|we|our|us|you|your|yours)\b/iu.test(prose)) {
+          findings.push(
+            finding(
+              "skill-description-third-person",
+              rootId,
+              skillName,
+              "Description prose must use third-person wording",
+              file,
+            ),
+          );
+        }
+        if (/<\/?[A-Za-z][^>]*>/u.test(frontmatter.description)) {
+          findings.push(
+            finding(
+              "skill-description-no-xml",
+              rootId,
+              skillName,
+              "Description must not contain XML/HTML-like tags",
+              file,
+            ),
+          );
+        }
+      }
+      if (physicalLineCount(content) > 500) {
+        findings.push(
+          finding("skill-body-max-lines", rootId, skillName, "SKILL.md must not exceed 500 physical lines", file),
+        );
+      }
     }
 
     const rawFrontmatter = getRawFrontmatter(content);
@@ -436,6 +553,7 @@ export function checkInvocation(rootId, skills, modelLoadedSkills) {
 export function validateSkillRoot({ rootId, skills, agents, searchableContent, nonSkillRedirects = [] }) {
   const findings = [
     ...checkFormat(rootId, skills),
+    ...checkReferenceTocs(rootId, skills),
     ...checkReferences(rootId, skills, searchableContent),
     ...checkRedirects(rootId, skills, agentRedirectNames(agents), nonSkillRedirects),
   ];

@@ -1,5 +1,14 @@
 # Azure Retail Prices API
 
+## Navigation
+
+- Endpoint
+- Querying VM Prices
+- Available Filters
+- Response Fields
+- Pagination
+- Tips for Recommendations
+
 Direct Retail Prices API calls for VM pricing, ported from the upstream `retail-prices-api.md`. The
 [Azure Retail Prices API](https://learn.microsoft.com/rest/api/cost-management/retail-prices/azure-retail-prices) is
 unauthenticated and read-only, so these calls may run directly.

@@ -1,6 +1,6 @@
 ---
 name: apex-requirements
-description: "Provides internal APEX requirements guidance for typed intake, scope, constraints, service preferences and the Gate 1 intent confirmation."
+description: "Guides the foreground APEX agent during kernel-issued Requirements intake, requirements tasks and review dispositions, ending at the Gate 1 intent confirmation. Preserves scope, typed answers, unknowns and service preferences. Not independent project setup or Architecture SKU selection."
 user-invocable: false
 ---
 
@@ -76,8 +76,17 @@ or task.
 ## Boundaries
 
 Do not read task context for `needs_input`, `needs_review`, a stale task ID, or a task owned by another role. Write only
-through APEX MCP. ARM MCP access is read-only and only supports indicative pricing when the user asks for it. Generated
-review projections are derived from accepted state and are never editable authority.
+through APEX MCP. Any external observation remains subject to the foreground agent's granted read-only tools;
+retail pricing belongs to `apex-azure/pricing` under `apex-azure-defaults`, not ARM CostManagement. Requirements
+does not choose Architecture SKUs or accept prices from memory. Generated review projections are never editable authority.
+
+## Examples
+
+| Input | Required response |
+| --- | --- |
+| Kernel `needs_input`, user has already stated a target | Confirm/correct the stated value for that exact question; do not ask for task context |
+| Intake-only request reaches its requested stop point | Report recorded context and stop; do not submit requirements, start review or ask for Gate 1 |
+| Requirements review resolves and Gate 1 is pending | Show purpose, target and accepted requirements; wait for explicit confirmation without polling |
 
 ## Output
 

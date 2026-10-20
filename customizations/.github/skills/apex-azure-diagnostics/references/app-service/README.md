@@ -7,6 +7,18 @@
 
 # App Service Troubleshooting
 
+## Navigation
+
+- Common Issues Matrix
+- High CPU / Memory Diagnosis
+- Deployment Failure Analysis
+- Application Crash / Restart Diagnosis
+- Slow Response Time Investigation
+- Custom Domain / TLS Certificate Issues
+- AZ CLI or MCP Tools for App Service Diagnostics
+- Combined Diagnostic Script (Source Example)
+- Port Source
+
 ## Common Issues Matrix
 
 | Symptom | Likely Cause | Action |

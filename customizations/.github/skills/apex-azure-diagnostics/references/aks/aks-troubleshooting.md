@@ -7,6 +7,21 @@
 
 # AKS Troubleshooting Guide
 
+## Navigation
+
+- When to Use This Guide
+- Scenario Playbooks
+- Tool Selection For Diagnostics
+- Required Inputs
+- Scope Buckets
+- Evidence Order
+- Workflow
+- Error Patterns
+- Safe Fallback Checks
+- Guardrails
+- Output Checklist
+- Port Source
+
 Primary AKS troubleshooting guide for incidents routed from [../../SKILL.md](../../SKILL.md).
 
 ## When to Use This Guide

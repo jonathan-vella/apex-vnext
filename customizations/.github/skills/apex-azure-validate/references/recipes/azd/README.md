@@ -9,6 +9,13 @@
 
 # AZD Validation
 
+## Navigation
+
+- Prerequisites
+- Validation Steps
+- References
+- Next
+
 Validation steps for Azure Developer CLI projects.
 
 ## Prerequisites
@@ -102,8 +109,9 @@ Validate IaC is ready (must complete without error):
 azd provision --preview --no-prompt
 ```
 
-> 💡 **Note:** `azd provision --preview` is design syntax for the planned Bicep-only azd executor (CP-26, #443). azd is
-> not a Terraform path (DECISION-036): Terraform validation uses the native CLI (`terraform validate` and a saved plan).
+> 💡 **Note:** `azd provision --preview` is provider context for the implemented Bicep-only executor (CP-26, #443),
+> not direct execution permission. azd is not a Terraform path (DECISION-036): Terraform validation uses the native CLI
+> (`terraform validate` and a saved plan).
 
 ### 7. Build Verification
 

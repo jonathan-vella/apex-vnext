@@ -9,6 +9,15 @@
 
 # Azure Region Availability Reference
 
+## Navigation
+
+- How to Use
+- MCP Tools Used
+- Services with LIMITED Region Availability
+- Services Available in Most Regions
+- Common Architecture Patterns
+- Port Source
+
 > **Historical upstream reference, dated 2026-03-03 — not current availability evidence or region defaults.**
 > Keep the tables as research examples only. Use accepted fresh capacity evidence, current official documentation
 > and [APEX defaults](../../apex-azure-defaults/SKILL.md) before any recommendation.

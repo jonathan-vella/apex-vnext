@@ -54,7 +54,7 @@
     },
     {
       "id": "project-controls",
-      "currentPath": "docs/vnext/{README,PRD,ROADMAP,REGISTER,DECISIONS,CLIENT-QUALIFICATION,LIVE-QUALIFICATION,AUDIT-REPORT}.md",
+      "currentPath": "docs/vnext/{README,PRD,ROADMAP,REGISTER,DECISIONS,CLIENT-QUALIFICATION,LIVE-QUALIFICATION,AUDIT-REPORT,SKILL-BEST-PRACTICES}.md",
       "contentClass": "project-control",
       "audiences": ["repository-contributor", "maintainer", "release-reviewer"],
       "lifecycle": "active",

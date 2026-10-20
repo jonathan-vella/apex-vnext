@@ -9,6 +9,13 @@
 
 # AZCLI Validation
 
+## Navigation
+
+- Prerequisites
+- Validation Steps
+- References
+- Next
+
 Validation steps for Azure CLI deployments.
 
 ## Prerequisites

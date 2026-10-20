@@ -639,6 +639,60 @@
         "Obsolete unversioned session-state, environment, IaC-contract, policy-property-map, handoff and SKU JSON templates; current versioned contracts and renderer receipts own those facts",
         "Direct artifact file writes, heading/numbered-agent workflow authority, recall/Challenger status sidecars and independent approval lifecycle"
       ]
+    },
+    {
+      "skill": "apex-azure-kubernetes",
+      "upstreamRepository": "jonathan-vella/apex",
+      "upstreamPath": ".github/skills/apex-azure-kubernetes/",
+      "upstreamCommit": "c209d8bb765681aa21dce5d3cd2a3b080dad8d5e",
+      "portedOn": "2026-10-20",
+      "tracking": ["#384", "#401"],
+      "adaptations": [
+        "All eight pinned files adapted for AKS design, accepted quota/network/identity evidence and no cluster, credential, debug or exec authority.",
+        "Per-file source disposition and kernel-safe adaptation recorded in references/upstream-coverage.md."
+      ],
+      "dropped": []
+    },
+    {
+      "skill": "apex-azure-reliability",
+      "upstreamRepository": "jonathan-vella/apex",
+      "upstreamPath": ".github/skills/apex-azure-reliability/",
+      "upstreamCommit": "c209d8bb765681aa21dce5d3cd2a3b080dad8d5e",
+      "portedOn": "2026-10-20",
+      "tracking": ["#384", "#401"],
+      "adaptations": [
+        "All seven pinned files adapted for traceable recovery objectives and reliability design; distinguish assumptions from measured restore/failover evidence; no new gate or live recovery executor.",
+        "Per-file source disposition and kernel-safe adaptation recorded in references/upstream-coverage.md."
+      ],
+      "dropped": []
+    },
+    {
+      "skill": "apex-azure-upgrade",
+      "upstreamRepository": "jonathan-vella/apex",
+      "upstreamPath": ".github/skills/apex-azure-upgrade/",
+      "upstreamCommit": "c209d8bb765681aa21dce5d3cd2a3b080dad8d5e",
+      "portedOn": "2026-10-20",
+      "tracking": ["#384", "#401"],
+      "adaptations": [
+        "All five pinned files adapted for supported-evidence lifecycle assessment and change intent; no invented retirement dates or application/data upgrade and cutover executor.",
+        "Per-file source disposition and kernel-safe adaptation recorded in references/upstream-coverage.md."
+      ],
+      "dropped": []
+    },
+    {
+      "skill": "apex-python-diagrams",
+      "upstreamRepository": "jonathan-vella/apex",
+      "upstreamPath": ".github/skills/apex-python-diagrams/",
+      "upstreamCommit": "c209d8bb765681aa21dce5d3cd2a3b080dad8d5e",
+      "portedOn": "2026-10-20",
+      "tracking": ["#384", "#401"],
+      "adaptations": [
+        "All thirteen prose files adapted for existing typed artifact/renderers; unexecuted editable Python; unsupported diagram families explicitly reference-only.",
+        "Per-file source disposition and kernel-safe adaptation recorded in references/upstream-coverage.md."
+      ],
+      "dropped": [
+        "Five upstream executable helpers excluded: unapproved dependencies/downloads and code execution; exact per-file reasons in references/upstream-coverage.md."
+      ]
     }
   ]
 }

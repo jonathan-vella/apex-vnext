@@ -1,6 +1,6 @@
 ---
 name: apex-next
-description: "Routes the next APEX kernel step inside the same APEX agent by mapping owner roles to stage skills, hidden workers or captured rubber-duck reviews."
+description: "Routes explicit APEX continuation and kernel next-step results to same-agent stage skills, hidden workers or captured rubber-duck reviews. Preserves status-only requests and human stop points. Not repository maintenance, independent workflow authority or an agent-switching command."
 user-invocable: true
 ---
 
@@ -104,3 +104,11 @@ output and the kernel derives the findings from that capture; this agent never w
 
 Report the mapped skill or worker, the kernel task/request/review identifier, the carried stop point, and the next
 action. If the requested outcome is complete, summarize and stop.
+
+## Examples
+
+| Result | Required response |
+| --- | --- |
+| Status-only request | Return `apex/status` and stop without issuing work |
+| `status=needs_review` | Present dispositions with the mapped stage skill; do not poll or rerun a captured review |
+| `status=task`, owner `validator` | Delegate only the hidden Validator with exact task ID, complete context instruction and stop boundary |

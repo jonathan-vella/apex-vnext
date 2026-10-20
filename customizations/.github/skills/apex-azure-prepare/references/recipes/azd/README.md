@@ -9,6 +9,16 @@
 
 # AZD Recipe
 
+## Navigation
+
+- When to Use
+- IaC Provider Options
+- Before Generation
+- Generation Steps
+- Outputs
+- References
+- Next
+
 Azure Developer CLI workflow for preparing Azure deployments.
 
 ## When to Use

@@ -8,6 +8,11 @@
 
 # Step 7: Workload Documentation Templates
 
+## Navigation
+
+- Generation Workflow
+- Step 7 Source Artifacts
+
 ### 07-documentation-index.md
 
 ```text
