@@ -232,9 +232,10 @@ and the repository archives.
   `prepare-assets.mjs`, explicit `approval-rejected` routing, centralized MCP review-pending enforcement,
   duplicate-measurement rejection in `scorecard.ts`, non-zero error exit in `fetch-azure-deprecations.mjs`, explicit
   `user-invocable: true` on `apex-next`, and YAML-parsed validator consumer checks.
-- **State:** Remediated on `fix/cp-32-audit-remediation`
-  ([CP-32](https://github.com/jonathan-vella/apex-vnext/issues/495): `c49fb45d`, `9a2bd31c`, `304372cb`, and
-  documentation closure slice); open until PR merge to `main`
+- **State:** Closed for this audit scope: remediation merged in
+  [#496](https://github.com/jonathan-vella/apex-vnext/pull/496) at `4ccd5d80` and post-merge hosted checks passed.
+  [CP-32](https://github.com/jonathan-vella/apex-vnext/issues/495) is closed; live-client and release acceptance remain
+  separate.
 - **Closure proof:** Focused unit/validator regressions, `npm run validate:_node-core`, and `npm run qualify:vnext`
   pass with all 22 findings in [AUDIT-REPORT.md](AUDIT-REPORT.md) resolved and the `skill-validation-baseline.json`
   suppression removed.
