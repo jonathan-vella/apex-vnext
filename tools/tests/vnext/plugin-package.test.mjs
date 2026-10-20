@@ -985,9 +985,8 @@ async function renderThroughPackagedServer(plugin, preload = []) {
     assert.deepEqual({ code: exit.code, signal: exit.signal }, { code: 0, signal: null }, exit.stderr);
   }
   for (const name of diagramNames) {
-    for (const extension of ["py", "svg"]) {
-      assert.ok((await readFile(join(task.directory, `${name}.${extension}`))).byteLength > 0, `${name}.${extension}`);
-    }
+    assert.ok((await readFile(join(task.directory, `${name}.svg`))).byteLength > 0, `${name}.svg`);
+    assert.ok((await readFile(join(task.directory, "sources", `${name}.py`))).byteLength > 0, `${name}.py`);
   }
   assert.match(await readFile(join(task.directory, "03-des-diagram.mmd"), "utf8"), /^%% .*\nflowchart TB\n/u);
   return { directory: task.directory, readme: await readFile(join(task.directory, "README.md"), "utf8") };
