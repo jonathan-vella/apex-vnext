@@ -9,6 +9,10 @@
           "minLength": 1,
           "type": "string"
         },
+        "approvalContextHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
         "decidedAt": {
           "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$",
           "type": "string"
@@ -90,6 +94,10 @@
       "properties": {
         "actor": {
           "minLength": 1,
+          "type": "string"
+        },
+        "approvalContextHash": {
+          "pattern": "^[0-9a-f]{64}$",
           "type": "string"
         },
         "decidedAt": {

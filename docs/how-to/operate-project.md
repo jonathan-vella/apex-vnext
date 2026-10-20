@@ -106,6 +106,11 @@ Review target, operation, dependency revision, IaC hash, change set, warnings, a
 single final approval for a lab: also review the Approval Context in `operations/deployment-preview.md` (purpose,
 target, gate provenance, architecture, cost estimate and accepted risks).
 
+For source candidates containing #466, the file and `apex render --kind preview` show the same immutable review material
+and its approval-context object hash. The full accepted-source hashes identify detail omitted from bounded summaries.
+Editing the file or its local generated-review base does not change accepted evidence. If review material is missing
+or changed, restore the exact bound bytes or create and review a fresh preview; never edit `.apex` to bypass rejection.
+
 ## Approve The Exact Preview
 
 ```bash

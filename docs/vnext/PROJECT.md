@@ -14,6 +14,12 @@ integration commit both passed their hosted checks. Neither result qualifies a l
 or authorizes deployment or release. [#466](https://github.com/jonathan-vella/apex-vnext/issues/466) is the next
 bounded implementation: bind the Gate 4 approval context immutably without enabling production execution.
 
+The #466 source slice adds the versioned immutable context object, `preview.created`/approval hash binding,
+full accepted-source references, and a final review-file check under the run mutation lock. Focused regressions cover
+both IaC tracks, restart, apply/destroy replacement, truncated summaries, missing/corrupt objects and document-plus-base
+tampering. Integration qualification and PR acceptance remain separate from this source implementation; no live
+client/cloud run, candidate replacement or publication is implied.
+
 The maintainer accepted
 [DECISION-036](DECISIONS.md#decision-036-deliver-non-production-first-with-purpose-bound-approval): non-production
 first, azd/Bicep and native Terraform, one lab intent confirmation plus final preview approval, optional production

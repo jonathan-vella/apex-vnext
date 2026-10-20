@@ -1,6 +1,7 @@
 import {
   CONTRACT_VERSION,
   type ArchitectureV1,
+  type CostEstimateV1,
   type ImplementationIntentV1,
   type IacBindingV1,
   type QualityScorecardV1,
@@ -174,7 +175,7 @@ export function architecture(runId: string): ArchitectureV1 {
   };
 }
 
-export function costEstimate(runId: string, monthlyCost = 1) {
+export function costEstimate(runId: string, monthlyCost = 1): CostEstimateV1 {
   return {
     schemaVersion: CONTRACT_VERSION,
     projectId: "demo",
@@ -632,7 +633,13 @@ export async function prepareValidatedRun(
   service: ApexService,
   runId: string,
   track: "bicep" | "terraform",
-  options: { requirements?: RequirementsV1; acceptAvailability?: boolean; stopBeforeCodegen?: boolean } = {},
+  options: {
+    requirements?: RequirementsV1;
+    architecture?: ArchitectureV1;
+    costEstimate?: CostEstimateV1;
+    acceptAvailability?: boolean;
+    stopBeforeCodegen?: boolean;
+  } = {},
 ) {
   const nextTask = async (expected: string) => {
     const next = await nextTaskAfterInput(service);
@@ -650,8 +657,8 @@ export async function prepareValidatedRun(
   await service.decideGateNumber(1, "approved", "tester");
   if (options.acceptAvailability !== false) await acceptAvailabilityEvidence(service, runId);
   const governanceHash = await importReferenceGovernance(service);
-  const architectureValue = architecture(runId);
-  const costValue = costEstimate(runId);
+  const architectureValue = options.architecture ?? architecture(runId);
+  const costValue = options.costEstimate ?? costEstimate(runId);
   const architectureTask = await nextTask("architecture");
   const findings = await governanceFindings(service, architectureTask, ["Microsoft.Web/sites"]);
   const architectureHashes = await service.completeTaskOutputs(architectureTask, [

@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { FormatRegistry } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
 import {
+  ApprovalContextV1Schema,
   ApprovalEvidenceV1Schema,
   ArchitectureV1Schema,
   CapabilityPackManifestV1Schema,
@@ -1914,6 +1915,26 @@ describe("target family contracts", () => {
         }
       }
     }
+  });
+
+  it("validates immutable approval contexts and their typed source hashes", () => {
+    const context = {
+      schemaVersion: CONTRACT_VERSION,
+      projectId: "example-project",
+      runId: "run-1",
+      previewHash: hash,
+      sourceHashes: { architecture: hash, "cost-estimate": otherHash, "risk-dispositions": hash },
+      contentType: "text/markdown",
+      content: "# Deployment Preview\n\nBound review material.",
+    };
+    assert.equal(Value.Check(ApprovalContextV1Schema, context), true);
+    assert.equal(Value.Check(ApprovalContextV1Schema, { ...context, previewHash: "invalid" }), false);
+    assert.equal(
+      Value.Check(ApprovalContextV1Schema, { ...context, sourceHashes: { architecture: "invalid" } }),
+      false,
+    );
+    assert.equal(Value.Check(ApprovalContextV1Schema, { ...context, content: "" }), false);
+    assert.equal(Value.Check(ApprovalContextV1Schema, { ...context, unreviewed: true }), false);
   });
 
   it("binds encrypted plan attestations to the preview and approval recipient", () => {

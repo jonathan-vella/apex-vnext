@@ -27,6 +27,7 @@ import {
   ArchetypeBatchPlanV1Schema,
 } from "./archetype-source.js";
 import {
+  ApprovalContextV1Schema,
   ApprovalEvidenceV1Schema,
   DeploymentPreviewV1Schema,
   OperationRecordV1Schema,
@@ -117,6 +118,7 @@ export const contractSchemas = [
   ImplementationIntentV1Schema,
   IacBindingV1Schema,
   AzdBindingV1Schema,
+  ApprovalContextV1Schema,
   ApprovalEvidenceV1Schema,
   DeploymentPreviewV1Schema,
   OperationRecordV1Schema,
@@ -201,6 +203,7 @@ export const contractMetadata: Readonly<Record<string, ContractMetadata>> = {
   "https://schemas.apexops.dev/iac-binding-v1.json": metadata(524_288, "confidential"),
   "https://schemas.apexops.dev/azd-binding-v1.json": metadata(524_288, "confidential"),
   "https://schemas.apexops.dev/approval-evidence-v1.json": metadata(32_768, "confidential"),
+  "https://schemas.apexops.dev/approval-context-v1.json": metadata(4_194_304, "confidential"),
   "https://schemas.apexops.dev/deployment-preview-v1.json": metadata(2_097_152, "confidential"),
   "https://schemas.apexops.dev/operation-record-v1.json": metadata(65_536, "confidential"),
   "https://schemas.apexops.dev/resource-inventory-v1.json": metadata(4_194_304, "confidential"),

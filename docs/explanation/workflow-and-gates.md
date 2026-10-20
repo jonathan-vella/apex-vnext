@@ -61,10 +61,18 @@ own. A new human confirmation is needed only for changed requirements, purpose o
 each apply and destroy, which keep their own current preview and Gate 4 approval.
 
 The Gate 4 approval context (purpose, target, architecture, cost estimate and accepted risks) is written to
-`operations/deployment-preview.md` as a bounded summary of accepted artifacts. Its tamper check is a best-effort local
-comparison with a generated-review base file, the same mechanism `approval.md` uses, and its content is not recorded in
-`preview.created` or the approval evidence. The exact preview binding remains the authority for what is authorized.
-Binding the context hash is tracked in [#466](https://github.com/jonathan-vella/apex-vnext/issues/466).
+`operations/deployment-preview.md` as a bounded summary of accepted artifacts. Source implementation for
+[#466](https://github.com/jonathan-vella/apex-vnext/issues/466) stores the exact review content in an immutable,
+content-addressed `approval-context-v1` object, including the full accepted artifact and risk-disposition hashes.
+The document displays this object's hash; `preview.created`, `gate.decided` and Gate 4 approval evidence bind the
+same `approvalContextHash`. CLI/MCP preview rendering reads the immutable content, not a mutable local base.
+
+Immediately before recording the decision, the kernel re-reads and compares the local review bytes with the bound
+object under the run mutation lock. Editing both the document and its generated-review base cannot satisfy that check.
+Missing context requires a fresh preview; missing or altered review material blocks the decision. Deployment checks the
+approval's context binding and immutable objects, including after restart or supported state transfer. The exact preview,
+writer, recipient, operation and expiry bindings remain authoritative; context binding does not replace them or enable
+production. The published `0.11.0-next.5` candidate and live-client qualification are unchanged by source implementation.
 
 The CLI and MCP descriptions, managed agent and skill guidance and the client qualification scenarios describe this
 flow. `gate decide` and `apex/gateDecide` on a lab Gate 2 or 3 are refused with reason `GATE_READINESS_AUTOMATIC`, the

@@ -14,6 +14,8 @@ export interface RunMutation {
   expectedJournalHead?: string | null;
   event: Omit<AppendEventInput, "expectedHead">;
   update: (current: RunConfigV1) => RunConfigV1;
+  /** Final evidence validation under the run mutation lock, before publishing transaction intent. */
+  validateBeforeCommit?: () => Promise<void>;
 }
 
 export interface RunMutationResult {
@@ -203,6 +205,7 @@ export class RunRepository {
         afterHash,
         after: next,
       };
+      await input.validateBeforeCommit?.();
       await atomicWriteJson(this.intentPath, intent, { refuseOverwrite: true });
       await this.faultInjector?.("intent");
       const event = await journal.append({

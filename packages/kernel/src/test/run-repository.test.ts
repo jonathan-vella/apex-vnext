@@ -315,6 +315,49 @@ async function writerLeaseFixture(now: { value: Date }) {
   return { directory, repository: new RunRepository(directory, { clock: () => now.value, writerLeaseTtlMs: 1_000 }) };
 }
 
+test("run mutation validates final evidence under its lock before publishing transaction intent", async () => {
+  const now = { value: new Date("2026-01-01T00:00:00.000Z") };
+  const { directory, repository } = await writerLeaseFixture(now);
+  const before = await repository.read();
+  const expectedRunHash = await repository.hash();
+  const mutation = {
+    expectedRunHash,
+    expectedJournalHead: null,
+    event: {
+      eventId: "approval-1",
+      projectId: "demo",
+      runId: "run-1",
+      type: "gate.decided",
+      timestamp: now.value.toISOString(),
+      ownerEpoch: 1,
+      payload: {},
+    },
+    update: () => before,
+  };
+  await assert.rejects(
+    repository.mutate({
+      ...mutation,
+      validateBeforeCommit: async () => {
+        await assert.rejects(repository.mutate(mutation), RunMutationBusyError);
+        throw new Error("Reviewed evidence changed");
+      },
+    }),
+    /Reviewed evidence changed/,
+  );
+  assert.deepEqual(await repository.read(), before);
+  assert.deepEqual(await repository.journal.replay(), []);
+  assert.ok(!(await readdir(directory)).includes(".run-transaction.json"));
+  let validated = false;
+  await repository.mutate({
+    ...mutation,
+    validateBeforeCommit: async () => {
+      validated = true;
+    },
+  });
+  assert.equal(validated, true);
+  assert.equal((await repository.journal.replay()).length, 1);
+});
+
 test("run writer lease acquires, renews, rejects a second writer, and releases", async () => {
   const now = { value: new Date("2026-01-01T00:00:00.000Z") };
   const { repository } = await writerLeaseFixture(now);

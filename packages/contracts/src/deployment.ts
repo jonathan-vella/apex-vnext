@@ -64,6 +64,8 @@ const approvalEvidenceProperties = {
   actor: NonEmptyStringSchema,
   dependencyHash: Sha256Schema,
   previewHash: Type.Optional(Sha256Schema),
+  // Gate 4 acceptance requires this binding; earlier gates have no deployment context.
+  approvalContextHash: Type.Optional(Sha256Schema),
   writerTransferClaimHash: Type.Optional(Sha256Schema),
   writerEpoch: Type.Integer({ minimum: 1 }),
   decidedAt: Type.String({
@@ -75,6 +77,19 @@ const approvalEvidenceProperties = {
     }),
   ),
 };
+
+export const ApprovalContextV1Schema = Type.Object(
+  {
+    schemaVersion: ContractVersionSchema,
+    projectId: ProjectIdSchema,
+    runId: RunIdSchema,
+    previewHash: Sha256Schema,
+    sourceHashes: Type.Record(NonEmptyStringSchema, Sha256Schema),
+    contentType: Type.Literal("text/markdown"),
+    content: NonEmptyStringSchema,
+  },
+  { $id: "https://schemas.apexops.dev/approval-context-v1.json", additionalProperties: false },
+);
 
 export const ApprovalEvidenceV1Schema = Type.Union(
   [
@@ -153,5 +168,6 @@ export const ResourceInventoryV1Schema = Type.Object(
 
 export type DeploymentPreviewV1 = Static<typeof DeploymentPreviewV1Schema>;
 export type ApprovalEvidenceV1 = Static<typeof ApprovalEvidenceV1Schema>;
+export type ApprovalContextV1 = Static<typeof ApprovalContextV1Schema>;
 export type OperationRecordV1 = Static<typeof OperationRecordV1Schema>;
 export type ResourceInventoryV1 = Static<typeof ResourceInventoryV1Schema>;
