@@ -13,7 +13,7 @@ test("current source delivery preserves complete deferred obligations without mu
   const before = structuredClone(inputs);
   assert.deepEqual(validateGuidanceDelivery(inputs), []);
   assert.deepEqual(inputs, before);
-  assert.equal(inputs.registry.skills.length, 32);
+  assert.equal(inputs.registry.skills.length, 36);
   assert.equal(inputs.registry.instructions.length, 21);
   assert.equal(inputs.registry.maintainerSkills.length, 8);
   assert.equal(inputs.registry.deferredCapabilities.length, 206);
