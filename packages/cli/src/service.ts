@@ -1,4 +1,6 @@
 import {
+  ApprovalContextV1Schema,
+  type ApprovalContextV1,
   ApprovalEvidenceV1Schema,
   ArchetypeBatchConfigV1Schema,
   ArchetypeBatchPlanV1Schema,
@@ -215,7 +217,6 @@ import {
   renderArchitectureDecisionRecords,
   renderCostBreakdownDiagram,
   renderCostUncertaintyDiagram,
-  renderDeploymentPreview,
   renderDeploymentSummary,
   renderDeploymentGuide,
   renderImplementationPlan,
@@ -866,6 +867,7 @@ export class ApexService {
     this.cache = new ContentCache(this.root);
     for (const [, [validator, schema]] of Object.entries(ARTIFACTS)) this.validators.register(validator, schema);
     this.validators.register("approval", ApprovalEvidenceV1Schema);
+    this.validators.register("approval-context", ApprovalContextV1Schema);
     this.validators.register("runtime-lock", RuntimeBundleLockV1Schema);
     this.validators.register("quality-measurements", QualityMeasurementsV1Schema);
     this.validators.register("architecture-availability", ArchitectureAvailabilityV1Schema);
@@ -6783,6 +6785,8 @@ export class ApexService {
     }
     const preview =
       previewObjectHash === undefined ? undefined : await this.objects.getJson<DeploymentPreviewV1>(previewObjectHash);
+    const approvalContextHash = gateNumber === 4 ? this.previewApprovalContextHash(events) : undefined;
+    if (preview !== undefined) await this.readApprovalContext(run, preview.previewHash, approvalContextHash);
     if (preview !== undefined && Date.parse(preview.expiresAt) <= this.clock().getTime()) {
       throw new ApexError("APEX_STALE", "Deployment preview has expired", EXIT_CODES.stale);
     }
@@ -6817,6 +6821,7 @@ export class ApexService {
       actor,
       dependencyHash: gate.dependencyHash,
       ...(previewHash === undefined ? {} : { previewHash }),
+      ...(approvalContextHash === undefined ? {} : { approvalContextHash }),
       ...(writerTransferClaimHash === undefined || writerTransferClaimHash === null ? {} : { writerTransferClaimHash }),
       writerEpoch: run.ownerEpoch,
       decidedAt,
@@ -6852,9 +6857,26 @@ export class ApexService {
         gate: gateNumber,
         approvalHash,
         ...(previewHash === undefined ? {} : { previewHash }),
+        ...(approvalContextHash === undefined ? {} : { approvalContextHash }),
         ...(validatorIds.length === 0 ? {} : { validatorIds }),
       },
       gateNumber === 4 ? (events.at(-1)?.hash ?? null) : undefined,
+      preview !== undefined && approvalContextHash !== undefined
+        ? async (lockedRun) => {
+            if (decision === "approved")
+              await this.validateGateValidators(
+                lockedRun,
+                gate,
+                events,
+                approval,
+                approvalRecipientIdentity,
+                lockedRun,
+              );
+            await this.assertApprovalContextReviewed(run, preview.previewHash, approvalContextHash);
+            if (approval.expiresAt === undefined || Date.parse(approval.expiresAt) <= this.clock().getTime())
+              throw new ApexError("APEX_STALE", "Approval authority expired before commit", EXIT_CODES.stale);
+          }
+        : undefined,
     );
     if (gateNumber === 4) await this.materializeOperationsApprovalPackage(run, approval, approvalHash);
     return approval;
@@ -7076,6 +7098,12 @@ export class ApexService {
       );
       await this.acquireRunWriterLease(run);
       const previewObjectHash = await this.objects.putJson(preview);
+      const approvalContextHash = await this.createApprovalContext(
+        run,
+        events,
+        preview,
+        provider.approvalMaterial?.(preview.previewHash),
+      );
       const attestationHash = attestation === undefined ? undefined : await this.objects.putJson(attestation);
       const policyValidationHash = policyReceipt === undefined ? undefined : await this.objects.putJson(policyReceipt);
       await this.append(run, "preview.requested", {
@@ -7087,6 +7115,7 @@ export class ApexService {
       await this.append(await this.currentRun(), "preview.created", {
         previewHash: preview.previewHash,
         previewObjectHash,
+        approvalContextHash,
         provider: options.provider,
         providerRequestHash: sha256Json(request),
         commit: preview.commit,
@@ -7096,12 +7125,7 @@ export class ApexService {
         ...(attestationHash === undefined ? {} : { attestationHash }),
         ...(policyValidationHash === undefined ? {} : { policyValidationHash }),
       });
-      await this.materializeOperationsPreviewPackage(
-        run,
-        preview,
-        previewObjectHash,
-        provider.approvalMaterial?.(preview.previewHash),
-      );
+      await this.materializeOperationsPreviewPackage(run, preview, previewObjectHash, approvalContextHash);
       await this.openRunGate(await this.currentRun(), 4, preview.previewHash);
       return preview;
     }
@@ -7144,6 +7168,7 @@ export class ApexService {
     );
     await this.acquireRunWriterLease(run);
     const previewObjectHash = await this.objects.putJson(preview);
+    const approvalContextHash = await this.createApprovalContext(run, events, preview);
     await this.append(run, "preview.requested", {
       provider: options.provider,
       operation: options.operation,
@@ -7155,13 +7180,14 @@ export class ApexService {
     await this.append(run, "preview.created", {
       previewHash: preview.previewHash,
       previewObjectHash,
+      approvalContextHash,
       provider: options.provider,
       commit: preview.commit,
       validatorIds: validation.validatorIds,
       evidenceMode: validation.evidenceMode,
       ...(validation.omittedValidatorIds.length === 0 ? {} : { omittedValidatorIds: validation.omittedValidatorIds }),
     });
-    await this.materializeOperationsPreviewPackage(run, preview, previewObjectHash);
+    await this.materializeOperationsPreviewPackage(run, preview, previewObjectHash, approvalContextHash);
     await this.openRunGate(await this.currentRun(), 4, preview.previewHash);
     return preview;
   }
@@ -7170,13 +7196,12 @@ export class ApexService {
     return join(this.root, "agent-output", run.projectId, run.runId, "operations");
   }
 
-  private async materializeOperationsPreviewPackage(
+  private async createApprovalContext(
     run: RunConfigV1,
+    events: Awaited<ReturnType<EventJournal["replay"]>>,
     preview: DeploymentPreviewV1,
-    previewObjectHash: string,
     executor?: { readonly warnings: readonly string[]; readonly inventory: readonly string[] },
-  ): Promise<void> {
-    const directory = this.operationsReviewDirectory(run);
+  ): Promise<string> {
     const changes =
       preview.changes.length === 0
         ? "- No changes."
@@ -7186,10 +7211,13 @@ export class ApexService {
               return `- ${this.reviewMarkdownText(action)} ${this.reviewMarkdownText(resourceId)}${material ? " (material)" : ""}${detail}`;
             })
             .join("\n");
-    const approvalContext = await this.approvalContextMarkdown(run, await this.journal(run).replay());
+    const approvalContext = await this.approvalContextMarkdown(run, events);
+    const { sourceHashes, resolutions } = this.approvalContextSources(events);
+    await this.objects.putJson(resolutions);
     const previewContent = [
       "# Deployment Preview",
       "",
+      `- Preview hash: ${preview.previewHash}`,
       `- Operation: ${this.reviewMarkdownText(preview.operation)}`,
       `- Target: ${this.reviewMarkdownText(preview.target)}`,
       `- Expires: ${this.reviewMarkdownText(preview.expiresAt)}`,
@@ -7215,17 +7243,138 @@ export class ApexService {
             "",
           ]),
       approvalContext,
+      "",
+      "## Full Accepted Sources",
+      "",
+      "The sections above are bounded summaries. Full accepted artifacts and risk dispositions are bound by these object hashes:",
+      "",
+      ...Object.entries(sourceHashes)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([kind, hash]) => `- ${kind}: ${hash}`),
     ].join("\n");
+    const context: ApprovalContextV1 = {
+      schemaVersion: CONTRACT_VERSION,
+      projectId: run.projectId,
+      runId: run.runId,
+      previewHash: preview.previewHash,
+      sourceHashes,
+      contentType: "text/markdown",
+      content: previewContent,
+    };
+    this.assertValid("approval-context", context);
+    return this.objects.putJson(context);
+  }
+
+  private approvalContextSources(events: Awaited<ReturnType<EventJournal["replay"]>>): {
+    sourceHashes: Record<string, string>;
+    resolutions: ReviewResolution[];
+  } {
+    const sourceHashes: Record<string, string> = {};
+    for (const kind of [
+      "requirements",
+      "architecture",
+      "cost-estimate",
+      "workload-decision-manifest",
+      "governance-constraints",
+      "policy-property-map",
+      "implementation-intent",
+      "iac-binding",
+      "environment-inputs",
+    ] as const) {
+      const hash = this.artifactHash(events, kind);
+      if (hash !== undefined) sourceHashes[kind] = hash;
+    }
+    const reviewHashes = new Set<string>();
+    for (const nodeId of ["requirements-review", "architecture-review", "plan-review"]) {
+      const hash = this.latestPayloadHash(events, "task.completed", "reviewHash", (value) => value.nodeId === nodeId);
+      if (hash !== undefined) {
+        sourceHashes[nodeId] = hash;
+        reviewHashes.add(hash);
+      }
+    }
+    const resolutions = events.flatMap((event) => {
+      if (event.type !== "review.resolved") return [];
+      const resolution = (event.payload as { resolution?: ReviewResolution }).resolution;
+      return resolution !== undefined && reviewHashes.has(resolution.reviewHash) ? [resolution] : [];
+    });
+    sourceHashes["risk-dispositions"] = sha256Json(resolutions);
+    return { sourceHashes, resolutions };
+  }
+
+  private approvalContextDocument(context: ApprovalContextV1, hash: string): Buffer {
+    return Buffer.from(`${context.content}\n\n- Approval context object hash: ${hash}\n`, "utf8");
+  }
+
+  private previewApprovalContextHash(events: Awaited<ReturnType<EventJournal["replay"]>>): string | undefined {
+    const payload = events.findLast(({ type }) => type === "preview.created")?.payload as
+      { approvalContextHash?: unknown } | undefined;
+    return typeof payload?.approvalContextHash === "string" ? payload.approvalContextHash : undefined;
+  }
+
+  private async readApprovalContext(
+    run: RunConfigV1,
+    previewHash: string,
+    approvalContextHash: string | undefined,
+  ): Promise<ApprovalContextV1> {
+    if (approvalContextHash === undefined)
+      throw new ApexError(
+        "APEX_STALE",
+        "The preview has no immutable approval context; create a new preview",
+        EXIT_CODES.stale,
+      );
+    const context = await this.objects.getJson<ApprovalContextV1>(approvalContextHash);
+    this.assertValid("approval-context", context);
+    if (context.projectId !== run.projectId || context.runId !== run.runId || context.previewHash !== previewHash)
+      throw new ApexError("APEX_STALE", "Approval context does not match the current preview", EXIT_CODES.stale);
+    const current = this.approvalContextSources(await this.journal(run).replay());
+    if (sha256Json(context.sourceHashes) !== sha256Json(current.sourceHashes))
+      throw new ApexError(
+        "APEX_STALE",
+        "Approval context sources or risk dispositions changed; create a fresh preview",
+        EXIT_CODES.stale,
+      );
+    for (const hash of Object.values(context.sourceHashes)) await this.objects.getBytes(hash);
+    return context;
+  }
+
+  private async assertApprovalContextReviewed(
+    run: RunConfigV1,
+    previewHash: string,
+    approvalContextHash: string,
+  ): Promise<void> {
+    const context = await this.readApprovalContext(run, previewHash, approvalContextHash);
+    const path = join(this.operationsReviewDirectory(run), "deployment-preview.md");
+    await this.assertSafeDestination(this.root, path);
+    const current = await this.readOptional(path);
+    if (current === undefined || !current.equals(this.approvalContextDocument(context, approvalContextHash)))
+      throw new ApexError(
+        "APEX_CONFLICT",
+        "Deployment approval context is missing or differs from immutable preview evidence; restore the exact review material or create a new preview",
+        EXIT_CODES.conflict,
+      );
+  }
+
+  private async materializeOperationsPreviewPackage(
+    run: RunConfigV1,
+    preview: DeploymentPreviewV1,
+    previewObjectHash: string,
+    approvalContextHash: string,
+  ): Promise<void> {
+    const directory = this.operationsReviewDirectory(run);
+    const context = await this.readApprovalContext(run, preview.previewHash, approvalContextHash);
     await mkdir(directory, { recursive: true });
     await Promise.all([
       this.writeGeneratedReview(
         join(directory, "README.md"),
         Buffer.from(
-          `# Operations Review\n\nGenerated from exact kernel evidence for run \`${this.reviewMarkdownText(run.runId)}\`. The APEX kernel state remains authoritative.\n\n- Preview hash: ${preview.previewHash}\n- Preview object hash: ${previewObjectHash}\n- Gate 4 status: pending human terminal approval\n`,
+          `# Operations Review\n\nGenerated from exact kernel evidence for run \`${this.reviewMarkdownText(run.runId)}\`. The APEX kernel state remains authoritative.\n\n- Preview hash: ${preview.previewHash}\n- Preview object hash: ${previewObjectHash}\n- Approval context object hash: ${approvalContextHash}\n- Gate 4 status: pending human terminal approval\n`,
           "utf8",
         ),
       ),
-      this.writeGeneratedReview(join(directory, "deployment-preview.md"), Buffer.from(previewContent, "utf8")),
+      this.writeGeneratedReview(
+        join(directory, "deployment-preview.md"),
+        this.approvalContextDocument(context, approvalContextHash),
+      ),
     ]);
   }
 
@@ -7362,6 +7511,7 @@ export class ApexService {
       `- Actor: ${this.reviewMarkdownText(approval.actor)}`,
       `- Recipient: ${this.reviewMarkdownText(approval.recipientIdentity ?? "Unavailable")}`,
       `- Preview hash: ${approval.previewHash ?? "Unavailable"}`,
+      `- Approval context object hash: ${approval.approvalContextHash ?? "Unavailable"}`,
       `- Approval hash: ${approvalHash}`,
       `- Expires: ${approval.expiresAt === undefined ? "Unavailable" : this.reviewMarkdownText(approval.expiresAt)}`,
       "",
@@ -7486,6 +7636,14 @@ export class ApexService {
         EXIT_CODES.authorization,
       );
     }
+    const approvalContextHash = this.previewApprovalContextHash(events);
+    await this.readApprovalContext(run, preview.previewHash, approvalContextHash);
+    if (approval.approvalContextHash !== approvalContextHash)
+      throw new ApexError(
+        "APEX_AUTHORIZATION",
+        "Approval does not bind the immutable preview review context",
+        EXIT_CODES.authorization,
+      );
     const providerName = [...events].reverse().find((event) => event.type === "preview.created")?.payload as
       { provider?: unknown } | undefined;
     const provider =
@@ -8306,8 +8464,15 @@ export class ApexService {
         throw new ApexError("APEX_NOT_FOUND", "No requirements artifact exists", EXIT_CODES.notFound);
       return (await this.requirementsDocumentMarkdown(await this.objects.getJson(hash), hash)).content;
     }
+    if (kind === "preview") {
+      const previewHash = this.latestPayloadHash(events, "preview.created", "previewHash");
+      if (previewHash === undefined)
+        throw new ApexError("APEX_NOT_FOUND", "No preview artifact exists", EXIT_CODES.notFound);
+      const approvalContextHash = this.previewApprovalContextHash(events);
+      const context = await this.readApprovalContext(run, previewHash, approvalContextHash);
+      return this.approvalContextDocument(context, approvalContextHash!).toString("utf8");
+    }
     const map = {
-      preview: ["preview.created", "previewObjectHash", renderDeploymentPreview],
       approval: ["gate.decided", "approvalHash", renderApprovalEvidence],
       inventory: ["deployment.completed", "inventoryHash", renderResourceInventory],
     } as const;
@@ -8561,6 +8726,7 @@ export class ApexService {
     eventType: string,
     payload: JsonValue,
     expectedJournalHead?: string | null,
+    validateBeforeCommit?: (current: RunConfigV1) => Promise<void>,
   ): Promise<void> {
     this.assertNotSnapshotRead();
     const repository = this.runRepository(before);
@@ -8569,6 +8735,7 @@ export class ApexService {
       await repository.mutate({
         expectedRunHash: sha256Json(before),
         ...(expectedJournalHead === undefined ? {} : { expectedJournalHead }),
+        ...(validateBeforeCommit === undefined ? {} : { validateBeforeCommit }),
         event: {
           eventId: this.idSource(),
           projectId: before.projectId,
@@ -10892,6 +11059,7 @@ export class ApexService {
     events: Awaited<ReturnType<EventJournal["replay"]>>,
     approval: ApprovalEvidenceV1 | undefined,
     expectedApprovalRecipientIdentity: string | undefined,
+    lockedRun?: RunConfigV1,
   ): Promise<string[]> {
     const workflow = await this.lockedWorkflowEngine(run);
     const nodeId = `gate-${gate.gate}`;
@@ -10935,7 +11103,8 @@ export class ApexService {
         : ((await new WriterTransferStore(
             this.projects.runDirectory(run.projectId, run.runId),
             this.clock,
-          ).proveOneHopPostPreviewLineage(preview.previewHash, preview.ownerEpoch)) ?? undefined);
+          ).proveOneHopPostPreviewLineage(preview.previewHash, preview.ownerEpoch, lockedRun)) ?? undefined);
+    const approvalContextHash = this.previewApprovalContextHash(events);
     const context: WorkflowGateValidatorContext = {
       gateNumber: gate.gate,
       now: this.clock().toISOString(),
@@ -10950,6 +11119,7 @@ export class ApexService {
       ...(provedPreviewTransferClaimHash === undefined ? {} : { provedPreviewTransferClaimHash }),
       ...(expectedDependencyHash === undefined ? {} : { expectedDependencyHash }),
       ...(preview === undefined ? {} : { preview }),
+      ...(gate.gate === 4 && approvalContextHash !== undefined ? { approvalContextHash } : {}),
     };
     for (const id of validatorIds) this.assertValid(id, context);
     return validatorIds;
@@ -11159,6 +11329,7 @@ export class ApexService {
       const ownership = workflowValidatorOwnership(id);
       return ownership?.boundary === "deploy" && ownership.owner === owner;
     });
+    const approvalContextHash = this.previewApprovalContextHash(await this.journal(run).replay());
     const context: WorkflowDeployValidatorContext = {
       now: this.clock().toISOString(),
       run,
@@ -11167,6 +11338,7 @@ export class ApexService {
       approval,
       expectedPreviewHash,
       currentDependencyRevision,
+      ...(approvalContextHash === undefined ? {} : { approvalContextHash }),
       ...(provedPreviewTransferClaimHash === undefined ? {} : { provedPreviewTransferClaimHash }),
       ...(operation === undefined ? {} : { operation }),
       ...(executionEvidence === undefined ? {} : { executionEvidence }),

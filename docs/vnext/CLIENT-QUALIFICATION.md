@@ -147,9 +147,12 @@ outcomes once they become runnable:
   approval. `ready` never satisfies Gate 1, Gate 4 or production.
 - **Final approval.** Gate 4 remains the single final approval and is decided only in the trusted terminal. Its
   `operations/deployment-preview.md` Approval Context shows purpose, target, gate provenance, architecture, cost
-  estimate and accepted risks; its tamper check is best-effort and local (immutable binding is
-  [#466](https://github.com/jonathan-vella/apex-vnext/issues/466)). Apply and destroy each need their own preview and
-  approval; changed requirements, a new risk acceptance or a stale preview need a new confirmation.
+  estimate and accepted risks. Source implementation for [#466](https://github.com/jonathan-vella/apex-vnext/issues/466)
+  binds the immutable `approval-context-v1` object and full source hashes in `preview.created` and approval evidence.
+  On a candidate containing that change, verify the displayed context hash, reject document-plus-base tampering,
+  and require a fresh preview when context evidence is absent. This is not qualification of the frozen published
+  candidate. Apply and destroy each need their own preview and approval; changed requirements, a new risk acceptance
+  or a stale preview need a new confirmation.
 
 A readiness checkpoint recorded as, or counted as, human approval fails these scenarios.
 

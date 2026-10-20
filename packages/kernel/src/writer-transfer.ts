@@ -1,4 +1,4 @@
-import type { ProjectId, RunId } from "@apexops/contracts";
+import type { ProjectId, RunConfigV1, RunId } from "@apexops/contracts";
 import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { sha256Json, type JsonValue } from "./canonical.js";
@@ -298,8 +298,13 @@ export class WriterTransferStore {
       );
   }
 
-  async proveOneHopPostPreviewLineage(previewHash: string, previewOwnerEpoch: number): Promise<string | null> {
-    return this.proveOneHopLineage(previewHash, previewOwnerEpoch);
+  /** `lockedRun` is only for callers already holding the run mutation lock with its CAS-checked snapshot. */
+  async proveOneHopPostPreviewLineage(
+    previewHash: string,
+    previewOwnerEpoch: number,
+    lockedRun?: RunConfigV1,
+  ): Promise<string | null> {
+    return this.proveOneHopLineage(previewHash, previewOwnerEpoch, undefined, lockedRun);
   }
 
   async proveOneHopPostApprovalLineage(
@@ -315,10 +320,12 @@ export class WriterTransferStore {
     previewHash: string,
     previewOwnerEpoch: number,
     approvalHash?: string,
+    lockedRun?: RunConfigV1,
   ): Promise<string | null> {
     try {
       if (!/^[0-9a-f]{64}$/.test(previewHash)) return null;
-      const run = await this.runs.read();
+      // A commit-time validator already holds the run lock and supplies its CAS-checked snapshot.
+      const run = lockedRun ?? (await this.runs.read());
       const ownership = await this.currentOwnership();
       const lease = await this.leases.current();
       if (

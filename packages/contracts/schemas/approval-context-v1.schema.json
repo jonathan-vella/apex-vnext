@@ -1,0 +1,50 @@
+{
+  "$id": "https://schemas.apexops.dev/approval-context-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "content": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "contentType": {
+      "const": "text/markdown",
+      "type": "string"
+    },
+    "previewHash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "projectId": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    },
+    "runId": {
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "sourceHashes": {
+      "patternProperties": {
+        "^(.*)$": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "projectId",
+    "runId",
+    "previewHash",
+    "sourceHashes",
+    "contentType",
+    "content"
+  ],
+  "type": "object"
+}

@@ -1,6 +1,7 @@
 import {
   CONTRACT_VERSION,
   type ArchitectureV1,
+  type CostEstimateV1,
   type ImplementationIntentV1,
   type IacBindingV1,
   type QualityScorecardV1,
@@ -174,7 +175,7 @@ export function architecture(runId: string): ArchitectureV1 {
   };
 }
 
-export function costEstimate(runId: string, monthlyCost = 1) {
+export function costEstimate(runId: string, monthlyCost = 1): CostEstimateV1 {
   return {
     schemaVersion: CONTRACT_VERSION,
     projectId: "demo",
@@ -632,7 +633,14 @@ export async function prepareValidatedRun(
   service: ApexService,
   runId: string,
   track: "bicep" | "terraform",
-  options: { requirements?: RequirementsV1; acceptAvailability?: boolean; stopBeforeCodegen?: boolean } = {},
+  options: {
+    requirements?: RequirementsV1;
+    architecture?: ArchitectureV1;
+    costEstimate?: CostEstimateV1;
+    planReviewRisk?: { rationale: string; expiresAt: string };
+    acceptAvailability?: boolean;
+    stopBeforeCodegen?: boolean;
+  } = {},
 ) {
   const nextTask = async (expected: string) => {
     const next = await nextTaskAfterInput(service);
@@ -650,8 +658,8 @@ export async function prepareValidatedRun(
   await service.decideGateNumber(1, "approved", "tester");
   if (options.acceptAvailability !== false) await acceptAvailabilityEvidence(service, runId);
   const governanceHash = await importReferenceGovernance(service);
-  const architectureValue = architecture(runId);
-  const costValue = costEstimate(runId);
+  const architectureValue = options.architecture ?? architecture(runId);
+  const costValue = options.costEstimate ?? costEstimate(runId);
   const architectureTask = await nextTask("architecture");
   const findings = await governanceFindings(service, architectureTask, ["Microsoft.Web/sites"]);
   const architectureHashes = await service.completeTaskOutputs(architectureTask, [
@@ -684,9 +692,32 @@ export async function prepareValidatedRun(
     },
   );
   const planHashes = await complete("plan", plan);
-  await complete("plan-review", [
-    { kind: "review-findings", value: review(runId, "plan", planHashes.outputHashes["implementation-intent"]!) },
+  const planReview = await complete("plan-review", [
+    {
+      kind: "review-findings",
+      value: review(
+        runId,
+        "plan",
+        planHashes.outputHashes["implementation-intent"]!,
+        options.planReviewRisk === undefined
+          ? []
+          : [
+              {
+                id: "F-PLAN-1",
+                severity: "medium",
+                disposition: "open",
+                title: "Capacity assumption",
+                detail: "Confirm temporary capacity risk.",
+                evidenceRefs: [],
+              },
+            ],
+      ),
+    },
   ]);
+  if (options.planReviewRisk !== undefined)
+    await service.decideReview(planReview.outputHashes["review-findings"]!, [
+      { findingId: "F-PLAN-1", action: "accept-risk", ...options.planReviewRisk },
+    ]);
   await assertLabReadiness(service, 3);
   if (options.stopBeforeCodegen === true) return;
   await complete(`codegen-${track}`, codegenBundle(runId, track, plan));

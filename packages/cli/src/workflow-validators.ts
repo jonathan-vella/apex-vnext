@@ -78,6 +78,7 @@ export interface WorkflowGateValidatorContext {
   readonly expectedApprovalRecipientIdentity?: string;
   readonly provedPreviewTransferClaimHash?: string;
   readonly preview?: DeploymentPreviewV1;
+  readonly approvalContextHash?: string;
 }
 
 export interface WorkflowPreviewValidatorContext {
@@ -107,6 +108,7 @@ export interface WorkflowDeployValidatorContext {
   readonly approval: ApprovalEvidenceV1;
   readonly expectedPreviewHash: string;
   readonly currentDependencyRevision: string;
+  readonly approvalContextHash?: string;
   readonly provedPreviewTransferClaimHash?: string;
   readonly operation?: OperationRecordV1;
   readonly attestation?: ExecutionPlanAttestationV1;
@@ -962,6 +964,8 @@ function gateApprovalBindingComplete(value: unknown): ValidationIssue[] {
     approval.projectId === context.run.projectId &&
     approval.runId === context.run.runId &&
     approval.previewHash === preview.previewHash &&
+    context.approvalContextHash !== undefined &&
+    approval.approvalContextHash === context.approvalContextHash &&
     approval.dependencyHash === preview.previewHash &&
     approval.writerEpoch === context.run.ownerEpoch &&
     approval.writerTransferClaimHash === context.provedPreviewTransferClaimHash &&
@@ -1138,6 +1142,8 @@ function deployExactApprovedOperation(value: unknown): ValidationIssue[] {
     approval.gate === 4 &&
     approval.decision === "approved" &&
     approval.previewHash === previewHash &&
+    context.approvalContextHash !== undefined &&
+    approval.approvalContextHash === context.approvalContextHash &&
     approval.dependencyHash === previewHash &&
     approval.recipientIdentity !== undefined;
   return valid ? [] : issue("/approval", "Deployment is not authorized by the exact approved operation");

@@ -306,6 +306,7 @@ export function renderApprovalEvidence(approval: ApprovalEvidenceV1): string {
       ["Writer epoch", approval.writerEpoch],
       ["Dependency hash", approval.dependencyHash],
       ["Preview hash", optional(approval.previewHash)],
+      ["Approval context hash", optional(approval.approvalContextHash)],
       ["Decided", approval.decidedAt],
       ["Expires", optional(approval.expiresAt)],
     ]),

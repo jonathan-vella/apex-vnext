@@ -18,6 +18,11 @@ documentation. Preserve working safety mechanisms; do not rebuild the runtime or
 
 ## Current Completion Order
 
+CP-32 (#495) is complete through merged [#496](https://github.com/jonathan-vella/apex-vnext/pull/496), integration
+commit `4ccd5d80`, with post-merge hosted checks passing. The next bounded implementation is
+[#466](https://github.com/jonathan-vella/apex-vnext/issues/466): immutably bind Gate 4 approval context and full accepted
+source hashes. This does not replace CP-20 client qualification, CP-30 deployment qualification, or release approval.
+
 The 2026-10-10 target update is
 [DECISION-036](DECISIONS.md#decision-036-deliver-non-production-first-with-purpose-bound-approval): non-production
 first, azd/Bicep and native Terraform, with purpose-bound lab prompts and separately qualified CI-owned production.

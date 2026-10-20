@@ -7,8 +7,9 @@
 - **Audit Date:** 2026-10-19
 - **Execution Mode:** `mode=full` (zero-skill, zero-instruction isolation; 7 parallel tracks + `rubber-duck`
   challenger pass)
-- **Remediation Status:** **Remediated** under [CP-32](https://github.com/jonathan-vella/apex-vnext/issues/495) on
-  branch `fix/cp-32-audit-remediation` (`c49fb45d`, `9a2bd31c`, `304372cb`, and documentation closure slice)
+- **Remediation Status:** **Merged** through [#496](https://github.com/jonathan-vella/apex-vnext/pull/496) at
+  `4ccd5d80043e19067e1e0c83a8023c53cdef00e6`; [CP-32](https://github.com/jonathan-vella/apex-vnext/issues/495)
+  is closed. The slice commits below are pre-squash provenance, not separate commits on `main`.
 
 ## Executive Summary And Health Scorecard
 
@@ -58,7 +59,9 @@ The repair preserves rejection of duplicate rules and measurements, invalid samp
 tolerance. Expected scorecard input failures now carry typed paths and are translated into issues by
 `quality:scorecard-decidable`; unexpected errors still propagate. Regressions cover both logical IaC lifecycles,
 typed error details, unchanged run/journal state after rejection, and successful completion after corrected evidence.
-Hosted Linux and Windows results must be verified on the repaired PR head before claiming CI acceptance.
+All hosted checks passed on repaired PR head `d5cb727661a16f87e2b4384f18a93373c42f90e6` and subsequently on merged
+integration commit `4ccd5d80043e19067e1e0c83a8023c53cdef00e6`. This closes CP-32's deterministic remediation evidence,
+not client/cloud qualification or release authorization.
 
 ---
 

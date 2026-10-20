@@ -360,6 +360,14 @@ state, plans, imports, apply, or destroy.
 
 ### REQ-APPROVAL-001: Preview And Approval Binding
 
+The exact review material shown for Gate 4 must be content-addressed and bound by hash to the current preview event
+and approval evidence. Bounded architecture, cost and risk summaries must identify their full accepted-source hashes.
+Re-read the displayed review bytes under serialized run mutation immediately before recording approval; matching edits
+to mutable generated-review base files are not proof. Missing, substituted or mismatched context blocks approval or
+execution. Renewed risk dispositions or changed accepted-source hashes require fresh context and preview even if the
+ordinary dependency revision is unchanged. Context binding complements, and never replaces, the exact operation/preview
+binding below.
+
 Deployment Preview is the deployment approval ceremony. Approval must bind actor and run identity, target, operation,
 inputs, IaC tree, policy envelope, preview, commit, owner epoch, recipient, and expiry. Stale, substituted,
 incomplete, or rejected evidence must fail closed. The kernel owns acceptance of approval evidence, not its physical
