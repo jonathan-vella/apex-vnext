@@ -9,6 +9,19 @@
 
 # AZD IAC Rules
 
+## Navigation
+
+- AVM Module Selection Order (MANDATORY)
+- Retrieval Strategy (Hybrid: azure-documentation MCP + Context7)
+- Validation Plan
+- File Structure
+- Naming Convention
+- Required Tags
+- Module Parameters
+- Security
+- Recommended Outputs
+- Templates
+
 IaC rules for AZD projects. For Bicep, the managed provider supplies `apex-azure/bicepschema` with `bicepschema_get`;
 pass a bounded intent and `parameters["resource-type"]`. A separate Bicep provider's best-practices/catalog tools are
 conditional and not granted by this namespace. Use verified documentation and the accepted module-version lookup

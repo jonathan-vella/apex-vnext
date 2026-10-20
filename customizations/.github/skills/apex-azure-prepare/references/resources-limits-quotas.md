@@ -11,6 +11,22 @@
 
 # Azure Resource Limits and Quotas
 
+## Navigation
+
+- Types
+- Hard Limits
+- Quotas
+- Workflow
+- Limit Scopes
+- Service Patterns
+- CLI Reference
+- apex-azure-prepare Integration
+- Error Messages
+- Best Practices
+- Quick Reference Limits
+- Related Documentation
+- Example: Complete Check Workflow
+
 Check Azure quota evidence during apex-azure-prepare workflow after the customer selects a region.
 Read the canonical [quota evidence and fallback contract](https://github.com/jonathan-vella/apex/blob/c209d8bb765681aa21dce5d3cd2a3b080dad8d5e/.github/skills/apex-azure-quotas/references/commands.md#quota-evidence-and-fallback).
 Quota headroom, SKU restrictions and physical regional capacity are separate checks.

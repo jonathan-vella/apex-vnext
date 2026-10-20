@@ -1,5 +1,13 @@
 # Azure Resource Graph Cost Queries
 
+## Navigation
+
+- How to Query
+- Correlation Rules
+- Orphan Candidate Patterns
+- Cost Query Patterns
+- Tips
+
 Azure Resource Graph (ARG) queries for cost optimization, ported from the upstream `azure-resource-graph.md` and the
 shared Resource Graph primer. ARG is read-only; these queries may run directly against the approved subscriptions.
 

@@ -1,5 +1,15 @@
 # Retail Pricing Evidence
 
+## Navigation
+
+- Query Contract
+- Empty Results
+- Service Names And Billing Regions
+- Meter Selection
+- Priced-Line Provenance
+- Monthly Calculations
+- Actual Costs Are Separate
+
 Use the verified `apex-azure/pricing` namespace with command `pricing_get` for planned-resource prices. Azure MCP Server
 `3.0.0` returns a `prices` collection; the caller selects meters and calculates totals. Pricing is public and read-only.
 Never substitute remembered or embedded rates for a returned record. Namespace discovery and authorization follow

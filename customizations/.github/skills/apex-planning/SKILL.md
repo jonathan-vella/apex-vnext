@@ -1,6 +1,6 @@
 ---
 name: apex-planning
-description: "Provides internal APEX planning guidance for implementation intent, controls, dependencies, bindings and the Gate 3 readiness checkpoint."
+description: "Guides the foreground APEX agent during kernel-issued implementation planning, plan-review dispositions and the lab Gate 3 readiness checkpoint. Binds accepted intent, controls and dependencies to the selected IaC track. Not code generation, an independent planning engine or deployment."
 user-invocable: false
 ---
 
@@ -65,3 +65,11 @@ planning, including a `local` target with no policy assignments and accepted-ris
 
 Return the kernel completion result, review-package location, validation risks, unresolved decisions and any
 architecture-rooted or user-owned blocker.
+
+## Examples
+
+| Task condition | Required response |
+| --- | --- |
+| Accepted plan task selects Terraform | Complete intent, Terraform binding and environment inputs atomically; do not generate Bicep |
+| A secret value or backend choice is missing | Return the affected user-owned field/blocker; never infer a secret or silently choose state ownership |
+| Plan review accepted in a lab run | Follow kernel Gate 3 readiness; do not call `apex/gateDecide` or invent a human decision |

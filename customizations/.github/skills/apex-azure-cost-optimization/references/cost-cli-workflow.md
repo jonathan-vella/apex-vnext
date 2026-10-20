@@ -1,5 +1,21 @@
 # Cost CLI Workflow
 
+## Navigation
+
+- Command Routing
+- Step 0: Prerequisites
+- Tool Preference
+- Step 1: Redis-Specific Branch
+- Step 2: Orphan Discovery With azqr
+- Step 3: Discover Resources
+- Step 4: Query Actual Costs
+- Step 5: Validate Pricing
+- Step 6: Collect Utilization Metrics
+- Step 7: Report Content
+- Step 8: Scratch Files
+- Common Pitfalls
+- Safety
+
 Azure CLI procedure for cost optimization, ported from the upstream `workflow-steps.md`, `detailed-workflow-steps.md`,
 `tools-and-safety.md`, `azure-redis.md` and `best-practices-notes.md`. The `apex-azure-cost` tools stay first for
 cost and forecast evidence; `apex-azure/pricing` (`pricing_get`) supplies retail prices. The CLI covers other

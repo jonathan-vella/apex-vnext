@@ -1,6 +1,6 @@
 ---
 name: apex-architecture
-description: "Provides internal APEX architecture guidance for traceable WAF, governance, identity, network, recovery and cost decisions."
+description: "Guides the foreground APEX agent during kernel-issued Architecture decisions, architecture tasks, policy refresh and review dispositions. Covers accepted WAF, policy, identity, network, recovery and cost reasoning. Not an independent design workflow or repository-maintenance skill."
 user-invocable: false
 ---
 
@@ -72,6 +72,21 @@ review or task.
     to retry recording it; if it still reports the blocker, report the blocking finding, review or validator result and
     stop. Otherwise follow `apex/nextTask`. The user's later confirmations are Gate 1 (intent) and Gate 4 (final
     preview).
+
+## Domain Selection
+
+Load only the relevant domain skill within this task: `apex-azure-kubernetes` for AKS topology, identity and sizing;
+`apex-azure-reliability` for SLO/RTO/RPO and failure-domain reasoning; `apex-azure-upgrade` for lifecycle alternatives;
+and `apex-python-diagrams` for accepted architecture/WAF/cost figure semantics. Domain advice neither issues a task
+nor grants tools, deployment authority or new artifact/renderer support.
+
+## Examples
+
+| Kernel result or request | Required response |
+| --- | --- |
+| Architecture decision request with a missing network choice | Ask the returned question; record only confirmed input, not a fabricated design |
+| Partial retail query with an unresolved meter | Preserve an unpriced item and uncertainty; do not submit zero as a price |
+| Lab Architecture review accepted, Gate 2 not yet ready | Read status; retry readiness once with `apex/nextTask`, never request human Gate 2 approval |
 
 ## Boundaries
 

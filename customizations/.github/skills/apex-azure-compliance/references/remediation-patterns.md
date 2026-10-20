@@ -1,5 +1,18 @@
 # Remediation Patterns for Common azqr Findings
 
+## Navigation
+
+- Routing
+- Storage Account Issues
+- Key Vault Issues
+- Virtual Machine Issues
+- AKS Issues
+- SQL Database Issues
+- App Service Issues
+- Bulk Remediation Script
+- Remediation Validation
+- Additional Resources
+
 Remediation templates for frequently identified compliance findings, ported in full from the upstream
 `azqr-remediation-patterns.md`.
 

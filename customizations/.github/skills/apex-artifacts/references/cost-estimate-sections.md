@@ -8,6 +8,14 @@
 
 # Cost Estimate — Section Templates
 
+## Navigation
+
+- Required Header Template
+- Cost At-a-Glance Template
+- Decision Summary Template
+- Visual Standards
+- Required Section Templates
+
 Detailed examples complement the canonical templates in `templates/`.
 Rules and enforcement live in the instruction file and templates.
 

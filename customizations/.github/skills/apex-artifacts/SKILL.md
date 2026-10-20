@@ -1,6 +1,6 @@
 ---
 name: apex-artifacts
-description: '**UTILITY SKILL** — Present accepted APEX artifacts as bounded Markdown views. WHEN: "generate artifact", "check H2 structure", "artifact template", "as-built docs", "cost view", "runbook". DO NOT USE FOR: Azure configuration (use apex-azure-defaults), Bicep patterns (use apex-bicep-patterns), Terraform patterns (use apex-terraform-patterns).'
+description: '**UTILITY SKILL** — Presents accepted APEX artifacts as bounded Markdown views. WHEN: "generate artifact", "check H2 structure", "artifact template", "as-built docs", "cost view", "runbook". DO NOT USE FOR: Azure configuration (use apex-azure-defaults), Bicep patterns (use apex-bicep-patterns), Terraform patterns (use apex-terraform-patterns).'
 user-invocable: false
 disable-model-invocation: false
 ---
@@ -62,6 +62,9 @@ resource inventory, and deployment summaries. Deployment summaries bind the comp
 they distinguish simulated from native-adapter evidence without independently asserting live execution or operational
 readiness. Architecture and cost packages also include deterministic Python, SVG, and PNG diagram views.
 All are read-only views of accepted typed sources.
+
+Use `apex-python-diagrams` for standalone figure semantics and supported-output checks. It does not add ERD,
+timeline, wireframe or other unregistered renderers, execute Python or make reference-only outlines renderable.
 
 ## Reference-Only Outlines
 

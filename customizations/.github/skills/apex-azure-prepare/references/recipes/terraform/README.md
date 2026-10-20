@@ -12,7 +12,7 @@
 Terraform workflow for Azure deployments.
 
 > **Native Terraform CLI is the Terraform path.** DECISION-036 keeps two IaC languages and adds no azd Terraform
-> adapter; azd is the planned executor for Bicep only (CP-26, #443). Use this recipe for Terraform work, bind one
+> adapter; azd implements Bicep provision/preview/down only (CP-26, #443). Use this recipe for Terraform work, bind one
 > accepted track, and never run `azd up`.
 
 ## When to Use This Recipe

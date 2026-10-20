@@ -329,6 +329,25 @@
       "capabilityQualification": "not-established-by-this-registry"
     },
     {
+      "id": "apex-azure-kubernetes",
+      "owner": "APEX managed guidance",
+      "entrypoint": ".github/skills/apex-azure-kubernetes/SKILL.md",
+      "files": [
+        ".github/skills/apex-azure-kubernetes/SKILL.md",
+        ".github/skills/apex-azure-kubernetes/references/azure-aks-autoscaler.md",
+        ".github/skills/apex-azure-kubernetes/references/azure-aks-rightsizing.md",
+        ".github/skills/apex-azure-kubernetes/references/azure-aks-spot.md",
+        ".github/skills/apex-azure-kubernetes/references/azure-aks-vpa.md",
+        ".github/skills/apex-azure-kubernetes/references/cli-reference.md",
+        ".github/skills/apex-azure-kubernetes/references/safeguards.md",
+        ".github/skills/apex-azure-kubernetes/references/upstream-coverage.md",
+        ".github/skills/apex-azure-kubernetes/references/workload-identity.md"
+      ],
+      "manifestOwner": "plugin",
+      "status": "current-source",
+      "capabilityQualification": "not-established-by-this-registry"
+    },
+    {
       "id": "apex-azure-kusto",
       "owner": "APEX managed guidance",
       "entrypoint": ".github/skills/apex-azure-kusto/SKILL.md",
@@ -591,6 +610,24 @@
       "capabilityQualification": "not-established-by-this-registry"
     },
     {
+      "id": "apex-azure-reliability",
+      "owner": "APEX managed guidance",
+      "entrypoint": ".github/skills/apex-azure-reliability/SKILL.md",
+      "files": [
+        ".github/skills/apex-azure-reliability/SKILL.md",
+        ".github/skills/apex-azure-reliability/references/health-probe-checks.md",
+        ".github/skills/apex-azure-reliability/references/multi-region-checks.md",
+        ".github/skills/apex-azure-reliability/references/services/app-service/reliability.md",
+        ".github/skills/apex-azure-reliability/references/services/functions/reliability.md",
+        ".github/skills/apex-azure-reliability/references/storage-redundancy-checks.md",
+        ".github/skills/apex-azure-reliability/references/upstream-coverage.md",
+        ".github/skills/apex-azure-reliability/references/zone-redundancy-checks.md"
+      ],
+      "manifestOwner": "plugin",
+      "status": "current-source",
+      "capabilityQualification": "not-established-by-this-registry"
+    },
+    {
       "id": "apex-azure-resources",
       "owner": "APEX managed guidance",
       "entrypoint": ".github/skills/apex-azure-resources/SKILL.md",
@@ -614,6 +651,22 @@
         ".github/skills/apex-azure-storage/references/service-auth-and-sdk-boundary.md",
         ".github/skills/apex-azure-storage/references/storage-cli-commands.md",
         ".github/skills/apex-azure-storage/references/storage-selection.md"
+      ],
+      "manifestOwner": "plugin",
+      "status": "current-source",
+      "capabilityQualification": "not-established-by-this-registry"
+    },
+    {
+      "id": "apex-azure-upgrade",
+      "owner": "APEX managed guidance",
+      "entrypoint": ".github/skills/apex-azure-upgrade/SKILL.md",
+      "files": [
+        ".github/skills/apex-azure-upgrade/SKILL.md",
+        ".github/skills/apex-azure-upgrade/references/global-rules.md",
+        ".github/skills/apex-azure-upgrade/references/services/functions/assessment.md",
+        ".github/skills/apex-azure-upgrade/references/services/functions/consumption-to-flex.md",
+        ".github/skills/apex-azure-upgrade/references/services/redis/redis-to-amr.md",
+        ".github/skills/apex-azure-upgrade/references/upstream-coverage.md"
       ],
       "manifestOwner": "plugin",
       "status": "current-source",
@@ -749,6 +802,30 @@
       "owner": "APEX managed guidance",
       "entrypoint": ".github/skills/apex-planning/SKILL.md",
       "files": [".github/skills/apex-planning/SKILL.md"],
+      "manifestOwner": "plugin",
+      "status": "current-source",
+      "capabilityQualification": "not-established-by-this-registry"
+    },
+    {
+      "id": "apex-python-diagrams",
+      "owner": "APEX managed guidance",
+      "entrypoint": ".github/skills/apex-python-diagrams/SKILL.md",
+      "files": [
+        ".github/skills/apex-python-diagrams/SKILL.md",
+        ".github/skills/apex-python-diagrams/references/azure-components.md",
+        ".github/skills/apex-python-diagrams/references/business-process-flows.md",
+        ".github/skills/apex-python-diagrams/references/common-patterns.md",
+        ".github/skills/apex-python-diagrams/references/entity-relationship-diagrams.md",
+        ".github/skills/apex-python-diagrams/references/iac-to-diagram.md",
+        ".github/skills/apex-python-diagrams/references/integration-services.md",
+        ".github/skills/apex-python-diagrams/references/migration-patterns.md",
+        ".github/skills/apex-python-diagrams/references/python-charts.md",
+        ".github/skills/apex-python-diagrams/references/sequence-auth-flows.md",
+        ".github/skills/apex-python-diagrams/references/timeline-gantt-diagrams.md",
+        ".github/skills/apex-python-diagrams/references/ui-wireframe-diagrams.md",
+        ".github/skills/apex-python-diagrams/references/upstream-coverage.md",
+        ".github/skills/apex-python-diagrams/references/waf-cost-charts.md"
+      ],
       "manifestOwner": "plugin",
       "status": "current-source",
       "capabilityQualification": "not-established-by-this-registry"

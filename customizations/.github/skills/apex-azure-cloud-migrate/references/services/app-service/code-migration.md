@@ -7,6 +7,18 @@
 
 # Code Migration Phase
 
+## Navigation
+
+- Prerequisites
+- Rules
+- Steps
+- Key Configuration Files
+- Database Migration Patterns
+- Static Assets & CDN
+- Background Workers
+- Handoff to apex-azure-prepare
+- Port Source
+
 Migrate source platform web application code to Azure App Service.
 
 ## Prerequisites

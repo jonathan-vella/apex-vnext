@@ -8,6 +8,14 @@
 
 # Research Components
 
+## Navigation
+
+- Process
+- Service-to-Reference Mapping
+- Research Instructions
+- Common Research Patterns
+- After Research
+
 After architecture planning, research each selected component to gather best practices before generating artifacts.
 
 ## Process

@@ -11,15 +11,21 @@
 CP-32 audit remediation merged in [#496](https://github.com/jonathan-vella/apex-vnext/pull/496) at
 `4ccd5d80043e19067e1e0c83a8023c53cdef00e6`; tracking issue #495 is closed. The repaired PR head and the exact
 integration commit both passed their hosted checks. Neither result qualifies a live client
-or authorizes deployment or release. [#466](https://github.com/jonathan-vella/apex-vnext/issues/466) is the next
-bounded implementation: bind the Gate 4 approval context immutably without enabling production execution.
+or authorizes deployment or release. [#466](https://github.com/jonathan-vella/apex-vnext/issues/466) merged through
+[#497](https://github.com/jonathan-vella/apex-vnext/pull/497) at `cd6a3a79`; its PR and integration-head hosted
+checks passed without enabling production.
 
 The #466 source slice adds the versioned immutable context object, `preview.created`/approval hash binding,
 full accepted-source references, and a final review-file check under the run mutation lock. Focused regressions cover
 both IaC tracks, restart, apply/destroy replacement, truncated summaries, missing/corrupt objects and document-plus-base
-tampering, including risk renewal before approval and deployment. Integration qualification and PR acceptance remain
-separate from this source implementation; no live
-client/cloud run, candidate replacement or publication is implied.
+tampering, including risk renewal before approval and deployment. No live client/cloud run, candidate replacement
+or publication is implied.
+
+The current content slice addresses the four remaining CP-18 #384 domains (Kubernetes, reliability, upgrade and Python
+diagrams) and CP-21 #401's best-practice/core-workflow review. The agreed upstream pin and
+[guideline dispositions](SKILL-BEST-PRACTICES.md) preserve existing kernel, renderer and tool boundaries.
+Source/packaging checks and maintainer review are required before integration; actual model/client discovery,
+behavior and visual outcomes remain with CP-20 #386 on a separately frozen candidate.
 
 The maintainer accepted
 [DECISION-036](DECISIONS.md#decision-036-deliver-non-production-first-with-purpose-bound-approval): non-production

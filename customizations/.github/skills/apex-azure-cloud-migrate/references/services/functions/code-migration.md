@@ -7,6 +7,18 @@
 
 # Code Migration Phase
 
+## Navigation
+
+- Prerequisites
+- Rules
+- Steps
+- Key Configuration Files
+- Critical Infrastructure Dependencies
+- Runtime-Specific Trigger & Binding Patterns
+- Scenario-Specific Guidance
+- Handoff to apex-azure-prepare
+- Port Source
+
 Migrate AWS Lambda function code to Azure Functions.
 
 ## Prerequisites

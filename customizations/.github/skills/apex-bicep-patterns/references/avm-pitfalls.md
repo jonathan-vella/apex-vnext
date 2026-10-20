@@ -11,6 +11,24 @@
 
 # AVM Pitfalls & What-If Interpretation
 
+## Navigation
+
+- What-If Interpretation
+- AVM Known Gotchas
+- Schema Drift in Pinned AVM Versions (mandatory pre-author check)
+- Bicep Language Constraints (compiler-level, not AVM)
+- Identity ↔ RBAC Circular Dependency
+- Runtime Managed Identity ≠ Data-Plane Admin
+- SKU-Default Mismatch (Premium-Only Properties on Lower SKUs)
+- Log Analytics Ingestion-Cap Alerts — KQL Column Safety
+- SQL Entra Admin Object ID Resolution
+- AKS Managed Cluster apply-time gotchas
+- Application Gateway backend pool (no loopback)
+- MySQL Flexible Server apply-time gotchas
+- Cost Management InsightAlert viewId scope
+- Automation Account runbook and jobSchedule
+- Learn More
+
 Known gotchas when using Azure Verified Modules and pre-deployment validation.
 
 ---

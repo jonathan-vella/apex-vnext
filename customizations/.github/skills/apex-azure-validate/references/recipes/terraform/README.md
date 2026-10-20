@@ -9,6 +9,13 @@
 
 # Terraform Validation
 
+## Navigation
+
+- Prerequisites
+- Validation Steps
+- References
+- Next
+
 Validation steps for Terraform deployments.
 
 ## Prerequisites

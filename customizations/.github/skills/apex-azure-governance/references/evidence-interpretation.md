@@ -1,5 +1,14 @@
 # Governance Evidence Interpretation
 
+## Navigation
+
+- Acceptance Checks
+- Classification Rules
+- Effective Values
+- Exemption Validity
+- Planning Handoff
+- Resume And Reconciliation
+
 Use this reference after accepted governance evidence is available in the
 active task context. The evidence is a point-in-time attestation, not a
 standing authorization.

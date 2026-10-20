@@ -1,5 +1,18 @@
 # Azure Quick Review Assessment
 
+## Navigation
+
+- Prerequisites
+- Step 1: Determine the Scan Scope
+- Step 2: Run the Scan
+- Step 3: Analyze the Results
+- Step 4: Categorize Findings
+- Step 5: Remediation Guidance
+- Step 6: Summary
+- Supported Services
+- Troubleshooting
+- Documentation
+
 Azure Quick Review (azqr) assessment workflow ported from the upstream `azure-quick-review.md`. An azqr scan only reads
 resource configuration; it may run directly against the approved scope. Its findings are observations until accepted
 as evidence, and every fix it suggests changes Azure and is routed (see

@@ -7,6 +7,15 @@
 
 # Assessment Phase
 
+## Navigation
+
+- Prerequisites
+- Assessment Steps
+- Code Preview
+- Architecture Diagrams
+- Assessment Report Format
+- Port Source
+
 Assess accepted source evidence before any code changes; submit through the active task's artifact contract.
 
 ## Prerequisites

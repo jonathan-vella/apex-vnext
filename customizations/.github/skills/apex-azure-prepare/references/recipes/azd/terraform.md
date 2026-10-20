@@ -8,10 +8,26 @@
 > Raw resources illustrate provider syntax; use AVM first and record any accepted coverage exception.
 
 > **Not an APEX execution path.** DECISION-036 keeps two IaC languages and adds no azd Terraform adapter: azd is the
-> planned executor for Bicep only (CP-26, #443), and native Terraform CLI with an exact saved plan is the Terraform
-> path. This page is upstream context for reading existing `azure.yaml` files; do not select it for new work.
+> implemented provision/preview/down executor for Bicep only (CP-26, #443). Native Terraform CLI with an exact saved plan
+> is the Terraform path. This page is upstream context for existing `azure.yaml` files; do not select it for new work.
 
 # AZD with Terraform
+
+## Navigation
+
+- When to Use
+- Benefits
+- Configuration
+- Preparation Workflow
+- Generation Steps
+- AVM Terraform Module Priority
+- Migration from Pure Terraform
+- CI/CD Integration
+- Comparison: azd+Terraform vs Pure Terraform
+- When NOT to Use azd+Terraform
+- Azure Policy Compliance
+- Troubleshooting
+- References
 
 Use Azure Developer CLI (azd) with Terraform as the infrastructure provider.
 

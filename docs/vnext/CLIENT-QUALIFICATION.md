@@ -25,6 +25,12 @@ bypass it.
 
 ## Candidate Binding
 
+Candidates including the CP-18/CP-21 domain additions must record the exact managed guidance/plugin hashes and inspect
+Kubernetes, reliability, upgrade and diagram discovery, near misses and blocked-operation behavior. The
+[best-practice review](SKILL-BEST-PRACTICES.md) and catalog scenario fixtures are deterministic source declarations,
+not live-model evaluations. Observe that the existing APEX agent remains foreground, loads only relevant references,
+and does not execute upstream Python, cluster changes, unsupported upgrades or unregistered renderers.
+
 Before interaction, record the exact source commit, package and runtime locks, managed projection digests, client
 versions, executable hashes, MCP inventory, and clean consumer workspace identity. An update during a run invalidates
 that client result.
