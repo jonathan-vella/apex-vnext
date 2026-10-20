@@ -213,7 +213,7 @@ import {
   DOCUMENT_REGISTRY,
   renderApprovalEvidence,
   rasterizeDiagram,
-  renderArchitectureDiagram,
+  renderArchitectureMermaid,
   renderArchitectureDecisionRecords,
   renderCostBreakdownDiagram,
   renderCostUncertaintyDiagram,
@@ -5845,6 +5845,7 @@ export class ApexService {
         "cost-estimate.md",
         "sku-comparison.md",
         "challenger-findings.md",
+        "03-des-diagram.mmd",
         ...["03-des-diagram", "02-waf-assessment", "03-des-cost-breakdown", "03-des-cost-uncertainty"].flatMap((name) =>
           ["py", "svg", "png"].map((extension) => `${name}.${extension}`),
         ),
@@ -6083,23 +6084,39 @@ export class ApexService {
       }
     };
     const diagrams = [
-      renderDiagram("03-des-diagram", () => renderArchitectureDiagram(architecture)),
       renderDiagram("02-waf-assessment", () => renderWafAssessmentDiagram(architecture)),
       renderDiagram("03-des-cost-breakdown", () => renderCostBreakdownDiagram(cost)),
       renderDiagram("03-des-cost-uncertainty", () => renderCostUncertaintyDiagram(cost)),
     ];
-    const diagramStatus = diagrams
-      .map((diagram) =>
+    // The architecture diagram is Mermaid text, so any Mermaid-capable viewer renders it without a rasterizer.
+    const architectureMermaid: { text: string } | { error: string } = (() => {
+      try {
+        return { text: renderArchitectureMermaid(architecture) };
+      } catch (error) {
+        return { error: message(error, "Diagram rendering failed") };
+      }
+    })();
+    const diagramStatus = [
+      "error" in architectureMermaid
+        ? `- 03-des-diagram: unavailable (${this.reviewMarkdownText(architectureMermaid.error)})`
+        : "- 03-des-diagram: generated as Mermaid (03-des-diagram.mmd), embedded in architecture-assessment.md",
+      ...diagrams.map((diagram) =>
         "error" in diagram
           ? `- ${this.reviewMarkdownText(diagram.name)}: unavailable (${this.reviewMarkdownText(diagram.error)})`
           : "pngError" in diagram
             ? `- ${this.reviewMarkdownText(diagram.name)}: generated as Python and SVG; PNG unavailable (${this.reviewMarkdownText(diagram.pngError)})`
             : `- ${this.reviewMarkdownText(diagram.name)}: generated as Python, SVG, and PNG`,
-      )
-      .join("\n");
-    const architectureImages = diagrams
-      .filter(({ name }) => name === "03-des-diagram" || name === "02-waf-assessment")
-      .flatMap((diagram) => ("error" in diagram ? [] : [`![${diagram.name}](${diagram.name}.svg)`]))
+      ),
+    ].join("\n");
+    const architectureImages = [
+      "error" in architectureMermaid
+        ? []
+        : [`\`\`\`mermaid\n${architectureMermaid.text}\`\`\`\n\nSource: 03-des-diagram.mmd`],
+      diagrams
+        .filter(({ name }) => name === "02-waf-assessment")
+        .flatMap((diagram) => ("error" in diagram ? [] : [`![${diagram.name}](${diagram.name}.svg)`])),
+    ]
+      .flat()
       .join("\n\n");
     const costImages = diagrams
       .filter(({ name }) => name === "03-des-cost-breakdown" || name === "03-des-cost-uncertainty")
@@ -6172,6 +6189,18 @@ export class ApexService {
           "# Challenger Findings\n\nArchitecture challenger review is pending. Gate 2 readiness cannot be recorded until the reviewer completes this document.\n",
           "utf8",
         ),
+      ),
+      ...("error" in architectureMermaid
+        ? []
+        : [
+            this.writeGeneratedReview(
+              join(directory, "03-des-diagram.mmd"),
+              Buffer.from(architectureMermaid.text, "utf8"),
+            ),
+          ]),
+      // Drop the Python, SVG and PNG architecture outputs that earlier renders wrote before it became Mermaid.
+      ...["py", "svg", "png"].map((extension) =>
+        this.removeGeneratedReview(join(directory, `03-des-diagram.${extension}`)),
       ),
       ...diagrams.flatMap((diagram) =>
         "error" in diagram

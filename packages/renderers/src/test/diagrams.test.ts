@@ -3,7 +3,7 @@ import test from "node:test";
 import type { ArchitectureV1, CostEstimateV1 } from "@apexops/contracts";
 import {
   rasterizeDiagram,
-  renderArchitectureDiagram,
+  renderArchitectureMermaid,
   renderCostBreakdownDiagram,
   renderCostUncertaintyDiagram,
   renderWafAssessmentDiagram,
@@ -87,15 +87,54 @@ const cost: CostEstimateV1 = {
   assumptions: [],
 };
 
-test("diagram renderers are deterministic, escaped, and produce PNG", () => {
-  const first = renderArchitectureDiagram(architecture);
-  const reordered = renderArchitectureDiagram({ ...architecture, components: [...architecture.components].reverse() });
-  assert.equal(first.svg, reordered.svg);
-  assert.equal(first.python, reordered.python);
-  assert.match(first.svg, /API &lt;platform&gt;/u);
-  assert.doesNotMatch(first.svg, /<platform>/u);
-  const png = rasterizeDiagram(first.svg);
-  assert.deepEqual([...png.slice(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+test("architecture Mermaid is deterministic, escaped, grouped by tier and draws dependencies as arrows", () => {
+  const first = renderArchitectureMermaid(architecture);
+  const reordered = renderArchitectureMermaid({ ...architecture, components: [...architecture.components].reverse() });
+  assert.equal(first, reordered);
+  assert.match(first, /^%% API #lt;platform#gt;\nflowchart TB\n/u);
+  assert.doesNotMatch(first, /<platform>/u);
+  assert.match(first, /subgraph lane_application\["Application #amp; compute"\]/u);
+  assert.match(first, /subgraph lane_data\["Data #amp; messaging"\]/u);
+  assert.ok(first.indexOf("lane_application[") < first.indexOf("lane_data["));
+  assert.match(first, /n_data\[\("🗄️ <b>Azure SQL<\/b><br\/><i>data<\/i>"\)\]/u);
+  assert.match(first, /n_api\["⚙️ <b>App Service<\/b><br\/><i>api<\/i>"\]/u);
+  assert.match(first, /^ {2}n_api --> n_data$/mu);
+  assert.match(first, /^ {2}class n_api tier_application$/mu);
+});
+
+test("architecture Mermaid keeps full labels, unique node ids, and only valid dependency arrows", () => {
+  const component = (id: string, service: string, resourceTypes: string[], dependsOn: string[] = []) => ({
+    id,
+    service,
+    resourceTypes,
+    purpose: "Purpose",
+    requirementIds: ["REQ-1"],
+    dependsOn,
+  });
+  const text = renderArchitectureMermaid({
+    ...architecture,
+    components: [
+      component(
+        "front-door",
+        'Azure Front Door Premium with "managed" WAF and Private Link origin',
+        ["Microsoft.Cdn/profiles"],
+        ["missing", "front-door", "app_x", "app-x", "app-x"],
+      ),
+      component("app-x", "App Service", ["Microsoft.Web/sites"]),
+      component("app_x", "Second App", ["Microsoft.Web/sites"]),
+      component("mystery", "Unmapped", ["Contoso.Widgets/things"]),
+    ],
+  });
+  assert.match(
+    text,
+    /\(\["🌐 <b>Azure Front Door Premium<\/b><br\/><b>with #quot;managed#quot; WAF and<\/b><br\/><b>Private Link origin<\/b><br\/><i>front-door<\/i>"\]\)/u,
+  );
+  assert.doesNotMatch(text, /\.\.\./u);
+  assert.match(text, /n_app_x\[/u);
+  assert.match(text, /n_app_x_2\[/u);
+  assert.match(text, /subgraph lane_other\["Other"\]/u);
+  const arrows = text.split("\n").filter((line) => line.includes("-->"));
+  assert.deepEqual(arrows, ["  n_front_door --> n_app_x", "  n_front_door --> n_app_x_2"]);
 });
 
 test("WAF and cost diagrams preserve qualitative and partial pricing semantics", () => {

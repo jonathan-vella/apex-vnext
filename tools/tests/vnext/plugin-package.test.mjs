@@ -907,7 +907,7 @@ test("packaged MCP server answers a Copilot discover then 2025-11-25 initialize 
 });
 
 const pngSignature = [137, 80, 78, 71, 13, 10, 26, 10];
-const diagramNames = ["02-waf-assessment", "03-des-cost-breakdown", "03-des-cost-uncertainty", "03-des-diagram"];
+const diagramNames = ["02-waf-assessment", "03-des-cost-breakdown", "03-des-cost-uncertainty"];
 
 /**
  * Drives a workspace to the Architecture task with the npm CLI service and its test fixtures, so the packaged server
@@ -989,6 +989,7 @@ async function renderThroughPackagedServer(plugin, preload = []) {
       assert.ok((await readFile(join(task.directory, `${name}.${extension}`))).byteLength > 0, `${name}.${extension}`);
     }
   }
+  assert.match(await readFile(join(task.directory, "03-des-diagram.mmd"), "utf8"), /^%% .*\nflowchart TB\n/u);
   return { directory: task.directory, readme: await readFile(join(task.directory, "README.md"), "utf8") };
 }
 
