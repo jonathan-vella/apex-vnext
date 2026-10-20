@@ -19,6 +19,16 @@ export interface ScorecardEvaluation {
   readonly reason: string;
 }
 
+export class ScorecardValidationError extends Error {
+  constructor(
+    public readonly path: "/scorecard/rules" | "/qualityMeasurements/measurements",
+    message: string,
+  ) {
+    super(message);
+    this.name = "ScorecardValidationError";
+  }
+}
+
 function unavailableDecision(unavailable: "block" | "omit-claim"): ScorecardDecision {
   return unavailable === "block" ? "fail" : "omitted";
 }
@@ -35,25 +45,40 @@ export function evaluateQualityScorecard(
   for (const rule of scorecard.rules) {
     const key = scorecardKey(rule.metric, rule.scenario);
     if (seenRules.has(key)) {
-      throw new Error(`Duplicate scorecard rule for ${rule.metric} (${rule.scenario})`);
+      throw new ScorecardValidationError(
+        "/scorecard/rules",
+        `Duplicate scorecard rule for ${rule.metric} (${rule.scenario})`,
+      );
     }
     seenRules.add(key);
     if (rule.direction === "exact" && rule.tolerance !== 0) {
-      throw new Error(`Exact scorecard rule ${rule.metric} (${rule.scenario}) must have tolerance 0`);
+      throw new ScorecardValidationError(
+        "/scorecard/rules",
+        `Exact scorecard rule ${rule.metric} (${rule.scenario}) must have tolerance 0`,
+      );
     }
   }
 
   const indexed = new Map<string, ScorecardMeasurement>();
   for (const item of measurements) {
     if (!Number.isSafeInteger(item.samples) || item.samples < 0) {
-      throw new Error(`Invalid scorecard sample count for ${item.metric} (${item.scenario})`);
+      throw new ScorecardValidationError(
+        "/qualityMeasurements/measurements",
+        `Invalid scorecard sample count for ${item.metric} (${item.scenario})`,
+      );
     }
     if (item.value !== undefined && !Number.isFinite(item.value)) {
-      throw new Error(`Invalid scorecard measurement value for ${item.metric} (${item.scenario})`);
+      throw new ScorecardValidationError(
+        "/qualityMeasurements/measurements",
+        `Invalid scorecard measurement value for ${item.metric} (${item.scenario})`,
+      );
     }
     const key = scorecardKey(item.metric, item.scenario);
     if (indexed.has(key)) {
-      throw new Error(`Duplicate scorecard measurement for ${item.metric} (${item.scenario})`);
+      throw new ScorecardValidationError(
+        "/qualityMeasurements/measurements",
+        `Duplicate scorecard measurement for ${item.metric} (${item.scenario})`,
+      );
     }
     indexed.set(key, item);
   }

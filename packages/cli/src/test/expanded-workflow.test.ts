@@ -64,6 +64,69 @@ import {
   assertLabReadiness,
 } from "./helpers.js";
 
+test("quality scorecard input errors become structured workflow validation issues", () => {
+  const registry = new ValidatorRegistry();
+  registerWorkflowValidators(registry);
+  const rule = {
+    metric: "cache-correctness-rate",
+    scenario: "mutate-every-cache-key-dependency",
+    direction: "exact",
+    target: 1,
+    tolerance: 0,
+    minimumSamples: 1,
+    source: "kernel",
+    owner: "quality",
+    unavailable: "block",
+  };
+  const measurement = { metric: rule.metric, scenario: rule.scenario, value: 1, samples: 1, evidenceRefs: [] };
+  for (const { rules, measurements, path, message } of [
+    {
+      rules: [rule],
+      measurements: [measurement, { ...measurement }],
+      path: "/qualityMeasurements/measurements",
+      message: "Duplicate scorecard measurement",
+    },
+    {
+      rules: [rule, { ...rule }],
+      measurements: [measurement],
+      path: "/scorecard/rules",
+      message: "Duplicate scorecard rule",
+    },
+    {
+      rules: [{ ...rule, tolerance: 1 }],
+      measurements: [measurement],
+      path: "/scorecard/rules",
+      message: "Exact scorecard rule",
+    },
+    {
+      rules: [rule],
+      measurements: [{ ...measurement, samples: -1 }],
+      path: "/qualityMeasurements/measurements",
+      message: "Invalid scorecard sample count",
+    },
+  ]) {
+    const result = registry.validate("quality:scorecard-decidable", {
+      outputs: { "quality-report": {} },
+      scorecard: { schemaVersion: "1.0.0", frozenAt: "2026-10-19T00:00:00Z", rules },
+      qualityMeasurements: { schemaVersion: "1.0.0", measurements },
+    });
+    assert.equal(result.valid, false);
+    assert.equal(result.issues.length, 1);
+    assert.equal(result.issues[0]!.path, path);
+    assert.ok(result.issues[0]!.message.startsWith(message));
+  }
+  assert.throws(
+    () =>
+      registry.validate("quality:scorecard-decidable", {
+        outputs: {},
+        scorecard: { rules: [rule] },
+        qualityMeasurements: { measurements: [measurement] },
+      }),
+    TypeError,
+    "unexpected implementation errors must not be converted into input validation issues",
+  );
+});
+
 async function importTestGovernance(service: ApexService): Promise<string> {
   const subscription = /^\/subscriptions\/([0-9a-f-]{36})/iu.exec((await service.status()).run.targetScope)?.[1];
   if (subscription === undefined) return (await service.importGovernanceReference()).outputHash;
@@ -1960,10 +2023,26 @@ for (const track of ["bicep", "terraform"] as const) {
       ...report,
       measurementsHash: sha256Json(duplicatedMeasurements),
     };
+    const beforeDuplicateRejection = await service.status();
+    const qualityJournal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", runId, "journal"));
+    const eventsBeforeDuplicateRejection = await qualityJournal.replay();
     await assert.rejects(
       service.completeTaskOutputs(qualityTask, [{ kind: "quality-report", value: duplicateMeasurementReport }]),
-      /quality:no-subjective-deterministic-claims/,
+      (error: unknown) => {
+        assert.ok(error instanceof ApexError);
+        assert.equal(error.code, "APEX_VALIDATION");
+        assert.match(error.message, /quality:scorecard-decidable/);
+        assert.deepEqual(error.details, [
+          {
+            path: "/qualityMeasurements/measurements",
+            message: `Duplicate scorecard measurement for ${duplicatedMeasurements.measurements[0]!.metric} (${duplicatedMeasurements.measurements[0]!.scenario})`,
+          },
+        ]);
+        return true;
+      },
     );
+    assert.deepEqual((await service.status()).run, beforeDuplicateRejection.run);
+    assert.deepEqual(await qualityJournal.replay(), eventsBeforeDuplicateRejection);
     await qualityReport(root, runId);
     const inventedPass = structuredClone(report);
     inventedPass.checks[0]!.status = "pass";

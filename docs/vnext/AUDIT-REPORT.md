@@ -47,6 +47,19 @@ edge cases, workflow manifest-to-engine drift, validator blind spots, and cross-
 - `npm run validate:_node` — Failed (`exit 1` in `validate:tool-versions` solely because the external `terraform`
   binary is not installed on this Linux host; `bicep`, `az`, and `node` pins passed)
 
+### CI Follow-Up For PR #496
+
+The baseline results above describe the audited commit, not every subsequent remediation head. CI on `a9c15483`
+failed in the Linux qualification job and Windows CLI shards 1 and 2: the new duplicate-measurement rejection
+(`F-004`) threw an untyped evaluator error before the workflow could report its normal `APEX_VALIDATION` diagnostic.
+The Windows package aggregate failed because those shards failed; its package tests did not run.
+
+The repair preserves rejection of duplicate rules and measurements, invalid samples/values, and non-zero `exact`
+tolerance. Expected scorecard input failures now carry typed paths and are translated into issues by
+`quality:scorecard-decidable`; unexpected errors still propagate. Regressions cover both logical IaC lifecycles,
+typed error details, unchanged run/journal state after rejection, and successful completion after corrected evidence.
+Hosted Linux and Windows results must be verified on the repaired PR head before claiming CI acceptance.
+
 ---
 
 ## Findings Summary Table

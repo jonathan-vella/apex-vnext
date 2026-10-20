@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { QualityScorecardV1 } from "@apexops/contracts";
-import { evaluateQualityScorecard, renderQualityScorecardEvaluation } from "../index.js";
+import { evaluateQualityScorecard, renderQualityScorecardEvaluation, ScorecardValidationError } from "../index.js";
 
 const scorecard: QualityScorecardV1 = {
   schemaVersion: "1.0.0",
@@ -140,7 +140,12 @@ test("scorecard rejects duplicate rules, duplicate measurements, invalid samples
         { metric: "minimum", scenario: "base", value: 50, samples: 2 },
         { metric: "minimum", scenario: "base", value: 95, samples: 2 },
       ]),
-    /Duplicate scorecard measurement for minimum \(base\)/u,
+    (error: unknown) => {
+      assert.ok(error instanceof ScorecardValidationError);
+      assert.equal(error.path, "/qualityMeasurements/measurements");
+      assert.match(error.message, /Duplicate scorecard measurement for minimum \(base\)/u);
+      return true;
+    },
   );
 
   assert.throws(
@@ -152,7 +157,12 @@ test("scorecard rejects duplicate rules, duplicate measurements, invalid samples
         },
         [],
       ),
-    /Duplicate scorecard rule for minimum \(base\)/u,
+    (error: unknown) => {
+      assert.ok(error instanceof ScorecardValidationError);
+      assert.equal(error.path, "/scorecard/rules");
+      assert.match(error.message, /Duplicate scorecard rule for minimum \(base\)/u);
+      return true;
+    },
   );
 
   for (const invalidSamples of [-1, Number.NaN, Number.POSITIVE_INFINITY, 1.5]) {
