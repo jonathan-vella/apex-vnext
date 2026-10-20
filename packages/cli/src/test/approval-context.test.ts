@@ -4,6 +4,7 @@ import { join, relative } from "node:path";
 import type { ApprovalContextV1, ApprovalEvidenceV1, ArchitectureV1, CostEstimateV1 } from "@apexops/contracts";
 import { EventJournal, ObjectStore, ValidatorRegistry, sha256Bytes } from "@apexops/kernel";
 import { ApexError } from "../errors.js";
+import { dependencyRevision } from "../dependency-revision.js";
 import { ApexService } from "../service.js";
 import { architecture, costEstimate, prepareValidatedRun, tempRoot } from "./helpers.js";
 import { registerWorkflowValidators } from "../workflow-validators.js";
@@ -184,6 +185,7 @@ test("renewed risk terms invalidate approval context before approval and before 
   ).approvalContextHash;
   const original = await new ObjectStore(root).getJson<ApprovalContextV1>(contextHash);
   const reviewHash = original.sourceHashes["plan-review"]!;
+  const revisionBeforeRenewal = dependencyRevision((await service.status()).run, await journal.replay());
   now += 2_000;
   await service.decideReview(reviewHash, [
     {
@@ -194,6 +196,7 @@ test("renewed risk terms invalidate approval context before approval and before 
     },
   ]);
   const beforeApproval = await journal.replay();
+  assert.equal(dependencyRevision((await service.status()).run, beforeApproval), revisionBeforeRenewal);
   await assert.rejects(service.decideGateNumber(4, "approved", "tester"), /risk dispositions changed/);
   assert.deepEqual(await journal.replay(), beforeApproval);
   assert.equal((await service.status()).run.gates[3]!.state, "open");
@@ -211,6 +214,7 @@ test("renewed risk terms invalidate approval context before approval and before 
     },
   ]);
   const beforeDeploy = await journal.replay();
+  assert.equal(dependencyRevision((await service.status()).run, beforeDeploy), revisionBeforeRenewal);
   await assert.rejects(service.deploy(fresh.previewHash), /risk dispositions changed/);
   assert.deepEqual(await journal.replay(), beforeDeploy);
 });
