@@ -32,9 +32,33 @@ Common verified reads (always include a bounded `intent` for routers):
 | `documentation` | `microsoft_docs_fetch` | `{url: "<selected official documentation URL>"}` |
 | `get_azure_bestpractices` | `get_azure_bestpractices_get` | `{resource: "general", action: "code-generation"}`; use `azurefunctions` for Functions |
 | `azureterraformbestpractices` | `azureterraformbestpractices_get` | `{}` |
+| `wellarchitectedframework` | `wellarchitectedframework_serviceguide_get` | `{service: "<Azure service name>"}` |
+| `cloudarchitect` | `cloudarchitect_design` | `{question: "<bounded design question>"}`; advisory only, see below |
+| `bicepschema` | `bicepschema_get` | `{"resource-type": "<ARM resource type>"}` |
+| `azureterraform` | `azureterraform_avm_versions` | `{"module-name": "<AVM module name>"}` |
+| `azureterraform` | `azureterraform_avm_get` | `{"module-name": "<AVM module name>", "module-version": "<exact version>"}` |
+| `azureterraform` | `azureterraform_azurerm_get` | `{"resource-type": "<azurerm resource type>"}` |
 | `quota` | `quota_usage_check` | `{region: "<accepted region>", "resource-types": "<comma-separated resource types>", subscription: "<approved subscription>"}` |
 | `policy` | `policy_assignment_list` | `{subscription: "<approved subscription>"}` |
 | `role` | `role_assignment_list` | `{scope: "<approved ARM scope>"}` |
+
+## Design Stage Grounding
+
+Requirements, Architecture and Planning use these read-only namespaces as advisory grounding so a design is not written
+from memory. Results are observations: they never become kernel evidence, accept a gate or review finding, answer a
+user-owned question or replace `apex/taskContext`. Record the namespace, command, bounded query and retrieval time
+wherever a result informs a recommendation or decision, and report the limitation if a call is unavailable or denied;
+an unavailable namespace never blocks the kernel workflow.
+
+| Stage | Grounding sources | Use |
+| --- | --- | --- |
+| Requirements | `cloudarchitect`, `documentation`, `wellarchitectedframework` | Advisory candidate-service rationale and recommendation text only; never recorded as a user answer |
+| Architecture | `wellarchitectedframework`, `cloudarchitect`, `documentation`, `get_azure_bestpractices` or `azureterraformbestpractices` for the selected track, `policy` only for an approved subscription target | WAF pillar reasoning, design alternatives, service guidance and policy context; pricing stays in `apex-azure/pricing` |
+| Planning, Bicep track | `bicepschema`, `documentation`, `get_azure_bestpractices` | Resource-type schemas and guidance for the binding; AVM module versions still come from the allow-listed MCR tag lists through `web_fetch` |
+| Planning, Terraform track | `azureterraform`, `azureterraformbestpractices`, `documentation` | AVM module versions and details, azurerm resource documentation and provider guidance |
+
+`policy` needs an approved subscription: do not call it for a `local` target, where the accepted governance input is the
+policy source. Do not use these namespaces to check regional support, quota or deployment feasibility.
 
 The verified `documentation` namespace is available. A namespace grant does not authorize every operation: the
 managed hook limits commands and parameters, including metadata-only Storage/Cosmos reads and Deploy guidance/log
