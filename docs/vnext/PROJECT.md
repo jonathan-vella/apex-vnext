@@ -17,7 +17,8 @@ bounded implementation: bind the Gate 4 approval context immutably without enabl
 The #466 source slice adds the versioned immutable context object, `preview.created`/approval hash binding,
 full accepted-source references, and a final review-file check under the run mutation lock. Focused regressions cover
 both IaC tracks, restart, apply/destroy replacement, truncated summaries, missing/corrupt objects and document-plus-base
-tampering. Integration qualification and PR acceptance remain separate from this source implementation; no live
+tampering, including risk renewal before approval and deployment. Integration qualification and PR acceptance remain
+separate from this source implementation; no live
 client/cloud run, candidate replacement or publication is implied.
 
 The maintainer accepted

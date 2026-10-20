@@ -337,7 +337,8 @@ test("run mutation validates final evidence under its lock before publishing tra
   await assert.rejects(
     repository.mutate({
       ...mutation,
-      validateBeforeCommit: async () => {
+      validateBeforeCommit: async (current) => {
+        assert.deepEqual(current, before);
         await assert.rejects(repository.mutate(mutation), RunMutationBusyError);
         throw new Error("Reviewed evidence changed");
       },

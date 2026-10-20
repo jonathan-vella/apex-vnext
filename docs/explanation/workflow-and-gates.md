@@ -70,7 +70,9 @@ same `approvalContextHash`. CLI/MCP preview rendering reads the immutable conten
 Immediately before recording the decision, the kernel re-reads and compares the local review bytes with the bound
 object under the run mutation lock. Editing both the document and its generated-review base cannot satisfy that check.
 Missing context requires a fresh preview; missing or altered review material blocks the decision. Deployment checks the
-approval's context binding and immutable objects, including after restart or supported state transfer. The exact preview,
+approval's context binding and immutable objects, including after restart or supported state transfer. Current accepted
+source hashes and risk dispositions must still match the snapshot: renewed risk terms require a fresh preview even
+when the ordinary dependency revision is unchanged. This is checked before approval commit and deployment. The exact preview,
 writer, recipient, operation and expiry bindings remain authoritative; context binding does not replace them or enable
 production. The published `0.11.0-next.5` candidate and live-client qualification are unchanged by source implementation.
 

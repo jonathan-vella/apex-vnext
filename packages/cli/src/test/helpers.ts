@@ -637,6 +637,7 @@ export async function prepareValidatedRun(
     requirements?: RequirementsV1;
     architecture?: ArchitectureV1;
     costEstimate?: CostEstimateV1;
+    planReviewRisk?: { rationale: string; expiresAt: string };
     acceptAvailability?: boolean;
     stopBeforeCodegen?: boolean;
   } = {},
@@ -691,9 +692,32 @@ export async function prepareValidatedRun(
     },
   );
   const planHashes = await complete("plan", plan);
-  await complete("plan-review", [
-    { kind: "review-findings", value: review(runId, "plan", planHashes.outputHashes["implementation-intent"]!) },
+  const planReview = await complete("plan-review", [
+    {
+      kind: "review-findings",
+      value: review(
+        runId,
+        "plan",
+        planHashes.outputHashes["implementation-intent"]!,
+        options.planReviewRisk === undefined
+          ? []
+          : [
+              {
+                id: "F-PLAN-1",
+                severity: "medium",
+                disposition: "open",
+                title: "Capacity assumption",
+                detail: "Confirm temporary capacity risk.",
+                evidenceRefs: [],
+              },
+            ],
+      ),
+    },
   ]);
+  if (options.planReviewRisk !== undefined)
+    await service.decideReview(planReview.outputHashes["review-findings"]!, [
+      { findingId: "F-PLAN-1", action: "accept-risk", ...options.planReviewRisk },
+    ]);
   await assertLabReadiness(service, 3);
   if (options.stopBeforeCodegen === true) return;
   await complete(`codegen-${track}`, codegenBundle(runId, track, plan));

@@ -6862,9 +6862,16 @@ export class ApexService {
       },
       gateNumber === 4 ? (events.at(-1)?.hash ?? null) : undefined,
       preview !== undefined && approvalContextHash !== undefined
-        ? async () => {
+        ? async (lockedRun) => {
             if (decision === "approved")
-              await this.validateGateValidators(run, gate, events, approval, approvalRecipientIdentity);
+              await this.validateGateValidators(
+                lockedRun,
+                gate,
+                events,
+                approval,
+                approvalRecipientIdentity,
+                lockedRun,
+              );
             await this.assertApprovalContextReviewed(run, preview.previewHash, approvalContextHash);
             if (approval.expiresAt === undefined || Date.parse(approval.expiresAt) <= this.clock().getTime())
               throw new ApexError("APEX_STALE", "Approval authority expired before commit", EXIT_CODES.stale);
@@ -7205,35 +7212,8 @@ export class ApexService {
             })
             .join("\n");
     const approvalContext = await this.approvalContextMarkdown(run, events);
-    const sourceHashes: Record<string, string> = {};
-    for (const kind of [
-      "requirements",
-      "architecture",
-      "cost-estimate",
-      "workload-decision-manifest",
-      "governance-constraints",
-      "policy-property-map",
-      "implementation-intent",
-      "iac-binding",
-      "environment-inputs",
-    ] as const) {
-      const hash = this.artifactHash(events, kind);
-      if (hash !== undefined) sourceHashes[kind] = hash;
-    }
-    const reviewHashes = new Set<string>();
-    for (const nodeId of ["requirements-review", "architecture-review", "plan-review"]) {
-      const hash = this.latestPayloadHash(events, "task.completed", "reviewHash", (value) => value.nodeId === nodeId);
-      if (hash !== undefined) {
-        sourceHashes[nodeId] = hash;
-        reviewHashes.add(hash);
-      }
-    }
-    const resolutions = events.flatMap((event) => {
-      if (event.type !== "review.resolved") return [];
-      const resolution = (event.payload as { resolution?: ReviewResolution }).resolution;
-      return resolution !== undefined && reviewHashes.has(resolution.reviewHash) ? [resolution] : [];
-    });
-    sourceHashes["risk-dispositions"] = await this.objects.putJson(resolutions);
+    const { sourceHashes, resolutions } = this.approvalContextSources(events);
+    await this.objects.putJson(resolutions);
     const previewContent = [
       "# Deployment Preview",
       "",
@@ -7285,6 +7265,42 @@ export class ApexService {
     return this.objects.putJson(context);
   }
 
+  private approvalContextSources(events: Awaited<ReturnType<EventJournal["replay"]>>): {
+    sourceHashes: Record<string, string>;
+    resolutions: ReviewResolution[];
+  } {
+    const sourceHashes: Record<string, string> = {};
+    for (const kind of [
+      "requirements",
+      "architecture",
+      "cost-estimate",
+      "workload-decision-manifest",
+      "governance-constraints",
+      "policy-property-map",
+      "implementation-intent",
+      "iac-binding",
+      "environment-inputs",
+    ] as const) {
+      const hash = this.artifactHash(events, kind);
+      if (hash !== undefined) sourceHashes[kind] = hash;
+    }
+    const reviewHashes = new Set<string>();
+    for (const nodeId of ["requirements-review", "architecture-review", "plan-review"]) {
+      const hash = this.latestPayloadHash(events, "task.completed", "reviewHash", (value) => value.nodeId === nodeId);
+      if (hash !== undefined) {
+        sourceHashes[nodeId] = hash;
+        reviewHashes.add(hash);
+      }
+    }
+    const resolutions = events.flatMap((event) => {
+      if (event.type !== "review.resolved") return [];
+      const resolution = (event.payload as { resolution?: ReviewResolution }).resolution;
+      return resolution !== undefined && reviewHashes.has(resolution.reviewHash) ? [resolution] : [];
+    });
+    sourceHashes["risk-dispositions"] = sha256Json(resolutions);
+    return { sourceHashes, resolutions };
+  }
+
   private approvalContextDocument(context: ApprovalContextV1, hash: string): Buffer {
     return Buffer.from(`${context.content}\n\n- Approval context object hash: ${hash}\n`, "utf8");
   }
@@ -7310,6 +7326,13 @@ export class ApexService {
     this.assertValid("approval-context", context);
     if (context.projectId !== run.projectId || context.runId !== run.runId || context.previewHash !== previewHash)
       throw new ApexError("APEX_STALE", "Approval context does not match the current preview", EXIT_CODES.stale);
+    const current = this.approvalContextSources(await this.journal(run).replay());
+    if (sha256Json(context.sourceHashes) !== sha256Json(current.sourceHashes))
+      throw new ApexError(
+        "APEX_STALE",
+        "Approval context sources or risk dispositions changed; create a fresh preview",
+        EXIT_CODES.stale,
+      );
     for (const hash of Object.values(context.sourceHashes)) await this.objects.getBytes(hash);
     return context;
   }
@@ -8703,7 +8726,7 @@ export class ApexService {
     eventType: string,
     payload: JsonValue,
     expectedJournalHead?: string | null,
-    validateBeforeCommit?: () => Promise<void>,
+    validateBeforeCommit?: (current: RunConfigV1) => Promise<void>,
   ): Promise<void> {
     this.assertNotSnapshotRead();
     const repository = this.runRepository(before);
@@ -11036,6 +11059,7 @@ export class ApexService {
     events: Awaited<ReturnType<EventJournal["replay"]>>,
     approval: ApprovalEvidenceV1 | undefined,
     expectedApprovalRecipientIdentity: string | undefined,
+    lockedRun?: RunConfigV1,
   ): Promise<string[]> {
     const workflow = await this.lockedWorkflowEngine(run);
     const nodeId = `gate-${gate.gate}`;
@@ -11079,7 +11103,7 @@ export class ApexService {
         : ((await new WriterTransferStore(
             this.projects.runDirectory(run.projectId, run.runId),
             this.clock,
-          ).proveOneHopPostPreviewLineage(preview.previewHash, preview.ownerEpoch)) ?? undefined);
+          ).proveOneHopPostPreviewLineage(preview.previewHash, preview.ownerEpoch, lockedRun)) ?? undefined);
     const approvalContextHash = this.previewApprovalContextHash(events);
     const context: WorkflowGateValidatorContext = {
       gateNumber: gate.gate,

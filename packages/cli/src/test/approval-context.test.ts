@@ -166,3 +166,51 @@ test("Gate 4 re-reads review bytes under the run mutation lock after approval ev
     store.putJson = put;
   }
 });
+
+test("renewed risk terms invalidate approval context before approval and before deployment", async () => {
+  let now = Date.parse("2026-10-20T00:00:00.000Z");
+  const root = await tempRoot();
+  const service = new ApexService(root, { clock: () => new Date(now) });
+  const { runId } = await service.init({ projectId: "demo", riskOwner: "partner" });
+  await prepareValidatedRun(service, runId, "bicep", {
+    planReviewRisk: { rationale: "Initial terms", expiresAt: new Date(now + 1_000).toISOString() },
+  });
+  await service.preview({ operation: "apply", provider: "fake" });
+  const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", runId, "journal"));
+  const contextHash = (
+    (await journal.replay()).findLast(({ type }) => type === "preview.created")!.payload as {
+      approvalContextHash: string;
+    }
+  ).approvalContextHash;
+  const original = await new ObjectStore(root).getJson<ApprovalContextV1>(contextHash);
+  const reviewHash = original.sourceHashes["plan-review"]!;
+  now += 2_000;
+  await service.decideReview(reviewHash, [
+    {
+      findingId: "F-PLAN-1",
+      action: "accept-risk",
+      rationale: "Renewed terms",
+      expiresAt: new Date(now + 1_000).toISOString(),
+    },
+  ]);
+  const beforeApproval = await journal.replay();
+  await assert.rejects(service.decideGateNumber(4, "approved", "tester"), /risk dispositions changed/);
+  assert.deepEqual(await journal.replay(), beforeApproval);
+  assert.equal((await service.status()).run.gates[3]!.state, "open");
+  const fresh = await service.preview({ operation: "apply", provider: "fake" });
+  const approval = await service.decideGateNumber(4, "approved", "tester");
+  assert.notEqual(approval.approvalContextHash, contextHash);
+  assert.match(await service.render("preview"), /Renewed terms/);
+  now += 2_000;
+  await service.decideReview(reviewHash, [
+    {
+      findingId: "F-PLAN-1",
+      action: "accept-risk",
+      rationale: "Changed after approval",
+      expiresAt: new Date(now + 60_000).toISOString(),
+    },
+  ]);
+  const beforeDeploy = await journal.replay();
+  await assert.rejects(service.deploy(fresh.previewHash), /risk dispositions changed/);
+  assert.deepEqual(await journal.replay(), beforeDeploy);
+});
