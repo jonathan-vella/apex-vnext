@@ -41,7 +41,7 @@ auto-validated (reviewer judgement). Existing repo patterns:
 > snippet).
 
 **Manual audit check** (no automated rule): Claude Opus / Sonnet prompts whose role is to
-research before deciding (Architect, IaC Planner, Context Optimizer)
+research before deciding (`APEX` loading `apex-architecture` or `apex-planning` stage skills)
 should include `<investigate_before_answering>`.
 
 **Manual counter-check** (no automated rule): ONE-SHOT prompts

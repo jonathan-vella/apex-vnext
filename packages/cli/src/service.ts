@@ -5325,7 +5325,7 @@ export class ApexService {
    * DECISION-031 amendment (2026-10-08): while a review waits for its capture, refuse operations that approve, delete
    * or publish (MCP_TOOL_REVIEW_GUARDS), so an inherited rubber-duck cannot use them even when hooks fail open.
    */
-  private async assertNoPendingReview(operation: ReviewGuardedTool): Promise<void> {
+  async assertNoPendingReview(operation: ReviewGuardedTool): Promise<void> {
     let pending: { projectId: string; runId: string; taskId: string; workspace?: string } | undefined = (
       await this.pendingReviews()
     )[0];
@@ -9751,6 +9751,12 @@ export class ApexService {
               : { reviewGate: descriptor.gate ?? 2 }),
           };
         if (descriptor.gate !== undefined && !this.gateSatisfied(run, descriptor.gate, events)) {
+          const gateState = run.gates.find(({ gate }) => gate === descriptor.gate)?.state;
+          if (gateState === "rejected") {
+            return {
+              blockers: [this.rejectedGateBlocker(descriptor.gate)],
+            };
+          }
           return {
             blockers: [
               isReadinessGate(run.purpose, descriptor.gate)
@@ -9767,12 +9773,29 @@ export class ApexService {
         }
         const preview = this.latestPayloadHash(events, "preview.created", "previewHash");
         if (preview === undefined) return { blockers: ["Deployment preview is required"] };
-        if (!this.gateSatisfied(run, 4, events)) return { blockers: ["Gate 4 approval is required"] };
+        if (!this.gateSatisfied(run, 4, events)) {
+          if (run.gates.find(({ gate }) => gate === 4)?.state === "rejected") {
+            return { blockers: [this.rejectedGateBlocker(4)] };
+          }
+          return { blockers: ["Gate 4 approval is required"] };
+        }
         return { blockers: ["Deployment and inventory are required"] };
       }
       return { task: descriptor, blockers: [] };
     }
     return { blockers: [] };
+  }
+
+  private rejectedGateBlocker(gateNumber: number): string {
+    const upstream =
+      gateNumber === 1
+        ? "requirements"
+        : gateNumber === 2
+          ? "architecture"
+          : gateNumber === 3
+            ? "implementation plan"
+            : "deployment preview";
+    return `Gate ${gateNumber} approval was rejected (approval-rejected); revise ${upstream} to reopen Gate ${gateNumber}`;
   }
 
   private async retryLabReadiness(run: RunConfigV1): Promise<boolean> {

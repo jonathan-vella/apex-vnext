@@ -43,7 +43,7 @@ import {
   type ValidationIssue,
   type ValidatorRegistry,
 } from "@apexops/kernel";
-import { evaluateQualityScorecard } from "@apexops/renderers";
+import { evaluateQualityScorecard, ScorecardValidationError } from "@apexops/renderers";
 import { Value } from "@sinclair/typebox/value";
 
 export interface WorkflowTaskValidatorContext {
@@ -1353,7 +1353,13 @@ function qualityScorecardDecidable(value: unknown): ValidationIssue[] {
   const report = context.outputs["quality-report"] as QualityReportV1;
   const measurementSet = context.qualityMeasurements;
   const measurements = measurementSet.measurements;
-  const evaluations = evaluateQualityScorecard(context.scorecard, measurements);
+  let evaluations: ReturnType<typeof evaluateQualityScorecard>;
+  try {
+    evaluations = evaluateQualityScorecard(context.scorecard, measurements);
+  } catch (error) {
+    if (!(error instanceof ScorecardValidationError)) throw error;
+    return issue(error.path, error.message);
+  }
   const checks = new Map(report.checks.map((check) => [`${check.id}\u0000${check.scenario}`, check]));
   const issues: ValidationIssue[] = [];
   if (report.scorecardHash !== sha256Json(context.scorecard)) {

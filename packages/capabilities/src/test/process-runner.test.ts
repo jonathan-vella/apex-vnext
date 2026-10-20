@@ -48,6 +48,26 @@ test("process runner returns stable timeout and output-limit errors", async () =
     }),
     processError("PROCESS_OUTPUT_LIMIT"),
   );
+  for (const invalid of [0, -1, Number.NaN, Number.POSITIVE_INFINITY, 1.5]) {
+    await assert.rejects(
+      runner.run({
+        executable: process.execPath,
+        args: ["-e", ""],
+        timeoutMs: invalid,
+        maxOutputBytes: 1_024,
+      }),
+      /timeoutMs must be a positive safe integer/u,
+    );
+    await assert.rejects(
+      runner.run({
+        executable: process.execPath,
+        args: ["-e", ""],
+        timeoutMs: 1_000,
+        maxOutputBytes: invalid,
+      }),
+      /maxOutputBytes must be a positive safe integer/u,
+    );
+  }
 });
 
 function processError(code: string): (error: unknown) => boolean {

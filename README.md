@@ -107,7 +107,7 @@ governance collection uses. Deployments to Azure always go through an approved p
 | ------------------------------ | ---------------------------------------------------------------------------------------------- |
 | Runtime, CLI and agent plugin  | Preview `0.11.0-next.5`, published to npm (`next`) and the `apex-plugins` marketplace           |
 | Lab approval flow              | Implemented: one intent confirmation, kernel readiness checkpoints, final preview approval     |
-| Bicep and Terraform tracks     | Implemented with native tooling. Bicep moves to an `azd` executor in a coming release           |
+| Bicep and Terraform tracks     | Implemented: Bicep runs through the `azd` executor (`CP-26`, awaiting `CP-30` live qualification); Terraform uses native CLI |
 | Supported-client qualification | Pending. Live runs in the three clients are still to be recorded                                |
 | Production deployments         | **Not available.** Planned as an opt-in, CI-owned run with verified human approval and setup help |
 

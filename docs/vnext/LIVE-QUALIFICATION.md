@@ -6,12 +6,14 @@ package qualification does not authorize cloud access or mutation.
 ## Purpose And Implementation Status
 
 [ADR-0007](adrs/03-des-adr-0007-use-purpose-bound-approval-and-ci-owned-production-runs.md) selects non-production
-first and CI-owned production execution with human approval verified before apply. Those purpose/approval paths are
-planned, not implemented by this procedure. Initial non-production acceptance is separate from deferred production.
+first and CI-owned production execution with human approval verified before apply. The typed purpose and
+non-production lab gate flow (`CP-27`) and the `azd`/Bicep provisioning and destroy executor (`CP-26`) are implemented
+in the runtime; CI-owned production runs (`CP-28`) and the production readiness kit (`CP-29`) remain planned. Initial
+non-production acceptance is separate from deferred production.
 
-The steps below exercise the existing native providers and local-to-CI qualification handoff retained after #454.
-They are not the new production setup kit or the future azd/Bicep lab executor. Do not skip current gates or reinterpret
-the qualification backend's network exception as production authorization.
+The steps below exercise the existing qualification handoff retained after #454 until `CP-30` completes purpose-bound
+live qualification. They are not the new production setup kit. Do not skip current gates or reinterpret the
+qualification backend's network exception as production authorization.
 
 ## Preconditions
 
@@ -34,14 +36,14 @@ If the executable qualification path still requires superseded evidence, align a
 
 ## Prepare Each Track
 
-Use an explicit current governance context with `subscription_id` and reviewed `security_exceptions`.
-The local launcher requires `--governance-file <absolute-file>` for `preview`, `dispatch` and `retrieve`.
-`recover` retains its no-endpoint-opening interface. Do not substitute historical checkout or archived evidence.
-Before any endpoint mutation the launcher also requires the file's `subscription_id` to equal the active Azure account.
-The hosted apply job requires protected nonsecret `APEX_QUALIFICATION_GOVERNANCE_JSON` and writes a regular
-mode-0600 context file under `RUNNER_TEMP`. It validates the file before endpoint opening and rechecks expiry.
-Setting that environment variable is a separately authorized maintainer prerequisite, not an action of cleanup.
-Neither the variable nor the file grants approval; local human Gate 4 and recipient/preview binding remain required.
+Use an explicit current governance context with `subscription_id` and reviewed `security_exceptions`. The local
+launcher requires `--governance-file <absolute-file>` for `preview`, `dispatch` and `retrieve`. `recover` retains its
+no-endpoint-opening interface. Do not substitute historical checkout or archived evidence. Before any endpoint
+mutation the launcher also requires the file's `subscription_id` to equal the active Azure account. The hosted apply
+job requires protected nonsecret `APEX_QUALIFICATION_GOVERNANCE_JSON` and writes a regular mode-0600 context file
+under `RUNNER_TEMP`. It validates the file before endpoint opening and rechecks expiry. Setting that environment
+variable is a separately authorized maintainer prerequisite, not an action of cleanup. Neither the variable nor the
+file grants approval; local human Gate 4 and recipient/preview binding remain required.
 
 Run Bicep and Terraform as separate environment runs. For each track:
 
@@ -63,9 +65,10 @@ Include at least one adapted archetype with fresh consumer governance and no inh
 
 ## Required Evidence
 
-Record candidate and runtime hashes, actor and recipient identities, owner epochs, target scope, governance and provider
-versions, preview and approval hashes, transfer lineage, operation records, inventory, diagnostics, cost, cleanup, and
-redacted logs. Terraform evidence also binds the lockfile, configuration tree, saved-plan lineage, and backend mode.
+Record candidate and runtime hashes, actor and recipient identities, owner epochs, target scope, governance and
+provider versions, preview and approval hashes, transfer lineage, operation records, inventory, diagnostics, cost,
+cleanup, and redacted logs. Terraform evidence also binds the lockfile, configuration tree, saved-plan lineage, and
+backend mode.
 
 Do not commit credentials, secret values, Terraform state, saved plans, transport material, or unredacted provider
 output.
@@ -76,25 +79,25 @@ CP-30 must add separately authorized scenarios after the relevant implementation
 
 - Non-production: confirm intent once, retain required reviews/validation, approve the final preview and exercise
   azd/Bicep and native Terraform apply, inventory, recovery, destroy and cleanup in both foundations.
-- Production rehearsal: CI originates the execution run/preview; actual human approval is validated before apply,
-  with run/attempt/commit/target/artifact identity and expiry. Missing or stale approval and unavailable protection
+- Production rehearsal: CI originates the execution run/preview; actual human approval is validated before apply, with
+  run/attempt/commit/target/artifact identity and expiry. Missing or stale approval and unavailable protection
   features block execution. CI artifacts remain protected even without a developer-to-CI handoff.
 - Setup: read-only readiness, reviewable configuration, explicitly approved provisioning and post-checks must report
   partial failure and missing prerequisites rather than success. Setup or a rehearsal does not by itself authorize
   production use.
 
-Retain negative-case proof for purpose/target changes, exact-plan tampering, replay, identity, state locking,
-secret handling and cleanup. Current historical evidence cannot qualify a changed implementation.
+Retain negative-case proof for purpose/target changes, exact-plan tampering, replay, identity, state locking, secret
+handling and cleanup. Current historical evidence cannot qualify a changed implementation.
 
 ## Failure And Recovery
 
-Do not repair state manually. Preserve diagnostics, reject stale evidence, reconcile only through supported operations,
-and create a fresh preview after any dependency or ownership change. A failed or partial run remains failed until its
-cleanup and evidence disposition are explicit.
+Do not repair state manually. Preserve diagnostics, reject stale evidence, reconcile only through supported
+operations, and create a fresh preview after any dependency or ownership change. A failed or partial run remains
+failed until its cleanup and evidence disposition are explicit.
 
-Quota, regional or service failures remain real failures even though availability is assumed during design. Report them,
-ask relevant recovery questions and approve any revised intent before regenerating the preview. Never substitute a SKU
-or region silently, and never weaken policy or security to complete a demo.
+Quota, regional or service failures remain real failures even though availability is assumed during design. Report
+them, ask relevant recovery questions and approve any revised intent before regenerating the preview. Never substitute
+a SKU or region silently, and never weaken policy or security to complete a demo.
 
 ## Acceptance
 

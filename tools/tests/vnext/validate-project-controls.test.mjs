@@ -66,3 +66,12 @@ test("rejects missing bug regression provenance", () => {
   });
   assert.ok(hasRule(findings, "bug.required-field"));
 });
+
+test("ignores example requirement and decision IDs inside fenced code blocks", () => {
+  const findings = mutate((model) => {
+    model.documents["PRD.md"] += "\n```markdown\n### REQ-DIST-001: Example in code block\n```\n";
+    model.documents["ROADMAP.md"] += "\n```markdown\nReferences REQ-EXAMPLE-999 in a fenced block.\n```\n";
+    model.documents["DECISIONS.md"] += "\n```markdown\n## DECISION-001: Example decision in code block\n```\n";
+  });
+  assert.deepEqual(findings, []);
+});

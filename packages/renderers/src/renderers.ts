@@ -127,7 +127,8 @@ export function renderDeploymentGuide(input: {
     markdownTable(
       ["Logical ID", "Type", "Purpose", "Implementation", "Version", "Dependencies", "Diagnostic Scope"],
       resources.map((resource) => {
-        const bound = binding.resourceBindings[resource.id]!;
+        const bound = binding.resourceBindings[resource.id];
+        if (bound === undefined) throw new Error(`Missing IaC binding for logical resource '${resource.id}'`);
         return [
           resource.id,
           resource.type,
@@ -147,14 +148,16 @@ export function renderDeploymentGuide(input: {
     markdownTable(
       ["Logical ID", "Resource ID", "Ownership", "Role"],
       resources
-        .flatMap(({ id }) =>
-          (binding.resourceBindings[id]!.physicalResources ?? []).map((resource) => [
-            id,
-            resource.resourceId,
-            resource.ownership,
-            resource.role,
-          ]),
-        )
+        .flatMap((resource) => {
+          const bound = binding.resourceBindings[resource.id];
+          if (bound === undefined) throw new Error(`Missing IaC binding for logical resource '${resource.id}'`);
+          return (bound.physicalResources ?? []).map((physical) => [
+            resource.id,
+            physical.resourceId,
+            physical.ownership,
+            physical.role,
+          ]);
+        })
         .sort((left, right) => compareText(stableJson(left), stableJson(right))),
     ),
     "",

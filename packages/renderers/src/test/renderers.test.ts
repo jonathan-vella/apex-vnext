@@ -147,6 +147,10 @@ for (const track of ["bicep", "terraform"] as const) {
     assert.match(guide, /Microsoft.Web\/sites\/api/);
     assert.doesNotMatch(guide, /DO_NOT_RENDER/);
     for (const digest of Object.values(input.hashes)) assert.ok(guide.includes(digest));
+    assert.throws(
+      () => renderDeploymentGuide({ ...input, binding: { ...binding, resourceBindings: {} } }),
+      /Missing IaC binding for logical resource 'api'/u,
+    );
   });
 }
 
@@ -169,15 +173,32 @@ test("requirements document rendering fills exact template slots with typed or u
     regionalConstraints: "swedencentral",
     architectureHandoff: "Candidate services: Container Apps and Azure SQL",
   };
-  const template = REQUIREMENTS_TEMPLATE_SLOTS.map((slot) => `{${slot}}`).join("\n");
+  const template = `${REQUIREMENTS_TEMPLATE_SLOTS.map((slot) => `{${slot}}`).join("\n")}\n\\{literal\\}`;
   const rendered = renderRequirementsDocument(input, template, hash("a"), hash("b"));
 
-  assert.doesNotMatch(rendered, /\{[a-z][a-z-]*\}/u);
+  assert.match(rendered, /\{literal\}$/u);
+  assert.doesNotMatch(rendered.replace(/\{literal\}$/u, ""), /\{[a-z][a-z-]*\}/u);
   assert.match(rendered, /Retail greenfield web API/u);
   assert.match(rendered, /Candidate services: Container Apps and Azure SQL/u);
   assert.throws(
     () => renderRequirementsDocument(input, `${template}\n{unexpected-slot}`, hash("a"), hash("b")),
-    /invalid slots/u,
+    /Requirements document template has invalid slots \(unknown: unexpected-slot\)/u,
+  );
+  assert.throws(
+    () =>
+      renderRequirementsDocument(
+        input,
+        REQUIREMENTS_TEMPLATE_SLOTS.slice(1)
+          .map((slot) => `{${slot}}`)
+          .join("\n"),
+        hash("a"),
+        hash("b"),
+      ),
+    /Requirements document template has invalid slots \(missing: workload\)/u,
+  );
+  assert.throws(
+    () => renderRequirementsDocument(input, `${template}\n{workload}`, hash("a"), hash("b")),
+    /Requirements document template has invalid slots \(duplicate: workload\)/u,
   );
 });
 

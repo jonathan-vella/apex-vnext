@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { QualityScorecardV1 } from "@apexops/contracts";
-import { evaluateQualityScorecard, renderQualityScorecardEvaluation } from "../index.js";
+import { evaluateQualityScorecard, renderQualityScorecardEvaluation, ScorecardValidationError } from "../index.js";
 
 const scorecard: QualityScorecardV1 = {
   schemaVersion: "1.0.0",
@@ -33,7 +33,7 @@ const scorecard: QualityScorecardV1 = {
       metric: "exact-pass",
       direction: "exact",
       target: 5,
-      tolerance: 0.5,
+      tolerance: 0,
       scenario: "base",
       minimumSamples: 1,
       source: "vscode",
@@ -44,7 +44,7 @@ const scorecard: QualityScorecardV1 = {
       metric: "exact-fail",
       direction: "exact",
       target: 5,
-      tolerance: 0.5,
+      tolerance: 0,
       scenario: "base",
       minimumSamples: 1,
       source: "vscode",
@@ -102,7 +102,7 @@ test("scorecard applies direction, tolerance, sample, and unavailable rules mech
   const measurements = [
     { metric: "minimum", scenario: "base", value: 88, samples: 2 },
     { metric: "maximum", scenario: "base", value: 11, samples: 1 },
-    { metric: "exact-pass", scenario: "base", value: 5.5, samples: 1 },
+    { metric: "exact-pass", scenario: "base", value: 5, samples: 1 },
     { metric: "exact-fail", scenario: "base", value: 5.51, samples: 1 },
     { metric: "undersampled-block", scenario: "base", value: 2, samples: 2 },
     { metric: "undersampled-omit", scenario: "base", value: 2, samples: 2 },
@@ -131,4 +131,103 @@ test("scorecard evaluation and Markdown ordering are deterministic", () => {
   assert.equal(rendered, renderQualityScorecardEvaluation(reversed, [...measurements].reverse()));
   assert.match(rendered, /\| maximum \| base \| max \| 10 \| 1 \| 12 \| 1\/1 \| FAIL \|/);
   assert.match(rendered, /\| minimum \| base \| min \| 90 \| 2 \| 87.99 \| 2\/2 \| FAIL \|/);
+});
+
+test("scorecard rejects duplicate rules, duplicate measurements, invalid samples/values, and non-zero exact tolerance", () => {
+  assert.throws(
+    () =>
+      evaluateQualityScorecard(scorecard, [
+        { metric: "minimum", scenario: "base", value: 50, samples: 2 },
+        { metric: "minimum", scenario: "base", value: 95, samples: 2 },
+      ]),
+    (error: unknown) => {
+      assert.ok(error instanceof ScorecardValidationError);
+      assert.equal(error.path, "/qualityMeasurements/measurements");
+      assert.match(error.message, /Duplicate scorecard measurement for minimum \(base\)/u);
+      return true;
+    },
+  );
+
+  assert.throws(
+    () =>
+      evaluateQualityScorecard(
+        {
+          ...scorecard,
+          rules: [...scorecard.rules, scorecard.rules[0]!],
+        },
+        [],
+      ),
+    (error: unknown) => {
+      assert.ok(error instanceof ScorecardValidationError);
+      assert.equal(error.path, "/scorecard/rules");
+      assert.match(error.message, /Duplicate scorecard rule for minimum \(base\)/u);
+      return true;
+    },
+  );
+
+  for (const invalidSamples of [-1, Number.NaN, Number.POSITIVE_INFINITY, 1.5]) {
+    assert.throws(
+      () =>
+        evaluateQualityScorecard(scorecard, [
+          { metric: "minimum", scenario: "base", value: 95, samples: invalidSamples },
+        ]),
+      /Invalid scorecard sample count for minimum \(base\)/u,
+    );
+  }
+
+  for (const invalidValue of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+    assert.throws(
+      () =>
+        evaluateQualityScorecard(scorecard, [{ metric: "minimum", scenario: "base", value: invalidValue, samples: 2 }]),
+      /Invalid scorecard measurement value for minimum \(base\)/u,
+    );
+  }
+
+  assert.throws(
+    () =>
+      evaluateQualityScorecard(
+        {
+          ...scorecard,
+          rules: scorecard.rules.map((rule) => (rule.metric === "exact-pass" ? { ...rule, tolerance: 0.5 } : rule)),
+        },
+        [],
+      ),
+    /Exact scorecard rule exact-pass \(base\) must have tolerance 0/u,
+  );
+
+  // Collision-safe composite key when metric/scenario contain null bytes
+  const collisionScorecard: QualityScorecardV1 = {
+    schemaVersion: "1.0.0",
+    frozenAt: "2026-07-01T00:00:00Z",
+    rules: [
+      {
+        metric: "a\u0000b",
+        direction: "min",
+        target: 10,
+        tolerance: 0,
+        scenario: "c",
+        minimumSamples: 1,
+        source: "kernel",
+        owner: "quality",
+        unavailable: "block",
+      },
+      {
+        metric: "a",
+        direction: "min",
+        target: 10,
+        tolerance: 0,
+        scenario: "b\u0000c",
+        minimumSamples: 1,
+        source: "kernel",
+        owner: "quality",
+        unavailable: "block",
+      },
+    ],
+  };
+  const evaluations = evaluateQualityScorecard(collisionScorecard, [
+    { metric: "a\u0000b", scenario: "c", value: 10, samples: 1 },
+    { metric: "a", scenario: "b\u0000c", value: 5, samples: 1 },
+  ]);
+  assert.equal(evaluations.find((item) => item.metric === "a\u0000b")?.decision, "pass");
+  assert.equal(evaluations.find((item) => item.metric === "a")?.decision, "fail");
 });

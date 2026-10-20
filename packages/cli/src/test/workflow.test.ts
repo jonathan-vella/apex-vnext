@@ -2987,6 +2987,11 @@ test("gate approval rejects stale dependencies while explicit rejection remains 
   await assert.rejects(service.decideGateNumber(1, "approved", "tester"), /gate:requirements-ready/);
   const rejection = await service.decideGateNumber(1, "rejected", "tester");
   assert.equal(rejection.decision, "rejected");
+  const rejectedStatus = await service.status();
+  assert.match(
+    rejectedStatus.blockers.join("; "),
+    /Gate 1 approval was rejected \(approval-rejected\); revise requirements to reopen Gate 1/u,
+  );
 
   const events = await new EventJournal(
     join(root, ".apex", "projects", "demo", "runs", initialized.runId, "journal"),
@@ -3004,6 +3009,33 @@ test("Gate 4 approval rejects an expired preview before changing gate state", as
   now += 2;
   await assert.rejects(service.decideGateNumber(4, "approved", "tester"), /preview has expired/);
   assert.equal((await service.status()).run.gates[3]?.state, "open");
+});
+
+test("rejecting Gate 4 blocks deployment with approval-rejected but permits a replacement preview on both tracks", async () => {
+  for (const track of ["bicep", "terraform"] as const) {
+    const service = new ApexService(await tempRoot());
+    const initialized = await service.init({ projectId: "demo", riskOwner: "partner", iacTool: track });
+    await prepareValidatedRun(service, initialized.runId, track);
+    const firstPreview = await service.preview({ operation: "apply", provider: "fake" });
+    const rejection = await service.decideGateNumber(4, "rejected", "tester");
+    assert.equal(rejection.decision, "rejected");
+
+    const rejectedStatus = await service.status();
+    assert.equal(rejectedStatus.run.gates[3]?.state, "rejected");
+    assert.match(
+      rejectedStatus.blockers.join("; "),
+      /Gate 4 approval was rejected \(approval-rejected\); revise deployment preview to reopen Gate 4/u,
+    );
+    await assert.rejects(service.deploy(firstPreview.previewHash), /Approval does not authorize the exact preview/u);
+
+    const replacementPreview = await service.preview({ operation: "apply", provider: "fake" });
+    const reopenedStatus = await service.status();
+    assert.equal(reopenedStatus.run.gates[3]?.state, "open");
+    await service.decideGateNumber(4, "approved", "tester");
+    const deployed = await service.deploy(replacementPreview.previewHash);
+    assert.equal((deployed.operation as { operation?: unknown }).operation, "apply");
+    assert.equal(deployed.inventory.resources.length, 1);
+  }
 });
 
 test("deploy rejects a preview and approval from an older owner epoch", async () => {

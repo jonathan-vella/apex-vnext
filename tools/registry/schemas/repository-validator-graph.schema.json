@@ -91,6 +91,18 @@
           "script": { "$ref": "#/$defs/script" }
         }
       }
+    },
+    "excludedScripts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["script", "reason"],
+        "properties": {
+          "script": { "$ref": "#/$defs/script" },
+          "reason": { "type": "string", "minLength": 1 }
+        }
+      }
     }
   },
   "$defs": {

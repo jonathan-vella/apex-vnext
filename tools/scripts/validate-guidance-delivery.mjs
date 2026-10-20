@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import Ajv2020 from "ajv/dist/2020.js";
 import { reportRegistryValidation } from "./_lib/registry-validator-reporter.mjs";
 
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const REGISTRY = "tools/registry/guidance-delivery.v1.json";
 const MAINTAINERS = [
   "apex-unslop",
@@ -60,7 +61,7 @@ function currentFiles(root, name) {
     .sort();
 }
 
-export function collectGuidanceDeliveryInputs(root) {
+export function collectGuidanceDeliveryInputs(root = repoRoot) {
   const readJson = (name) => JSON.parse(regularFile(root, name));
   const sourceSkills = currentFiles(root, "customizations/.github/skills").map((name) =>
     name.slice("customizations/".length),
@@ -204,7 +205,7 @@ function main(args = process.argv.slice(2)) {
   if (args.length) errors = [`Unknown arguments: ${args.join(" ")}`];
   else {
     try {
-      errors = validateGuidanceDelivery(collectGuidanceDeliveryInputs(process.cwd()));
+      errors = validateGuidanceDelivery(collectGuidanceDeliveryInputs(repoRoot));
     } catch (error) {
       errors = [`Unable to read current guidance sources: ${error.message}`];
     }

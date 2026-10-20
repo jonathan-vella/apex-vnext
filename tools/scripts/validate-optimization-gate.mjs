@@ -3,15 +3,20 @@
 
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import path from "node:path";
 import process from "node:process";
+import { fileURLToPath } from "node:url";
 import Ajv2020 from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 
-const MANIFEST_PATH = "tools/registry/optimization-gate.v1.json";
-const SCHEMA_PATH = "tools/registry/schemas/optimization-gate.schema.json";
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const MANIFEST_REL_PATH = "tools/registry/optimization-gate.v1.json";
+const MANIFEST_PATH = path.join(repoRoot, MANIFEST_REL_PATH);
+const SCHEMA_PATH = path.join(repoRoot, "tools/registry/schemas/optimization-gate.schema.json");
+const PACKAGE_JSON_PATH = path.join(repoRoot, "package.json");
 
-export function collectTrackedPaths(runGit = execFileSync) {
-  return runGit("git", ["ls-files"], { encoding: "utf8" }).split("\n").filter(Boolean).sort();
+export function collectTrackedPaths(runGit = execFileSync, root = repoRoot) {
+  return runGit("git", ["ls-files"], { cwd: root, encoding: "utf8" }).split("\n").filter(Boolean).sort();
 }
 
 function matchesSurface(path, surface) {
@@ -72,9 +77,9 @@ export function buildOptimizationGateInventory({ manifest, trackedPaths }) {
 function main() {
   const manifest = JSON.parse(readFileSync(MANIFEST_PATH, "utf8"));
   const schema = JSON.parse(readFileSync(SCHEMA_PATH, "utf8"));
-  const scripts = JSON.parse(readFileSync("package.json", "utf8")).scripts ?? {};
+  const scripts = JSON.parse(readFileSync(PACKAGE_JSON_PATH, "utf8")).scripts ?? {};
   const errors = validateOptimizationGate({ manifest, schema, scripts, trackedPaths: collectTrackedPaths() });
-  for (const error of errors) console.error(`❌ ${MANIFEST_PATH}: ${error}`);
+  for (const error of errors) console.error(`❌ ${MANIFEST_REL_PATH}: ${error}`);
   if (errors.length === 0) console.log(`✅ Optimization gate manifest is valid (${manifest.state})`);
   return errors.length === 0 ? 0 : 1;
 }

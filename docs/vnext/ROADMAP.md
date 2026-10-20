@@ -1,8 +1,8 @@
 # APEX vNext Roadmap
 
-The [PRD](PRD.md) owns scope and acceptance; [PROJECT.md](PROJECT.md) owns the current checkpoint. This is delivery order,
-not another runtime workflow or set of human gates. Each slice includes focused tests and relevant documentation.
-Preserve working safety mechanisms; do not rebuild the runtime or create a general platform framework.
+The [PRD](PRD.md) owns scope and acceptance; [PROJECT.md](PROJECT.md) owns the current checkpoint. This is delivery
+order, not another runtime workflow or set of human gates. Each slice includes focused tests and relevant
+documentation. Preserve working safety mechanisms; do not rebuild the runtime or create a general platform framework.
 
 ## Delivery Order
 
@@ -26,9 +26,9 @@ This design update does not alter executable gates. Preserve the maintenance/arc
 As of 2026-10-05, follow the [client pivot](#client-pivot) under
 [DECISION-031](DECISIONS.md#decision-031-replace-the-apex-reviewer-with-captured-rubber-duck-reviews),
 [DECISION-032](DECISIONS.md#decision-032-use-one-interactive-apex-agent) and
-[DECISION-033](DECISIONS.md#decision-033-support-native-windows-clients-and-deliver-apex-as-an-agent-plugin):
-VS Code (Copilot harness) and the GitHub Copilot app on native Windows, Copilot CLI on Linux and WSL2, one APEX agent,
-and an Agent Plugin plus `apex init` onboarding. The slice 11 fixes are merged (#356 to #366).
+[DECISION-033](DECISIONS.md#decision-033-support-native-windows-clients-and-deliver-apex-as-an-agent-plugin): VS Code
+(Copilot harness) and the GitHub Copilot app on native Windows, Copilot CLI on Linux and WSL2, one APEX agent, and an
+Agent Plugin plus `apex init` onboarding. The slice 11 fixes are merged (#356 to #366).
 
 1. Deliver the client pivot workstreams in the order of the [backlog](#client-pivot-backlog). Task, evidence,
    ownership and approval checks stay authoritative.
@@ -48,7 +48,8 @@ or optional feature expansion is needed to follow this order.
 ### Purpose-Bound Delivery Sequence
 
 1. Record ADR-0007, PRD acceptance, this roadmap and linked backlog. Keep current runtime and qualification checks.
-2. CP-27 purpose contracts and non-production intent/final-preview approval are implemented; required reviews still run.
+2. CP-27 purpose contracts and non-production intent/final-preview approval are implemented; required reviews still
+   run.
 3. CP-26 azd/Bicep provisioning and destroy are implemented (azd is the only Bicep executor); native Terraform keeps
    saved-plan/locking semantics rather than gaining an azd path. Application packages (`azd deploy`) and pipeline
    setup remain open under #443.
@@ -68,10 +69,10 @@ optimization first batch or its deferred telemetry recommendation:
 
 - Implement workspace registration/disable, isolated VS Code settings, process-scoped CLI launch, and a Linux/WSL
   collector using Azure CLI credentials. Preserve consumer packaging and existing service-principal credentials.
-- Supply bounded, provenance-bearing local/Azure evidence for agent-led analysis. Missing capture remains a gap,
-  never a passing workflow outcome. No unattended model invocation or automatic improvement application.
-- Verify synthetic ingestion and local regressions first; retain real VS Code/CLI custom-agent session coverage as
-  a separate pending qualification item. No desktop-app export claim.
+- Supply bounded, provenance-bearing local/Azure evidence for agent-led analysis. Missing capture remains a gap, never
+  a passing workflow outcome. No unattended model invocation or automatic improvement application.
+- Verify synthetic ingestion and local regressions first; retain real VS Code/CLI custom-agent session coverage as a
+  separate pending qualification item. No desktop-app export claim.
 
 See [current checkpoint](PROJECT.md#development-diagnostics-checkpoint) and
 [operator commands](../how-to/debug-local.md#command-driven-session-assessment).
@@ -80,20 +81,21 @@ See [current checkpoint](PROJECT.md#development-diagnostics-checkpoint) and
 
 Owner: managed customization, CLI lifecycle and client experience maintainers. Decision:
 [DECISION-029](DECISIONS.md#decision-029-ship-one-copilot-cli-projection). Acceptance:
-[REQ-CUSTOMIZATION-001](PRD.md#req-customization-001-managed-copilot-experiences) and the planned [CLI-only
-scenarios](CLIENT-QUALIFICATION.md#planned-cli-only-scenarios). Branch: `feat/cli-projection`, PR #350; the plan and
-slice 1 merged in #347. Tracking: [issue #348](https://github.com/jonathan-vella/apex-vnext/issues/348). Status: closed
-on 2026-10-05. Slices 1 to 10 and 12 are done; slice 11 ran on 2026-10-02 against a real subscription and stopped at
-Gate 2 ([results](CLIENT-QUALIFICATION.md#slice-11-re-run-on-a-subscription)). Its fixes merged
-in #356 to #366. The [client pivot](#client-pivot) replaces the remaining plan: the VS Code harness now targets native
-Windows instead of WSL, and CLIENT-021 and CLIENT-025 retire with agent switching and model pins.
+[REQ-CUSTOMIZATION-001](PRD.md#req-customization-001-managed-copilot-experiences) and the planned
+[CLI-only scenarios](CLIENT-QUALIFICATION.md#planned-cli-only-scenarios). Branch: `feat/cli-projection`, PR #350; the
+plan and slice 1 merged in #347. Tracking: [issue #348](https://github.com/jonathan-vella/apex-vnext/issues/348).
+Status: closed on 2026-10-05. Slices 1 to 10 and 12 are done; slice 11 ran on 2026-10-02 against a real subscription
+and stopped at Gate 2 ([results](CLIENT-QUALIFICATION.md#slice-11-re-run-on-a-subscription)). Its fixes merged in #356
+to #366. The [client pivot](#client-pivot) replaces the remaining plan: the VS Code harness now targets native Windows
+instead of WSL, and CLIENT-021 and CLIENT-025 retire with agent switching and model pins.
 
 Managed agents target Copilot CLI only. Users may still run them in VS Code through its Copilot harness, which must
 pass the same qualification. Builder-only VS Code tooling for this repository stays.
 
-The closed slice table is preserved in the [archive catalog](../../.archive/CATALOG.json) (entry `docs/vnext/ROADMAP.md`).
-It records delivery history, not qualification of the current candidate. Follow the [client pivot](#client-pivot)
-for current work; use the [restore guide](../../.archive/RESTORE.md) for historical inspection.
+The closed slice table is preserved in the [archive catalog](../../.archive/CATALOG.json) (entry
+`docs/vnext/ROADMAP.md`). It records delivery history, not qualification of the current candidate. Follow the
+[client pivot](#client-pivot) for current work; use the [restore guide](../../.archive/RESTORE.md) for historical
+inspection.
 
 Each slice is one commit, or a small set, on `feat/cli-projection`. Slices 5 to 7 may run in any order after slice 4;
 slice 8 follows them.
@@ -102,8 +104,8 @@ slice 8 follows them.
   [probe results](CLIENT-QUALIFICATION.md#cli-only-projection-probes) select the frontmatter and MCP options and name
   the decisions that slices 5 to 7 and 11 need.
 - **Slices 2 and 4:** done on 2026-09-23 in one push so CI stayed green. Workspace MCP moved to `.mcp.json` with a
-  directory-independent `npx --no apex mcp serve` launch. VS Code profile commands and the VS Code render branch stayed
-  until slice 8 archived them.
+  directory-independent `npx --no apex mcp serve` launch. VS Code profile commands and the VS Code render branch
+  stayed until slice 8 archived them.
 - **Slice 3:** remove `vscode/askQuestions`, handoffs, argument hints, agent allowlists and VS Code client mechanics.
   Workers use kernel task context, not repository instructions.
 - **Slice 5:** `apex-next` centralizes routing from kernel state. CP-13 changes that routing to load same-agent stage
@@ -131,11 +133,11 @@ General-purpose delegation, `/fleet`, `/delegate`, `/pr automerge` and plan mode
 Owner: client experience, CLI lifecycle and managed customization maintainers. Decisions:
 [DECISION-031](DECISIONS.md#decision-031-replace-the-apex-reviewer-with-captured-rubber-duck-reviews),
 [DECISION-032](DECISIONS.md#decision-032-use-one-interactive-apex-agent) and
-[DECISION-033](DECISIONS.md#decision-033-support-native-windows-clients-and-deliver-apex-as-an-agent-plugin). Tracking:
-[epic #387](https://github.com/jonathan-vella/apex-vnext/issues/387). The separate apex-jon modernization already proved
-the client mechanics in a spike (8 of 8 checks in all three clients); vNext ports its helpers into the TypeScript
-packages with tests rather than copying files. No separate Windows probe runs; everything is proven in final
-qualification.
+[DECISION-033](DECISIONS.md#decision-033-support-native-windows-clients-and-deliver-apex-as-an-agent-plugin).
+Tracking: [epic #387](https://github.com/jonathan-vella/apex-vnext/issues/387). The separate apex-jon modernization
+already proved the client mechanics in a spike (8 of 8 checks in all three clients); vNext ports its helpers into the
+TypeScript packages with tests rather than copying files. No separate Windows probe runs; everything is proven in
+final qualification.
 
 ### Client Pivot Traceability
 
@@ -151,6 +153,7 @@ qualification.
 | DECISION-033 models and worktrees   | `REQ-CUSTOMIZATION-001`, `REQ-STATE-001`                                      | CP-05, CP-10, CP-14          | CLIENT-034, CLIENT-036, CLIENT-037                           |
 | Governance and content follow-ups   | `REQ-GOV-001`, `REQ-GUIDANCE-001`                                             | CP-17, CP-18, CP-21          | CLIENT-018                                                   |
 | DECISION-038 Azure MCP Server 3     | `REQ-ARCH-001`, `REQ-MCP-001`                                                 | CP-31                        | Local stages pass; final CI/human qualification pending      |
+| End-to-end audit remediation        | `REQ-STATE-001`, `REQ-WORKFLOW-001`, `REQ-DETERMINISM-001`, `REQ-DOCS-001`    | CP-32                        | Deterministic and validator suites pass on candidate head    |
 
 ### Client Pivot Backlog
 
@@ -187,42 +190,43 @@ qualification.
 | [CP-29](https://github.com/jonathan-vella/apex-vnext/issues/458) | Setup           | Optional production readiness/configuration kit                                                                                                                                                                      | Inspect, generate, explicitly configure, verify; unsupported consumer approval features block production                      |
 | [CP-30](https://github.com/jonathan-vella/apex-vnext/issues/455) | Qualification   | Purpose-bound deployment qualification                                                                                                                                                                               | Initial non-production evidence separate from deferred production; exact-candidate adversarial and authorized live acceptance |
 | [CP-31](https://github.com/jonathan-vella/apex-vnext/issues/489) | MCP             | Azure MCP Server 3 managed provider (IMPLEMENTED LOCAL); amends DECISION-014 via DECISION-038                                                                                                                        | Local qualification stages pass; final-head CI and human client/authenticated Azure qualification pending                     |
+| [CP-32](https://github.com/jonathan-vella/apex-vnext/issues/495) | Quality         | End-to-end audit remediation (`F-001` through `F-022` in [AUDIT-REPORT.md](AUDIT-REPORT.md), `RISK-017` in [REGISTER.md](REGISTER.md))                                                                               | All 22 findings remediated, baseline suppression removed, and `qualify:vnext` passes                                          |
 
 Order: CP-01 to CP-04 and CP-17 and CP-18 can start now. CP-05 precedes CP-06 to CP-11. CP-09, then CP-23, precede
 CP-06, CP-08, CP-10 and CP-15. CP-13 and CP-14 precede CP-15 and CP-16. CP-21 runs with CP-18. CP-25 precedes the
-first plugin release. CP-26 follows host setup and CP-27 purpose contracts, and informs the CP-18 deploy skills.
-CP-29 configuration preparation can proceed alongside CP-26/CP-28; production integration requires both purpose and
-approval contracts. CP-30 non-production acceptance follows CP-26/CP-27; production acceptance also requires CP-28/CP-29.
-CP-19 and CP-20 client work need not wait for deferred production support. Rebase pending content on #454's provenance
+first plugin release. CP-26 follows host setup and CP-27 purpose contracts, and informs the CP-18 deploy skills. CP-29
+configuration preparation can proceed alongside CP-26/CP-28; production integration requires both purpose and approval
+contracts. CP-30 non-production acceptance follows CP-26/CP-27; production acceptance also requires CP-28/CP-29. CP-19
+and CP-20 client work need not wait for deferred production support. Rebase pending content on #454's provenance
 layout; do not repeat its retired-root deletions or restore archived runtime dependencies. CP-31 is independent of
 CP-26 to CP-30: it starts with tool/schema discovery against real Azure MCP Server `3.0.0` output, then an exact
-version pin, then one coherent server+grants+guards+registries+tests PR, then a focused `qualify:vnext` checkpoint;
-it does not authorize live qualification or release.
+version pin, then one coherent server+grants+guards+registries+tests PR, then a focused `qualify:vnext` checkpoint; it
+does not authorize live qualification or release.
 
 ### Azure MCP Server 3 Integration (CP-31)
 
 Owner: MCP adapter and managed customization maintainers. Decision:
-[DECISION-038](DECISIONS.md#decision-038-introduce-azure-mcp-server-3-as-a-managed-azure-tool-provider).
-Acceptance: [REQ-ARCH-001](PRD.md#req-arch-001-architecture-cost-and-assumptions),
+[DECISION-038](DECISIONS.md#decision-038-introduce-azure-mcp-server-3-as-a-managed-azure-tool-provider). Acceptance:
+[REQ-ARCH-001](PRD.md#req-arch-001-architecture-cost-and-assumptions),
 [REQ-MCP-001](PRD.md#req-mcp-001-predictable-tool-contracts). Tracking:
-[issue #489](https://github.com/jonathan-vella/apex-vnext/issues/489). Status: **IMPLEMENTED LOCAL**, local qualification
-stages pass after restoring jq; final-head CI and human client/authenticated Azure qualification remain pending.
-Planning merged in [PR #490](https://github.com/jonathan-vella/apex-vnext/pull/490), `42d82a54`.
+[issue #489](https://github.com/jonathan-vella/apex-vnext/issues/489). Status: **IMPLEMENTED LOCAL**, local
+qualification stages pass after restoring jq; final-head CI and human client/authenticated Azure qualification remain
+pending. Planning merged in [PR #490](https://github.com/jonathan-vella/apex-vnext/pull/490), `42d82a54`.
 
 1. **Discovered locally.** Credential-free real `3.0.0` tools/list output grounds namespace schemas and explicit
    commands, including the real `documentation` proxy. The foreground agent receives 44 verified namespace/direct
    grants; opaque/unverified `azd`, `arm` and `foundry` proxies are not granted.
 2. **Exact version.** Manifest and launch declarations use `3.0.0`, not floating `latest`/`@3`/`@3.x`. Stable 3.x
    updates require focused discovery/schema/grant review; a new major requires an explicit decision.
-3. **Coherent implementation slice.** `apex-azure` provides general Azure reads/guidance/pricing;
-   `apex-azure-cost` retains the ten ARM CostManagement reads. Curated command/parameter hooks, registries,
-   pricing provenance/contracts, managed skills and tests move together. `pricing_get` results at or above 5,000
-   rows require narrowing or explicit unpriced items, never a complete priced line or fake zero. Kernel approvals
-   and APEX SDK v2/protocol remain unchanged.
+3. **Coherent implementation slice.** `apex-azure` provides general Azure reads/guidance/pricing; `apex-azure-cost`
+   retains the ten ARM CostManagement reads. Curated command/parameter hooks, registries, pricing
+   provenance/contracts, managed skills and tests move together. `pricing_get` results at or above 5,000 rows require
+   narrowing or explicit unpriced items, never a complete priced line or fake zero. Kernel approvals and APEX SDK
+   v2/protocol remain unchanged.
 4. **Local qualification stages passed.** Focused checks, credential-free capture and the `qualify:vnext`
    validation/workspace/validator stages pass. After the missing jq host prerequisite was restored, the final pack
-   rerun passed 131/131; the HIGH-fix regressions pass 52/52. Final-head CI remains pending. These local results
-   do not qualify human clients or authorize authenticated Azure execution.
+   rerun passed 131/131; the HIGH-fix regressions pass 52/52. Final-head CI remains pending. These local results do
+   not qualify human clients or authorize authenticated Azure execution.
 5. **Qualify and release (separately authorized, out of scope here).** Per-supported-client discovery/schema/
    permission qualification, then any release step — neither is claimed or started by this plan.
 
@@ -231,7 +235,8 @@ from APEX bundled offline startup; human-authorized client/live qualification an
 
 ## Phase 1: Align Without Rebuilding
 
-**Requirements:** `REQ-MAINTAINABILITY-001`, `REQ-OPTIMIZATION-001`, `REQ-WORKFLOW-001`, `REQ-GUIDANCE-001`, `REQ-DOCS-001`.
+**Requirements:** `REQ-MAINTAINABILITY-001`, `REQ-OPTIMIZATION-001`, `REQ-WORKFLOW-001`, `REQ-GUIDANCE-001`,
+`REQ-DOCS-001`.
 
 Start with the first batch below. This is bounded implementation work, not a prerequisite optimization campaign for
 every other feature. Existing governance work retains its owner; coordinate shared service and test edits rather than
@@ -249,18 +254,20 @@ Implement these slices in order, validating each before moving on. Canonical acc
 [REQ-OPTIMIZATION-001](PRD.md#req-optimization-001-bounded-input-efficiency).
 
 1. **Fix review reads and current-revision selection.** Owner: CLI/kernel maintainers. Repair plan-review's
-   `implementation-intent` lookup and select current accepted task dependencies instead of historical completion lists.
-   Add regressions for superseded/invalidated inputs, every review subject, pagination and both IaC generation tracks.
-   Anchors: `readTaskInput`, `inputRefs`, `generateIac` in `packages/cli/src/service.ts`. Addresses R-13 and prerequisites
-   for R-12/R-20. Do not weaken invalidation or approval checks.
-2. **Bound context and all reviewer packs.** Owner: CLI/kernel and contracts maintainers. Build task-specific projections,
-   enforce locked byte budgets, preserve compact templates and offer selective authoritative reads. Remove redundant
-   full-context loading for subject-only reads. Test large/multibyte fixtures, missing dependencies, stale ownership and
-   expiry, review criteria/dispositions and required retrieval coverage. Addresses R-12/R-13/R-16/R-20 without new caches.
-3. **Correct routing guidance and narrow tools.** Owner: managed customization and MCP maintainers. Handle `needs_review`,
-   describe every registered tool and remove demonstrably irrelevant role grants. Preserve Architect pricing and needed
-   Operator cost paths. Test both generated projections for required-tool coverage and forbidden-tool exclusion, plus
-   `needs_input`/`needs_review`/`task` behavior. Addresses R-01/R-02/R-06; no new worker or client authority.
+   `implementation-intent` lookup and select current accepted task dependencies instead of historical completion
+   lists. Add regressions for superseded/invalidated inputs, every review subject, pagination and both IaC generation
+   tracks. Anchors: `readTaskInput`, `inputRefs`, `generateIac` in `packages/cli/src/service.ts`. Addresses R-13 and
+   prerequisites for R-12/R-20. Do not weaken invalidation or approval checks.
+2. **Bound context and all reviewer packs.** Owner: CLI/kernel and contracts maintainers. Build task-specific
+   projections, enforce locked byte budgets, preserve compact templates and offer selective authoritative reads.
+   Remove redundant full-context loading for subject-only reads. Test large/multibyte fixtures, missing dependencies,
+   stale ownership and expiry, review criteria/dispositions and required retrieval coverage. Addresses
+   R-12/R-13/R-16/R-20 without new caches.
+3. **Correct routing guidance and narrow tools.** Owner: managed customization and MCP maintainers. Handle
+   `needs_review`, describe every registered tool and remove demonstrably irrelevant role grants. Preserve Architect
+   pricing and needed Operator cost paths. Test both generated projections for required-tool coverage and
+   forbidden-tool exclusion, plus `needs_input`/`needs_review`/`task` behavior. Addresses R-01/R-02/R-06; no new
+   worker or client authority.
 4. **Remove proven prompt duplication.** Owner: managed customization maintainers. Consolidate repeated sequencing and
    use compact domain references only where they reduce actual duplicate guidance. Keep essential worker rules and
    distinct operational checklists. Test guidance consumers, installed references, delegation boundaries and output
@@ -269,12 +276,14 @@ Implement these slices in order, validating each before moving on. Canonical acc
 For each slice, run its focused regression or contract check first, then relevant documentation and projection checks.
 Use existing CLI workflow, adapter, dependency-revision and customization tests rather than a new measurement harness.
 Run `npm run qualify:vnext` for product changes. Client behavior changes require separately authorized exact-client
-qualification before parity claims. Preserve all four review passes, deterministic rich output and human approval.
+qualification before parity claims. Preserve the three required review passes (`requirements-review`,
+`architecture-review`, `plan-review` under DECISION-030 and DECISION-031), deterministic rich output and human
+approval.
 
 ### MCP Contract Follow-Up
 
-Owner: CLI adapter maintainers; acceptance: [REQ-MCP-001](PRD.md#req-mcp-001-predictable-tool-contracts).
-Implement before claiming paired-client readiness, in bounded slices:
+Owner: CLI adapter maintainers; acceptance: [REQ-MCP-001](PRD.md#req-mcp-001-predictable-tool-contracts). Implement
+before claiming paired-client readiness, in bounded slices:
 
 1. Fix string/list response envelopes and sanitized execution errors. Run SDK in-memory regressions first.
 2. Add canonical output schemas, strict arguments and staging-form validation; cover all registered tool results.
@@ -324,13 +333,15 @@ the PRD owns acceptance. Applicable follow-ons belong in existing phases, not a 
 
 Deferred mechanisms are not authorized implementation work. Reconsider only with a concrete functional need, named
 owner, compatibility and security design, focused tests and the required client evidence. Do not introduce model
-benchmarks or telemetry to unlock them under this plan. Neither tool wire bytes nor bundle bytes prove model-token cost.
+benchmarks or telemetry to unlock them under this plan. Neither tool wire bytes nor bundle bytes prove model-token
+cost.
 
 ## Phase 2: Finish Governance
 
 **Requirements:** `REQ-GOV-001`, `REQ-PLAN-001`, `REQ-IAC-001`, `REQ-CAPABILITY-001`.
 
-- Complete [issue #344](https://github.com/jonathan-vella/apex-vnext/issues/344) with its current implementation owner.
+- Complete [issue #344](https://github.com/jonathan-vella/apex-vnext/issues/344) with its current implementation
+  owner.
 - Reuse the collector/schema/parser and import only the active subscription from a reviewed committed baseline.
 - Deliver consumer-owned scheduled/manual collection and OIDC configuration before expanding local policy emulation.
 - Enforce the PRD's 30-day UTC age boundary at import, planning and new deployment approval. Retain a per-run optional
@@ -338,8 +349,8 @@ benchmarks or telemetry to unlock them under this plan. Neither tool wire bytes 
 - Renew observation time on every successful collection, including unchanged content. Separate observation receipts
   from semantic policy identity before claiming timestamp-only refresh preserves planning and approval dependencies.
 - Package and qualify the consumer collect/import/plan path, then native validation and deployment enforcement.
-- Discover governance before Architecture and map policy inside it ([DECISION-030](DECISIONS.md)); no new agent,
-  gate or delivery infrastructure. Default to the ALZ Corp reference baseline until a reviewed subscription baseline
+- Discover governance before Architecture and map policy inside it ([DECISION-030](DECISIONS.md)); no new agent, gate
+  or delivery infrastructure. Default to the ALZ Corp reference baseline until a reviewed subscription baseline
   replaces it after Gate 2 through `governance-refresh` and `policy-refresh`, which carry matching mappings and reopen
   Gate 2 only on `blocked`.
 - Include effective-policy and evidenced-empty cases for standalone labs as well as management-group inheritance.
@@ -358,15 +369,18 @@ both-track policy/ownership qualification are still required; packaging tests do
 `REQ-ONBOARDING-001`.
 
 - Represent ALZ-backed and standalone lab/demo profiles using existing project contracts and resource ownership.
-- Ask for a remote COE during bootstrap, select one or more workload archetypes and create independent copies in separate
-  folders with exact-commit provenance and separate project state. Do not compose workloads or import authority.
+- Ask for a remote COE during bootstrap, select one or more workload archetypes and create independent copies in
+  separate folders with exact-commit provenance and separate project state. Do not compose workloads or import
+  authority.
 - Support manually copied projects by bounded inspection and confirmation, not full-history import.
-- Reuse contracts and parameter files; clarify missing facts once. Exclude source secrets, state and approval authority.
+- Reuse contracts and parameter files; clarify missing facts once. Exclude source secrets, state and approval
+  authority.
 - Ask relevant change questions, show consequences, confirm conflicts and update affected outputs only.
 - Implement the applicable requirements follow-ons R-14/R-15/R-24 after the first batch: validated amendments,
   confirmed-decision reuse and permitted recommendations. Preserve old intake requests and full-document submission.
-- Test profile changes, SKU/service/region/address/compliance/budget changes, manual edits, unrelated-file preservation,
-  stale evidence and supplied-resource protection. Do not add cross-archetype composition or synchronization engines.
+- Test profile changes, SKU/service/region/address/compliance/budget changes, manual edits, unrelated-file
+  preservation, stale evidence and supplied-resource protection. Do not add cross-archetype composition or
+  synchronization engines.
 
 ## Phase 4: Complete Useful Output
 
@@ -387,13 +401,13 @@ both-track policy/ownership qualification are still required; packaging tests do
 `REQ-WORKFLOW-001`.
 
 - Run basic client checks during earlier slices; use this phase to close end-to-end gaps, not first discover them.
-- Scope this phase to the VS Code Copilot harness and the GitHub Copilot app on native Windows and Copilot CLI on Linux
-  and WSL2, all running the APEX plugin and one APEX agent.
+- Scope this phase to the VS Code Copilot harness and the GitHub Copilot app on native Windows and Copilot CLI on
+  Linux and WSL2, all running the APEX plugin and one APEX agent.
 - Prove greenfield, COE import, changes, review, generation, validation and resume in both profiles.
 - Preserve kernel authority and existing worker grants while qualifying required outcomes; profile visibility is not
   an authentication or security gate.
-- Address R-22's outcome-parity goal without assuming a terminal invocation authenticates a worker's caller. Do not add
-  a review command, broaden worker visibility or delegate generic tasks without proving the authority boundary.
+- Address R-22's outcome-parity goal without assuming a terminal invocation authenticates a worker's caller. Do not
+  add a review command, broaden worker visibility or delegate generic tasks without proving the authority boundary.
 - Validate setup/doctor on each host, least-privilege prerequisites and the selected IaC tool without Docker or a
   source checkout.
 - Use compact inputs, scoped skills and deterministic filtering throughout; no current token benchmark is required.
@@ -407,8 +421,7 @@ These are planned additions, not capabilities established by existing bootstrap 
    canonical toolchain. Deliver `apex-install` on each supported host without requiring Node/APEX first, covering the
    plugin, the three supported clients and both IaC tracks. Verify installations and preserve compatible tools.
 2. Extend repository bootstrap to resumable new/existing/cloned-repo setup that writes the thin projection and plugin
-   settings.
-   Retain one managed ownership/update path, conflict preservation and explicit partial outcomes.
+   settings. Retain one managed ownership/update path, conflict preservation and explicit partial outcomes.
 3. Add remote-only COE selection during setup, independent multi-archetype copies and confirmed defaults/decision
    adoption. Reuse bounded import validation and provenance; never execute imported instructions or copy approvals.
 4. Offer reviewed GitHub repository creation/push and policy-discovery OIDC setup with identity reuse or confirmed
@@ -416,16 +429,16 @@ These are planned additions, not capabilities established by existing bootstrap 
 5. Verify repository/client health and create the first collection review PR, or verify/import an existing central
    reviewed baseline. Preserve human review and report governance pending where appropriate.
 6. Qualify reruns, interruption, missing permissions, conflicts, each supported client on its host, and secret-safe
-   authentication.
-   Live identity, federation, role and repository changes require separate explicit authorization during qualification.
+   authentication. Live identity, federation, role and repository changes require separate explicit authorization
+   during qualification.
 
 ## Phase 6: Deliver APEX As An Agent Plugin
 
 **Requirements:** `REQ-DIST-001`, `REQ-ONBOARDING-001`, `REQ-HOST-001`, `REQ-SECURITY-001`, `REQ-DETERMINISM-001`.
 
-- Build one Agent Plugins 1.0 package with the bundled `@apexops/cli` runtime, with the MCP server as one esbuild bundle
-  on the SDK v2 (DECISION-034), and publish it from the separate vNext marketplace repository, pinned to a commit SHA.
-  Keep `@apexops/cli` on npm at the same exact version.
+- Build one Agent Plugins 1.0 package with the bundled `@apexops/cli` runtime, with the MCP server as one esbuild
+  bundle on the SDK v2 (DECISION-034), and publish it from the separate vNext marketplace repository, pinned to a
+  commit SHA. Keep `@apexops/cli` on npm at the same exact version.
 - Install through one channel, the Copilot CLI store, which VS Code reads. `apex init` writes the thin projection and
   plugin settings.
 - Prove workspace selection, prerequisites, version compatibility, updates, rollback, uninstall and active-run
@@ -435,7 +448,8 @@ These are planned additions, not capabilities established by existing bootstrap 
 
 ## Phase 7: Final Qualification And Release
 
-**Requirements:** `REQ-APPROVAL-001`, `REQ-BICEP-001`, `REQ-TERRAFORM-001`, `REQ-IMPROVE-001` and all requirements above.
+**Requirements:** `REQ-APPROVAL-001`, `REQ-BICEP-001`, `REQ-TERRAFORM-001`, `REQ-IMPROVE-001` and all requirements
+above.
 
 - Freeze the candidate and run required validation, deterministic qualification, package, security and client checks.
 - Run separately authorized Bicep/Terraform apply, inventory, diagnosis, reconciliation and destroy scenarios with
@@ -450,21 +464,20 @@ These are planned additions, not capabilities established by existing bootstrap 
 ### Superseded: Standalone Copilot Desktop Plan
 
 DECISION-033 makes the GitHub Copilot app a supported client again, so the separate desktop backlog parked on
-2026-09-21 is closed. The [desktop implementation plan](../../.archive/CATALOG.json)
-(entry `docs/vnext/COPILOT-DESKTOP-PLAN.md`) is design history. Its native Windows
-findings (process launching, newline checkout, worktree binding, worker authorization) feed the
-[client pivot backlog](#client-pivot-backlog); its probe receipts are provenance, not qualification evidence.
-github/app#4097 and github/app#4098 no longer block: APEX stops pinning models, and a managed hook denies the APEX agent
-as a subagent target.
+2026-09-21 is closed. The [desktop implementation plan](../../.archive/CATALOG.json) (entry
+`docs/vnext/COPILOT-DESKTOP-PLAN.md`) is design history. Its native Windows findings (process launching, newline
+checkout, worktree binding, worker authorization) feed the [client pivot backlog](#client-pivot-backlog); its probe
+receipts are provenance, not qualification evidence. github/app#4097 and github/app#4098 no longer block: APEX stops
+pinning models, and a managed hook denies the APEX agent as a subagent target.
 
 ### Excluded CLI Helpers
 
-On 2026-09-23 the maintainer moved advisory built-in helpers into the active [CLI-only
-projection](#cli-only-projection): Explore, Rubber-duck, Code-review, Security-review, Validator `bicep` and `terraform`
-pre-checks and user-invoked Research. They remain advisory and never replace APEX CodeGen or Validator contracts, create
-validation receipts or approve gates. DECISION-031 later made rubber-duck the managed reviewer, with kernel-captured
-output. The slice 6 probes kept only Explore in managed agents; the other helpers and Validator pre-checks wait for
-helper tool scoping and a CLI-enforced shell limit.
+On 2026-09-23 the maintainer moved advisory built-in helpers into the active
+[CLI-only projection](#cli-only-projection): Explore, Rubber-duck, Code-review, Security-review, Validator `bicep` and
+`terraform` pre-checks and user-invoked Research. They remain advisory and never replace APEX CodeGen or Validator
+contracts, create validation receipts or approve gates. DECISION-031 later made rubber-duck the managed reviewer, with
+kernel-captured output. The slice 6 probes kept only Explore in managed agents; the other helpers and Validator
+pre-checks wait for helper tool scoping and a CLI-enforced shell limit.
 
 General-purpose delegation, `/fleet`, `/delegate`, `/pr automerge` and plan mode stay out of managed workflows.
 General-purpose delegation defeats bounded least-privilege roles, `/fleet` bypasses kernel batch control, `/delegate`
@@ -475,7 +488,7 @@ named need, an authority design, focused tests and client evidence.
 
 Application deployment pipelines and application-specific configuration are optional after the core product works.
 Token benchmarking is not current work. Continuous COE synchronization, multi-archetype composition, hosts beyond
-`REQ-HOST-001`, ALZ foundation deployment, application development and generic orchestration/synchronization frameworks
-are not initial scope. Existing advanced capabilities need no expansion or deletion merely to simplify this plan.
-The read-only context sidekick waits until a Copilot CLI release launches custom sidekicks; the slice 1 probe found
-that CLI `1.0.88` does not.
+`REQ-HOST-001`, ALZ foundation deployment, application development and generic orchestration/synchronization
+frameworks are not initial scope. Existing advanced capabilities need no expansion or deletion merely to simplify this
+plan. The read-only context sidekick waits until a Copilot CLI release launches custom sidekicks; the slice 1 probe
+found that CLI `1.0.88` does not.

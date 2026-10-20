@@ -3,7 +3,7 @@
 # Branch Naming and Scope Strategy
 
 Rules for branch naming conventions and file-scope enforcement.
-Validated by `scripts/validate-branch-naming.sh` and `scripts/validate-branch-scope.sh`.
+Validated by `tools/scripts/validate-branch-naming.sh` and `tools/scripts/validate-branch-scope.sh`.
 
 ## Approved Prefixes
 

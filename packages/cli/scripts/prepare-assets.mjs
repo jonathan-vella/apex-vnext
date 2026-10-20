@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
 import { constants } from "node:fs";
-import { lstat, mkdir, open, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
+import { lstat, mkdir, open, readFile, readdir, realpath, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { dump as dumpYaml, load as loadYaml } from "js-yaml";
@@ -33,9 +33,48 @@ async function sleep(milliseconds) {
   await new Promise((done) => setTimeout(done, milliseconds));
 }
 
-export async function acquireAssetGenerationLock() {
-  const lockPath = join(packageRoot, ".prepare-assets.lock");
-  const deadline = Date.now() + ASSET_GENERATION_LOCK_TTL_MS;
+async function withAssetLockGuard(guardPath, deadline, retryMs, now, action) {
+  for (;;) {
+    try {
+      await mkdir(guardPath);
+      break;
+    } catch (error) {
+      if (error?.code !== "EEXIST") throw error;
+      if (now() >= deadline) {
+        throw new Error(`Timed out waiting for asset generation lock guard: ${guardPath}`, { cause: error });
+      }
+      await sleep(retryMs);
+    }
+  }
+  try {
+    return await action();
+  } finally {
+    await rm(guardPath, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+export async function assertAssetGenerationLockHeld(lockPath, token, now = () => Date.now()) {
+  let metadata;
+  try {
+    metadata = JSON.parse(await readFile(join(lockPath, "metadata.json"), "utf8"));
+  } catch (error) {
+    throw new Error(`Asset generation lock was lost before completion: ${lockPath}`, { cause: error });
+  }
+  if (metadata?.token !== token) {
+    throw new Error(`Asset generation lock ownership changed before completion: ${lockPath}`);
+  }
+  if (!(Date.parse(metadata.expiresAt ?? "") > now())) {
+    throw new Error(`Asset generation lock expired before completion: ${lockPath}`);
+  }
+}
+
+export async function acquireAssetGenerationLock(options = {}) {
+  const lockPath = options.lockPath ?? join(packageRoot, ".prepare-assets.lock");
+  const guardPath = `${lockPath}.guard`;
+  const ttlMs = options.ttlMs ?? ASSET_GENERATION_LOCK_TTL_MS;
+  const retryMs = options.retryMs ?? ASSET_GENERATION_LOCK_RETRY_MS;
+  const now = options.now ?? (() => Date.now());
+  const deadline = now() + ttlMs;
   const token = crypto.randomUUID();
   for (;;) {
     try {
@@ -45,35 +84,88 @@ export async function acquireAssetGenerationLock() {
         `${JSON.stringify({
           token,
           pid: process.pid,
-          createdAt: new Date().toISOString(),
-          expiresAt: new Date(Date.now() + ASSET_GENERATION_LOCK_TTL_MS).toISOString(),
+          createdAt: new Date(now()).toISOString(),
+          expiresAt: new Date(now() + ttlMs).toISOString(),
         })}\n`,
       );
       let released = false;
-      return async () => {
+      const release = async () => {
         if (released) return;
         released = true;
-        try {
-          const metadata = JSON.parse(await readFile(join(lockPath, "metadata.json"), "utf8"));
-          if (metadata.token !== token) return;
-        } catch {
-          return;
-        }
-        await rm(lockPath, { recursive: true, force: true });
+        const releaseDeadline = now() + Math.max(ttlMs, 5_000);
+        const quarantinePath = `${lockPath}.release.${token}`;
+        const moved = await withAssetLockGuard(guardPath, releaseDeadline, retryMs, now, async () => {
+          try {
+            const metadata = JSON.parse(await readFile(join(lockPath, "metadata.json"), "utf8"));
+            if (metadata.token !== token) return false;
+            await rename(lockPath, quarantinePath);
+            return true;
+          } catch {
+            return false;
+          }
+        }).catch(() => false);
+        if (moved) await rm(quarantinePath, { recursive: true, force: true });
       };
+      release.token = token;
+      release.lockPath = lockPath;
+      release.assertHeld = () => assertAssetGenerationLockHeld(lockPath, token, now);
+      release.publish = async (stagingRoot, targetRoot = assetsRoot) => {
+        const publishDeadline = now() + Math.max(ttlMs, 5_000);
+        await withAssetLockGuard(guardPath, publishDeadline, retryMs, now, async () => {
+          await assertAssetGenerationLockHeld(lockPath, token, now);
+          const previousRoot = `${targetRoot}.prev.${token}`;
+          await rm(previousRoot, { recursive: true, force: true });
+          let movedPrevious = false;
+          try {
+            await rename(targetRoot, previousRoot);
+            movedPrevious = true;
+          } catch (error) {
+            if (error?.code !== "ENOENT") throw error;
+          }
+          try {
+            await rename(stagingRoot, targetRoot);
+          } catch (error) {
+            if (movedPrevious) await rename(previousRoot, targetRoot).catch(() => {});
+            throw error;
+          }
+          if (movedPrevious) await rm(previousRoot, { recursive: true, force: true });
+        });
+      };
+      return release;
     } catch (error) {
       if (error?.code !== "EEXIST") throw error;
-      if (Date.now() >= deadline)
+      if (now() >= deadline)
         throw new Error(`Timed out waiting for asset generation lock: ${lockPath}`, { cause: error });
-      let expired = false;
+      let observedToken = null;
       try {
         const metadata = JSON.parse(await readFile(join(lockPath, "metadata.json"), "utf8"));
-        expired = Date.parse(metadata.expiresAt ?? "") <= Date.now();
+        if (Date.parse(metadata.expiresAt ?? "") <= now() && typeof metadata.token === "string") {
+          observedToken = metadata.token;
+        }
       } catch {
         // Unreadable metadata may be a concurrent writer; keep waiting until the deadline.
       }
-      if (expired) await rm(lockPath, { recursive: true, force: true });
-      else await sleep(ASSET_GENERATION_LOCK_RETRY_MS);
+      if (observedToken !== null) {
+        await options.onStaleRead?.(observedToken);
+        const quarantinePath = `${lockPath}.stale.${token}`;
+        const reclaimed = await withAssetLockGuard(guardPath, deadline, retryMs, now, async () => {
+          try {
+            const current = JSON.parse(await readFile(join(lockPath, "metadata.json"), "utf8"));
+            if (current.token !== observedToken || Date.parse(current.expiresAt ?? "") > now()) {
+              return false;
+            }
+            await rename(lockPath, quarantinePath);
+            return true;
+          } catch {
+            return false;
+          }
+        });
+        if (reclaimed) {
+          await rm(quarantinePath, { recursive: true, force: true });
+          continue;
+        }
+      }
+      await sleep(retryMs);
     }
   }
 }
@@ -440,17 +532,23 @@ export function validateCliToolInventory(value) {
   return value;
 }
 
-async function prepareClientProjections(customizationManifest, pinnedCustomizations, inventory, generatedSharedFiles) {
+async function prepareClientProjections(
+  customizationManifest,
+  pinnedCustomizations,
+  inventory,
+  generatedSharedFiles,
+  targetAssetsRoot = assetsRoot,
+) {
   const { sharedFiles, sharedDirectories, clientProjections, plugin } =
     validateClientProjectionDeclarations(customizationManifest);
   const toolInventoryPath = join(repositoryRoot, "tools", "registry", "copilot-cli-agent-tools.json");
   validateCliToolInventory(JSON.parse(await readFile(toolInventoryPath, "utf8")));
-  const metadataDestination = join(assetsRoot, "client-projection-metadata", "copilot-cli-agent-tools.json");
+  const metadataDestination = join(targetAssetsRoot, "client-projection-metadata", "copilot-cli-agent-tools.json");
   await mkdir(dirname(metadataDestination), { recursive: true });
   const metadataBytes = await readFile(toolInventoryPath);
   await writeFile(metadataDestination, metadataBytes);
   inventory.push({
-    path: portablePath(relative(assetsRoot, metadataDestination)),
+    path: portablePath(relative(targetAssetsRoot, metadataDestination)),
     source: {
       kind: "repository-file",
       path: "tools/registry/copilot-cli-agent-tools.json",
@@ -474,8 +572,8 @@ async function prepareClientProjections(customizationManifest, pinnedCustomizati
 
   for (const projection of clientProjections) {
     const client = projection.id;
-    const generatedRoot = join(assetsRoot, projection.generatedRoot);
-    assertContained(assetsRoot, generatedRoot);
+    const generatedRoot = join(targetAssetsRoot, projection.generatedRoot);
+    assertContained(targetAssetsRoot, generatedRoot);
     const sources = [...new Set([...sharedFiles, ...sharedDirectoryFiles, ...projection.files])];
     const reintroduced = sources.find((path) => pluginOwnsPath(plugin, path));
     if (reintroduced !== undefined) {
@@ -491,7 +589,7 @@ async function prepareClientProjections(customizationManifest, pinnedCustomizati
       await mkdir(dirname(destination), { recursive: true });
       await writeFile(destination, bytes);
       inventory.push({
-        path: portablePath(relative(assetsRoot, destination)),
+        path: portablePath(relative(targetAssetsRoot, destination)),
         source: {
           kind: "generated",
           composition: "client-projections",
@@ -533,24 +631,24 @@ async function walkFiles(root, directory = root, expectedIdentity) {
   return files;
 }
 
-async function prepareCapabilityPacks(inventory) {
+async function prepareCapabilityPacks(inventory, targetAssetsRoot = assetsRoot) {
   const policy = JSON.parse(await readFile(join(repositoryRoot, "config", "capability-packs.v1.json"), "utf8"));
   if (policy.packs.length !== 0) throw new Error("New shipped capability packs require an explicit asset binding");
-  const packsRoot = join(assetsRoot, "capability-packs");
+  const packsRoot = join(targetAssetsRoot, "capability-packs");
   await mkdir(packsRoot, { recursive: true });
   const registry = { ...policy, packs: [] };
   const registryPath = join(packsRoot, "registry.v1.json");
   await writeFile(registryPath, `${JSON.stringify(registry, null, 2)}\n`);
   const registryBytes = await readFile(registryPath);
   inventory.push({
-    path: portablePath(relative(assetsRoot, registryPath)),
+    path: portablePath(relative(targetAssetsRoot, registryPath)),
     source: { kind: "generated", composition: "capability-pack-registry" },
     sha256: createHash("sha256").update(registryBytes).digest("hex"),
     bytes: registryBytes.byteLength,
   });
 }
 
-async function prepareAssets() {
+async function prepareAssets(targetAssetsRoot = assetsRoot) {
   const customizationManifest = JSON.parse(
     await readFile(join(repositoryRoot, "customizations", "manifest.json"), "utf8"),
   );
@@ -572,8 +670,8 @@ async function prepareAssets() {
     sourceRoots.map(async (source) => ({ ...source, pinnedRoot: await pinSourceRoot(source.root) })),
   );
   const inventory = [];
-  await rm(assetsRoot, { recursive: true, force: true });
-  await mkdir(assetsRoot, { recursive: true });
+  await rm(targetAssetsRoot, { recursive: true, force: true });
+  await mkdir(targetAssetsRoot, { recursive: true });
 
   for (const source of sources) {
     for (const sourceFile of await walkFiles(source.root, source.root, {
@@ -581,8 +679,8 @@ async function prepareAssets() {
       ino: source.pinnedRoot.identity.ino,
     })) {
       const sourceRelative = relative(source.root, sourceFile.path);
-      const destination = join(assetsRoot, source.name, sourceRelative);
-      assertContained(join(assetsRoot, source.name), destination);
+      const destination = join(targetAssetsRoot, source.name, sourceRelative);
+      assertContained(join(targetAssetsRoot, source.name), destination);
       await mkdir(dirname(destination), { recursive: true });
       const bytes = await readSourceFile(
         source.pinnedRoot.resolvedRoot,
@@ -592,7 +690,7 @@ async function prepareAssets() {
       );
       await writeFile(destination, bytes);
       inventory.push({
-        path: portablePath(relative(assetsRoot, destination)),
+        path: portablePath(relative(targetAssetsRoot, destination)),
         source: {
           kind: "repository-file",
           path: portablePath(relative(repositoryRoot, sourceFile.path)),
@@ -616,8 +714,8 @@ async function prepareAssets() {
     if (inventory.some(({ path }) => path === target)) {
       throw new Error(`Generated shared asset has a duplicate maintained source: ${sourcePath}`);
     }
-    const destination = join(assetsRoot, target);
-    assertContained(assetsRoot, destination);
+    const destination = join(targetAssetsRoot, target);
+    assertContained(targetAssetsRoot, destination);
     await mkdir(dirname(destination), { recursive: true });
     await writeFile(destination, bytes);
     const mapping = `governance-shared-${index}`;
@@ -642,15 +740,16 @@ async function prepareAssets() {
     sources.find(({ name }) => name === "customizations").pinnedRoot,
     inventory,
     generatedSharedFiles,
+    targetAssetsRoot,
   );
-  await prepareCapabilityPacks(inventory);
+  await prepareCapabilityPacks(inventory, targetAssetsRoot);
 
   const schemasRoot = join(repositoryRoot, "tools", "schemas");
   const pinnedSchemas = await pinSourceRoot(schemasRoot);
   const schemaName = "governance-baseline.schema.json";
   const schemaBytes = await readSourceFile(pinnedSchemas.resolvedRoot, join(schemasRoot, schemaName));
-  const schemaDestination = join(assetsRoot, "schemas", schemaName);
-  assertContained(assetsRoot, schemaDestination);
+  const schemaDestination = join(targetAssetsRoot, "schemas", schemaName);
+  assertContained(targetAssetsRoot, schemaDestination);
   await mkdir(dirname(schemaDestination), { recursive: true });
   await writeFile(schemaDestination, schemaBytes);
   inventory.push({
@@ -742,16 +841,19 @@ async function prepareAssets() {
         .digest("hex"),
     },
   };
-  await writeFile(join(assetsRoot, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+  await writeFile(join(targetAssetsRoot, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (process.env[ASSET_GENERATION_LOCK_ENV] === "1") await prepareAssets();
   else {
     const release = await acquireAssetGenerationLock();
+    const stagingRoot = `${assetsRoot}.staging.${release.token}`;
     try {
-      await prepareAssets();
+      await prepareAssets(stagingRoot);
+      await release.publish(stagingRoot, assetsRoot);
     } finally {
+      await rm(stagingRoot, { recursive: true, force: true }).catch(() => {});
       await release();
     }
   }

@@ -146,17 +146,16 @@ When `VERSION.md` is updated, check these files for version references:
 
 ## Emoji Conventions in Agent/Skill Tables
 
-Codenames use consistent emoji in documentation:
+Agent and stage-skill tables use consistent emoji in documentation:
 
-| Codename     | Emoji | Agent        |
-| ------------ | ----- | ------------ |
-| Orchestrator | 🧠    | Orchestrator |
-| Scribe       | 📜    | Requirements |
-| Oracle       | 🏛️    | Architect    |
-| Artisan      | 🎨    | Design       |
-| Strategist   | 📐    | Bicep Plan   |
-| Forge        | ⚒️    | Bicep Code   |
-| Envoy        | 🚀    | Deploy       |
-| Sentinel     | 🔍    | Diagnose     |
+| Role / Stage        | Emoji | Surface                               |
+| ------------------- | ----- | ------------------------------------- |
+| Foreground workflow | 🧠    | `APEX` (`apex-workflow`, `apex-next`) |
+| Requirements        | 📜    | `apex-requirements`                   |
+| Architecture        | 🏛️    | `apex-architecture`                   |
+| Planning            | 📐    | `apex-planning`                       |
+| Code Generation     | ⚒️    | `APEX CodeGen` (`apex-codegen`)       |
+| Validation          | 🛡️    | `APEX Validator`                      |
+| Operations          | 🚀    | `apex-operations`                     |
 
-When adding a new agent, choose a unique emoji + codename.
+When documenting a new agent or stage skill, choose a unique emoji and surface label.

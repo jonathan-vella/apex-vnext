@@ -35,6 +35,8 @@ const KNOWN_DEPRECATIONS = [
     sunsetDate: "2025-09-30",
     replacement: "Standard_AzureFrontDoor",
     source: "manual",
+    fallbackSource: true,
+    lastVerified: "2025-09-30",
     addedDate: "2024-01-15",
   },
   {
@@ -43,6 +45,8 @@ const KNOWN_DEPRECATIONS = [
     sunsetDate: "2025-09-30",
     replacement: "Premium_AzureFrontDoor",
     source: "manual",
+    fallbackSource: true,
+    lastVerified: "2025-09-30",
     addedDate: "2024-01-15",
   },
   {
@@ -51,6 +55,8 @@ const KNOWN_DEPRECATIONS = [
     sunsetDate: "2026-04-28",
     replacement: "Standard_v2",
     source: "manual",
+    fallbackSource: true,
+    lastVerified: "2025-09-30",
     addedDate: "2024-06-01",
   },
   {
@@ -59,6 +65,8 @@ const KNOWN_DEPRECATIONS = [
     sunsetDate: "2026-04-28",
     replacement: "WAF_v2",
     source: "manual",
+    fallbackSource: true,
+    lastVerified: "2025-09-30",
     addedDate: "2024-06-01",
   },
   {
@@ -67,6 +75,8 @@ const KNOWN_DEPRECATIONS = [
     sunsetDate: "2024-03-31",
     replacement: "Basic/Standard/Premium",
     source: "manual",
+    fallbackSource: true,
+    lastVerified: "2025-09-30",
     addedDate: "2023-01-01",
   },
   {
@@ -75,6 +85,8 @@ const KNOWN_DEPRECATIONS = [
     sunsetDate: null,
     replacement: "Standard/Premium",
     source: "manual",
+    fallbackSource: true,
+    lastVerified: "2025-09-30",
     notes: "Basic tier has limited features, consider Premium for production",
   },
 ];
@@ -178,7 +190,19 @@ async function main() {
   const rssDeprecations = await fetchAzureUpdates();
 
   // Merge with known deprecations (deduplicate by service+sku)
-  const allDeprecations = [...KNOWN_DEPRECATIONS];
+  const nowMs = Date.now();
+  const allDeprecations = KNOWN_DEPRECATIONS.map((record) => ({
+    ...record,
+    staleFallback: Boolean(record.sunsetDate && Date.parse(record.sunsetDate) < nowMs),
+  }));
+  const staleFallbacks = allDeprecations.filter((record) => record.staleFallback);
+  if (staleFallbacks.length > 0) {
+    console.warn(
+      `⚠️  ${staleFallbacks.length} fallback deprecation record(s) have past sunset dates: ${staleFallbacks
+        .map((record) => `${record.service} (${record.sku}: ${record.sunsetDate})`)
+        .join(", ")}`,
+    );
+  }
 
   for (const rss of rssDeprecations) {
     const exists = allDeprecations.some((d) => d.service === rss.service && d.sku === rss.sku);
@@ -222,4 +246,7 @@ async function main() {
   }
 }
 
-main().catch(console.error);
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

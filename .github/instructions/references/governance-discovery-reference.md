@@ -1,7 +1,7 @@
 # Governance Discovery Reference
 
 Deep domain knowledge for governance constraint discovery, policy effect
-handling, and plan adaptations. Loaded on-demand by Planner agents.
+handling, and plan adaptations. Loaded on-demand during architecture and planning stages.
 
 ## Policy Effect Decision Tree
 

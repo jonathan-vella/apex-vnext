@@ -1247,10 +1247,14 @@ function validateCustomizations(model, findings) {
 
 function validateMcp(model, findings) {
   const servers = object(model.customization.pluginMcp?.mcpServers) ? model.customization.pluginMcp.mcpServers : {};
+  const expectedServers = ["apex", "apex-azure", ARM_MCP_SERVER];
+  const serverKeys = new Set(Object.keys(servers));
+  const hasExpectedServers =
+    serverKeys.size === expectedServers.length && expectedServers.every((key) => serverKeys.has(key));
   const apex = servers.apex;
   const pricing = servers[ARM_MCP_SERVER];
   if (
-    JSON.stringify(Object.keys(servers)) !== JSON.stringify(["apex", "apex-azure", ARM_MCP_SERVER]) ||
+    !hasExpectedServers ||
     !apex ||
     apex.type !== "stdio" ||
     apex.command !== "node" ||

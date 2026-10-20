@@ -125,14 +125,26 @@ export const DOCUMENT_REGISTRY: Readonly<Record<string, DocumentDefinition>> = {
   },
 };
 
+const UNESCAPED_SLOT_PATTERN = /(?<!\\)\{([a-z][a-z-]*)\}/gu;
+
 function assertExactSlots(template: string, expectedSlots: readonly string[]): void {
-  const slots = [...template.matchAll(/\{([a-z][a-z-]*)\}/gu)].map((match) => match[1]!);
-  if (
-    slots.length !== expectedSlots.length ||
-    new Set(slots).size !== expectedSlots.length ||
-    expectedSlots.some((slot) => !slots.includes(slot))
-  ) {
-    throw new Error("Requirements document template has invalid slots");
+  const slots = [...template.matchAll(UNESCAPED_SLOT_PATTERN)].map((match) => match[1]!);
+  const expectedSet = new Set(expectedSlots);
+  const seen = new Set<string>();
+  const duplicates = new Set<string>();
+  for (const slot of slots) {
+    if (seen.has(slot)) duplicates.add(slot);
+    seen.add(slot);
+  }
+  const missing = expectedSlots.filter((slot) => !seen.has(slot));
+  const unknown = [...seen].filter((slot) => !expectedSet.has(slot));
+  if (missing.length > 0 || duplicates.size > 0 || unknown.length > 0) {
+    const details = [
+      ...(missing.length > 0 ? [`missing: ${missing.join(", ")}`] : []),
+      ...(duplicates.size > 0 ? [`duplicate: ${[...duplicates].join(", ")}`] : []),
+      ...(unknown.length > 0 ? [`unknown: ${unknown.join(", ")}`] : []),
+    ].join("; ");
+    throw new Error(`Requirements document template has invalid slots (${details})`);
   }
 }
 
@@ -187,8 +199,8 @@ export function renderRequirementsDocument(
       requirements.architectureHandoff ?? "Architecture must validate candidate services against current evidence.",
     ),
   };
-  return REQUIREMENTS_TEMPLATE_SLOTS.reduce(
-    (document, slot) => document.replaceAll(`{${slot}}`, () => replacements[slot]),
-    template,
+  return template.replace(
+    /(?<!\\)\{([a-z][a-z-]*)\}|\\([{}])/gu,
+    (_match, slot?: string, escapedBrace?: string) => escapedBrace ?? replacements[slot as RequirementsTemplateSlot],
   );
 }

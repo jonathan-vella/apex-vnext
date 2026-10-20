@@ -32,8 +32,9 @@ Neither historical receipts nor archived delegation qualifies this candidate or 
 Start with the [PRD goals](PRD.md#goals), [workload boundary](PRD.md#workload-boundary), and
 [output quality reference](PRD.md#output-quality-reference). Start with the
 [first optimization batch](ROADMAP.md#first-batch-input-correctness-and-scope), then follow the existing phases for
-governance, COE reuse and conversational changes, rich output, both-client WSL2 workflows and distribution including
-APEX MCP. The roadmap records applicable recommendation follow-ons and deferrals. No token baseline is current work.
+governance, COE reuse and conversational changes, rich output, supported-client workflows (native Windows VS Code and
+GitHub Copilot app, Linux/WSL2 Copilot CLI) and Agent Plugin distribution including APEX MCP. The roadmap records
+applicable recommendation follow-ons and deferrals. No token baseline is current work.
 Do not duplicate these rules in a new master plan or treat target requirements as already implemented commands.
 
 ## Scope Boundary

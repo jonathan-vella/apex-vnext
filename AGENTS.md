@@ -64,7 +64,7 @@ ownership, and approval safeguards; their age does not make them obsolete.
 - `packages/capabilities/` owns bounded provider and workflow capabilities.
 - `packages/renderers/` owns client-neutral rendering.
 - `packages/cli/` owns install, update, setup, lifecycle, and terminal interaction.
-- `customizations/` owns managed VS Code and Copilot CLI projections.
+- `customizations/` owns managed Agent Plugin and thin Copilot CLI workspace projections.
 - `config/*.v1.json` owns shipped workflow, policy, toolchain, and runtime defaults.
 
 State-changing behavior belongs behind kernel authorization and typed contracts. Custom agents and skills guide users;
