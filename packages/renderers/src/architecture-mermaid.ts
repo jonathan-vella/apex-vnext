@@ -73,11 +73,21 @@ export function architectureTierOf(resourceTypes: readonly string[]): TierId {
 function label(value: string): string {
   return value
     .replace(/[\u0000-\u001f\u007f]/gu, " ")
+    .replaceAll("#", "#35;")
     .replaceAll("&", "#amp;")
     .replaceAll('"', "#quot;")
     .replaceAll("<", "#lt;")
     .replaceAll(">", "#gt;")
     .replaceAll("`", "#96;")
+    .trim();
+}
+
+/** Single-line plain text for Mermaid accessibility metadata, which does not take entity codes. */
+function plain(value: string): string {
+  return value
+    .replace(/[\u0000-\u001f\u007f\s]+/gu, " ")
+    .replaceAll("{", "(")
+    .replaceAll("}", ")")
     .trim();
 }
 
@@ -133,7 +143,12 @@ export function renderArchitectureMermaid(architecture: ArchitectureV1): string 
     used.add(candidate);
     nodeIds.set(id, candidate);
   }
-  const lines: string[] = [`%% ${label(architecture.title)}`, "flowchart TB"];
+  const lines: string[] = [
+    `%% ${label(architecture.title)}`,
+    "flowchart TB",
+    `  accTitle: ${plain(architecture.title)}`,
+    `  accDescr: ${plain(`Architecture diagram with ${components.length} components grouped by Azure resource family. ${architecture.summary}`)}`,
+  ];
   for (const tier of TIERS) {
     lines.push(
       `  classDef tier_${tier.id} fill:${tier.fill},stroke:${tier.stroke},color:#172033,stroke-width:1.5px`,

@@ -92,7 +92,7 @@ test("architecture Mermaid is deterministic, escaped, grouped by tier and draws 
   const reordered = renderArchitectureMermaid({ ...architecture, components: [...architecture.components].reverse() });
   assert.equal(first, reordered);
   assert.match(first, /^%% API #lt;platform#gt;\nflowchart TB\n/u);
-  assert.doesNotMatch(first, /<platform>/u);
+  assert.doesNotMatch(first.replace(/^ {2}acc.*$/gmu, ""), /<platform>/u);
   assert.match(first, /subgraph lane_application\["Application #amp; compute"\]/u);
   assert.match(first, /subgraph lane_data\["Data #amp; messaging"\]/u);
   assert.ok(first.indexOf("lane_application[") < first.indexOf("lane_data["));
@@ -100,6 +100,26 @@ test("architecture Mermaid is deterministic, escaped, grouped by tier and draws 
   assert.match(first, /n_api\["⚙️ <b>App Service<\/b><br\/><i>api<\/i>"\]/u);
   assert.match(first, /^ {2}n_api --> n_data$/mu);
   assert.match(first, /^ {2}class n_api tier_application$/mu);
+  assert.match(first, /^ {2}accTitle: API <platform>$/mu);
+  assert.match(first, /^ {2}accDescr: Architecture diagram with 2 components grouped by Azure resource family\. /mu);
+});
+
+test("architecture Mermaid keeps literal entity text distinct from the characters it encodes", () => {
+  const component = (id: string, service: string) => ({
+    id,
+    service,
+    resourceTypes: ["Microsoft.Web/sites"],
+    purpose: "Purpose",
+    requirementIds: ["REQ-1"],
+    dependsOn: [],
+  });
+  const text = renderArchitectureMermaid({
+    ...architecture,
+    components: [component("a", "#quot;"), component("b", '"'), component("c", "Tier #1")],
+  });
+  assert.match(text, /<b>#35;quot;<\/b>/u);
+  assert.match(text, /<b>#quot;<\/b>/u);
+  assert.match(text, /<b>Tier #35;1<\/b>/u);
 });
 
 test("architecture Mermaid keeps full labels, unique node ids, and only valid dependency arrows", () => {
