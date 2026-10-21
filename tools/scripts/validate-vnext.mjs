@@ -19,6 +19,7 @@ import {
   roleDelegatesOnClient,
 } from "../../packages/cli/scripts/prepare-assets.mjs";
 import { MARKETPLACE_NAME, MARKETPLACE_REPOSITORY, PLUGIN_NAME } from "./publish-plugin.mjs";
+import { npmCommand } from "./npm-command.mjs";
 import { azureLaunchErrors, azureRegistryPath, readJson as readMcpJson } from "./_lib/mcp-contracts.mjs";
 import { validateAzureMcpRegistry } from "./validate-azure-mcp.mjs";
 
@@ -1371,7 +1372,8 @@ export function validateRepositoryModel(model) {
 }
 
 export function runSchemaCheck(root, quiet = false) {
-  execFileSync("npm", ["run", "schemas:check", "--workspace", "@apexops/contracts"], {
+  const [executable, args] = npmCommand(["run", "schemas:check", "--workspace", "@apexops/contracts"]);
+  execFileSync(executable, args, {
     cwd: root,
     stdio: quiet ? "pipe" : "inherit",
   });

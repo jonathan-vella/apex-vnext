@@ -8,6 +8,7 @@ import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { basename, join, relative, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import { npmCommand } from "./npm-command.mjs";
 
 const ROOT = resolve(fileURLToPath(new URL("../..", import.meta.url)));
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
@@ -34,7 +35,13 @@ async function runCommand(command, args, { cwd, log }) {
   await mkdir(resolve(log, ".."), { recursive: true });
   const stream = createWriteStream(log, { flags: "w", mode: 0o600 });
   await new Promise((resolvePromise, reject) => {
-    const child = spawn(command, args, { cwd, env: process.env, shell: false, stdio: ["ignore", "pipe", "pipe"] });
+    const [executable, finalArgs] = command === "npm" ? npmCommand(args) : [command, args];
+    const child = spawn(executable, finalArgs, {
+      cwd,
+      env: process.env,
+      shell: false,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
     // The shared log closes only after both child streams drain; console streams must remain open for later commands.
     child.stdout.pipe(stream, { end: false });
     child.stderr.pipe(stream, { end: false });
@@ -52,7 +59,8 @@ async function runCommand(command, args, { cwd, log }) {
 
 async function capture(command, args, cwd) {
   return await new Promise((resolvePromise, reject) => {
-    const child = spawn(command, args, { cwd, shell: false, stdio: ["ignore", "pipe", "pipe"] });
+    const [executable, finalArgs] = command === "npm" ? npmCommand(args) : [command, args];
+    const child = spawn(executable, finalArgs, { cwd, shell: false, stdio: ["ignore", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
     child.stdout.setEncoding("utf8").on("data", (chunk) => (stdout += chunk));
