@@ -174,6 +174,29 @@ test("lab readiness never unlocks Gate 4 or deployment; the final preview still 
   assert.deepEqual(humanDecisions, [1, 4]);
 });
 
+test("a hand-edited run index blocks the preview and the Gate 4 decision before any state change", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  const { runId } = await service.init({ projectId: "demo", riskOwner: "partner" });
+  await prepareValidatedRun(service, runId, "bicep");
+  const indexPath = join(root, "agent-output", "demo", runId, "00-index.md");
+  const index = await readFile(indexPath, "utf8");
+
+  await writeFile(indexPath, `${index}\nedited\n`);
+  const beforePreview = (await events(root, runId)).length;
+  await assert.rejects(service.preview({ operation: "apply", provider: "fake" }), /manual edits/u);
+  assert.equal((await events(root, runId)).length, beforePreview);
+  assert.equal((await gates(service))[3]!.state, "closed");
+
+  await writeFile(indexPath, index);
+  await service.preview({ operation: "apply", provider: "fake" });
+  await writeFile(indexPath, `${index}\nedited\n`);
+  const beforeDecision = (await events(root, runId)).length;
+  await assert.rejects(service.decideGateNumber(4, "approved", "tester"), /manual edits/u);
+  assert.equal((await events(root, runId)).length, beforeDecision);
+  assert.equal((await gates(service))[3]!.state, "open");
+});
+
 test("apply and destroy each need their own current preview and human approval in a lab run", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);

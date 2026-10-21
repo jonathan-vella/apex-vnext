@@ -5777,6 +5777,7 @@ export class ApexService {
         await this.openRunGate(await this.currentRun(), descriptor.gate, dependencyHash);
       }
     }
+    await this.materializeRunIndex(await this.currentRun());
     const completedRun = await this.currentRun();
     const completedEvents = await this.journal(completedRun).replay();
     const route = await this.route(completedRun, completedEvents);
@@ -5849,6 +5850,9 @@ export class ApexService {
         ...["03-des-diagram", "02-waf-assessment", "03-des-cost-breakdown", "03-des-cost-uncertainty"].flatMap((name) =>
           ["py", "svg", "png"].map((extension) => `${name}.${extension}`),
         ),
+        ...["02-waf-assessment", "03-des-cost-breakdown", "03-des-cost-uncertainty"].map(
+          (name) => `sources/${name}.py`,
+        ),
       ].map((name) => `architecture/${name}`);
     if (descriptor.id === "plan")
       files = [
@@ -5875,7 +5879,7 @@ export class ApexService {
       if (["architecture", "plan"].includes(descriptor.reviewSubject))
         files.push(`${descriptor.reviewSubject}/challenger-findings.md`);
     }
-    for (const name of files) await this.assertGeneratedReviewUnmodified(join(root, name));
+    for (const name of ["00-index.md", ...files]) await this.assertGeneratedReviewUnmodified(join(root, name));
   }
 
   // Drops a previously generated file that the current render no longer produces, unless it has manual edits.
@@ -5885,6 +5889,99 @@ export class ApexService {
     const basePath = this.generatedReviewBase(path);
     await this.assertSafeDestination(this.root, basePath);
     await rm(basePath, { force: true });
+  }
+
+  private async assertRunIndexUnmodified(run: RunConfigV1): Promise<void> {
+    await this.assertGeneratedReviewUnmodified(join(this.requirementsReviewDirectory(run), "00-index.md"));
+  }
+
+  /**
+   * Writes `00-index.md`, the entry point of a run's generated review packages. It links only files that exist, in
+   * reading order, so a new reader does not have to scan the stage folders.
+   */
+  private async materializeRunIndex(run: RunConfigV1): Promise<void> {
+    const root = this.requirementsReviewDirectory(run);
+    const stages: readonly (readonly [string, string, readonly (readonly [string, string])[]])[] = [
+      [
+        "1. Requirements",
+        "What the workload must do, and the review of it.",
+        [
+          ["01-requirements.md", "Requirements"],
+          ["service-recommendations.md", "Candidate service recommendations"],
+          ["sku-preferences.md", "SKU preferences"],
+          ["reviews/requirements-findings.md", "Review findings with dispositions"],
+          ["README.md", "Package status and hashes"],
+        ],
+      ],
+      [
+        "2. Architecture",
+        "The accepted design, cost and decisions. The architecture diagram is embedded in the assessment.",
+        [
+          ["architecture/architecture-assessment.md", "Architecture assessment with the diagram"],
+          ["architecture/architecture-decisions.md", "Architecture decision records"],
+          ["architecture/cost-estimate.md", "Cost estimate"],
+          ["architecture/sku-comparison.md", "SKU comparison"],
+          ["architecture/03-des-diagram.mmd", "Architecture diagram source (Mermaid)"],
+          ["reviews/architecture-findings.md", "Review findings with dispositions"],
+          ["architecture/README.md", "Package status, hashes and diagram status"],
+        ],
+      ],
+      [
+        "3. Plan",
+        "How the design is built on the selected IaC track.",
+        [
+          ["plan/implementation-plan.md", "Implementation plan"],
+          ["plan/deployment-guide.md", "Deployment guide"],
+          ["plan/iac-binding.md", "IaC binding"],
+          ["plan/environment-inputs.md", "Environment inputs"],
+          ["reviews/plan-findings.md", "Review findings with dispositions"],
+          ["plan/README.md", "Package status and hashes"],
+        ],
+      ],
+      [
+        "4. Validation",
+        "Evidence that the generated IaC was checked.",
+        [["validation/validation-report.md", "Validation report"]],
+      ],
+      [
+        "5. Operations",
+        "Deployment preview, approval and operating handoff.",
+        [
+          ["operations/deployment-preview.md", "Deployment preview"],
+          ["operations/approval.md", "Gate 4 approval"],
+          ["operations/deployment-summary.md", "Deployment summary"],
+          ["operations/resource-inventory.md", "Resource inventory"],
+          ["operations/policy-matrix.md", "Policy matrix"],
+          ["operations/operations-runbook.md", "Operations runbook"],
+          ["operations/handoff-index.md", "Handoff index"],
+          ["operations/cost-reference.md", "Cost reference"],
+        ],
+      ],
+    ];
+    const sections: string[] = [];
+    for (const [title, summary, files] of stages) {
+      const present: string[] = [];
+      for (const [path, description] of files)
+        if ((await this.readOptional(join(root, path))) !== undefined) present.push(`- [${description}](${path})`);
+      sections.push(`## ${title}\n\n${summary}\n\n${present.length === 0 ? "Not generated yet." : present.join("\n")}`);
+    }
+    const text = [
+      "# Run index",
+      "",
+      `- Project: \`${this.reviewMarkdownText(run.projectId)}\``,
+      `- Run: \`${this.reviewMarkdownText(run.runId)}\``,
+      `- Purpose: ${this.reviewMarkdownText(run.purpose)}; environment: ${this.reviewMarkdownText(run.environment)}; IaC track: ${this.reviewMarkdownText(run.iacTool)}; target: ${this.reviewMarkdownText(run.targetScope)}`,
+      "",
+      "The APEX kernel state is authoritative. These generated files are read-only projections of accepted work; they are listed in reading order and only existing files are linked.",
+      "",
+      ...sections.flatMap((section) => [section, ""]),
+      "## Which findings file to read",
+      "",
+      "Each review stage has two files. `reviews/<stage>-findings.md` is the full record with dispositions, evidence and the reviewed subject hash. The stage folder's `challenger-findings.md` is a shorter projection of the same review.",
+      "",
+    ].join("\n");
+    await mkdir(root, { recursive: true });
+    await this.writeGeneratedReview(join(root, "00-index.md"), Buffer.from(text, "utf8"));
   }
 
   private async writeGeneratedReview(path: string, content: Buffer): Promise<void> {
@@ -6207,9 +6304,11 @@ export class ApexService {
           ? []
           : [
               this.writeGeneratedReview(
-                join(directory, `${diagram.name}.py`),
+                join(directory, "sources", `${diagram.name}.py`),
                 Buffer.from(diagram.source.python, "utf8"),
               ),
+              // Earlier renders wrote the Python source beside the rendered output.
+              this.removeGeneratedReview(join(directory, `${diagram.name}.py`)),
               this.writeGeneratedReview(
                 join(directory, `${diagram.name}.svg`),
                 Buffer.from(diagram.source.svg, "utf8"),
@@ -6788,6 +6887,7 @@ export class ApexService {
       // The approver relies on the generated preview material, so hand edits block the decision.
       for (const name of ["README.md", "deployment-preview.md", "approval.md"])
         await this.assertGeneratedReviewUnmodified(join(this.operationsReviewDirectory(run), name));
+      await this.assertRunIndexUnmodified(run);
     }
     const gate = run.gates.find(({ gate }) => gate === gateNumber);
     if (gate === undefined) throw new ApexError("APEX_USAGE", `Unknown gate ${gateNumber}`, EXIT_CODES.usage);
@@ -6929,6 +7029,8 @@ export class ApexService {
     );
     const events = await this.journal(run).replay();
     await this.assertPreviewReady(run, events);
+    // Both preview paths refresh the run index after journal writes, so a hand edit must block before any of them.
+    await this.assertRunIndexUnmodified(run);
     const dependencyRevision = this.dependencyRevision(run, events);
     const intendedExecutionRecipientIdentity = options.recipientIdentity ?? (await this.currentRecipientIdentity(run));
     const intentHash = this.artifactHash(events, "implementation-intent");
@@ -7405,6 +7507,7 @@ export class ApexService {
         this.approvalContextDocument(context, approvalContextHash),
       ),
     ]);
+    await this.materializeRunIndex(run);
   }
 
   /** Deterministic, bounded summary so the single final approval is informed by accepted evidence. */
@@ -7551,6 +7654,7 @@ export class ApexService {
       join(this.operationsReviewDirectory(run), "approval.md"),
       Buffer.from(content, "utf8"),
     );
+    await this.materializeRunIndex(run);
   }
 
   async currentPreview(): Promise<string> {

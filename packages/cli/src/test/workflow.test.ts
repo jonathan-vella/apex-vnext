@@ -2483,9 +2483,9 @@ async function planTaskContextScenario(pngAvailable: boolean): Promise<void> {
   );
   const expectedDiagrams = ["02-waf-assessment", "03-des-cost-breakdown", "03-des-cost-uncertainty"];
   for (const name of expectedDiagrams) {
-    for (const extension of ["py", "svg"]) {
-      assert.ok((await readFile(join(architectureReviewDirectory, `${name}.${extension}`))).byteLength > 0);
-    }
+    assert.ok((await readFile(join(architectureReviewDirectory, `${name}.svg`))).byteLength > 0);
+    assert.ok((await readFile(join(architectureReviewDirectory, "sources", `${name}.py`))).byteLength > 0);
+    await assert.rejects(stat(join(architectureReviewDirectory, `${name}.py`)), { code: "ENOENT" });
     const png = join(architectureReviewDirectory, `${name}.png`);
     if (pngAvailable) assert.ok((await readFile(png)).byteLength > 0);
     else await assert.rejects(stat(png), { code: "ENOENT" });
@@ -2499,6 +2499,11 @@ async function planTaskContextScenario(pngAvailable: boolean): Promise<void> {
     await assert.rejects(stat(join(architectureReviewDirectory, `03-des-diagram.${extension}`)), { code: "ENOENT" });
   }
   const architectureReadme = await readFile(join(architectureReviewDirectory, "README.md"), "utf8");
+  const runIndex = await readFile(join(architectureReviewDirectory, "..", "00-index.md"), "utf8");
+  assert.match(runIndex, /^# Run index/u);
+  assert.match(runIndex, /\[Requirements\]\(01-requirements\.md\)/u);
+  assert.match(runIndex, /\(architecture\/architecture-assessment\.md\)/u);
+  assert.match(runIndex, /## 3\. Plan\n\n.*\n\nNot generated yet\./u);
   assert.match(
     architectureReadme,
     /03-des-diagram: generated as Mermaid \(03-des-diagram\.mmd\), embedded in architecture-assessment\.md/u,
