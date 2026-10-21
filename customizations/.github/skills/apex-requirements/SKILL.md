@@ -54,6 +54,14 @@ or task.
 8. Populate narrative recommendations for access, ingress, DNS, personal-data inventory, retention/deletion,
    data-subject handling and telemetry minimization. Recommendations are proposed, not confirmed requirements,
    assigned owners or compliance evidence.
+   For steps 7 and 8 only, you may ground recommendation text in `apex-azure/cloudarchitect` (`cloudarchitect_design`),
+   `apex-azure/documentation` (`microsoft_docs_search`, `microsoft_docs_fetch`) and
+   `apex-azure/wellarchitectedframework` (`wellarchitectedframework_serviceguide_get`) with bounded queries, following
+   [Design Stage Grounding](../apex-azure-defaults/references/azure-mcp-tools.md#design-stage-grounding). This is
+   advisory: label each such recommendation with its source and retrieval time, never record it as a user answer, default
+   or confirmed requirement, and never submit a service or SKU as a decision. If a namespace is unavailable or denied,
+   state that and continue from the kernel's question catalog; intake never depends on it. `policy` and `bicepschema` are
+   not used in Requirements.
 9. Submit the typed requirements artifact through `apex/requirementsComplete`. Report the materialized read-only Gate 1
    review package under `agent-output/<project>/<run>/`, including requirements, recommendations, SKU preferences and
    challenger findings.
