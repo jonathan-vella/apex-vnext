@@ -25,7 +25,7 @@ Use this skill only when the kernel routes the active foreground `APEX` agent to
    planning findings and submit permitted decisions through `apex/reviewDecide`.
 2. For `status=task`, call `apex/taskContext` with the exact planning task ID. If task context is externalized, read it
    in bounded chunks through `apex/readTaskInput`. Do not query session stores, repository files, chat history or
-   external schema sources.
+   APEX artifact schemas. The Azure schema and AVM version lookups authorized in step 6 are the only external reads.
 3. Replace every template placeholder with a decision grounded in projected inputs. For `environment-inputs`, every
    secret reference includes its required kind, provider and reference shape, never a secret value.
 4. Keep implementation intent track-neutral. Define logical resources, controls, dependencies, identity, networking,
