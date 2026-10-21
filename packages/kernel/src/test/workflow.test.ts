@@ -243,6 +243,28 @@ test("kernel validates freeform, single-select, and multi-select answers", () =>
     ),
     [{ questionId: "compliance", value: { kind: "compliance", scopes: ["gdpr", "pci-dss"] } }],
   );
+  const complianceQuestion = {
+    id: "compliance",
+    prompt: "Compliance?",
+    options: ["gdpr", "none"],
+    multiSelect: true,
+    valueType: "compliance" as const,
+  };
+  assert.deepEqual(
+    validateInputAnswers(
+      [complianceQuestion],
+      [{ questionId: "compliance", value: { kind: "compliance", scopes: ["none"] } }],
+    ),
+    [{ questionId: "compliance", value: { kind: "compliance", scopes: ["none"] } }],
+  );
+  assert.throws(
+    () =>
+      validateInputAnswers(
+        [complianceQuestion],
+        [{ questionId: "compliance", value: { kind: "compliance", scopes: ["gdpr", "none"] } }],
+      ),
+    /cannot combine none/u,
+  );
 });
 
 test("validator registry names the allowed values of a failed literal union", () => {

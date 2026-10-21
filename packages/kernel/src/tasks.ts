@@ -115,6 +115,11 @@ export function validateInputAnswers(questions: QuestionV1[], submitted: InputAn
       ) {
         throw new Error(`Answer is not a declared option: ${question.id}`);
       }
+      if (question.valueType === "compliance" && value.kind === "compliance") {
+        if (value.scopes.includes("none") && value.scopes.length > 1) {
+          throw new Error(`Answer cannot combine none with other scopes: ${question.id}`);
+        }
+      }
       return {
         questionId: question.id,
         value:

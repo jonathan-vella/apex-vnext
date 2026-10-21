@@ -1148,6 +1148,7 @@ test("requirements intake provides selectable Azure service and security recomme
     "iso-27001",
     "soc-2",
     "other",
+    "none",
   ]);
   assert.equal(security.request.questions.find(({ id }) => id === "authentication")?.multiSelect, true);
   assert.equal(security.request.questions.find(({ id }) => id === "operations")?.multiSelect, true);

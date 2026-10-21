@@ -706,7 +706,7 @@ const REQUIREMENTS_INTAKE: readonly RequirementsIntakeRound[] = [
       {
         id: "compliance",
         prompt: "Select applicable compliance and regulatory scopes, or explicitly defer them.",
-        options: ["gdpr", "hipaa", "pci-dss", "iso-27001", "soc-2", "other"],
+        options: ["gdpr", "hipaa", "pci-dss", "iso-27001", "soc-2", "other", "none"],
         multiSelect: true,
         valueType: "compliance",
       },

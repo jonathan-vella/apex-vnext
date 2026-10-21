@@ -406,7 +406,8 @@ Under the [CLI-only projection plan](ROADMAP.md#cli-only-projection), use `ask_u
 an array field and map the returned text back to exact option values. Otherwise present the options numbered in kernel
 order, accept the user's numbers and resolve them to option values. The kernel validates the array either way.
 Out-of-range, duplicate, non-numeric or unmatched entries require correction. Checkbox answers that map exactly need
-no extra question; resolved numbers or free text still require explicit confirmation. Preserve the kernel option
+no extra question, and neither does choosing "accept the recommended set" on a question that carries a
+recommendation; resolved numbers or free text still require explicit confirmation. Preserve the kernel option
 order, allowed values, request identity, typed arrays and user stop boundary. Never invent a `multiSelect` parameter,
 silently reduce the question to one choice, infer aliases or record recommended defaults. Invalid, empty or ambiguous
 input requires correction; corrected selections require confirmation again. Cancellation records nothing. If free-text
