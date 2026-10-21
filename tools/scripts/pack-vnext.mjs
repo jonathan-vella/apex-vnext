@@ -12,6 +12,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
+import { npmCommand } from "./npm-command.mjs";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const runtimePackages = ["contracts", "kernel", "capabilities", "renderers", "cli"];
@@ -24,8 +25,9 @@ export const releaseSbomArguments = Object.freeze([
 const compareText = (left, right) => (left < right ? -1 : left > right ? 1 : 0);
 
 function run(command, args, cwd = repositoryRoot) {
+  const [executable, finalArgs] = command === "npm" ? npmCommand(args) : [command, args];
   return new Promise((resolvePromise, reject) => {
-    const child = spawn(command, args, { cwd, shell: false, stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(executable, finalArgs, { cwd, shell: false, stdio: ["ignore", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
     child.stdout.setEncoding("utf8").on("data", (chunk) => {
