@@ -29,12 +29,12 @@ or task.
    service preference, budget posture, unknown, deferral, owner, risk acceptance or approval.
 2. For `status=needs_input`, ask every returned question through `ask_user` in chat. Use single-select controls without
    adding or reordering kernel options. For a multi-value question that carries a recommendation, first ask one
-   single-choice question: accept the recommended set (name its values) or customize. Accept maps exactly, so record it
-   without a second confirmation. To customize, or when there is no recommendation, use native multi-select if the tool
-   offers an array field; otherwise show the exact kernel options numbered in kernel order, collect the numbers,
-   resolve them back to option values, and confirm the complete selection before recording. Name each invalid,
-   duplicate, empty, ambiguous or out-of-range entry and why before asking again. `none` is exclusive. Recommendations
-   are proposals only; never submit them without the accept answer.
+   single-choice question offering to accept the recommended set (name its values) or customize. Accept maps exactly,
+   so record it without a second confirmation. To customize, or when there is no recommendation, use native
+   multi-select if the tool offers it; otherwise show the exact kernel options numbered in kernel order, collect the
+   numbers, resolve them back to option values, and confirm the complete selection before recording. Name each
+   invalid, duplicate, empty, ambiguous or out-of-range entry and why before asking again. `none` is exclusive.
+   Recommendations are proposals only; never submit them without the accept answer.
    When the request includes intake metadata, report the round as `request.intake.ordinal` of
    `request.intake.total` and continue through each remaining intake round only up to the user's requested stop point;
    each round has its own request ID and must be recorded separately.
