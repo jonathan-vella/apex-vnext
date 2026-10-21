@@ -5891,6 +5891,10 @@ export class ApexService {
     await rm(basePath, { force: true });
   }
 
+  private async assertRunIndexUnmodified(run: RunConfigV1): Promise<void> {
+    await this.assertGeneratedReviewUnmodified(join(this.requirementsReviewDirectory(run), "00-index.md"));
+  }
+
   /**
    * Writes `00-index.md`, the entry point of a run's generated review packages. It links only files that exist, in
    * reading order, so a new reader does not have to scan the stage folders.
@@ -6883,6 +6887,7 @@ export class ApexService {
       // The approver relies on the generated preview material, so hand edits block the decision.
       for (const name of ["README.md", "deployment-preview.md", "approval.md"])
         await this.assertGeneratedReviewUnmodified(join(this.operationsReviewDirectory(run), name));
+      await this.assertRunIndexUnmodified(run);
     }
     const gate = run.gates.find(({ gate }) => gate === gateNumber);
     if (gate === undefined) throw new ApexError("APEX_USAGE", `Unknown gate ${gateNumber}`, EXIT_CODES.usage);
@@ -7024,6 +7029,8 @@ export class ApexService {
     );
     const events = await this.journal(run).replay();
     await this.assertPreviewReady(run, events);
+    // Both preview paths refresh the run index after journal writes, so a hand edit must block before any of them.
+    await this.assertRunIndexUnmodified(run);
     const dependencyRevision = this.dependencyRevision(run, events);
     const intendedExecutionRecipientIdentity = options.recipientIdentity ?? (await this.currentRecipientIdentity(run));
     const intentHash = this.artifactHash(events, "implementation-intent");
