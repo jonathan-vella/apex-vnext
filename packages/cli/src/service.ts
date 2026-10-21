@@ -3430,7 +3430,9 @@ export class ApexService {
               entry.ino !== metadata.ino ||
               entry.size !== metadata.size ||
               entry.mtimeMs !== metadata.mtimeMs ||
-              entry.ctimeMs !== metadata.ctimeMs,
+              // NTFS flushes ChangeTime lazily, so a file that was just written reports a later value without any
+              // content change; the other fields still detect replacement or modification there.
+              (process.platform !== "win32" && entry.ctimeMs !== metadata.ctimeMs),
           )
         )
           throw new ApexError("APEX_STALE", "Governance baseline file changed", EXIT_CODES.stale);
