@@ -146,7 +146,7 @@ test("lab readiness never unlocks Gate 4 or deployment; the final preview still 
   assert.equal((await gates(service))[3]!.state, "open");
   await assert.rejects(service.deploy(preview.previewHash), /Gate 4 approval/u);
   const material = await readFile(
-    join(root, "agent-output", "demo", runId, "operations", "deployment-preview.md"),
+    join(root, "agent-output", "demo", runId, "05-operations", "deployment-preview.md"),
     "utf8",
   );
   assert.match(material, /## Approval Context/u);
@@ -159,7 +159,7 @@ test("lab readiness never unlocks Gate 4 or deployment; the final preview still 
   assert.match(material, /## Accepted Risks\n\n- None\./u);
 
   // The approver relies on this material, so a hand edit blocks the decision until it is restored.
-  const materialPath = join(root, "agent-output", "demo", runId, "operations", "deployment-preview.md");
+  const materialPath = join(root, "agent-output", "demo", runId, "05-operations", "deployment-preview.md");
   await writeFile(materialPath, material.replace("- Purpose: lab", "- Purpose: edited"));
   await assert.rejects(service.decideGateNumber(4, "approved", "tester"), /manual edits/u);
   await writeFile(materialPath, material);

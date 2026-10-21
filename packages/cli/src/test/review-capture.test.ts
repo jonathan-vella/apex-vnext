@@ -370,7 +370,7 @@ test(
     const { nonce } = (await service.taskContext(taskId)).reviewRequest!;
     await captureReview(service, taskId, { findings: [] });
     // A read-only run output folder passes the pre-commit checks but fails materialization after task.completed.
-    const output = join(root, "agent-output", "demo", runId);
+    const output = join(root, "agent-output", "demo", runId, "01-requirements");
     await chmod(output, 0o555);
     context.after(() => chmod(output, 0o755));
     await assert.rejects(service.completeReview(taskId));

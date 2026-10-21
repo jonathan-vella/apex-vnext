@@ -60,7 +60,7 @@ review or task.
    cost/SKU bindings. Before submitting, check common rejection causes: WAF statuses use the allowed values; dates use
    UTC milliseconds; ADR alternative fields are strings; policy mappings have property paths; and SKU decision
    logical IDs match component IDs.
-9. Report the read-only Gate 2 review package under `agent-output/<project>/<run>/architecture/`, including
+9. Report the read-only Gate 2 review package under `agent-output/<project>/<run>/02-architecture/`, including
    Architecture, WAF, cost breakdown, uncertainty diagrams, assessment, SKU comparison and challenger findings.
    Diagrams are derived views, not gate evidence. The same architecture, cost estimate and accepted risks are shown
    again at the final Gate 4 approval.

@@ -261,6 +261,14 @@ import {
 } from "./workflow-validators.js";
 
 const ZERO_HASH = "0".repeat(64);
+// Numbered in reading order; `00-index.md` sits beside them at the run root.
+const STAGE_FOLDERS = {
+  requirements: "01-requirements",
+  architecture: "02-architecture",
+  plan: "03-plan",
+  validation: "04-validation",
+  operations: "05-operations",
+} as const;
 const TASK_TTL_MS = 24 * 60 * 60 * 1000;
 const PREVIEW_TTL_MS = 24 * 60 * 60 * 1000;
 /** Workspace setup files that bootstrap, init, update and customization repair change outside any run. */
@@ -5761,9 +5769,6 @@ export class ApexService {
         );
       await this.materializeOperationalIndex(run, events, diagnosis, outputHashes.diagnosis!);
     }
-    if (descriptor.reviewSubject !== undefined) {
-      await this.materializeReviewerSummary(run, descriptor.reviewSubject, outputs[0]!.value as ReviewFindingsV1);
-    }
     if (descriptor.id === "validation-bicep" || descriptor.id === "validation-terraform") {
       await this.materializeValidationReport(
         run,
@@ -5804,8 +5809,17 @@ export class ApexService {
     };
   }
 
-  private requirementsReviewDirectory(run: RunConfigV1): string {
+  /** Run root under `agent-output/`; it holds `00-index.md` and one numbered folder per stage. */
+  private runOutputDirectory(run: RunConfigV1): string {
     return join(this.root, "agent-output", run.projectId, run.runId);
+  }
+
+  private stageDirectory(run: RunConfigV1, stage: keyof typeof STAGE_FOLDERS): string {
+    return join(this.runOutputDirectory(run), STAGE_FOLDERS[stage]);
+  }
+
+  private requirementsReviewDirectory(run: RunConfigV1): string {
+    return this.stageDirectory(run, "requirements");
   }
 
   private generatedReviewBase(path: string): string {
@@ -5828,18 +5842,20 @@ export class ApexService {
   }
 
   private async assertTaskReviewFilesUnmodified(run: RunConfigV1, descriptor: WorkflowTaskDescriptor): Promise<void> {
-    const root = this.requirementsReviewDirectory(run);
+    const root = this.runOutputDirectory(run);
+    const inStage = (stage: keyof typeof STAGE_FOLDERS, names: readonly string[]): string[] =>
+      names.map((name) => `${STAGE_FOLDERS[stage]}/${name}`);
     let files: string[] = [];
     if (descriptor.id === "requirements")
-      files = [
-        "01-requirements.md",
+      files = inStage("requirements", [
+        "requirements.md",
         "README.md",
         "service-recommendations.md",
         "sku-preferences.md",
         "challenger-findings.md",
-      ];
+      ]);
     if (descriptor.id === "architecture")
-      files = [
+      files = inStage("architecture", [
         "README.md",
         "architecture-assessment.md",
         "architecture-decisions.md",
@@ -5853,33 +5869,31 @@ export class ApexService {
         ...["02-waf-assessment", "03-des-cost-breakdown", "03-des-cost-uncertainty"].map(
           (name) => `sources/${name}.py`,
         ),
-      ].map((name) => `architecture/${name}`);
+      ]);
     if (descriptor.id === "plan")
-      files = [
+      files = inStage("plan", [
         "README.md",
         "implementation-plan.md",
         "deployment-guide.md",
         "iac-binding.md",
         "environment-inputs.md",
         "challenger-findings.md",
-      ].map((name) => `plan/${name}`);
-    if (descriptor.id.startsWith("validation-")) files = ["validation/validation-report.md"];
+      ]);
+    if (descriptor.id.startsWith("validation-")) files = inStage("validation", ["validation-report.md"]);
     if (descriptor.id === "diagnosis")
-      files = [
+      files = inStage("operations", [
         "operations-runbook.md",
         "handoff-index.md",
         "deployment-summary.md",
         "resource-inventory.md",
         "policy-matrix.md",
         "cost-reference.md",
-      ].map((name) => `operations/${name}`);
+      ]);
     if (descriptor.reviewSubject !== undefined) {
-      files.push(`reviews/${descriptor.reviewSubject}-findings.md`);
-      if (descriptor.reviewSubject === "requirements") files.push("challenger-findings.md");
-      if (["architecture", "plan"].includes(descriptor.reviewSubject))
-        files.push(`${descriptor.reviewSubject}/challenger-findings.md`);
+      const stage = descriptor.reviewSubject as keyof typeof STAGE_FOLDERS;
+      files.push(...inStage(stage, ["challenger-findings.md"]));
     }
-    for (const name of ["00-index.md", ...files]) await this.assertGeneratedReviewUnmodified(join(root, name));
+    for (const name of ["00-index.md", ...new Set(files)]) await this.assertGeneratedReviewUnmodified(join(root, name));
   }
 
   // Drops a previously generated file that the current render no longer produces, unless it has manual edits.
@@ -5892,7 +5906,7 @@ export class ApexService {
   }
 
   private async assertRunIndexUnmodified(run: RunConfigV1): Promise<void> {
-    await this.assertGeneratedReviewUnmodified(join(this.requirementsReviewDirectory(run), "00-index.md"));
+    await this.assertGeneratedReviewUnmodified(join(this.runOutputDirectory(run), "00-index.md"));
   }
 
   /**
@@ -5900,62 +5914,67 @@ export class ApexService {
    * reading order, so a new reader does not have to scan the stage folders.
    */
   private async materializeRunIndex(run: RunConfigV1): Promise<void> {
-    const root = this.requirementsReviewDirectory(run);
+    const root = this.runOutputDirectory(run);
+    const stageFiles = (
+      stage: keyof typeof STAGE_FOLDERS,
+      files: readonly (readonly [string, string])[],
+    ): (readonly [string, string])[] =>
+      files.map(([name, description]) => [`${STAGE_FOLDERS[stage]}/${name}`, description]);
     const stages: readonly (readonly [string, string, readonly (readonly [string, string])[]])[] = [
       [
         "1. Requirements",
         "What the workload must do, and the review of it.",
-        [
-          ["01-requirements.md", "Requirements"],
+        stageFiles("requirements", [
+          ["requirements.md", "Requirements"],
           ["service-recommendations.md", "Candidate service recommendations"],
           ["sku-preferences.md", "SKU preferences"],
-          ["reviews/requirements-findings.md", "Review findings with dispositions"],
+          ["challenger-findings.md", "Review findings with dispositions"],
           ["README.md", "Package status and hashes"],
-        ],
+        ]),
       ],
       [
         "2. Architecture",
         "The accepted design, cost and decisions. The architecture diagram is embedded in the assessment.",
-        [
-          ["architecture/architecture-assessment.md", "Architecture assessment with the diagram"],
-          ["architecture/architecture-decisions.md", "Architecture decision records"],
-          ["architecture/cost-estimate.md", "Cost estimate"],
-          ["architecture/sku-comparison.md", "SKU comparison"],
-          ["architecture/03-des-diagram.mmd", "Architecture diagram source (Mermaid)"],
-          ["reviews/architecture-findings.md", "Review findings with dispositions"],
-          ["architecture/README.md", "Package status, hashes and diagram status"],
-        ],
+        stageFiles("architecture", [
+          ["architecture-assessment.md", "Architecture assessment with the diagram"],
+          ["architecture-decisions.md", "Architecture decision records"],
+          ["cost-estimate.md", "Cost estimate"],
+          ["sku-comparison.md", "SKU comparison"],
+          ["03-des-diagram.mmd", "Architecture diagram source (Mermaid)"],
+          ["challenger-findings.md", "Review findings with dispositions"],
+          ["README.md", "Package status, hashes and diagram status"],
+        ]),
       ],
       [
         "3. Plan",
         "How the design is built on the selected IaC track.",
-        [
-          ["plan/implementation-plan.md", "Implementation plan"],
-          ["plan/deployment-guide.md", "Deployment guide"],
-          ["plan/iac-binding.md", "IaC binding"],
-          ["plan/environment-inputs.md", "Environment inputs"],
-          ["reviews/plan-findings.md", "Review findings with dispositions"],
-          ["plan/README.md", "Package status and hashes"],
-        ],
+        stageFiles("plan", [
+          ["implementation-plan.md", "Implementation plan"],
+          ["deployment-guide.md", "Deployment guide"],
+          ["iac-binding.md", "IaC binding"],
+          ["environment-inputs.md", "Environment inputs"],
+          ["challenger-findings.md", "Review findings with dispositions"],
+          ["README.md", "Package status and hashes"],
+        ]),
       ],
       [
         "4. Validation",
         "Evidence that the generated IaC was checked.",
-        [["validation/validation-report.md", "Validation report"]],
+        stageFiles("validation", [["validation-report.md", "Validation report"]]),
       ],
       [
         "5. Operations",
         "Deployment preview, approval and operating handoff.",
-        [
-          ["operations/deployment-preview.md", "Deployment preview"],
-          ["operations/approval.md", "Gate 4 approval"],
-          ["operations/deployment-summary.md", "Deployment summary"],
-          ["operations/resource-inventory.md", "Resource inventory"],
-          ["operations/policy-matrix.md", "Policy matrix"],
-          ["operations/operations-runbook.md", "Operations runbook"],
-          ["operations/handoff-index.md", "Handoff index"],
-          ["operations/cost-reference.md", "Cost reference"],
-        ],
+        stageFiles("operations", [
+          ["deployment-preview.md", "Deployment preview"],
+          ["approval.md", "Gate 4 approval"],
+          ["deployment-summary.md", "Deployment summary"],
+          ["resource-inventory.md", "Resource inventory"],
+          ["policy-matrix.md", "Policy matrix"],
+          ["operations-runbook.md", "Operations runbook"],
+          ["handoff-index.md", "Handoff index"],
+          ["cost-reference.md", "Cost reference"],
+        ]),
       ],
     ];
     const sections: string[] = [];
@@ -5977,7 +5996,7 @@ export class ApexService {
       ...sections.flatMap((section) => [section, ""]),
       "## Which findings file to read",
       "",
-      "Each review stage has two files. `reviews/<stage>-findings.md` is the full record with dispositions, evidence and the reviewed subject hash. The stage folder's `challenger-findings.md` is a shorter projection of the same review.",
+      "Each review stage keeps one findings file, `challenger-findings.md`, in its own folder. It records every finding with its severity, disposition, evidence and the reviewed subject hash.",
       "",
     ].join("\n");
     await mkdir(root, { recursive: true });
@@ -6073,7 +6092,7 @@ export class ApexService {
     };
     await mkdir(directory, { recursive: true });
     await Promise.all([
-      this.writeGeneratedReview(join(directory, "01-requirements.md"), Buffer.from(document.content, "utf8")),
+      this.writeGeneratedReview(join(directory, "requirements.md"), Buffer.from(document.content, "utf8")),
       this.writeGeneratedReview(
         join(directory, "README.md"),
         Buffer.from(
@@ -6105,24 +6124,29 @@ export class ApexService {
     ]);
   }
 
-  private async materializeRequirementsChallengeFindings(run: RunConfigV1, review: ReviewFindingsV1): Promise<void> {
+  /** The single findings record for a review stage: subject, every finding with its disposition and its evidence. */
+  private reviewFindingsMarkdown(review: ReviewFindingsV1): string {
     const findings =
       review.findings.length === 0
-        ? "No challenger findings remain open."
+        ? "No findings remain open."
         : review.findings
             .map(
-              ({ id, severity, title, detail, resolution }) =>
-                `## ${this.reviewMarkdownText(id)}: ${this.reviewMarkdownText(title)}\n\n- Severity: ${this.reviewMarkdownText(severity)}\n- Finding: ${this.reviewMarkdownText(detail)}${resolution === undefined ? "" : `\n- Resolution: ${this.reviewMarkdownText(resolution)}`}`,
+              ({ id, severity, disposition, title, detail, evidenceRefs, resolution }) =>
+                `## ${this.reviewMarkdownText(id)}: ${this.reviewMarkdownText(title)}\n\n- Severity: ${this.reviewMarkdownText(severity)}\n- Disposition: ${this.reviewMarkdownText(disposition)}\n- Finding: ${this.reviewMarkdownText(detail)}\n- Evidence: ${evidenceRefs.map((reference) => this.reviewMarkdownText(reference)).join(", ") || "None"}${resolution === undefined ? "" : `\n- Resolution: ${this.reviewMarkdownText(resolution)}`}`,
             )
             .join("\n\n");
+    return `- Reviewed artifact kind: ${this.reviewMarkdownText(review.subjectKind)}\n- Review subject hash: ${review.subjectHash}\n- Reviewed at: ${this.reviewMarkdownText(review.reviewedAt)}\n\n${findings}`;
+  }
+
+  private async materializeRequirementsChallengeFindings(run: RunConfigV1, review: ReviewFindingsV1): Promise<void> {
     await this.writeGeneratedReview(
       join(this.requirementsReviewDirectory(run), "challenger-findings.md"),
-      Buffer.from(`# Challenger Findings\n\n${findings}\n`, "utf8"),
+      Buffer.from(`# Challenger Findings\n\n${this.reviewFindingsMarkdown(review)}\n`, "utf8"),
     );
   }
 
   private architectureReviewDirectory(run: RunConfigV1): string {
-    return join(this.root, "agent-output", run.projectId, run.runId, "architecture");
+    return this.stageDirectory(run, "architecture");
   }
 
   private async materializeArchitectureReviewPackage(
@@ -6328,15 +6352,6 @@ export class ApexService {
         `| ${headers.map(() => "---").join(" | ")} |`,
         ...rows.map((row) => `| ${row.join(" | ")} |`),
       ].join("\n");
-    const findings =
-      review.findings.length === 0
-        ? "No challenger findings remain open."
-        : review.findings
-            .map(
-              ({ id, severity, title, detail, resolution }) =>
-                `## ${this.reviewMarkdownText(id)}: ${this.reviewMarkdownText(title)}\n\n- Severity: ${this.reviewMarkdownText(severity)}\n- Finding: ${this.reviewMarkdownText(detail)}${resolution === undefined ? "" : `\n- Resolution: ${this.reviewMarkdownText(resolution)}`}`,
-            )
-            .join("\n\n");
     const criteria =
       review.criteria === undefined
         ? "- Criterion receipts unavailable for this historical review."
@@ -6351,12 +6366,15 @@ export class ApexService {
           );
     await this.writeGeneratedReview(
       join(this.architectureReviewDirectory(run), "challenger-findings.md"),
-      Buffer.from(`# Challenger Findings\n\n## Well-Architected Criteria\n\n${criteria}\n\n${findings}\n`, "utf8"),
+      Buffer.from(
+        `# Challenger Findings\n\n## Well-Architected Criteria\n\n${criteria}\n\n${this.reviewFindingsMarkdown(review)}\n`,
+        "utf8",
+      ),
     );
   }
 
   private planReviewDirectory(run: RunConfigV1): string {
-    return join(this.root, "agent-output", run.projectId, run.runId, "plan");
+    return this.stageDirectory(run, "plan");
   }
 
   private async materializePlanReviewPackage(
@@ -6430,39 +6448,9 @@ export class ApexService {
   }
 
   private async materializePlanChallengeFindings(run: RunConfigV1, review: ReviewFindingsV1): Promise<void> {
-    const findings =
-      review.findings.length === 0
-        ? "No challenger findings remain open."
-        : review.findings
-            .map(
-              ({ id, severity, title, detail, resolution }) =>
-                `## ${this.reviewMarkdownText(id)}: ${this.reviewMarkdownText(title)}\n\n- Severity: ${this.reviewMarkdownText(severity)}\n- Finding: ${this.reviewMarkdownText(detail)}${resolution === undefined ? "" : `\n- Resolution: ${this.reviewMarkdownText(resolution)}`}`,
-            )
-            .join("\n\n");
     await this.writeGeneratedReview(
       join(this.planReviewDirectory(run), "challenger-findings.md"),
-      Buffer.from(`# Challenger Findings\n\n${findings}\n`, "utf8"),
-    );
-  }
-
-  private async materializeReviewerSummary(run: RunConfigV1, subject: string, review: ReviewFindingsV1): Promise<void> {
-    const findings =
-      review.findings.length === 0
-        ? "No findings remain open."
-        : review.findings
-            .map(
-              ({ id, severity, disposition, title, detail, evidenceRefs, resolution }) =>
-                `## ${this.reviewMarkdownText(id)}: ${this.reviewMarkdownText(title)}\n\n- Severity: ${this.reviewMarkdownText(severity)}\n- Disposition: ${this.reviewMarkdownText(disposition)}\n- Finding: ${this.reviewMarkdownText(detail)}\n- Evidence: ${evidenceRefs.map((reference) => this.reviewMarkdownText(reference)).join(", ") || "None"}${resolution === undefined ? "" : `\n- Resolution: ${this.reviewMarkdownText(resolution)}`}`,
-            )
-            .join("\n\n");
-    const directory = join(this.root, "agent-output", run.projectId, run.runId, "reviews");
-    await mkdir(directory, { recursive: true });
-    await this.writeGeneratedReview(
-      join(directory, `${subject}-findings.md`),
-      Buffer.from(
-        `# ${this.reviewMarkdownText(subject)} Challenger Findings\n\n- Reviewed artifact kind: ${this.reviewMarkdownText(review.subjectKind)}\n- Review subject hash: ${review.subjectHash}\n- Reviewed at: ${this.reviewMarkdownText(review.reviewedAt)}\n\n${findings}\n`,
-        "utf8",
-      ),
+      Buffer.from(`# Challenger Findings\n\n${this.reviewFindingsMarkdown(review)}\n`, "utf8"),
     );
   }
 
@@ -6472,7 +6460,7 @@ export class ApexService {
     taskType: "validation-bicep" | "validation-terraform",
     evidenceModes: Readonly<Record<string, string>>,
   ): Promise<void> {
-    const directory = join(this.root, "agent-output", run.projectId, run.runId, "validation");
+    const directory = this.stageDirectory(run, "validation");
     const entries =
       evidence.entries.length === 0
         ? "- No validation evidence entries were produced."
@@ -7324,7 +7312,7 @@ export class ApexService {
   }
 
   private operationsReviewDirectory(run: RunConfigV1): string {
-    return join(this.root, "agent-output", run.projectId, run.runId, "operations");
+    return this.stageDirectory(run, "operations");
   }
 
   private async createApprovalContext(

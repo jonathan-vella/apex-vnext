@@ -48,7 +48,7 @@ Use this skill only when the kernel routes the active foreground `APEX` agent to
 8. Complete planning through `apex/planComplete` with implementation intent, binding without `intentHash`, and
    environment inputs. The kernel derives the canonical intent hash and atomically validates all three outputs. Do not
    call `apex/completeTask` with a partial plan bundle or placeholder hash.
-9. Report the read-only Gate 3 review package under `agent-output/<project>/<run>/plan/`, including implementation
+9. Report the read-only Gate 3 review package under `agent-output/<project>/<run>/03-plan/`, including implementation
    plan, IaC binding, environment inputs and challenger findings.
 10. When the `plan-review` task appears, run the rubber-duck review steps in `apex-next` with the exact `task.taskId`.
     For `needs_review`, do not request task context or run rubber-duck again; record a disposition for every finding.

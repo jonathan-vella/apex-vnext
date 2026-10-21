@@ -276,9 +276,13 @@ Gate 1, and a different purpose or target needs a new run (promotion to a differ
 MCP the agent calls `apex/gateDecide` (`gate: 1`, `decision` `approved` or `rejected`, `confirm: true`) for Gate 1
 only after your explicit confirmation or rejection.
 
-Requirements acceptance also materializes a read-only Gate 1 review package at `agent-output/<project>/<run>/`. Review
-`01-requirements.md`, `README.md`, `service-recommendations.md`, `sku-preferences.md`, and `challenger-findings.md`
-before confirming Gate 1. These documents are derived from accepted APEX state; regeneration overwrites local edits.
+Requirements acceptance also materializes a read-only Gate 1 review package under `agent-output/<project>/<run>/`. Each
+run has `00-index.md`, which links the generated files in reading order, and one numbered folder per stage:
+`01-requirements/`, `02-architecture/`, `03-plan/`, `04-validation/` and `05-operations/`. Review
+`01-requirements/requirements.md`, `README.md`, `service-recommendations.md`, `sku-preferences.md`, and
+`challenger-findings.md` before confirming Gate 1. Each review stage keeps one `challenger-findings.md` with every
+finding's disposition and evidence. These documents are derived from accepted APEX state; regeneration overwrites local
+edits.
 
 Conflict-aware selective updates are planned under `REQ-CHANGE-001`; until implemented, do not treat manual edits to
 these generated packages as persistent project intent. Ask APEX to revise accepted decisions through supported tasks.
@@ -292,9 +296,11 @@ Until readiness is recorded, `nextTask` retries recording it and, if it still ca
 `Gate N readiness checkpoint is not recorded: <reason>`. Resolve the blocking review finding (including an unaccepted
 risk) or validator failure it names.
 
-Architecture acceptance materializes `agent-output/<project>/<run>/architecture/` with authoritative assessment, cost,
-SKU, and challenger Markdown. It also includes editable Python, SVG, and PNG views for Architecture topology,
-qualitative WAF status, priced monthly cost breakdown, and lower/base/upper cost uncertainty. Unpriced items remain
+Architecture acceptance materializes `agent-output/<project>/<run>/02-architecture/` with authoritative assessment, cost,
+SKU, and challenger Markdown. The architecture diagram is a Mermaid flowchart (`03-des-diagram.mmd`) embedded in the
+assessment, grouped by Azure resource family with the full component names. The folder also includes editable Python
+and SVG views (PNG where a rasterizer is available) for qualitative WAF status, priced monthly cost breakdown, and
+lower/base/upper cost uncertainty; the Python sources are under `sources/`. Unpriced items remain
 listed separately and are excluded from cost diagrams and the priced subtotal. Diagram failures are visible but do not
 replace or block typed review evidence.
 
@@ -304,7 +310,7 @@ them.
 
 ### Gate 4: Approve The Final Preview
 
-Gate 4 is decided only after an exact provider preview exists. The generated `operations/deployment-preview.md` shows
+Gate 4 is decided only after an exact provider preview exists. The generated `05-operations/deployment-preview.md` shows
 an Approval Context with the purpose, target, gate provenance, architecture, cost estimate and accepted risks so the
 single final approval is informed. There is no cost threshold. Its tamper check is best-effort and local; binding it
 immutably is tracked in [#466](https://github.com/jonathan-vella/apex-vnext/issues/466). Apply and destroy each need
