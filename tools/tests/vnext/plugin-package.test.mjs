@@ -959,7 +959,7 @@ async function architectureTask(plugin) {
       },
       { kind: "policy-property-map", value: fixtures.policyMap(plugin.runId, governanceHash, findings) },
     ],
-    directory: join(plugin.workspace, "agent-output", projectId, plugin.runId, "architecture"),
+    directory: join(plugin.workspace, "agent-output", projectId, plugin.runId, "02-architecture"),
   };
 }
 

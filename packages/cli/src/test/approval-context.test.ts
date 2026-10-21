@@ -42,7 +42,7 @@ for (const track of ["bicep", "terraform"] as const) {
     assert.equal(context.runId, runId);
     for (const kind of ["architecture", "cost-estimate", "requirements-review", "risk-dispositions"])
       assert.match(context.sourceHashes[kind]!, /^[a-f0-9]{64}$/);
-    const path = join(root, "agent-output", "demo", runId, "operations", "deployment-preview.md");
+    const path = join(root, "agent-output", "demo", runId, "05-operations", "deployment-preview.md");
     const original = await readFile(path, "utf8");
     const basePath = join(root, ".apex", "generated-review-bases", sha256Bytes(Buffer.from(relative(root, path))));
     const base = await readFile(basePath);
@@ -143,7 +143,7 @@ test("Gate 4 re-reads review bytes under the run mutation lock after approval ev
   const { runId } = await service.init({ projectId: "demo", riskOwner: "partner" });
   await prepareValidatedRun(service, runId, "bicep");
   await service.preview({ operation: "apply", provider: "fake" });
-  const path = join(root, "agent-output", "demo", runId, "operations", "deployment-preview.md");
+  const path = join(root, "agent-output", "demo", runId, "05-operations", "deployment-preview.md");
   const original = await readFile(path, "utf8");
   const basePath = join(root, ".apex", "generated-review-bases", sha256Bytes(Buffer.from(relative(root, path))));
   const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", runId, "journal"));

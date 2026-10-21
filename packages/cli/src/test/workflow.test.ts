@@ -275,7 +275,7 @@ test("confirmed requirements revision invalidates proof without approvals or fil
   if (task.status !== "task") throw new Error("Expected revised requirements task");
   assert.deepEqual((await restarted.taskContext(task.task.taskId)).outputTemplates.requirements, candidate);
   await assert.rejects(restarted.completeRequirements(task.task.taskId, requirements()), /confirmed change candidate/);
-  const documentPath = join(root, "agent-output", "demo", runId, "01-requirements.md");
+  const documentPath = join(root, "agent-output", "demo", runId, "01-requirements", "requirements.md");
   const originalDocument = await readFile(documentPath, "utf8");
   await writeFile(documentPath, "Manual requirements edit\n");
   const pending = await restarted.status();
@@ -283,7 +283,7 @@ test("confirmed requirements revision invalidates proof without approvals or fil
   assert.deepEqual(await restarted.status(), pending);
   assert.equal(await readFile(documentPath, "utf8"), "Manual requirements edit\n");
   await writeFile(documentPath, originalDocument);
-  const unchangedPath = join(root, "agent-output", "demo", runId, "service-recommendations.md");
+  const unchangedPath = join(root, "agent-output", "demo", runId, "01-requirements", "service-recommendations.md");
   const unchangedBefore = await stat(unchangedPath, { bigint: true });
   await restarted.completeRequirements(task.task.taskId, candidate);
   assert.equal((await stat(unchangedPath, { bigint: true })).mtimeNs, unchangedBefore.mtimeNs);
@@ -410,7 +410,7 @@ for (const track of ["bicep", "terraform"] as const) {
     const guide = await service.render("deployment-guide");
     assert.match(guide, /Accepted design only/);
     assert.match(guide, new RegExp(`--provider ${track}`));
-    const directory = join(root, "agent-output", "demo", runId, "plan");
+    const directory = join(root, "agent-output", "demo", runId, "03-plan");
     const implementation = await service.render("implementation-plan");
     assert.equal(await readFile(join(directory, "implementation-plan.md"), "utf8"), implementation);
     assert.equal(await new ApexService(root).render("implementation-plan"), implementation);
@@ -449,7 +449,7 @@ test("manual deployment guide blocks plan acceptance without replacing user cont
   const root = await tempRoot();
   const service = new ApexService(root);
   const { runId } = await service.init({ projectId: "demo", riskOwner: "partner" });
-  const directory = join(root, "agent-output", "demo", runId, "plan");
+  const directory = join(root, "agent-output", "demo", runId, "03-plan");
   const originalComplete = service.completeTaskOutputs.bind(service);
   let planHead: string | null | undefined;
   context.mock.method(service, "completeTaskOutputs", async (...args: Parameters<typeof originalComplete>) => {
@@ -593,10 +593,10 @@ test("operational handoff requires current inventory and pinned evidence before 
   assert.match(runbook, new RegExp(accepted.outputHashes.diagnosis!));
   assert.match(runbook, /Simulation, not production readiness/);
   assert.equal(
-    await readFile(join(root, "agent-output", "demo", runId, "operations", "operations-runbook.md"), "utf8"),
+    await readFile(join(root, "agent-output", "demo", runId, "05-operations", "operations-runbook.md"), "utf8"),
     runbook,
   );
-  const directory = join(root, "agent-output", "demo", runId, "operations");
+  const directory = join(root, "agent-output", "demo", runId, "05-operations");
   const index = await readFile(join(directory, "handoff-index.md"), "utf8");
   for (const name of [
     "deployment-summary.md",
@@ -722,12 +722,12 @@ test("full requirements to fake deploy workflow survives restart", async () => {
   const service = new ApexService(root);
   const initialized = await service.init({ projectId: "demo", riskOwner: "partner" });
   await prepareValidatedRun(service, initialized.runId, "bicep");
-  const planReviewDirectory = join(root, "agent-output", "demo", initialized.runId, "plan");
+  const planReviewDirectory = join(root, "agent-output", "demo", initialized.runId, "03-plan");
   assert.match(await readFile(join(planReviewDirectory, "implementation-plan.md"), "utf8"), /Logical Resources/u);
   assert.match(await readFile(join(planReviewDirectory, "iac-binding.md"), "utf8"), /IaC Binding/u);
   assert.match(await readFile(join(planReviewDirectory, "environment-inputs.md"), "utf8"), /Environment Inputs/u);
   const preview = await service.preview({ operation: "apply", provider: "fake" });
-  const operationsDirectory = join(root, "agent-output", "demo", initialized.runId, "operations");
+  const operationsDirectory = join(root, "agent-output", "demo", initialized.runId, "05-operations");
   assert.match(await readFile(join(operationsDirectory, "deployment-preview.md"), "utf8"), /Deployment Preview/u);
   await service.decideGateNumber(4, "approved", "tester");
   assert.match(await readFile(join(operationsDirectory, "approval.md"), "utf8"), /Gate 4 Approval/u);
@@ -1609,8 +1609,8 @@ test("requirements acceptance records a bound rendered document", async () => {
   assert.equal(await service.render("requirements"), persisted.content);
   assert.match(persisted.content, /Unavailable: RequirementsV1 does not represent business context\./u);
   assert.notEqual(document?.outputHash, accepted.outputHashes.requirements);
-  const reviewDirectory = join(root, "agent-output", "demo", initialized.runId);
-  assert.equal(await readFile(join(reviewDirectory, "01-requirements.md"), "utf8"), persisted.content);
+  const reviewDirectory = join(root, "agent-output", "demo", initialized.runId, "01-requirements");
+  assert.equal(await readFile(join(reviewDirectory, "requirements.md"), "utf8"), persisted.content);
   assert.match(await readFile(join(reviewDirectory, "README.md"), "utf8"), /APEX kernel state remains authoritative/u);
   assert.match(await readFile(join(reviewDirectory, "service-recommendations.md"), "utf8"), /Candidate Services/u);
   assert.match(await readFile(join(reviewDirectory, "sku-preferences.md"), "utf8"), /SKU Preferences/u);
@@ -1628,7 +1628,7 @@ test("requirements review package escapes user-provided Markdown", async () => {
   value.architectureHandoff = "Candidate | rationale\nsecond line";
   await service.completeTaskOutputs(issued.task.taskId, [{ kind: "requirements", value }]);
   const serviceRecommendations = await readFile(
-    join(root, "agent-output", "demo", initialized.runId, "service-recommendations.md"),
+    join(root, "agent-output", "demo", initialized.runId, "01-requirements", "service-recommendations.md"),
     "utf8",
   );
   assert.match(serviceRecommendations, /Candidate \\| rationale<br>second line/u);
@@ -1918,7 +1918,10 @@ test("requirements task context includes recorded input and stageable output tem
     issued.task.taskId,
     context.outputTemplates.requirements as Parameters<typeof service.completeRequirements>[1],
   );
-  const document = await readFile(join(root, "agent-output", "demo", initialized.runId, "01-requirements.md"), "utf8");
+  const document = await readFile(
+    join(root, "agent-output", "demo", initialized.runId, "01-requirements", "requirements.md"),
+    "utf8",
+  );
   assert.match(document, /Validate performance and scale later/);
   assert.match(document, /ingress and DNS/);
   assert.match(document, /proposed, not confirmed/);
@@ -2390,14 +2393,10 @@ async function planTaskContextScenario(pngAvailable: boolean): Promise<void> {
   ]);
   assert.match(
     await readFile(
-      join(root, "agent-output", "demo", initialized.runId, "reviews", "requirements-findings.md"),
+      join(root, "agent-output", "demo", initialized.runId, "01-requirements", "challenger-findings.md"),
       "utf8",
     ),
     /No findings remain open\./u,
-  );
-  assert.match(
-    await readFile(join(root, "agent-output", "demo", initialized.runId, "challenger-findings.md"), "utf8"),
-    /No challenger findings remain open\./u,
   );
   await service.decideGateNumber(1, "approved", "tester");
   await acceptAvailabilityEvidence(service, initialized.runId);
@@ -2443,7 +2442,7 @@ async function planTaskContextScenario(pngAvailable: boolean): Promise<void> {
     ],
   };
   const costValue = costEstimate(initialized.runId);
-  const architectureReviewDirectory = join(root, "agent-output", "demo", initialized.runId, "architecture");
+  const architectureReviewDirectory = join(root, "agent-output", "demo", initialized.runId, "02-architecture");
   const stalePng = join(architectureReviewDirectory, "03-des-diagram.png");
   const stalePngBase = join(
     root,
@@ -2501,8 +2500,10 @@ async function planTaskContextScenario(pngAvailable: boolean): Promise<void> {
   const architectureReadme = await readFile(join(architectureReviewDirectory, "README.md"), "utf8");
   const runIndex = await readFile(join(architectureReviewDirectory, "..", "00-index.md"), "utf8");
   assert.match(runIndex, /^# Run index/u);
-  assert.match(runIndex, /\[Requirements\]\(01-requirements\.md\)/u);
-  assert.match(runIndex, /\(architecture\/architecture-assessment\.md\)/u);
+  assert.match(runIndex, /\[Requirements\]\(01-requirements\/requirements\.md\)/u);
+  assert.match(runIndex, /\(02-architecture\/architecture-assessment\.md\)/u);
+  assert.match(runIndex, /\(02-architecture\/challenger-findings\.md\)/u);
+  assert.doesNotMatch(runIndex, /reviews\//u);
   assert.match(runIndex, /## 3\. Plan\n\n.*\n\nNot generated yet\./u);
   assert.match(
     architectureReadme,
@@ -2542,11 +2543,11 @@ async function planTaskContextScenario(pngAvailable: boolean): Promise<void> {
     await readFile(join(architectureReviewDirectory, "challenger-findings.md"), "utf8"),
     /Well-Architected Criteria/u,
   );
-  const reviewsDirectory = join(root, "agent-output", "demo", initialized.runId, "reviews");
   assert.match(
-    await readFile(join(reviewsDirectory, "architecture-findings.md"), "utf8"),
+    await readFile(join(architectureReviewDirectory, "challenger-findings.md"), "utf8"),
     /Reviewed artifact kind: architecture/u,
   );
+  await assert.rejects(stat(join(root, "agent-output", "demo", initialized.runId, "reviews")), { code: "ENOENT" });
   await assertLabReadiness(service, 2);
 
   const issued = await service.nextTask();
@@ -2732,7 +2733,7 @@ test("reviewer summary preserves non-empty findings and evidence references", as
     ]),
   );
   const summary = await readFile(
-    join(root, "agent-output", "demo", initialized.runId, "reviews", "requirements-findings.md"),
+    join(root, "agent-output", "demo", initialized.runId, "01-requirements", "challenger-findings.md"),
     "utf8",
   );
   assert.match(summary, /FIND-001: Missing owner/u);

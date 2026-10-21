@@ -1184,7 +1184,7 @@ test("native validation receipts are source-bound, runtime-owned and distinguish
       );
     }
     const report = await readFile(
-      join(root, "agent-output", "demo", runId, "validation", "validation-report.md"),
+      join(root, "agent-output", "demo", runId, "04-validation", "validation-report.md"),
       "utf8",
     );
     assert.match(report, /immutable; native/);
@@ -1832,7 +1832,7 @@ test("task-bound workflow validators reject semantic and evidence mutations", as
   );
   await service.completeTaskOutputs(validationTask, [{ kind: "validation-evidence", value: validEvidence }]);
   assert.match(
-    await readFile(join(root, "agent-output", "demo", runId, "validation", "validation-report.md"), "utf8"),
+    await readFile(join(root, "agent-output", "demo", runId, "04-validation", "validation-report.md"), "utf8"),
     /Validation Report[\s\S]*bicep:format/u,
   );
 });
@@ -2273,7 +2273,7 @@ test("native Bicep scoped diagnostic preview binds the exact extension target", 
   });
   await service.generateIac(generated.taskId);
   assert.match(
-    await readFile(join(root, "agent-output", "demo", runId, "plan", "iac-binding.md"), "utf8"),
+    await readFile(join(root, "agent-output", "demo", runId, "03-plan", "iac-binding.md"), "utf8"),
     /Diagnostic Scope Logical ID/,
   );
   await complete(service, "validation-bicep", [
@@ -2495,7 +2495,10 @@ test("Bicep AVM exact scope binds requests and rejects foreign inventory", async
   assert.equal((await service.status()).run.gates[3]!.state, "closed");
   deleteParent = false;
   const preview = await service.preview({ operation: "apply", provider: "bicep" });
-  const bindingDocument = await readFile(join(root, "agent-output", "demo", runId, "plan", "iac-binding.md"), "utf8");
+  const bindingDocument = await readFile(
+    join(root, "agent-output", "demo", runId, "03-plan", "iac-binding.md"),
+    "utf8",
+  );
   assert.match(bindingDocument, /Physical Authorization Scope/);
   assert.ok(bindingDocument.includes(childId));
   await service.decideGateNumber(4, "approved", "tester");
