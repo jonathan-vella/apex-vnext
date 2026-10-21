@@ -783,10 +783,21 @@ const publicNpmRegistry = "https://registry.npmjs.org/";
  */
 function tarballDownloadUrl(resolved, env = process.env) {
   const configured = env.npm_config_registry;
-  if (typeof configured !== "string" || !configured.startsWith("https://") || !resolved.startsWith(publicNpmRegistry))
+  if (typeof configured !== "string" || !resolved.startsWith(publicNpmRegistry)) return resolved;
+  let registry;
+  try {
+    registry = new URL(configured);
+  } catch {
     return resolved;
-  const registry = configured.endsWith("/") ? configured : `${configured}/`;
-  return `${registry}${resolved.slice(publicNpmRegistry.length)}`;
+  }
+  if (registry.protocol !== "https:") return resolved;
+  // Never echo the configured URL: it may carry a token. Authentication belongs in .npmrc, not in the URL.
+  if (registry.username !== "" || registry.password !== "")
+    throw new Error("npm_config_registry must not embed credentials; configure authentication in .npmrc instead");
+  registry.search = "";
+  registry.hash = "";
+  const base = registry.href.endsWith("/") ? registry.href : `${registry.href}/`;
+  return `${base}${resolved.slice(publicNpmRegistry.length)}`;
 }
 
 async function readIfPresent(path) {
