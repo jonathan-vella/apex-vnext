@@ -2682,7 +2682,9 @@ test("policy mapping failures cannot complete planning or open Gate 3", async (c
               disposition: failure === "blocked" ? "blocked" : "planned",
             });
           }),
-          /business:plan-source-coverage validation failed|must name an Architecture component/,
+          failure === "blocked"
+            ? /business:policy-effect-coverage validation failed/
+            : /business:plan-source-coverage validation failed|must name an Architecture component/,
         );
         const events = await new EventJournal(
           join(root, ".apex", "projects", "demo", "runs", runId, "journal"),
@@ -2693,7 +2695,10 @@ test("policy mapping failures cannot complete planning or open Gate 3", async (c
           ),
           false,
         );
-        assert.equal((await service.status()).run.gates[2]!.state, "closed");
+        const gates = (await service.status()).run.gates;
+        assert.equal(gates[2]!.state, "closed");
+        // A blocked row is refused with the Architecture, so Gate 2 never becomes ready.
+        if (failure === "blocked") assert.equal(gates[1]!.state, "closed");
       });
     }
   }

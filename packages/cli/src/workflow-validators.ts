@@ -639,7 +639,7 @@ function policyEffectCoverage(value: unknown): ValidationIssue[] {
     if (blocked.length > 0) {
       issues.push({
         path: "/outputs/policy-property-map/mappings",
-        message: `Blocked policy controls must be resolved in the Architecture before it is accepted: ${blocked.join("; ")}. Satisfy or plan each control, or mark it exempt or not-applicable with a reason; an Architecture review disposition does not change a mapping.`,
+        message: `Blocked policy controls must be resolved in the Architecture before it is accepted: ${blocked.join("; ")}. Change the design so each control is satisfied or planned, or mark it not-applicable with a factual reason; an Architecture review disposition does not change a mapping.`,
       });
     }
   }
