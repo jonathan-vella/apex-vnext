@@ -61,25 +61,27 @@ npm run validate:all
 npm run qualify:vnext
 ```
 
-Do not run live cloud qualification unless it is separately authorized. Do not bypass hooks or protected branch checks
-where they can run; see [Native Windows limits](#native-windows-limits).
+Do not run live cloud qualification unless it is separately authorized. Do not bypass hooks or protected branch checks.
 
-## Native Windows Limits
+## Native Windows Notes
 
-Prefer WSL2 or the devcontainer for development; the hooks and shell scripts are written for them. On native Windows
-(PowerShell with Git for Windows):
+Development works on native Windows (PowerShell with Git for Windows). WSL2 or the devcontainer remain the reference
+setup. Three things differ:
 
-- **Git hooks do not run.** lefthook 2.1.17 passes each multi-line `run:` script to `sh -c` without escaping inner
-  double quotes, so a double-quoted string containing spaces splits the script and `sh` reports
-  `unexpected end of file`. Upstream tracks this as
-  [evilmartians/lefthook#1167](https://github.com/evilmartians/lefthook/issues/1167); 2.2.x does not change it. Commit
-  from WSL2, or use `--no-verify` and run the validators for the files you changed (for example `npm run lint:md`,
-  `npm run validate:skills`, `npx prettier --check <files>`). Say in the pull request which checks you ran by hand;
-  required CI remains the gate.
+- **Hooks run natively, with one authoring rule.** lefthook 2.1.x on Windows builds the `sh -c` command line itself and
+  strips every double quote from the script (so `[ -n "$X" ]` becomes `[ -n $X ]`, which is true for an empty value) and
+  splits it at whitespace between quotes. Upstream tracks this as
+  [evilmartians/lefthook#1167](https://github.com/evilmartians/lefthook/issues/1167). Every `run:` in `lefthook.yml`
+  is therefore one line with no `"`, normally `bash tools/scripts/hooks/<name>.sh`; put the logic in that script.
+  `tools/tests/vnext/lefthook-windows-quoting.test.mjs` enforces this. The secret scan is skipped with a warning
+  unless `gitleaks` is installed.
 - **Symlink tests need the symlink privilege.** Many rejection tests create symlinks and fail with `EPERM` unless
   Windows Developer Mode is on or the shell is elevated.
-- **Plugin package tests download from the npm registry** and fail on a network that intercepts TLS. Run them in CI or
-  WSL2.
+- **Managed package feeds.** If `.npmrc` sets `registry` to a managed feed, `npm run` scripts export it as
+  `npm_config_registry`, and the plugin build fetches the pinned native tarballs through it. The bytes are still checked
+  against the lockfile `sha512`. Running `node --test` directly does not set it; use
+  `$env:npm_config_registry = (npm config get registry)` first. Live qualification pins the public registry on purpose
+  and needs it to be reachable.
 
 ## Open A Pull Request
 
