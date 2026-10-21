@@ -1055,8 +1055,8 @@
     {
       "id": "hook-markdown-lint",
       "kind": "lefthook",
-      "path": "lefthook.yml",
-      "name": "markdown-lint",
+      "path": "tools/scripts/hooks/markdown-lint.sh",
+      "name": "xargs npm run lint:md",
       "script": "lint:md"
     }
   ],

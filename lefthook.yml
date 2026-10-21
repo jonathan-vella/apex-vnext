@@ -7,46 +7,14 @@ pre-commit:
   commands:
     markdown-lint:
       glob: "*.md"
-      run: |
-        # Get staged markdown files
-        STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM) || exit $?
-        STAGED_MD=$(printf '%s\n' "$STAGED_FILES" | grep '\.md$' || true)
-        if [ -n "$STAGED_MD" ]; then
-          COUNT=$(echo "$STAGED_MD" | wc -l | tr -d ' ')
-          echo "📝 Validating $COUNT markdown file(s)..."
-          # Lint staged files only, suppress verbose Finding: output
-          RESULT=$(printf '%s\n' "$STAGED_MD" | xargs npm run lint:md -- --no-globs 2>&1)
-          STATUS=$?
-          # Show only Summary and errors, skip Finding/Linting lines
-          printf '%s\n' "$RESULT" | grep -v -E '^(Finding:|Linting:)' || true
-          exit "$STATUS"
-        else
-          echo "ℹ️  No markdown files to validate"
-        fi
+      run: bash tools/scripts/hooks/markdown-lint.sh
     link-check:
       glob: "docs/{tutorials,how-to,explanation,reference}/**/*.md"
-      run: |
-        # Get staged user-guide Markdown files
-        STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM) || exit $?
-        STAGED_DOCS=$(printf '%s\n' "$STAGED_FILES" | grep -E '^docs/(tutorials|how-to|explanation|reference)/.*\.md$' || true)
-        if [ -n "$STAGED_DOCS" ]; then
-          echo "🔗 Checking links in $(echo "$STAGED_DOCS" | wc -l | tr -d ' ') doc file(s)..."
-          # Use npx to run from local node_modules (avoids Node.js 24 global install bug)
-          echo "$STAGED_DOCS" | xargs -I {} npx markdown-link-check {} --config .markdown-link-check.json --quiet
-        else
-          echo "ℹ️  No docs to check links"
-        fi
+      run: bash tools/scripts/hooks/link-check.sh
 
     h2-sync:
       glob: "{customizations/.github/skills/apex-artifacts/templates/requirements.md,customizations/manifest.json,packages/renderers/src/document-registry.ts,tools/scripts/validate-artifacts.mjs,tools/tests/validate-artifacts.test.mjs}"
-      run: |
-        STAGED_SYNC=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^(customizations/(\.github/skills/apex-artifacts/templates/requirements\.md|manifest\.json)|packages/renderers/src/document-registry\.ts|tools/(scripts/validate-artifacts\.mjs|tests/validate-artifacts\.test\.mjs))$' || true)
-        if [ -n "$STAGED_SYNC" ]; then
-          echo "🔄 Checking current document sources..."
-          npm run validate:artifacts
-        else
-          echo "ℹ️  No current document-source files to check"
-        fi
+      run: bash tools/scripts/hooks/h2-sync.sh
       fail_text: |
         ❌ Current document-source validation failed!
 
@@ -55,37 +23,7 @@ pre-commit:
 
     artifact-validation:
       glob: "{agent-output/**/*.md,customizations/.github/skills/apex-artifacts/templates/requirements.md,customizations/manifest.json,packages/renderers/src/document-registry.ts,tools/scripts/validate-artifacts.mjs,tools/tests/validate-artifacts.test.mjs}"
-      run: |
-        STAGED_ARTIFACTS=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^agent-output/.*\.md$|^customizations/(\.github/skills/apex-artifacts/templates/requirements\.md|manifest\.json)$|^packages/renderers/src/document-registry\.ts$|^tools/(scripts/validate-artifacts\.mjs|tests/validate-artifacts\.test\.mjs)$' || true)
-        if [ -n "$STAGED_ARTIFACTS" ]; then
-          COUNT=$(echo "$STAGED_ARTIFACTS" | wc -l | tr -d ' ')
-          echo "📋 Validating current artifact sources for $COUNT staged path(s)..."
-          if ! npm run validate:artifacts; then
-            echo ""
-            echo "❌ Current artifact source validation failed!"
-            echo ""
-            echo "🔧 To fix:"
-            echo "   1. Check customizations/.github/instructions/apex-artifact-contracts.instructions.md"
-            echo "   2. Repair the registered template and source binding"
-            echo "   3. Run: npm run validate:artifacts"
-            echo "   4. Re-stage and commit"
-            echo ""
-            exit 1
-          fi
-          # Mandatory challenger-findings presence gate (Steps 1, 2, 3.5, 4).
-          # Primary enforcement is through the kernel's typed review completion;
-          # this is the commit-time fallback so the same drift cannot land
-          # via direct edits.
-          if ! npm run validate:challenger-presence --silent; then
-            echo ""
-            echo "❌ Mandatory challenger review missing for one or more steps."
-            echo "   Run the kernel-issued rubber-duck review for the current artifact"
-            echo "   (apex-next: exact reviewRequest.prompt, then apex/reviewComplete)."
-            exit 1
-          fi
-        else
-          echo "ℹ️  No artifact-source changes to validate"
-        fi
+      run: bash tools/scripts/hooks/artifact-validation.sh
       fail_text: |
         ❌ Current artifact source or challenger-review presence check failed!
 
@@ -97,15 +35,7 @@ pre-commit:
 
     agents:
       glob: "customizations/.github/agents/**/*.agent.md,.github/prompts/**/*.prompt.md"
-      run: |
-        STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(agent|prompt)\.md$' || true)
-        if [ -n "$STAGED" ]; then
-          COUNT=$(echo "$STAGED" | wc -l | tr -d ' ')
-          echo "🤖 Validating $COUNT agent/prompt file(s)..."
-          npm run validate:agents
-        else
-          echo "ℹ️  No agent/prompt files to validate"
-        fi
+      run: bash tools/scripts/hooks/agents.sh
       fail_text: |
         ❌ Agent validation failed!
 
@@ -116,15 +46,7 @@ pre-commit:
 
     instructions:
       glob: "**/*.instructions.md,{.github/skills/**,.github/instructions/**}"
-      run: |
-        STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(instructions|agent)\.md$|SKILL\.md$' || true)
-        if [ -n "$STAGED" ]; then
-          COUNT=$(echo "$STAGED" | wc -l | tr -d ' ')
-          echo "📋 Validating $COUNT instruction/reference file(s)..."
-          npm run validate:instruction-checks
-        else
-          echo "ℹ️  No instruction files to validate"
-        fi
+      run: bash tools/scripts/hooks/instructions.sh
       fail_text: |
         ❌ Instruction validation failed!
 
@@ -137,16 +59,7 @@ pre-commit:
       # globally; this hook gives same-PR feedback when a new reference
       # file is added.
       glob: ".github/skills/*/references/*.md,.github/skills/*/SKILL.md"
-      run: |
-        STAGED_REFS=$(git diff --cached --name-only --diff-filter=ACM \
-          | grep -E '^\.github/skills/[^/]+/(references/.*\.md|SKILL\.md)$' || true)
-        if [ -n "$STAGED_REFS" ]; then
-          COUNT=$(echo "$STAGED_REFS" | wc -l | tr -d ' ')
-          echo "🔖 Validating $COUNT skill reference/SKILL file(s) (canary markers + size)..."
-          npm run validate:skill-checks
-        else
-          echo "ℹ️  No skill references/SKILL files staged"
-        fi
+      run: bash tools/scripts/hooks/skill-references.sh
       fail_text: |
         ❌ Skill-references validation failed!
 
@@ -156,57 +69,22 @@ pre-commit:
         🔧 Run: npm run validate:skill-checks
 
     secrets-baseline:
-      run: |
-        if command -v gitleaks >/dev/null 2>&1; then
-          gitleaks protect --staged --redact --no-banner
-        else
-          echo "⚠️  gitleaks not installed — secret scan skipped. Install gitleaks (see tools/scripts/setup-wsl.sh) to enable."
-        fi
+      run: bash tools/scripts/hooks/secrets-baseline.sh
       fail_text: |
         ❌ Secrets detected in staged files!
         🔧 Remove secrets before committing. See AGENTS.md for gitleaks setup.
 
     terraform-fmt:
       glob: "*.tf"
-      run: |
-        STAGED_TF=$(git diff --cached --name-only --diff-filter=ACM | grep '\.tf$' || true)
-        if [ -n "$STAGED_TF" ]; then
-          echo "🔧 Checking Terraform formatting..."
-          npm run lint:terraform-fmt || {
-            echo "❌ npm run lint:terraform-fmt failed. Fix with: terraform fmt -recursive infra/terraform/"
-            exit 1
-          }
-        else
-          echo "ℹ️  No Terraform files to format-check"
-        fi
+      run: bash tools/scripts/hooks/terraform-fmt.sh
 
     terraform-validate:
       glob: "*.tf"
-      run: |
-        STAGED_TF=$(git diff --cached --name-only --diff-filter=ACM | grep '\.tf$' || true)
-        if [ -n "$STAGED_TF" ]; then
-          echo "🔧 Validating Terraform..."
-          for dir in infra/terraform/*/; do
-            if [ -f "$dir/main.tf" ]; then
-              echo "  Validating $dir..."
-              (cd "$dir" && terraform init -backend=false -input=false -no-color > /dev/null 2>&1 \
-                && terraform validate -no-color) || { echo "❌ Validation failed in $dir"; exit 1; }
-            fi
-          done
-        else
-          echo "ℹ️  No Terraform project to validate"
-        fi
+      run: bash tools/scripts/hooks/terraform-validate.sh
 
     iac-security-baseline:
       glob: "{infra/bicep/**/*.bicep,infra/terraform/**/*.tf}"
-      run: |
-        STAGED_IAC=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(bicep|tf)$' || true)
-        if [ -n "$STAGED_IAC" ]; then
-          echo "🔒 Checking IaC security baseline..."
-          npm run validate:iac-security-baseline
-        else
-          echo "ℹ️  No IaC files to security-check"
-        fi
+      run: bash tools/scripts/hooks/iac-security-baseline.sh
       fail_text: |
         ❌ IaC security baseline violation!
 
@@ -215,15 +93,7 @@ pre-commit:
 
     js-lint:
       glob: "**/*.{js,mjs,cjs}"
-      run: |
-        STAGED_JS=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(js|mjs|cjs)$' || true)
-        if [ -n "$STAGED_JS" ]; then
-          COUNT=$(echo "$STAGED_JS" | wc -l | tr -d ' ')
-          echo "🧹 Linting $COUNT JS/MJS file(s) (--max-warnings=0)..."
-          echo "$STAGED_JS" | xargs npx eslint --cache --cache-location node_modules/.cache/eslint/ --quiet --format=compact --max-warnings=0
-        else
-          echo "ℹ️  No JS/MJS files to lint"
-        fi
+      run: bash tools/scripts/hooks/js-lint.sh
       fail_text: |
         ❌ ESLint failed!
 
@@ -232,14 +102,7 @@ pre-commit:
 
     js-format:
       glob: "**/*.{js,mjs,cjs}"
-      run: |
-        STAGED_FMT=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(js|mjs|cjs)$' || true)
-        if [ -n "$STAGED_FMT" ]; then
-          echo "💅 Checking Prettier on $(echo "$STAGED_FMT" | wc -l | tr -d ' ') file(s)..."
-          echo "$STAGED_FMT" | xargs npx prettier --check --log-level warn
-        else
-          echo "ℹ️  No JS/MJS files to format-check"
-        fi
+      run: bash tools/scripts/hooks/js-format.sh
       fail_text: |
         ❌ Prettier check failed!
 

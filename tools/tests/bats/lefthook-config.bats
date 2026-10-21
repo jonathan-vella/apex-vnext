@@ -1,26 +1,9 @@
 #!/usr/bin/env bats
-# lefthook-config.bats — Structural tests for lefthook.yml
+# lefthook-config.bats — Structural tests for lefthook.yml and the hook scripts it runs
 
 load setup
 
-extract_markdown_lint_hook() {
-  awk '
-    /^    markdown-lint:/ { in_hook=1 }
-    in_hook && /^      run: \|/ { capture=1; next }
-    capture && /^    [a-z][a-z0-9-]*:/ { exit }
-    capture { sub(/^        /, ""); print }
-  ' "$REPO_ROOT/lefthook.yml"
-}
-
-extract_hook_block() {
-  local hook_name="$1"
-  awk -v hook_name="$hook_name" '
-    $0 == "    " hook_name ":" { capture=1 }
-    capture && $0 != "    " hook_name ":" && /^    [a-z][a-z0-9-]*:/ { exit }
-    capture && /^      fail_text:/ { exit }
-    capture { print }
-  ' "$REPO_ROOT/lefthook.yml"
-}
+HOOK_SCRIPTS_DIR="$REPO_ROOT/tools/scripts/hooks"
 
 create_markdown_fixture() {
   fixture="$TEST_LOG_DIR/repository"
@@ -31,8 +14,7 @@ create_markdown_fixture() {
   git -C "$fixture" config user.name "Hook Tests"
   printf '## Fixture\n' >"$fixture/docs/fixture.md"
   git -C "$fixture" add docs/fixture.md
-  hook_script="$TEST_LOG_DIR/markdown-lint-hook.sh"
-  extract_markdown_lint_hook >"$hook_script"
+  hook_script="$HOOK_SCRIPTS_DIR/markdown-lint.sh"
 }
 
 @test "post-commit has no retired SKU manifest stamp hook" {
@@ -53,11 +35,29 @@ create_markdown_fixture() {
 
 @test "Terraform formatting delegates validator behavior to its canonical npm script" {
   local terraform_hook
-  terraform_hook=$(extract_hook_block terraform-fmt)
+  terraform_hook=$(cat "$HOOK_SCRIPTS_DIR/terraform-fmt.sh")
 
   [[ "$terraform_hook" == *"npm run lint:terraform-fmt"* ]]
   [[ "$terraform_hook" != *"terraform fmt -check"* ]]
   [[ "$terraform_hook" == *"npm run lint:terraform-fmt failed"* ]]
+}
+
+@test "every lefthook command runs a bash script that exists" {
+  local runs missing=0 script
+  runs=$(awk '/^      run:/ { sub(/^      run: */, ""); print }' "$REPO_ROOT/lefthook.yml")
+  [ -n "$runs" ]
+  while IFS= read -r line; do
+    case "$line" in
+      "bash "*)
+        script="${line#bash }"
+        if [ ! -f "$REPO_ROOT/$script" ]; then
+          echo "Missing hook script: $script"
+          missing=$((missing + 1))
+        fi
+        ;;
+    esac
+  done <<<"$runs"
+  [ "$missing" -eq 0 ]
 }
 
 @test "Gitleaks configuration retains default secret detectors" {
@@ -103,7 +103,7 @@ create_markdown_fixture() {
 
 @test "all referenced npm scripts exist in package.json" {
   local scripts
-  scripts=$(grep -oP 'npm run \K[a-z0-9:_-]+' "$REPO_ROOT/lefthook.yml" | sort -u)
+  scripts=$(grep -ohP 'npm run \K[a-z0-9:_-]+' "$REPO_ROOT/lefthook.yml" "$HOOK_SCRIPTS_DIR"/*.sh | sort -u)
   local missing=0
   for script in $scripts; do
     if ! grep -q "\"$script\"" "$REPO_ROOT/package.json"; then

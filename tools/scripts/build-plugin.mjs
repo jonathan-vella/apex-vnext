@@ -774,6 +774,21 @@ function matchesIntegrity(bytes, integrity) {
   return `sha512-${createHash("sha512").update(bytes).digest("base64")}` === integrity;
 }
 
+const publicNpmRegistry = "https://registry.npmjs.org/";
+
+/**
+ * Lockfile tarball URLs name the public registry. A developer behind a managed package feed sets `registry` in their
+ * `.npmrc`, which npm exports as `npm_config_registry`; the tarball is fetched through it. This is safe because the
+ * bytes are still checked against the lockfile's sha512 integrity before they are used.
+ */
+function tarballDownloadUrl(resolved, env = process.env) {
+  const configured = env.npm_config_registry;
+  if (typeof configured !== "string" || !configured.startsWith("https://") || !resolved.startsWith(publicNpmRegistry))
+    return resolved;
+  const registry = configured.endsWith("/") ? configured : `${configured}/`;
+  return `${registry}${resolved.slice(publicNpmRegistry.length)}`;
+}
+
 async function readIfPresent(path) {
   return readFile(path).catch((error) => {
     if (error.code === "ENOENT" || error.code === "ENOTDIR") return undefined;
@@ -801,17 +816,18 @@ async function lockedTarball(locked) {
   }
   if (process.env.npm_config_offline === "true" || process.env.NPM_CONFIG_OFFLINE === "true")
     throw new Error(`${locked.name}@${locked.version} is not cached and npm offline mode is set; build online once`);
+  const url = tarballDownloadUrl(locked.resolved);
   let response;
   try {
-    response = await fetch(locked.resolved, { signal: AbortSignal.timeout(nativeFetchTimeoutMs) });
+    response = await fetch(url, { signal: AbortSignal.timeout(nativeFetchTimeoutMs) });
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
-    throw new Error(`Could not download ${locked.resolved}: ${reason}`, { cause: error });
+    throw new Error(`Could not download ${url}: ${reason}`, { cause: error });
   }
-  if (!response.ok) throw new Error(`Could not download ${locked.resolved}: HTTP ${response.status}`);
+  if (!response.ok) throw new Error(`Could not download ${url}: HTTP ${response.status}`);
   const bytes = Buffer.from(await response.arrayBuffer());
   if (!matchesIntegrity(bytes, locked.integrity))
-    throw new Error(`${locked.resolved} does not match its package-lock.json integrity`);
+    throw new Error(`${url} does not match its package-lock.json integrity`);
   await mkdir(nativeCacheDirectory, { recursive: true });
   const partial = `${ownCache}.${process.pid}.partial`;
   await writeFile(partial, bytes);
@@ -1164,6 +1180,7 @@ export {
   hashTree,
   hookCommands,
   mcpToolPolicy,
+  tarballDownloadUrl,
   validateMcpJson,
   validatePackageManifest,
   validatePackagedAgents,
