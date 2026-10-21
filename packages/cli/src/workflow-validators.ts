@@ -627,9 +627,23 @@ function policyEffectCoverage(value: unknown): ValidationIssue[] {
   const missing = requiredCounts.flatMap(([effect, required]) =>
     (counts.get(effect as string) ?? 0) < (required as number) ? [effect as string] : [],
   );
-  return missing.length === 0
-    ? []
-    : issue("/outputs/policy-property-map/mappings", `Missing policy effect coverage: ${missing.join(", ")}`);
+  const issues: ValidationIssue[] =
+    missing.length === 0
+      ? []
+      : issue("/outputs/policy-property-map/mappings", `Missing policy effect coverage: ${missing.join(", ")}`);
+  // A policy refresh may record blocked rows because that is how it reopens Architecture; the design itself may not.
+  if (context.nodeId === "architecture") {
+    const blocked = policyMap.mappings
+      .filter(({ disposition }) => disposition === "blocked")
+      .map(({ logicalResourceId, effect, propertyPath }) => `${logicalResourceId} (${effect} ${propertyPath})`);
+    if (blocked.length > 0) {
+      issues.push({
+        path: "/outputs/policy-property-map/mappings",
+        message: `Blocked policy controls must be resolved in the Architecture before it is accepted: ${blocked.join("; ")}. Change the design so each control is satisfied or planned, or mark it not-applicable with a factual reason; an Architecture review disposition does not change a mapping.`,
+      });
+    }
+  }
+  return issues;
 }
 
 function planSourceCoverage(value: unknown): ValidationIssue[] {

@@ -233,8 +233,9 @@ governance review retire; the Architecture review covers the policy map. After G
 the reference gets a `governance-refresh` task that imports the reviewed baseline, then a `policy-refresh` task. The
 kernel carries mappings whose policy definition, reference ID and effect match, marks undesigned resource types
 `not-applicable` and sends only the remaining findings to the Architect. Gate 2 stays approved unless a refreshed row
-is `blocked`, which reopens Architecture and Gate 2. [REQ-GOV-001](PRD.md#req-gov-001-governance-and-policy) owns
-acceptance.
+is `blocked`, which reopens Architecture and Gate 2. Architecture acceptance itself rejects any `blocked` row, so the
+design resolves each control before Gate 2 can be ready; only a refresh may record one.
+[REQ-GOV-001](PRD.md#req-gov-001-governance-and-policy) owns acceptance.
 
 ## DECISION-031: Replace The APEX Reviewer With Captured Rubber-Duck Reviews
 

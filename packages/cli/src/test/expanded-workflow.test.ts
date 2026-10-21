@@ -1721,6 +1721,31 @@ test("task-bound workflow validators reject semantic and evidence mutations", as
     ),
     /needs a reason/,
   );
+  await assert.rejects(
+    service.completeTaskOutputs(
+      architectureTask,
+      architectureBundle({
+        ...policy,
+        mappings: policy.mappings.map((mapping, index) =>
+          index === 0
+            ? {
+                ...mapping,
+                logicalResourceId: architectureValue.components[0]!.id,
+                disposition: "blocked",
+                reason: "Design does not satisfy the control",
+              }
+            : mapping,
+        ),
+      }),
+    ),
+    (error: unknown) => {
+      assert.match((error as Error).message, /business:policy-effect-coverage validation failed/);
+      const details = JSON.stringify((error as { details?: unknown }).details);
+      assert.match(details, /Blocked policy controls must be resolved in the Architecture before it is accepted/);
+      assert.ok(details.includes(architectureValue.components[0]!.id));
+      return true;
+    },
+  );
   const architectureHashes = await service.completeTaskOutputs(architectureTask, architectureBundle(policy));
   const architectureEvents = await new EventJournal(
     join(root, ".apex", "projects", "demo", "runs", runId, "journal"),
@@ -2657,7 +2682,9 @@ test("policy mapping failures cannot complete planning or open Gate 3", async (c
               disposition: failure === "blocked" ? "blocked" : "planned",
             });
           }),
-          /business:plan-source-coverage validation failed|must name an Architecture component/,
+          failure === "blocked"
+            ? /business:policy-effect-coverage validation failed/
+            : /business:plan-source-coverage validation failed|must name an Architecture component/,
         );
         const events = await new EventJournal(
           join(root, ".apex", "projects", "demo", "runs", runId, "journal"),
@@ -2668,7 +2695,10 @@ test("policy mapping failures cannot complete planning or open Gate 3", async (c
           ),
           false,
         );
-        assert.equal((await service.status()).run.gates[2]!.state, "closed");
+        const gates = (await service.status()).run.gates;
+        assert.equal(gates[2]!.state, "closed");
+        // A blocked row is refused with the Architecture, so Gate 2 never becomes ready.
+        if (failure === "blocked") assert.equal(gates[1]!.state, "closed");
       });
     }
   }
