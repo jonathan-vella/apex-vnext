@@ -152,7 +152,7 @@
     "@commitlint/cli": "21.2.3",
     "@commitlint/config-conventional": "21.2.3",
     "@eslint/js": "^10.0.1",
-    "@types/node": "26.6.4",
+    "@types/node": "26.6.5",
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",
     "esbuild": "0.28.2",
@@ -163,11 +163,11 @@
     "fast-xml-parser": "5.11.2",
     "js-yaml": "5.4.3",
     "jsonc-parser": "^3.3.1",
-    "lefthook": "2.1.17",
+    "lefthook": "2.2.2",
     "markdown-link-check": "3.15.0",
     "markdownlint-cli2": "0.23.3",
     "npm-run-all2": "9.0.3",
-    "prettier": "3.9.9",
+    "prettier": "3.9.10",
     "typescript": "7.0.2"
   },
   "repository": {
