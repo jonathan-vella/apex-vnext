@@ -66,8 +66,8 @@ or task.
    state that and continue from the kernel's question catalog; intake never depends on it. `policy` and `bicepschema` are
    not used in Requirements.
 9. Submit the typed requirements artifact through `apex/requirementsComplete`. Report the materialized read-only Gate 1
-   review package under `agent-output/<project>/<run>/01-requirements/` (start from `00-index.md`), including
-   requirements, recommendations, SKU preferences and
+   review package under `agent-output/<project>/<run>/01-requirements/` (the run-level `00-index.md` one folder up links
+   every stage), including requirements, recommendations, SKU preferences and
    challenger findings.
 10. Immediately call `apex/nextTask` after submitting requirements. When it returns the `requirements-review` task,
     run the rubber-duck review steps in `apex-next` with that exact `task.taskId`. If rubber-duck is unavailable or the
