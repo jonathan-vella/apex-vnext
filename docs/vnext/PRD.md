@@ -281,7 +281,8 @@ from a pinned Azure Landing Zones Library release (root, landing zones and corp 
 format. Local targets always use it. For a subscription target it supports design, pricing and Gate 2 (for example
 pre-sales without Azure access) but cannot authorize planning. After Gate 2 the reviewed subscription baseline
 replaces it; matching mappings carry over, only new or changed findings need Architect decisions, and Gate 2 reopens
-only for a `blocked` conflict. Findings whose resource types match no designed component are marked `not-applicable`
+only for a `blocked` conflict. Architecture acceptance rejects a `blocked` row; a design must satisfy or plan each
+control. Findings whose resource types match no designed component are marked `not-applicable`
 by the kernel; any other `not-applicable` disposition needs a factual reason.
 
 The consumer repository owns the collection workflow, variables and GitHub Secrets/environment settings. Prefer OIDC

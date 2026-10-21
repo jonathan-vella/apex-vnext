@@ -49,7 +49,9 @@ review or task.
    relevant governance findings with `apex/readTaskInput` using the task-context input hash for those designed types.
    Map each applicable finding in `policyMappings` with assignment, definition, reference ID, effect, logical resource,
    property path, expected value where known and disposition: `satisfied`, `planned`, `blocked` or
-   `not-applicable` with a factual reason. Never mark `exempt`.
+   `not-applicable` with a factual reason. Never mark `exempt`. Architecture acceptance rejects any `blocked` row and
+   names it: change the design so the control is `satisfied` or `planned`, or ask the user how to proceed. A review
+   disposition never changes a mapping.
 7. Assume selected Azure services and SKUs are regionally available and quota is sufficient. Mention material regional,
    zonal, recovery or capacity assumptions in documentation when useful; do not request, validate, gate or create
    findings for regional support, quota, deployment, restore, failover or unresolved retail meters.

@@ -1721,6 +1721,31 @@ test("task-bound workflow validators reject semantic and evidence mutations", as
     ),
     /needs a reason/,
   );
+  await assert.rejects(
+    service.completeTaskOutputs(
+      architectureTask,
+      architectureBundle({
+        ...policy,
+        mappings: policy.mappings.map((mapping, index) =>
+          index === 0
+            ? {
+                ...mapping,
+                logicalResourceId: architectureValue.components[0]!.id,
+                disposition: "blocked",
+                reason: "Design does not satisfy the control",
+              }
+            : mapping,
+        ),
+      }),
+    ),
+    (error: unknown) => {
+      assert.match((error as Error).message, /business:policy-effect-coverage validation failed/);
+      const details = JSON.stringify((error as { details?: unknown }).details);
+      assert.match(details, /Blocked policy controls must be resolved in the Architecture before it is accepted/);
+      assert.ok(details.includes(architectureValue.components[0]!.id));
+      return true;
+    },
+  );
   const architectureHashes = await service.completeTaskOutputs(architectureTask, architectureBundle(policy));
   const architectureEvents = await new EventJournal(
     join(root, ".apex", "projects", "demo", "runs", runId, "journal"),
