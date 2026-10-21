@@ -2480,7 +2480,7 @@ async function planTaskContextScenario(pngAvailable: boolean): Promise<void> {
     await readFile(join(architectureReviewDirectory, "architecture-assessment.md"), "utf8"),
     /Five WAF Pillars/u,
   );
-  const expectedDiagrams = ["02-waf-assessment", "03-des-cost-breakdown", "03-des-cost-uncertainty", "03-des-diagram"];
+  const expectedDiagrams = ["02-waf-assessment", "03-des-cost-breakdown", "03-des-cost-uncertainty"];
   for (const name of expectedDiagrams) {
     for (const extension of ["py", "svg"]) {
       assert.ok((await readFile(join(architectureReviewDirectory, `${name}.${extension}`))).byteLength > 0);
@@ -2489,12 +2489,24 @@ async function planTaskContextScenario(pngAvailable: boolean): Promise<void> {
     if (pngAvailable) assert.ok((await readFile(png)).byteLength > 0);
     else await assert.rejects(stat(png), { code: "ENOENT" });
   }
+  // The architecture diagram is Mermaid text; earlier Python, SVG and PNG outputs are not written or kept.
+  assert.match(
+    await readFile(join(architectureReviewDirectory, "03-des-diagram.mmd"), "utf8"),
+    /^%% .*\nflowchart TB\n[\s\S]*subgraph lane_application/u,
+  );
+  for (const extension of ["py", "svg", "png"]) {
+    await assert.rejects(stat(join(architectureReviewDirectory, `03-des-diagram.${extension}`)), { code: "ENOENT" });
+  }
   const architectureReadme = await readFile(join(architectureReviewDirectory, "README.md"), "utf8");
-  if (pngAvailable) assert.match(architectureReadme, /03-des-diagram: generated as Python, SVG, and PNG/u);
+  assert.match(
+    architectureReadme,
+    /03-des-diagram: generated as Mermaid \(03-des-diagram\.mmd\), embedded in architecture-assessment\.md/u,
+  );
+  if (pngAvailable) assert.match(architectureReadme, /02-waf-assessment: generated as Python, SVG, and PNG/u);
   else {
     assert.match(
       architectureReadme,
-      /03-des-diagram: generated as Python and SVG; PNG unavailable \(PNG rasterizer @resvg\/resvg-js is not installed/u,
+      /02-waf-assessment: generated as Python and SVG; PNG unavailable \(PNG rasterizer @resvg\/resvg-js is not installed/u,
     );
     await assert.rejects(stat(stalePngBase), { code: "ENOENT" });
   }
@@ -2502,7 +2514,7 @@ async function planTaskContextScenario(pngAvailable: boolean): Promise<void> {
     join(architectureReviewDirectory, "architecture-assessment.md"),
     "utf8",
   );
-  assert.match(architectureAssessment, /03-des-diagram\.svg/u);
+  assert.match(architectureAssessment, /```mermaid\n%% [\s\S]*flowchart TB[\s\S]*```\n\nSource: 03-des-diagram\.mmd/u);
   assert.match(architectureAssessment, /02-waf-assessment\.svg/u);
   const costAssessment = await readFile(join(architectureReviewDirectory, "cost-estimate.md"), "utf8");
   assert.match(costAssessment, /03-des-cost-breakdown\.svg/u);
@@ -2593,7 +2605,7 @@ test("plan task context projects source hashes and valid output templates", asyn
   await planTaskContextScenario(true);
 });
 
-test("architecture review keeps Python and SVG diagrams and drops a stale PNG without a rasterizer", async () => {
+test("architecture review writes Mermaid, keeps Python and SVG WAF and cost diagrams, and drops a stale PNG without a rasterizer", async () => {
   await planTaskContextScenario(false);
 });
 

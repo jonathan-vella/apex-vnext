@@ -8,7 +8,7 @@ import Ajv2020 from "ajv/dist/2020.js";
 
 const REGISTRY_PATH = "tools/registry/diagram-semantics.v1.json";
 const SCHEMA_PATH = "tools/registry/schemas/diagram-semantics.schema.json";
-const EXPECTED_SHA256 = "433e1e9412b893ae5f087fc01930a1ce7c41173fd5a54c739434b844aeb6a039";
+const EXPECTED_SHA256 = "e1122252762d3212038289810e5dddc5ca81a456f2cb70a3b830d998bfdbc531";
 const EXPECTED_IDS = [
   "g1-three-tier-web",
   "g2-hub-spoke-landing-zone",
@@ -27,7 +27,7 @@ const EXPECTED_ROUTING = {
   standalone: {
     owner: "packages/renderers",
     outputClasses: ["architecture", "network", "dependency", "runtime", "as-built", "waf", "cost", "compliance"],
-    formats: ["py", "png", "svg"],
+    formats: ["py", "png", "svg", "mmd"],
   },
 };
 const EXPECTED_RECONCILIATIONS = {

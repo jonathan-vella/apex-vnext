@@ -60,7 +60,8 @@ the current renderer registry, not an upstream heading table, decides supported 
 The registry also exposes direct, non-template renderers for run status, deployment preview, approval evidence, and
 resource inventory, and deployment summaries. Deployment summaries bind the completed operation, inventory and approval;
 they distinguish simulated from native-adapter evidence without independently asserting live execution or operational
-readiness. Architecture and cost packages also include deterministic Python, SVG, and PNG diagram views.
+readiness. Architecture packages include a deterministic Mermaid architecture diagram (`03-des-diagram.mmd`, also
+embedded in the assessment); architecture and cost packages also include deterministic Python, SVG, and PNG diagram views.
 All are read-only views of accepted typed sources.
 
 Use `apex-python-diagrams` for standalone figure semantics and supported-output checks. It does not add ERD,

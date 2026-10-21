@@ -49,23 +49,28 @@ param location string = 'swedencentral'
 
 ## Diagram Embeds
 
-For Azure architecture artifacts, prefer **non-Mermaid** diagram files generated via
-kernel-rendered Python sources and outputs (`.py`, `.png`/`.svg`) from `packages/renderers`,
-bound to accepted typed sources, and embed with Markdown images. Current architecture, WAF and cost
-renderers do not imply availability of every standalone or as-built diagram class.
+For Azure architecture artifacts, the kernel renders the architecture diagram as Mermaid (`03-des-diagram.mmd`) from
+`packages/renderers`, bound to accepted typed sources, and embeds it in the architecture assessment as a fenced
+`mermaid` block. WAF and cost views are kernel-rendered Python sources and outputs (`.py`, `.png`/`.svg`); embed those
+with Markdown images. Current architecture, WAF and cost renderers do not imply availability of every standalone or
+as-built diagram class.
 
 ### Good Example
 
-```markdown
-![Design Architecture](./03-des-diagram.png)
-
-Source: `03-des-diagram.py`
+````markdown
+```mermaid
+flowchart TB
+  ...
 ```
+
+Source: `03-des-diagram.mmd`
+````
 
 ### Mermaid Usage
 
 Use managed `apex-mermaid` guidance only for supported renderer slots.
-There are currently no Mermaid-capable slots; report that blocker rather than generating inline output.
+There are currently no Mermaid-capable slots for agent-written inline diagrams; report that blocker rather than
+generating inline output. The kernel-rendered architecture diagram is the exception: do not hand-edit it.
 If Mermaid is used, include a neutral theme directive for dark mode compatibility.
 
 ## Visual Styling Standards

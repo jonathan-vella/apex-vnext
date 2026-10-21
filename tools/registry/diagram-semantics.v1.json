@@ -10,7 +10,7 @@
     "standalone": {
       "owner": "packages/renderers",
       "outputClasses": ["architecture", "network", "dependency", "runtime", "as-built", "waf", "cost", "compliance"],
-      "formats": ["py", "png", "svg"]
+      "formats": ["py", "png", "svg", "mmd"]
     }
   },
   "activeConsumers": [
@@ -30,14 +30,13 @@
       "id": "markdown-formatting-guide",
       "path": ".github/instructions/references/markdown-formatting-guide.md",
       "outputClass": "documentation",
-      "requiredMarkers": ["03-des-diagram.py", "03-des-diagram.png"]
+      "requiredMarkers": ["03-des-diagram.mmd"]
     },
     {
       "id": "current-diagram-source",
       "path": "packages/renderers/src/diagrams.ts",
       "outputClass": "architecture",
       "requiredMarkers": [
-        "renderArchitectureDiagram",
         "renderWafAssessmentDiagram",
         "renderCostBreakdownDiagram",
         "renderCostUncertaintyDiagram",
@@ -46,11 +45,17 @@
       ]
     },
     {
+      "id": "current-architecture-mermaid-source",
+      "path": "packages/renderers/src/architecture-mermaid.ts",
+      "outputClass": "architecture",
+      "requiredMarkers": ["renderArchitectureMermaid", "flowchart TB", "dependsOn"]
+    },
+    {
       "id": "current-diagram-tests",
       "path": "packages/renderers/src/test/diagrams.test.ts",
       "outputClass": "validation",
       "requiredMarkers": [
-        "renderArchitectureDiagram",
+        "renderArchitectureMermaid",
         "renderWafAssessmentDiagram",
         "renderCostBreakdownDiagram",
         "renderCostUncertaintyDiagram",

@@ -17,10 +17,9 @@ interface DiagramRow {
 }
 
 interface DiagramSpec {
-  readonly kind: "architecture" | "waf" | "cost-breakdown" | "cost-uncertainty";
+  readonly kind: "waf" | "cost-breakdown" | "cost-uncertainty";
   readonly title: string;
   readonly rows: readonly DiagramRow[];
-  readonly edges?: readonly { readonly from: string; readonly to: string }[];
   readonly notes?: readonly string[];
 }
 
@@ -108,49 +107,6 @@ function source(spec: DiagramSpec, svg: string): DiagramSource {
     }
   }
   return { svg, python: pythonSource(spec) };
-}
-
-export function renderArchitectureDiagram(architecture: ArchitectureV1): DiagramSource {
-  const rows = architecture.components
-    .map(({ id, service, purpose }) => ({ id, label: `${id}: ${service}`, detail: purpose }))
-    .sort((left, right) => compare(left.id, right.id));
-  const edges = architecture.components
-    .flatMap(({ id, dependsOn }) => dependsOn.map((dependency) => ({ from: dependency, to: id })))
-    .sort((left, right) => compare(`${left.from}\0${left.to}`, `${right.from}\0${right.to}`));
-  const columns = Math.min(3, Math.max(1, rows.length));
-  const nodeWidth = 250;
-  const nodeHeight = 82;
-  const columnGap = 42;
-  const rowGap = 52;
-  const positions = new Map(
-    rows.map((row, index) => [
-      row.id,
-      {
-        x: 64 + (index % columns) * (nodeWidth + columnGap),
-        y: 88 + Math.floor(index / columns) * (nodeHeight + rowGap),
-      },
-    ]),
-  );
-  const height = Math.max(260, 130 + Math.ceil(rows.length / columns) * (nodeHeight + rowGap));
-  const edgeSvg = edges
-    .map(({ from, to }) => {
-      const start = positions.get(from);
-      const end = positions.get(to);
-      if (start === undefined || end === undefined) return "";
-      return `<line x1="${start.x + nodeWidth / 2}" y1="${start.y + nodeHeight / 2}" x2="${end.x + nodeWidth / 2}" y2="${end.y + nodeHeight / 2}" stroke="#8a9bad" stroke-width="2"/>`;
-    })
-    .join("\n");
-  const nodeSvg = rows
-    .map((row) => {
-      const position = positions.get(row.id)!;
-      return `<g><rect x="${position.x}" y="${position.y}" width="${nodeWidth}" height="${nodeHeight}" rx="6" fill="#ffffff" stroke="${ACCENT}" stroke-width="2"/><text x="${position.x + 14}" y="${position.y + 30}" fill="${INK}" font-family="Arial, sans-serif" font-size="15" font-weight="700">${xml(short(row.label, 34))}</text><text x="${position.x + 14}" y="${position.y + 56}" fill="${MUTED}" font-family="Arial, sans-serif" font-size="12">${xml(short(row.detail ?? "", 38))}</text></g>`;
-    })
-    .join("\n");
-  const spec: DiagramSpec = { kind: "architecture", title: architecture.title, rows, edges };
-  return source(
-    spec,
-    document(architecture.title, height, `${edgeSvg}\n${nodeSvg}`, "Accepted architecture components and dependencies"),
-  );
 }
 
 export function renderWafAssessmentDiagram(architecture: ArchitectureV1): DiagramSource {
