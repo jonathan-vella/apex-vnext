@@ -74,18 +74,17 @@ export function copilotHome(host: HostEnvironment): string {
 }
 
 function hostCheck(kind: HostKind): HostCheck {
-  const sandbox = "client local sandboxing is assumed on and not checked";
   switch (kind) {
     case "windows":
       return {
         id: "host",
         ok: true,
-        value: `windows: VS Code Copilot harness or GitHub Copilot app; Copilot CLI manages the plugin store only; ${sandbox}`,
+        value: "windows: VS Code Copilot harness or GitHub Copilot app; Copilot CLI manages the plugin store only",
       };
     case "wsl2":
-      return { id: "host", ok: true, value: `wsl2: GitHub Copilot CLI; ${sandbox}` };
+      return { id: "host", ok: true, value: "wsl2: GitHub Copilot CLI" };
     case "linux":
-      return { id: "host", ok: true, value: `linux: GitHub Copilot CLI; ${sandbox}` };
+      return { id: "host", ok: true, value: "linux: GitHub Copilot CLI" };
     case "macos":
       return {
         id: "host",

@@ -7,7 +7,8 @@ native Windows VS Code **Copilot** harness, native Windows Copilot app, Linux Co
 Do not use VS Code Local, VS Code over WSL, native-Windows CLI sessions, Docker, or a devcontainer. Windows Copilot CLI
 may manage the plugin store only. Keep one host per workspace; do not move runs between Windows and WSL2.
 
-The human operates every live client, sign-in, sandbox setting and Azure check. Repository preparation must not start a
+The human operates every live client, sign-in and Azure check. Local sandboxing is deferred until after launch: leave it
+off, and do not record sandbox state as qualification evidence. Repository preparation must not start a
 Copilot session, dispatch a deployment workflow, publish packages/plugins, or change Azure. Stop at every gate.
 `CLIENT-039` to `CLIENT-042` are **PLANNED, blocked/not runnable** until
 [CP-26 to CP-30](../vnext/ROADMAP.md#client-pivot-backlog) deliver the purpose-bound lab, azd/Bicep, CI-owned
@@ -95,24 +96,19 @@ Follow [host prerequisites](prepare-windows-11.md) and the
 checkout for each case and another disposable consumer for destructive lifecycle/tamper checks. Do not test against a
 real workload. #378 is closed for implementation; `CLIENT-012` still needs live clean-machine evidence.
 
-On native Windows, record the actual edition, DisplayVersion, OS build and installed sandbox-required update, plus
+On native Windows, record the actual edition, DisplayVersion and OS build, plus
 PowerShell, Node, npm, Git, Copilot store-manager, VS Code/extension or app versions. On Linux/WSL2, record distro,
-kernel, architecture, Node/npm/Git/Copilot versions and `bwrap --version`, `slirp4netns --version`.
+kernel, architecture and Node/npm/Git/Copilot versions.
 For WSL2 also record the WSL version and distro mode (`wsl.exe --version`, `wsl.exe --list --verbose`), with user names
 redacted. Keep WSL workspaces in the Linux filesystem, not `/mnt/c`.
 
 The recorded Windows decision remains **25H2/24H2**. Vendor app documentation lists **25H2/26H1**; this discrepancy
-requires human observation, not an inferred support-matrix edit. Record the actual host and whether that client reports
-its sandbox available/enabled, with a redacted UI reference. Do not claim 24H2 works or 26H1 is qualified without a run.
+requires human observation, not an inferred support-matrix edit. Record the actual host. Do not claim 24H2 works or
+26H1 is qualified without a run.
 
-Before starting a new session:
-
-- VS Code: `chat.agent.sandbox.enabled=on`, outbound network allowed; record the session's reported sandbox state.
-- App: enable **Sandbox new sessions** in the project, leave **Outbound internet** on; record availability and any
-  **Sandbox unavailable** reason.
-- CLI: inspect `copilot help sandbox`, install its namespace prerequisites, then `/sandbox enable`; record actual
-  session status. Bubblewrap version alone does not prove it runs. Record WSL2/AppArmor namespace failures as blocked;
-  do not disable host security policy to get a pass.
+Before starting a new session, leave local sandboxing off in every client (VS Code `chat.agent.sandbox.enabled=off`,
+the app's **Sandbox new sessions** off, CLI `/sandbox disable`; a bare `copilot` session is unsandboxed unless
+`--sandbox` or the saved setting turns it on). Sandboxed runs are post-launch work. Use explicit tool grants.
 
 Close every VS Code window before changing the Windows plugin store. In the human's disposable testing profile,
 remove any old APEX copy before installing the frozen local folder:
@@ -155,7 +151,7 @@ node node_modules/@apexops/cli/dist/cli.js status --json
 ```
 
 Save sanitized outputs and `.apex/apex.lock.json`/`customizations.lock.json` hashes, not whole state directories.
-Doctor is read-only without `--fix`; it does not prove plugin discovery or sandboxing. Do not repair or update during a
+Doctor is read-only without `--fix`; it does not prove plugin discovery. Do not repair or update during a
 bound run. Record warnings/failures and their reasons. A source install is not a no-checkout clean-host pass:
 `CLIENT-012` also requires the human to test the frozen installer/released distribution on a genuinely clean host.
 
@@ -167,8 +163,8 @@ It creates only CLI/VS Code workspaces, not an app case; initialize the app cons
 ## 3. Human Client Checks
 
 Open only the prepared consumer. VS Code: restart **Local Agent Host**, select target **Copilot**, then pick **APEX**;
-verify one `apex` under `@agentPlugins`. App: start a new local sandboxed session with APEX. CLI: start
-`copilot --agent apex` in Linux/WSL2 and enable sandboxing. Choose and record the session model (HydraFusion if available);
+verify one `apex` under `@agentPlugins`. App: start a new local session with APEX. CLI: start
+`copilot --agent apex` in Linux/WSL2. Choose and record the session model (HydraFusion if available);
 do not silently substitute a model. Use client UI/log snippets only after redaction; a server-side test is not a UI pass.
 
 The checklist below remains bound to its frozen `0.11.0-next.5` candidate, including that candidate's historical
@@ -189,7 +185,7 @@ reads and the external Azure MCP install/cache lifecycle; see
 | Worktrees (`008`, `034`)                                        | In the app use its worktree session; in CLI use two Git worktrees on the same host. Each calls status with its own absolute path. First workspace performs one bounded run write; second may read but its write must return `APEX_WRITER_CONFLICT`. Resolve main checkout through Git common dir; do not copy `.apex`. Owner calls `releaseWriter`, then second writes and records the new ownership. Record roots as aliases, epochs and before/after heads.                                                                                                                                                                                                       |
 | Lifecycle (`009`, `011`, `020`, `026`, `030`)                   | On a disposable consumer follow the installation update/conflict/rollback/uninstall/reinstall checklist. Preserve a user-file canary and active-run journal hashes. A plugin update needs a separately frozen candidate and a new session; on Windows close VS Code first and restart Local Agent Host afterward. Record both candidate identities; do not continue the original run's pass claims after update.                                                                                                                                                                                                                                                    |
 | Remaining product outcomes (`010`, `013`–`019`, `027`)          | Follow the authoritative matrix and reuse its existing fake-provider/profile/COE/change fixtures. Record actual implementation gaps as blocked, not passing. Fake-provider results are not Azure or production evidence.                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| Sandbox/auth (`035`)                                            | Human separately authorizes and drives sign-in/token-refresh/pricing/native-validation checks inside the actual sandbox. Record only success/failure, tool versions and sanitized denial codes. Local checks may proceed without Azure auth; the Azure part stays blocked until authorized. No login output, token cache, tenant/account dump or credential reuse across hosts is collected.                                                                                                                                                                                                                                                                        |
+| Azure auth (`035`)                                              | Human separately authorizes and drives sign-in/token-refresh/pricing/native-validation checks. Record only success/failure, tool versions and sanitized denial codes. Local checks may proceed without Azure auth; the Azure part stays blocked until authorized. Sandboxed sessions are deferred until after launch. No login output, token cache, tenant/account dump or credential reuse across hosts is collected.                                                                                                                                                                                                                                              |
 | Lab approval flow (`006`, `031`, `041`)                         | **Not run until a client is qualified against it.** On a new `lab` run, confirm the status shows purpose `lab` and that `production` is rejected. Observe one Gate 1 intent confirmation (purpose, target, requirements) and no Gate 2/3 prompt; `gateDecide` for Gate 2/3 must be refused with reason `GATE_READINESS_AUTOMATIC`, and the journal shows `gate.readiness-recorded` for each. Gate 4 stays the final terminal approval, with the Approval Context in `operations/deployment-preview.md` showing purpose, target, gate provenance, architecture, cost estimate and accepted risks. Record actual events only; never infer a pass from the unit tests. |
 | azd/CI (`039`, `040`)                                           | **PLANNED — blocked/not runnable (CP-26 not delivered).** No `azd up`, provision, deploy, pipeline config, workflow dispatch or fabricated preview/approval. Future qualification must bind each operation's own Gate 4 preview, packages/CI recipient and imported evidence per DECISION-035.                                                                                                                                                                                                                                                                                                                                                                      |
 
@@ -252,9 +248,9 @@ Keep one private copy per host/client case. This Markdown is a human checklist, 
 | Candidate JSON/release manifest/tarballs/provenance/locks                 | Not recorded; include hashes and immutable locator                                                                                             |
 | Host version/build/architecture; WSL distro/kernel/mode                   | Not recorded                                                                                                                                   |
 | Client/app/extension/Agent Host/store-manager version; executable SHA-256 | Not recorded; use About/version UI where needed                                                                                                |
-| Node/npm/Git/IaC/sandbox-tool versions                                    | Not recorded                                                                                                                                   |
+| Node/npm/Git/IaC tool versions                                            | Not recorded                                                                                                                                   |
 | Workspace/run aliases; journal head/owner epoch                           | Not recorded; no personal absolute paths in shared evidence                                                                                    |
-| Session model; actual sandbox available/enabled/network setting           | Not recorded                                                                                                                                   |
+| Session model and network setting                                         | Not recorded                                                                                                                                   |
 | Azure auth authorization/outcome                                          | Not authorized/not run                                                                                                                         |
 | Negotiated MCP protocol/discovery/inventory reference                     | Not recorded                                                                                                                                   |
 

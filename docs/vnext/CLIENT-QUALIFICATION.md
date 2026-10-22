@@ -17,7 +17,8 @@ version alone. Earlier candidates (`0.11.0-next.2` and source `a4bc16fbe4eadea48
 after #454) and their exploratory results remain historical; the current candidate needs fresh affected-scenario
 evidence without restoring retired root guidance.
 
-Each client runs on its supported host with client local sandboxing on, without Docker or a devcontainer. Required
+Each client runs on its supported host without Docker or a devcontainer; client local sandboxing is deferred until after
+launch and is not part of qualification. Required
 outcomes follow the [PRD](PRD.md), including both environment profiles, COE reuse and conversational changes. Basic
 interaction checks accompany feature delivery; final installation qualification uses the APEX plugin. No token
 baseline is required now. Existing executable gate alignment must be completed before affected scenarios; do not
@@ -37,7 +38,7 @@ that client result.
 
 The GitHub Copilot app is a supported client again. Its historical desktop receipts are provenance only and do not
 count as current evidence. The app needs its own evidence identity alongside `github-copilot-cli` and
-`github-copilot-vscode`. Also record the Windows build, whether local sandboxing is on, and the session model. The
+`github-copilot-vscode`. Also record the Windows build and the session model. The
 current typed client-outcome contract accepts only those CLI/VS Code identities; app typed export/closure remains a
 tooling gap. Keep an app-specific human worksheet; never relabel its evidence as another client.
 
@@ -121,7 +122,7 @@ Copilot CLI on Linux and WSL2, unless noted.
 | `CLIENT-032` | Hidden workers never ask questions, and the hook denies the APEX agent as a `task` target                                                              |
 | `CLIENT-033` | Review findings come only from captured rubber-duck output bound to the prompt and artifact; tampering fails closed                                    |
 | `CLIENT-034` | Sessions in app-created worktrees share the main checkout's `.apex/`, and a second writer is rejected (app, CLI)                                       |
-| `CLIENT-035` | With local sandboxing on, the workflow completes, including Azure CLI sign-in, pricing and native validation                                           |
+| `CLIENT-035` | The workflow completes, including Azure CLI sign-in, pricing and native validation; sandboxed sessions are deferred until after launch                 |
 | `CLIENT-036` | A duplicated state-changing tool call, as HydraFusion can produce, has no extra effect                                                                 |
 | `CLIENT-037` | Agents without model pins run under the user-selected session model                                                                                    |
 | `CLIENT-038` | APEX MCP answers `server/discover`, the client negotiates `2026-07-28`, and the session records the negotiated version                                 |
@@ -167,7 +168,7 @@ A readiness checkpoint recorded as, or counted as, human approval fails these sc
 `CLIENT-042` remain **planned and not runnable** until `CP-28` and `CP-29` deliver the CI-owned production execution
 and production-setup paths. Do not run these scenarios through direct azd commands or claim live readiness from
 shipped skill guidance alone. `CLIENT-012` still needs live clean-host evidence even though implementation issue #378
-is closed. The qualification kit records actual Windows host/client sandbox observations without changing
+is closed. The qualification kit records actual Windows host and client observations without changing
 DECISION-033's recorded 25H2/24H2 support assumption based on vendor-documentation differences alone.
 
 ### CLIENT-038 Offline Transport Evidence
@@ -225,8 +226,8 @@ CLIENT-017, not live VS Code or Copilot CLI agent interaction and not complete a
 2. Install the same exact plugin and package candidate through one channel.
 3. Trust only the qualification workspace. A disposable, isolated profile root may be mutated solely for the managed
    VS Code bootstrap agent scenario; do not mutate a real user profile or global MCP configuration.
-4. Turn on client local sandboxing and record the client-reported sandbox state in the candidate binding. Allow All
-   tool permissions are allowed only when the client reports sandboxing on; otherwise use explicit tool grants. Remote
+4. Leave client local sandboxing off; it is deferred until after launch. Without a client-reported sandbox, use explicit
+   tool grants rather than Allow All. Remote
    delegation modes stay prohibited, and gate decisions still come from the maintainer.
 5. Record structured outcomes and content-free provenance, not raw chat or secrets.
 6. Repeat affected scenarios in every supported client after release-relevant runtime, contract, plugin, MCP, skill or
@@ -422,8 +423,8 @@ confirmed free-text fallback can satisfy typed selection semantics but is not na
 ## Copilot App Qualification
 
 DECISION-033 makes the GitHub Copilot app a supported client, so desktop qualification is no longer parked. The app
-runs the same scenarios as the other clients, plus CLIENT-034 for app-created worktrees. Turn on local sandboxing in
-the app's project settings before a run. The parked M1/M2/M3 milestones in the
+runs the same scenarios as the other clients, plus CLIENT-034 for app-created worktrees. Local sandboxing stays off for
+a run. The parked M1/M2/M3 milestones in the
 [desktop plan](../../.archive/CATALOG.json) (entry `docs/vnext/COPILOT-DESKTOP-PLAN.md`) are design history; their
 receipts and confirmed-selection observations do not qualify the current candidate.
 

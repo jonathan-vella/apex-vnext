@@ -282,9 +282,10 @@ It replaces the parked desktop plan. Client support matches the separate apex-jo
 - **Hosts.** One host per workspace; runs do not move between a Windows client and the WSL CLI. Windows means the
   latest Windows 11 release and the one before it (25H2, 24H2), or any build where the client reports local
   sandboxing as supported.
-- **Sandbox.** Client local sandboxing is a documented prerequisite that APEX assumes is on and does not check.
-  Outbound network stays allowed. Because the sandbox is on, clients may use Allow All tool permissions; gate decisions
-  still come from the user. Azure CLI sign-in inside the sandbox is settled during qualification.
+- **Sandbox.** Deferred until after launch (maintainer direction 2026-10-22, amending this decision). Client local
+  sandboxing is not a launch requirement and is not qualified; APEX neither requires nor checks it. Without a
+  client-reported sandbox, use explicit tool grants rather than Allow All; gate decisions still come from the user.
+  Qualifying APEX inside the sandbox (Azure CLI sign-in, workspace access and MCP startup) is post-launch work.
 - **Distribution.** APEX ships as one Agent Plugins 1.0 plugin: skills, the APEX agent and workers, hooks, and an MCP
   server that runs the bundled `@apexops/cli` runtime with `node`. A separate vNext marketplace repository publishes it.
   Installs and release provenance pin an immutable commit SHA; tags are release labels only. `apex init` and bootstrap
@@ -300,8 +301,9 @@ It replaces the parked desktop plan. Client support matches the separate apex-jo
 
 Evidence: the apex-jon Phase 0 spike passed 8 of 8 checks in all three clients on 2026-10-03 and 2026-10-04 (plugin
 install, plugin agents, plugin MCP through `${PLUGIN_ROOT}`, hooks with bash and PowerShell, `ask_user`, rubber-duck
-isolation and hook deny). The separate Windows probe was skipped; sandbox, Azure sign-in and worktree behavior are
-proven during final qualification. The [client pivot plan](ROADMAP.md#client-pivot) owns delivery and
+isolation and hook deny). The separate Windows probe was skipped; Azure sign-in and worktree behavior are
+proven during final qualification, and the sandbox is deferred until after launch. The
+[client pivot plan](ROADMAP.md#client-pivot) owns delivery and
 [REQ-HOST-001](PRD.md#req-host-001-supported-hosts-and-clients) owns acceptance.
 
 ## DECISION-034: Serve APEX MCP With The MCP TypeScript SDK v2

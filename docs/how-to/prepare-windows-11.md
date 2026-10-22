@@ -19,8 +19,7 @@ Run these commands in PowerShell. App Installer (`winget`) must be available.
 
 ### Update Windows
 
-Install current Windows updates from **Settings** > **Windows Update**. Client local sandboxing needs the September
-2026 Windows security update or later; the GitHub Copilot app documents Windows 11 25H2 with KB5124010 or later.
+Install current Windows updates from **Settings** > **Windows Update**.
 
 ### Install The Client
 
@@ -35,9 +34,6 @@ Open VS Code and sign in through **Accounts** with your Copilot-enabled GitHub a
 harness: set the chat session target to **Copilot**. The **Local** harness is not supported.
 
 For the GitHub Copilot app, install it and sign in with the same account. Add the workspace folder as a local project.
-
-Then turn on local sandboxing for your client as described in
-[Manage installation](manage-installation.md#turn-on-local-sandboxing).
 
 ### Install Git, Node.js And Copilot CLI
 
@@ -126,19 +122,17 @@ node --version
 npm --version
 ```
 
-### Install Copilot CLI And Sandbox Tools
+### Install Copilot CLI
 
-Install GitHub Copilot CLI and the tools its local sandbox needs, then sign in:
+Install GitHub Copilot CLI, then sign in:
 
 ```bash
 npm install -g @github/copilot
-sudo apt install -y bubblewrap slirp4netns
 copilot --version
 copilot login
 ```
 
-Turn on local sandboxing as described in [Manage installation](manage-installation.md#turn-on-local-sandboxing), then
-[install the plugin](manage-installation.md#linux-or-wsl2-copilot-cli).
+Then [install the plugin](manage-installation.md#linux-or-wsl2-copilot-cli).
 
 ### Install Azure Tooling On Ubuntu
 
@@ -243,7 +237,7 @@ copilot --version
 az account show --output table
 ```
 
-For VS Code, `code --version` must report 1.140 or later. Confirm that local sandboxing is on for your client and that
+For VS Code, `code --version` must report 1.140 or later. Confirm that
 `copilot plugin list` shows one `apex` plugin once a release is published. After you install the CLI, `apex doctor`
 checks the same prerequisites for your host; see [Verify a clean host](manage-installation.md#verify-a-clean-host).
 
