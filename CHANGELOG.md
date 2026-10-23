@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- A policy `deny` in a `DoNotEnforce` assignment is now informational instead of a blocker, in the ALZ reference
+  baseline (142 of 226 blockers), the collector and the importer check. It also needs no Architecture mapping. An unknown
+  mode keeps the deny a blocker.
 - CP-31 adds a general read-only Azure MCP Server `3.0.0` provider for foreground APEX, with verified namespace/command
   grants and cap-aware retail-price provenance; the ten ARM CostManagement reads remain under `apex-azure-cost`.
   Kernel approvals and APEX SDK v2/protocol are unchanged. Client/live qualification remains separately authorized.
