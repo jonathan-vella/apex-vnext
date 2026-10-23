@@ -89,7 +89,7 @@ or task.
 
 Do not read task context for `needs_input`, `needs_review`, a stale task ID, or a task owned by another role. Write only
 through APEX MCP. Any external observation remains subject to the foreground agent's granted read-only tools;
-retail pricing belongs to `apex-azure/pricing` under `apex-azure-defaults`, not ARM CostManagement. Requirements
+retail pricing belongs to `apex-azure/pricing` under `apex-azure-defaults`. Requirements
 does not choose Architecture SKUs or accept prices from memory. Generated review projections are never editable authority.
 
 ## Examples

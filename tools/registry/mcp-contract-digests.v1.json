@@ -1,7 +1,6 @@
 {
   "schemaVersion": "1.0.0",
   "files": {
-    "tools/registry/azure-mcp.v1.json": "4e16d8935fecbde30accb41bda4f1f7f20a41f8047648f218489078113717f0f",
-    "tools/registry/arm-mcp-cost-pricing.v1.json": "7d733a3a9d0007452bebdd9f22567b036ac3047069cef040803f5dabcb79dbc6"
+    "tools/registry/azure-mcp.v1.json": "4e16d8935fecbde30accb41bda4f1f7f20a41f8047648f218489078113717f0f"
   }
 }

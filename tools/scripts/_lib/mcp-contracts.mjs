@@ -5,7 +5,6 @@ import { fileURLToPath } from "node:url";
 
 export const repositoryRoot = fileURLToPath(new URL("../../../", import.meta.url));
 export const azureRegistryPath = "tools/registry/azure-mcp.v1.json";
-export const armRegistryPath = "tools/registry/arm-mcp-cost-pricing.v1.json";
 export const digestPath = "tools/registry/mcp-contract-digests.v1.json";
 export const readJson = (path, root = repositoryRoot) => JSON.parse(readFileSync(resolve(root, path), "utf8"));
 

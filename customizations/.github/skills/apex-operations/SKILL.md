@@ -61,8 +61,9 @@ inventory, diagnosis, reconciliation or quality work.
 
 Required validation, authorization, freshness, writer epoch and approval checks are kernel-controlled. Do not invent
 operations, retry effects, mutate infrastructure, run shell/Git/Bicep/Terraform commands, or claim provider inspection
-that the current APEX MCP result does not contain. ARM CostManagement reads use `apex-azure-cost`; retail pricing and
-general guarded Azure reads use `apex-azure` under the foreground agent's verified grants. Missing tools are blockers.
+that the current APEX MCP result does not contain. Retail pricing, supported cost-saving recommendations, and general
+guarded Azure reads use `apex-azure` under the foreground agent's verified grants. Actual billing, forecasts, budgets,
+alerts and commitment records are unavailable. Missing tools are blockers.
 
 For the active task's domain reasoning, use `apex-azure-reliability` for recovery/failure evidence,
 `apex-azure-kubernetes` for AKS sizing/identity recommendations, `apex-azure-upgrade` for lifecycle assessment and
