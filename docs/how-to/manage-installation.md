@@ -36,23 +36,18 @@ WSL2 for Copilot CLI.
 ## Local Sandboxing (Deferred)
 
 Local sandboxing is not required for APEX, is not qualified, and is deferred until after launch. APEX does not check
-it. Leave it off. If you turn it on anyway, expect that APEX tools may fail to start or may not see the workspace, and
-use explicit tool grants rather than **Allow all**; gate decisions still come from you. If your Copilot license comes
-from an enterprise, managed settings can control these options.
+it. Leave it off. If you turn it on anyway, APEX tools may fail to start or may not see the workspace.
 
-- **VS Code.** Set `chat.agent.sandbox.enabled` to `on` (the default is `off`) and start a new Copilot session. Leave
-  `chat.agent.sandbox.network.allowNetwork` at its default, `true`. On Windows, sandboxing needs the September 2026
-  Windows security update, and VS Code marks Windows support as experimental. **Permissions** > **Sandboxing for
-  terminal** in a session changes that session only.
-- **GitHub Copilot app.** Sandboxing is a per-project setting and is off by default; APEX cannot turn it on for you. Open
-  **Settings**, select the project under **Projects**, and turn on **Sandbox new sessions** under **Sandbox**. Leave
-  **Outbound internet** on. The setting applies to new sessions. The app documents Windows 11 25H2 with update
-  KB5124010 or later; on 24H2, check that the app reports the sandbox as available. If the app shows **Sandbox
-  unavailable**, fix the reported problem and select **Retry sandbox**.
-- **Copilot CLI.** In a session, run `/sandbox enable`, or set `sandbox.enabled` to `true` in
-  `~/.copilot/settings.json`. On Linux and WSL2, first install Bubblewrap 0.5.0 or later, `slirp4netns` and the other
-  namespace tools that `copilot help sandbox` lists; on Ubuntu, start with `sudo apt install bubblewrap slirp4netns`.
-  WSL1 cannot run Bubblewrap.
+Use explicit tool grants rather than **Allow all**, including when sandboxing is off. If you previously used
+**Allow all**, replace it with explicit grants before starting an unsandboxed session. Kernel approvals and human
+gate decisions remain required; tool grants do not replace them. Enterprise-managed settings may control these
+options; do not bypass your organization's restrictions.
+
+- **VS Code.** Set `chat.agent.sandbox.enabled` to `off` and start a new Copilot session. **Permissions** >
+  **Sandboxing for terminal** changes that session only; leave it disabled for APEX.
+- **GitHub Copilot app.** Open **Settings**, select the project under **Projects**, and turn off **Sandbox new
+  sessions** under **Sandbox**. Start a new session, because the setting applies only to new sessions.
+- **Copilot CLI.** Set `sandbox.enabled` to `false` in `~/.copilot/settings.json` and start a new session.
 
 ## Install The Plugin
 
