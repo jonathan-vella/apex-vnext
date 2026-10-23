@@ -303,8 +303,9 @@ function deriveRequiredValue(policyDefinition) {
   return requiredValue;
 }
 
-function classificationForEffect(effect) {
-  if (effect === "deny") return "blocker";
+function classificationForEffect(effect, enforcementMode) {
+  // A deny in a DoNotEnforce assignment is never enforced by Azure, so it is informational, not a blocker.
+  if (effect === "deny") return enforcementMode === "DoNotEnforce" ? "informational" : "blocker";
   if (AUTO_REMEDIATE_EFFECTS.has(effect)) return "auto-remediate";
   return "informational";
 }
@@ -508,15 +509,16 @@ async function buildFinding({
   }
   const resourceTypes = extractResourceTypes(policyDefinition.properties?.policyRule ?? {});
   const propertyPaths = derivePropertyPaths(policyDefinition, effect, resourceTypes);
+  const enforcementMode = assignment.properties?.enforcementMode ?? "Default";
   const finding = {
     policy_id: policyDefinition.id,
     display_name: policyDefinition.properties?.displayName ?? policyDefinition.name ?? policyDefinition.id,
     effect,
-    enforcementMode: assignment.properties?.enforcementMode ?? "Default",
+    enforcementMode,
     scope,
     assignment_display_name: assignment.properties?.displayName ?? assignmentName,
     assignment_id: `${scope}/providers/Microsoft.Authorization/policyAssignments/${assignmentName}`,
-    classification: classificationForEffect(effect),
+    classification: classificationForEffect(effect, enforcementMode),
     category: policyDefinition.properties?.metadata?.category ?? null,
     resource_types: resourceTypes,
     required_value: deriveRequiredValue(policyDefinition),

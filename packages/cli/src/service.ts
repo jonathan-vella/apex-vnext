@@ -10945,6 +10945,7 @@ export class ApexService {
           ({ resourceTypes }) =>
             resourceTypes.length === 0 || resourceTypes.some((type) => designed.has(type.toLowerCase())),
         )
+        .filter(({ effect, enforcementMode }) => !(effect === "deny" && enforcementMode === "DoNotEnforce"))
         .map(({ effect }) => effect);
     }
     if (descriptor.id === "architecture") {
