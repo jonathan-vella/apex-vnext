@@ -66,16 +66,16 @@ Read [Workflow and gates](docs/explanation/workflow-and-gates.md) and
 | GitHub Copilot app               | Windows 11              | Start a local session in the project with **APEX**        |
 | GitHub Copilot CLI               | Linux or WSL2           | Run `copilot --agent apex` in the workspace               |
 
-Use one client per workspace. Local sandboxing should be on. No devcontainer is needed. Other combinations are not
-qualified; see [client support](docs/reference/client-support.md).
+Use one client per workspace. No devcontainer is needed. Local sandboxing is not required and is not qualified yet.
+Other combinations are not qualified; see [client support](docs/reference/client-support.md).
 
 ## Quick Start
 
 APEX has two parts: the `apex` Agent Plugin, which carries the agent, skills and MCP server, and the `@apexops/cli`
 npm package, which sets up and checks your workspace. Install both at the same version.
 
-1. **Prepare the host.** On Windows, follow [Prepare Windows 11](docs/how-to/prepare-windows-11.md). Turn on your
-   client's sandbox. You need Node.js 24.21.0 or newer and Git.
+1. **Prepare the host.** On Windows, follow [Prepare Windows 11](docs/how-to/prepare-windows-11.md). You need
+   Node.js 24.21.0 or newer and Git.
 2. **Install the plugin.**
 
    ```bash

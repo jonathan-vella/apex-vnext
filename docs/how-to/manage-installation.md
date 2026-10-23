@@ -23,8 +23,8 @@ workspace CLI at the version of the installed plugin.
 | Host                             | Platform                | Requirement            | Start APEX                                                |
 | -------------------------------- | ----------------------- | ---------------------- | --------------------------------------------------------- |
 | VS Code with the Copilot harness | Windows 11 25H2 or 24H2 | VS Code 1.140 or later | Set the session target to **Copilot**, then pick **APEX** |
-| GitHub Copilot app               | Windows 11 25H2 or 24H2 | Project sandbox on     | Start a local session in the project with **APEX**        |
-| GitHub Copilot CLI               | Linux or WSL2           | Bubblewrap for sandbox | Run `copilot --agent apex` in the workspace               |
+| GitHub Copilot app               | Windows 11 25H2 or 24H2 | None beyond the app    | Start a local session in the project with **APEX**        |
+| GitHub Copilot CLI               | Linux or WSL2           | None beyond the CLI    | Run `copilot --agent apex` in the workspace               |
 
 Copilot CLI on native Windows and the VS Code **Local** harness are not supported. VS Code and the app on macOS or Linux
 desktops are best effort and not qualified. Use one host per workspace: a run does not move between a Windows client
@@ -33,25 +33,21 @@ and Copilot CLI in WSL2.
 Prepare Windows with [Prepare Windows 11](prepare-windows-11.md). It covers native Windows for VS Code and the app, and
 WSL2 for Copilot CLI.
 
-## Turn On Local Sandboxing
+## Local Sandboxing (Deferred)
 
-APEX assumes that the client's local sandboxing is on and does not check it. Turn it on before you start APEX and keep
-outbound network access allowed. With the sandbox on, you can use the **Allow all** permission level; gate decisions
-still come from you. If your Copilot license comes from an enterprise, managed settings can control these options.
+Local sandboxing is not required for APEX, is not qualified, and is deferred until after launch. APEX does not check
+it. Leave it off. If you turn it on anyway, APEX tools may fail to start or may not see the workspace.
 
-- **VS Code.** Set `chat.agent.sandbox.enabled` to `on` (the default is `off`) and start a new Copilot session. Leave
-  `chat.agent.sandbox.network.allowNetwork` at its default, `true`. On Windows, sandboxing needs the September 2026
-  Windows security update, and VS Code marks Windows support as experimental. **Permissions** > **Sandboxing for
-  terminal** in a session changes that session only.
-- **GitHub Copilot app.** Sandboxing is a per-project setting and is off by default; APEX cannot turn it on for you. Open
-  **Settings**, select the project under **Projects**, and turn on **Sandbox new sessions** under **Sandbox**. Leave
-  **Outbound internet** on. The setting applies to new sessions. The app documents Windows 11 25H2 with update
-  KB5124010 or later; on 24H2, check that the app reports the sandbox as available. If the app shows **Sandbox
-  unavailable**, fix the reported problem and select **Retry sandbox**.
-- **Copilot CLI.** In a session, run `/sandbox enable`, or set `sandbox.enabled` to `true` in
-  `~/.copilot/settings.json`. On Linux and WSL2, first install Bubblewrap 0.5.0 or later, `slirp4netns` and the other
-  namespace tools that `copilot help sandbox` lists; on Ubuntu, start with `sudo apt install bubblewrap slirp4netns`.
-  WSL1 cannot run Bubblewrap.
+Use explicit tool grants rather than **Allow all**, including when sandboxing is off. If you previously used
+**Allow all**, replace it with explicit grants before starting an unsandboxed session. Kernel approvals and human
+gate decisions remain required; tool grants do not replace them. Enterprise-managed settings may control these
+options; do not bypass your organization's restrictions.
+
+- **VS Code.** Set `chat.agent.sandbox.enabled` to `off` and start a new Copilot session. **Permissions** >
+  **Sandboxing for terminal** changes that session only; leave it disabled for APEX.
+- **GitHub Copilot app.** Open **Settings**, select the project under **Projects**, and turn off **Sandbox new
+  sessions** under **Sandbox**. Start a new session, because the setting applies only to new sessions.
+- **Copilot CLI.** Set `sandbox.enabled` to `false` in `~/.copilot/settings.json` and start a new session.
 
 ## Install The Plugin
 
@@ -219,7 +215,7 @@ Run `apex doctor` on the host after setup; add `--json` for every check. Plain `
 `apex doctor --fix --yes` rewrites managed files and the runtime lock, never host tools. Doctor infers the host from
 the platform, because every workspace uses the `github-copilot-cli` projection whichever client runs it. Warnings do
 not make doctor unhealthy; failures do, and each one names a remedy. Doctor cannot see inside a client, so it does not
-check whether local sandboxing is on or whether the client has loaded the plugin.
+check whether the client has loaded the plugin.
 
 | Check                 | Windows: VS Code or the app                                  | Linux or WSL2: Copilot CLI                                  |
 | --------------------- | ------------------------------------------------------------ | ----------------------------------------------------------- |
@@ -238,8 +234,8 @@ the first trusted session, so a missing plugin is only a warning there.
 
 Clean-host qualification belongs to [CP-20](https://github.com/jonathan-vella/apex-vnext/issues/386) (`CLIENT-012`).
 Start from a host without APEX, follow [Prepare Windows 11](prepare-windows-11.md) for that host, and record each result.
-Closing implementation issue #378 did not provide live clean-host evidence. Record actual sandbox availability on the
-host/client: vendor app documentation lists 25H2/26H1, while the recorded APEX decision is 25H2/24H2. The
+Closing implementation issue #378 did not provide live clean-host evidence. Record the actual host: vendor
+app documentation lists 25H2/26H1, while the recorded APEX decision is 25H2/24H2. The
 [qualification worksheet](qualify-live-clients.md#5-copy-this-run-worksheet) retains that distinction for human evaluation.
 
 ### Windows 11 With VS Code Or The App
@@ -251,7 +247,7 @@ In PowerShell, without WSL:
 2. Install the plugin and CLI as in [Install the CLI on Windows](#install-the-cli-on-windows), in an empty folder.
 3. Run `apex doctor`. Expect `Status: Ready`; without Copilot CLI, the app reports one warning for `copilot-cli`.
 4. Run `apex doctor --json`. Expect `host` to start with `windows:` and `copilot-plugin` to name the plugin store.
-5. In VS Code, search `@agentPlugins` and expect one `apex` entry; in the app, confirm that the project sandbox is on.
+5. In VS Code, search `@agentPlugins` and expect one `apex` entry; in the app, start a session with **APEX**.
    Doctor cannot check either.
 
 ### Linux Or WSL2 With Copilot CLI
@@ -266,7 +262,7 @@ In the Ubuntu terminal:
 3. Run `apex doctor`. Expect `Status: Ready` with no warnings. A Windows `code` shim on `PATH` must not change the
    result.
 4. Run `apex doctor --json`. Expect `host` to start with `wsl2:` or `linux:`, and `linux-sandbox-tools` to pass.
-5. Run `copilot --agent apex` in the workspace and turn on the sandbox with `/sandbox enable`. Doctor cannot check it.
+5. Run `copilot --agent apex` in the workspace. Doctor cannot check that the client loaded the plugin.
 
 ## Update APEX
 
@@ -385,7 +381,7 @@ Removing the plugin does not delete `.apex/` project state or history.
 | `copilot plugin install apex@apex-plugins` finds no plugin                | Check the marketplace entry and refresh it; use the release status above to distinguish local candidates  |
 | `doctor` reports `plugin-owned:<path>`                                    | Run `apex update`, then move or delete edited copies it lists                                             |
 | `doctor` reports `copilot-plugin` with another version                    | Run `copilot plugin update apex@apex-plugins`, or install the CLI at the plugin's version                 |
-| The client reports the sandbox as unavailable                             | Install the Windows update it names, or Bubblewrap and `slirp4netns` on Linux and WSL2                    |
+| APEX tools are missing or fail only in a sandboxed session                | Turn the sandbox off; sandboxed sessions are deferred until after launch                                  |
 
 ## Install A Local Candidate
 

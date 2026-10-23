@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Client local sandboxing is no longer a launch requirement or qualification input; sandboxed sessions are deferred
+  until after launch. Doctor's host check no longer says the sandbox is assumed on.
 - CP-31 adds a general read-only Azure MCP Server `3.0.0` provider for foreground APEX, with verified namespace/command
   grants and cap-aware retail-price provenance; the ten ARM CostManagement reads remain under `apex-azure-cost`.
   Kernel approvals and APEX SDK v2/protocol are unchanged. Client/live qualification remains separately authorized.

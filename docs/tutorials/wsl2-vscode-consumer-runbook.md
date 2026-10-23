@@ -23,9 +23,9 @@ Ubuntu without WSL, start at [Install Node.js And npm](../how-to/prepare-windows
 
 - Ubuntu on WSL2, with workspaces in the Linux filesystem, such as `~/src`, rather than under `/mnt/c`;
 - Node.js 24.21.0 (LTS) or later, installed in Ubuntu and separate from any Node.js installation on Windows;
-- GitHub Copilot CLI, signed in, with Bubblewrap and `slirp4netns` for its local sandbox.
+- GitHub Copilot CLI, signed in.
 
-Then turn on the Copilot CLI sandbox with `/sandbox enable` in a session. APEX assumes it is on and does not check it.
+Local sandboxing is not required and is deferred until after launch; leave it off.
 
 ## Install The Plugin
 

@@ -90,8 +90,8 @@ come from the plugin. Plugin support must still be proven with exact client vers
 
 - **Hosts.** VS Code and the Copilot app run on native Windows 11 (25H2 or 24H2), without WSL. VS Code needs version
   1.140 or later and the Copilot harness. Copilot CLI runs on Linux or WSL2. Each workspace uses one host.
-- **Sandbox.** Turn on client local sandboxing before using APEX. In the Copilot app it is a project setting; APEX
-  cannot set it for you and does not check it. Outbound network stays allowed.
+- **Sandbox.** Local sandboxing is not required and is not qualified for launch; leave it off. APEX does not check
+  it. Sandboxed sessions are post-launch work.
 - **Install.** Install the plugin once per machine through the Copilot CLI store, which Copilot CLI and the app write
   and VS Code reads. Do not also install it from the VS Code marketplace view. After a plugin change, run **Developer:
   Restart Local Agent Host** in VS Code. On Windows, close VS Code before you update or remove the plugin, because VS
