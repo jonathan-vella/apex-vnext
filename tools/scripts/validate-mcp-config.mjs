@@ -13,13 +13,22 @@ const mcpConfigPath = resolve(repoRoot, ".vscode/mcp.json");
 const RETIRED_ASTRO_HOST = "mcp.docs.astro.build";
 const RETIRED_TERRAFORM_EXECUTABLE = "terraform-mcp-server";
 const RETIRED_DRAWIO_EXECUTABLE = "deno";
-const ARM_MCP_ENDPOINT = "https://mcp.management.azure.com";
-const ARM_MCP_TOOLSET = "CostManagement";
+const RETIRED_ARM_MCP_HOST = "mcp.management.azure.com";
 
 function isRetiredAstroEndpoint(value) {
   if (typeof value !== "string") return false;
   try {
     return new URL(value).hostname.toLowerCase().replace(/\.+$/u, "") === RETIRED_ASTRO_HOST;
+  } catch {
+    return false;
+  }
+}
+
+function retiredArmCostServer(name, server) {
+  if (name.toLowerCase().replaceAll("_", "-") === "apex-azure-cost") return true;
+  if (typeof server?.url !== "string") return false;
+  try {
+    return new URL(server.url).hostname.toLowerCase().replace(/\.+$/u, "") === RETIRED_ARM_MCP_HOST;
   } catch {
     return false;
   }
@@ -81,17 +90,10 @@ export function validateMcpConfig(mcpConfig) {
   }
   if (!servers.github) errors.push("Missing required MCP server: servers.github");
 
-  const armMcp = servers["apex-azure-cost"];
-  if (!armMcp) errors.push("Missing required MCP server: servers.apex-azure-cost");
-  else if (armMcp.type !== "http") errors.push('apex-azure-cost must use type: "http"');
-  else if (armMcp.url !== ARM_MCP_ENDPOINT) {
-    errors.push(`apex-azure-cost must use the managed endpoint: ${ARM_MCP_ENDPOINT}`);
-  } else if (JSON.stringify(armMcp.headers) !== JSON.stringify({ "x-mcp-toolset": ARM_MCP_TOOLSET })) {
-    errors.push(`apex-azure-cost must enable x-mcp-toolset: ${ARM_MCP_TOOLSET}`);
-  }
-
   for (const [name, server] of Object.entries(servers)) {
     const serialized = JSON.stringify(server).toLowerCase().replaceAll("\\", "/");
+    if (retiredArmCostServer(name, server))
+      errors.push(`Retired ARM CostManagement MCP server must not be active: servers.${name}`);
     if (unguardedAzureLaunch(name, server)) {
       errors.push(
         `Unguarded developer Azure MCP launch must not be active: servers.${name}; use the registry-guarded APEX plugin`,
@@ -144,8 +146,10 @@ function main() {
   r.tick();
   if (mcpConfig?.servers?.github) r.ok("MCP config includes required server: github");
   r.tick();
-  if (hasServerMap && !errors.some((error) => error.includes("apex-azure"))) {
-    r.ok("MCP config keeps ARM Cost Management-only; general Azure MCP is available only through the guarded plugin");
+  if (hasServerMap && !errors.some((error) => error.startsWith("Retired ARM CostManagement MCP"))) {
+    r.ok(
+      "MCP config has no retired ARM CostManagement server; general Azure MCP is available only through the guarded plugin",
+    );
   }
   r.tick();
   if (hasServerMap && !errors.some((error) => error.startsWith("Retired custom Azure Pricing MCP"))) {

@@ -116,7 +116,7 @@ nor grants tools, deployment authority or new artifact/renderer support.
 ## Boundaries
 
 The kernel is authoritative for accepted requirements, governance completeness, task state, review findings and gates.
-Write only through APEX MCP. Azure MCP and ARM CostManagement access is read-only; do not call mutation, deployment
+Write only through APEX MCP. Azure MCP access is read-only; do not call mutation, deployment
 or filesystem tools. Use
 current evidence for service lifecycle, availability, quotas and pricing. Generated review files are read-only
 projections of accepted state.

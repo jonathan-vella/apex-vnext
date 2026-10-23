@@ -10,21 +10,21 @@ avoids duplicate tools and independent state.
 ## Azure MCP Server 3
 
 [DECISION-038](../vnext/DECISIONS.md#decision-038-introduce-azure-mcp-server-3-as-a-managed-azure-tool-provider)
-and [CP-31](https://github.com/jonathan-vella/apex-vnext/issues/489) introduce three separate server identities.
-**IMPLEMENTED LOCAL; local qualification stages pass after restoring the jq prerequisite.**
-Final-head CI and human client/authenticated Azure qualification remain pending; this is not a release claim.
+and [CP-31](https://github.com/jonathan-vella/apex-vnext/issues/489) introduced Azure MCP Server 3; the separate ARM
+CostManagement provider was subsequently retired by DECISION-039.
+The earlier CP-31 local qualification passed after restoring the jq prerequisite; that evidence does not qualify
+the DECISION-039 retirement head. Retirement-head CI and human client/authenticated Azure qualification remain
+pending; this is not a release claim.
 
 | Server            | Provider                                                         | Managed role                                                                                    |
 | ----------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | `apex`            | Bundled APEX MCP                                                 | Kernel-authorized workflow, evidence, reviews, gates and execution                              |
-| `apex-azure`      | Official `@azure/mcp@3.0.0`, namespace mode, `--read-only`       | Verified general Azure reads, metadata, diagnostics, documentation, guidance and retail pricing |
-| `apex-azure-cost` | Remote `https://mcp.management.azure.com`, `CostManagement` only | Ten existing ARM cost, forecast, budget, alert and commitment reads                             |
+| `apex-azure`      | Official `@azure/mcp@3.0.0`, namespace mode, `--read-only`       | Verified general Azure reads, metadata, diagnostics, documentation, guidance, retail pricing and supported Advisor/optimization recommendations |
 
-General `apex-azure` access is provided only through guarded plugin consumers. The root developer workspace's
-`.vscode/mcp.json` does not register that broad standalone server: without the loaded plugin, its command/parameter
-guard is absent, and `--read-only` alone is insufficient. The developer configuration retains its CostManagement-only
-endpoint. Do not add a standalone general Azure registration until equivalent guarding exists, or duplicate a provider
-already registered by the plugin.
+`apex-azure` access is provided only through guarded plugin consumers. The root developer workspace's
+`.vscode/mcp.json` does not register standalone Azure access: without the loaded plugin, its command/parameter guard is
+absent, and `--read-only` alone is insufficient. Do not add an unguarded registration or duplicate a provider already
+registered by the plugin.
 
 The foreground APEX agent has explicit grants for the 44 verified namespace/direct tools in
 [`azure-mcp.v1.json`](../../tools/registry/azure-mcp.v1.json), including the actual `documentation` proxy, quota,
@@ -63,11 +63,10 @@ Metadata is declared evidence, not cryptographic attestation; the pricing provid
 [managed pricing contract](../../customizations/.github/skills/apex-azure-defaults/references/retail-pricing.md)
 owns parameter, meter-selection and evidence rules.
 
-The retained ARM reads are `query_costs`, `query_aks_costs`, `forecast_costs`, `list_dimensions`, `list_budgets`,
-`get_budget`, `list_alerts`, `list_benefit_utilization`, `get_benefit_recommendations` and
-`list_reservation_transactions`, each under `apex-azure-cost/<tool>`. Their read allowlist lives in
-[`arm-mcp-cost-pricing.v1.json`](../../tools/registry/arm-mcp-cost-pricing.v1.json); the historical filename does not
-restore the removed Pricing toolset. Budget writes, price-sheet downloads, operation tools and unknown names are denied.
+The separate ARM CostManagement server was retired by [DECISION-039](../vnext/DECISIONS.md#decision-039-retire-the-separate-arm-costmanagement-server).
+Historical spend, AKS cost allocation, forecasts, budgets, alerts and commitment records are unsupported and are not
+inferred from Advisor recommendations or retail prices. Cost optimization uses only the reviewed Azure MCP pricing,
+Advisor and optimization commands. Retired `apex-azure-cost` tool names are explicitly denied by the managed hook.
 
 Stable `3.x` updates use dependency review and focused discovery/schema/grant tests; the executable version is the
 tracked exact `3.0.0`, never floating `latest`, `@3` or `@3.x`. A new major needs an explicit decision. Cold `npx`

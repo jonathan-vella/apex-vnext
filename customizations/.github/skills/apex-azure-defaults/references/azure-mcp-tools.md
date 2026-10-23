@@ -1,8 +1,9 @@
 # Managed Azure MCP Tools
 
 In a guarded plugin consumer, the foreground `APEX` agent uses `apex-azure` for verified general Azure read-only
-discovery, resource metadata, diagnostics, service guidance and retail pricing. It uses `apex-azure-cost` only for
-the ten ARM CostManagement reads.
+discovery, resource metadata, diagnostics, service guidance, retail pricing and supported Advisor/optimization
+recommendations. The separate ARM CostManagement server is retired; actual billing, forecasts, budgets, alerts and
+commitment records are not available through this integration.
 The `apex` server remains the sole workflow authority: external observations do not approve gates, accept evidence,
 authorize changes or replace `apex/taskContext`. Hidden workers do not inherit broad Azure grants.
 

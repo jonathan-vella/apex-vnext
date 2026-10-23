@@ -6,9 +6,9 @@
  * preToolUse:
  * - Deny the user-facing APEX agent as a `task` target. A person selects APEX in the agent picker; it never runs as a
  *   subagent. Hidden workers and built-in agents are left to the normal permission flow.
- * - Restrict `apex-azure-cost` to the ten approved ARM cost reads. Restrict `apex-azure` to reviewed namespace
- *   commands with schema-shaped arguments. Namespace grants and upstream readOnlyHint alone are not authorization.
- *   Unknown commands, nonempty-intent learn requests and malformed protected calls are denied before transport.
+ * - Deny the retired `apex-azure-cost` server by name. Restrict `apex-azure` to reviewed namespace commands with
+ *   schema-shaped arguments. Namespace grants and upstream readOnlyHint alone are not authorization. Unknown
+ *   commands, nonempty-intent learn requests and malformed protected calls are denied before transport.
  *
  * Failure rule: the script always exits 0, because the client denies a preToolUse call when a command hook exits
  * non-zero. Input it cannot parse therefore allows the call (fail open), except that a raw-text scan still denies a
@@ -56,16 +56,9 @@ const TASK_TOOLS = new Set(["task", "Task", "Agent"]);
 
 export const APEX_PLUGIN_NAME = "apex";
 
-export const PRICING_SERVER = "apex-azure-cost";
-// build-plugin.mjs replaces this line with managedPolicy.candidateReadAllowlist from
-// tools/registry/arm-mcp-cost-pricing.v1.json. Unbuilt, the hook allows no pricing tool.
-export const PRICING_READ_TOOLS = Object.freeze([]); // @apex-build: pricing-read-tools
 export const AZURE_COMMAND_POLICY = Object.freeze({}); // @apex-build: azure-command-policy
 // The server name, with "-" or "_" between its words, anywhere in a tool name.
-const PRICING_SERVER_MARK = /apex[-_]azure[-_]cost/iu;
-// Copilot CLI sends "<server>-<tool>". Also accepted: "/", ":" or "." separators and
-// the "mcp__<server>__<tool>" and "mcp_<server>_<tool>" forms other hosts use.
-const PRICING_TOOL_NAME = /^(?:mcp_{1,2})?apex[-_]azure[-_]cost(?:-|_{1,2}|\/|:|\.)([A-Za-z0-9_.-]+)$/iu;
+const RETIRED_COST_SERVER_MARK = /apex[-_]azure[-_]cost/iu;
 const AZURE_SERVER_MARK = /apex[-_]azure/iu;
 const AZURE_TOOL_NAME = /^(?:mcp_{1,2})?apex[-_]azure(?:-|_{1,2}|\/|:|\.)([A-Za-z0-9_.-]+)$/iu;
 
@@ -103,28 +96,14 @@ function apexTaskDenial(target) {
   );
 }
 
-/**
- * Returns the tool on the pricing server that a tool name addresses: a tool name, "" when the name addresses the server
- * but no tool can be read from it, or undefined when the name is not for the pricing server.
- */
-export function pricingTool(toolName) {
-  if (typeof toolName !== "string") return undefined;
-  const name = toolName.trim();
-  if (!PRICING_SERVER_MARK.test(name)) return undefined;
-  return PRICING_TOOL_NAME.exec(name)?.[1] ?? "";
+export function isRetiredCostServerTool(toolName) {
+  return typeof toolName === "string" && RETIRED_COST_SERVER_MARK.test(toolName.trim());
 }
 
-function pricingDenial(toolName) {
-  return deny(
-    `"${toolName}" is not one of the read-only Azure cost tools. APEX uses only read-only tools from the ` +
-      `${PRICING_SERVER} server; write, operation and unrecognized tools on it are blocked.`,
-  );
-}
-
-function denyPricingWrite({ toolName, argsValid = true }) {
-  const tool = pricingTool(toolName);
-  if (tool === undefined) return null;
-  return argsValid && PRICING_READ_TOOLS.includes(tool) ? null : pricingDenial(toolName);
+function denyRetiredCostServer({ toolName }) {
+  return isRetiredCostServerTool(toolName)
+    ? deny(`"${toolName}" targets the retired apex-azure-cost server and is blocked before transport.`)
+    : null;
 }
 
 function isObject(value) {
@@ -132,7 +111,7 @@ function isObject(value) {
 }
 
 export function azureTool(toolName) {
-  if (typeof toolName !== "string" || pricingTool(toolName) !== undefined) return undefined;
+  if (typeof toolName !== "string" || isRetiredCostServerTool(toolName)) return undefined;
   const name = toolName.trim();
   if (!AZURE_SERVER_MARK.test(name)) return undefined;
   return AZURE_TOOL_NAME.exec(name)?.[1] ?? "";
@@ -622,7 +601,7 @@ export function denyNestedRubberDuck({ payload, toolName, args }, { env = proces
 export const handlers = Object.freeze({
   preToolUse: Object.freeze([
     denyApexTaskTarget,
-    denyPricingWrite,
+    denyRetiredCostServer,
     denyAzureCommand,
     denyNestedRubberDuck,
     denyApexMutationDuringRubberDuck,
@@ -646,10 +625,12 @@ function failSafe(event, text) {
   if (target !== undefined) return apexTaskDenial(target);
   const names = scanToolNames(text);
   for (const name of names) {
-    if (pricingTool(name) !== undefined) return pricingDenial(name);
+    if (isRetiredCostServerTool(name))
+      return deny(`"${name}" targets the retired apex-azure-cost server and is blocked before transport.`);
     if (azureTool(name) !== undefined) return azureDenial(name);
   }
-  if (names.length === 0 && PRICING_SERVER_MARK.test(text)) return pricingDenial(PRICING_SERVER);
+  if (names.length === 0 && RETIRED_COST_SERVER_MARK.test(text))
+    return deny("apex-azure-cost targets a retired server and is blocked before transport.");
   if (names.length === 0 && AZURE_SERVER_MARK.test(text)) return azureDenial("apex-azure");
   const tool = names.map(apexToolName).find((name) => name !== undefined);
   const rubberDuck = targets.some(isRubberDuck);

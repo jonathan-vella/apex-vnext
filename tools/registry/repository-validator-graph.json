@@ -409,16 +409,6 @@
       }
     },
     {
-      "id": "test-arm-mcp-cost-pricing",
-      "script": "test:arm-mcp-cost-pricing",
-      "profile": "node-test",
-      "aliases": [],
-      "retirement": {
-        "status": "active",
-        "replacementIds": []
-      }
-    },
-    {
       "id": "test-azure-mcp",
       "script": "test:azure-mcp",
       "profile": "node-test",
@@ -601,16 +591,6 @@
     {
       "id": "validate-pricing-parity-prepared",
       "script": "validate:pricing-parity:prepared",
-      "profile": "node-validation",
-      "aliases": [],
-      "retirement": {
-        "status": "active",
-        "replacementIds": []
-      }
-    },
-    {
-      "id": "validate-arm-mcp-cost-pricing",
-      "script": "validate:arm-mcp-cost-pricing",
       "profile": "node-validation",
       "aliases": [],
       "retirement": {
@@ -955,8 +935,6 @@
         "test:client-outcomes:prepared",
         "validate:pricing-parity:prepared",
         "test:pricing-parity:prepared",
-        "validate:arm-mcp-cost-pricing",
-        "test:arm-mcp-cost-pricing",
         "validate:azure-mcp",
         "test:azure-mcp",
         "validate:diagram-semantics",

@@ -292,7 +292,6 @@ test("asset generator inventories only the reviewed governance baseline schema",
 test("managed role projections retain required tools and exclude unrelated grants", async () => {
   await execFile(process.execPath, ["packages/cli/scripts/prepare-assets.mjs"], { cwd: root });
   const manifest = JSON.parse(await readFile(join(root, "customizations/manifest.json"), "utf8"));
-  const arm = JSON.parse(await readFile(join(root, "tools/registry/arm-mcp-cost-pricing.v1.json"), "utf8"));
   const requiredApex = {
     coordinator: [
       "status",
@@ -322,11 +321,6 @@ test("managed role projections retain required tools and exclude unrelated grant
     "code-generation": ["taskContext", "stageFile", "generateIac"],
     validation: ["taskContext", "validateTask", "completeTask"],
   };
-  const requiredArm = {
-    coordinator: arm.managedPolicy.candidateReadAllowlist,
-    "code-generation": [],
-    validation: [],
-  };
   const readTools = ["view", "glob", "rg"];
   const explorers = ["coordinator"];
   const webTools = { coordinator: ["web_fetch"] };
@@ -347,16 +341,11 @@ test("managed role projections retain required tools and exclude unrelated grant
         assert.match(content, /apex\/governanceImport/u, label);
       }
       const apexTools = requiredApex[role.id].map((tool) => `apex/${tool}`);
-      const armTools = requiredArm[role.id].map((tool) => `apex-azure-cost/${tool}`);
       const azureRegistry = JSON.parse(await readFile(join(root, "tools/registry/azure-mcp.v1.json"), "utf8"));
       const azureTools =
         role.id === "coordinator" ? Object.keys(azureRegistry.namespaces).map((tool) => `apex-azure/${tool}`) : [];
       assert.deepEqual(metadata.tools.filter((tool) => tool.startsWith("apex/")).sort(), apexTools.sort(), label);
-      assert.deepEqual(
-        metadata.tools.filter((tool) => tool.startsWith("apex-azure-cost/")).sort(),
-        armTools.sort(),
-        label,
-      );
+      assert.ok(!metadata.tools.some((tool) => tool.startsWith("apex-azure-cost/")), `${label}: retired cost tools`);
       assert.deepEqual(
         metadata.tools.filter((tool) => tool.startsWith("apex-azure/")).sort(),
         azureTools.sort(),
@@ -398,16 +387,12 @@ test("managed role projections retain required tools and exclude unrelated grant
       );
       const allowed = new Set([
         ...apexTools,
-        ...armTools,
         ...azureTools,
         ...interactive,
         ...nativeRead,
         ...(webTools[role.id] ?? []),
       ]);
       for (const tool of metadata.tools) assert.ok(allowed.has(tool), `${label}: unexpected tool ${tool}`);
-      for (const tool of [...arm.managedPolicy.denyBeforeTransport, ...arm.managedPolicy.deferredTools]) {
-        assert.ok(!metadata.tools.includes(`apex-azure-cost/${tool}`), `${label}: forbidden ARM tool ${tool}`);
-      }
       if (role.interactionType === "autonomous-subagent") {
         assert.equal(metadata["user-invocable"], false, label);
         assert.ok(!metadata.tools.includes("vscode/askQuestions"), label);
