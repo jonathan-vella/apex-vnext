@@ -5382,6 +5382,81 @@ function baselineWithFindings(subscriptionId: string, observedAt: string, findin
   return baseline;
 }
 
+test("Architecture omits DoNotEnforce deny mappings but requires Default and unknown modes", async () => {
+  const root = await tempRoot();
+  const subscriptionId = "11111111-1111-1111-1111-111111111111";
+  const scope = `/subscriptions/${subscriptionId}`;
+  const service = new ApexService(root);
+  const { runId } = await service.init({
+    projectId: "demo",
+    riskOwner: "partner",
+    targetScope: `${scope}/resourceGroups/rg-test`,
+  });
+  await service.nextTask();
+  const requirementHashes = await complete(service, "requirements", [{ kind: "requirements", value: requirements() }]);
+  await complete(service, "requirements-review", [
+    { kind: "review-findings", value: review(runId, "requirements", requirementHashes.requirements!) },
+  ]);
+  await service.decideGateNumber(1, "approved", "tester");
+  await acceptAvailabilityEvidence(service, runId);
+  await task(service, "governance-discovery");
+  const findings = ["DoNotEnforce", "Default", undefined].map((mode, index) => ({
+    policy_id: `/providers/Microsoft.Authorization/policyDefinitions/mode-${index}`,
+    display_name: `mode-${mode ?? "unknown"}`,
+    effect: "deny",
+    ...(mode === undefined ? {} : { enforcementMode: mode }),
+    scope,
+    assignment_id: `${scope}/providers/Microsoft.Authorization/policyAssignments/mode-${index}`,
+    classification: mode === "DoNotEnforce" ? "informational" : "blocker",
+    resource_types: ["Microsoft.Web/sites"],
+    exemption: null,
+    reported_exemptions: [],
+  }));
+  const baseline = baselineWithFindings(subscriptionId, new Date().toISOString(), findings);
+  Object.assign(baseline.subscriptions[subscriptionId]!.discovery_summary, {
+    blocker_count: 2,
+    informational_count: 1,
+  });
+  baseline.summary.total_blockers = 2;
+  const path = join(root, "baseline.json");
+  await writeJson(path, baseline);
+  const governanceHash = (await service.importGovernanceBaseline(path)).outputHash;
+  const architectureTask = await task(service, "architecture");
+  const required = await governanceFindings(service, architectureTask, ["Microsoft.Web/sites"]);
+  assert.deepEqual(
+    required.map(({ policyDefinitionId }) => policyDefinitionId.split("/").at(-1)).sort(),
+    ["mode-1", "mode-2"],
+  );
+  const policy = policyMap(runId, governanceHash, required);
+  assert.equal(policy.mappings.length, 2);
+  const architectureValue = architecture(runId);
+  const costValue = costEstimate(runId);
+  const bundle = (mappings: typeof policy.mappings): TaskOutput[] => [
+    { kind: "architecture", value: architectureValue },
+    { kind: "cost-estimate", value: costValue },
+    {
+      kind: "workload-decision-manifest",
+      value: workloadDecisionManifest({
+        runId,
+        requirementsHash: requirementHashes.requirements!,
+        architectureHash: sha256Json(architectureValue),
+        costEstimateHash: sha256Json(costValue),
+      }),
+    },
+    { kind: "policy-property-map", value: { ...policy, mappings } },
+  ];
+  for (const missing of policy.mappings) {
+    const before = await service.status();
+    await assert.rejects(
+      service.completeTaskOutputs(architectureTask, bundle(policy.mappings.filter((item) => item !== missing))),
+      /Policy mappings are required/,
+    );
+    assert.deepEqual(await service.status(), before);
+  }
+  await service.completeTaskOutputs(architectureTask, bundle(policy.mappings));
+  assert.equal((await service.status()).task, "architecture-review");
+});
+
 async function approveOnReferenceGovernance(findings: Record<string, unknown>[] = []) {
   const root = await tempRoot();
   const subscriptionId = "11111111-1111-1111-1111-111111111111";
