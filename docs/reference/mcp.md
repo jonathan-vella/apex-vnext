@@ -16,10 +16,10 @@ The earlier CP-31 local qualification passed after restoring the jq prerequisite
 the DECISION-039 retirement head. Retirement-head CI and human client/authenticated Azure qualification remain
 pending; this is not a release claim.
 
-| Server            | Provider                                                         | Managed role                                                                                    |
-| ----------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `apex`            | Bundled APEX MCP                                                 | Kernel-authorized workflow, evidence, reviews, gates and execution                              |
-| `apex-azure`      | Official `@azure/mcp@3.0.0`, namespace mode, `--read-only`       | Verified general Azure reads, metadata, diagnostics, documentation, guidance, retail pricing and supported Advisor/optimization recommendations |
+| Server       | Provider                                                   | Managed role                                                                                                                                    |
+| ------------ | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apex`       | Bundled APEX MCP                                           | Kernel-authorized workflow, evidence, reviews, gates and execution                                                                              |
+| `apex-azure` | Official `@azure/mcp@3.0.0`, namespace mode, `--read-only` | Verified general Azure reads, metadata, diagnostics, documentation, guidance, retail pricing and supported Advisor/optimization recommendations |
 
 `apex-azure` access is provided only through guarded plugin consumers. The root developer workspace's
 `.vscode/mcp.json` does not register standalone Azure access: without the loaded plugin, its command/parameter guard is
