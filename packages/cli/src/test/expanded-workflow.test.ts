@@ -5423,10 +5423,10 @@ test("Architecture omits DoNotEnforce deny mappings but requires Default and unk
   const governanceHash = (await service.importGovernanceBaseline(path)).outputHash;
   const architectureTask = await task(service, "architecture");
   const required = await governanceFindings(service, architectureTask, ["Microsoft.Web/sites"]);
-  assert.deepEqual(
-    required.map(({ policyDefinitionId }) => policyDefinitionId.split("/").at(-1)).sort(),
-    ["mode-1", "mode-2"],
-  );
+  assert.deepEqual(required.map(({ policyDefinitionId }) => policyDefinitionId.split("/").at(-1)).sort(), [
+    "mode-1",
+    "mode-2",
+  ]);
   const policy = policyMap(runId, governanceHash, required);
   assert.equal(policy.mappings.length, 2);
   const architectureValue = architecture(runId);
