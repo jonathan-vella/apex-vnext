@@ -226,9 +226,9 @@ CLIENT-017, not live VS Code or Copilot CLI agent interaction and not complete a
 2. Install the same exact plugin and package candidate through one channel.
 3. Trust only the qualification workspace. A disposable, isolated profile root may be mutated solely for the managed
    VS Code bootstrap agent scenario; do not mutate a real user profile or global MCP configuration.
-4. Leave client local sandboxing off; it is deferred until after launch. Without a client-reported sandbox, use explicit
-   tool grants rather than Allow All. Remote
-   delegation modes stay prohibited, and gate decisions still come from the maintainer.
+4. Leave client local sandboxing off; it is deferred until after launch. Allow All tool permissions are acceptable in
+   qualification sessions; record the approval mode used. They do not replace gate decisions, which still come from the
+   maintainer, or the separate authorization for Azure sign-in and deployment. Remote delegation modes stay prohibited.
 5. Record structured outcomes and content-free provenance, not raw chat or secrets.
 6. Repeat affected scenarios in every supported client after release-relevant runtime, contract, plugin, MCP, skill or
    toolchain changes; retain exact candidate binding for cross-client comparisons.
