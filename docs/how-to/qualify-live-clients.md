@@ -219,10 +219,13 @@ and answer here. Never enter real tenant, subscription or account IDs. This shee
 | Question or step                       | Answer                                                                                      |
 | -------------------------------------- | ------------------------------------------------------------------------------------------- |
 | First message                          | `Create a small lab project: one Azure App Service web app and one storage account.`        |
-| Project name                           | `qual-lab-webapp`                                                                           |
+| Project ID                             | `qual-lab-webapp`                                                                           |
+| Display name                           | `Qualification lab web app`                                                                 |
+| Environment name                       | `dev`                                                                                       |
+| Target scope                           | `local` (the local-only option; no Azure target)                                            |
+| Risk owner                             | `partner` (the only valid values are `partner` and `customer`)                              |
 | Workload                               | `Qualification lab: one App Service web app and one storage account`                        |
 | Purpose                                | `lab` (also try `production` once and confirm it is rejected)                               |
-| Environment                            | `dev`                                                                                       |
 | Region                                 | `swedencentral`                                                                             |
 | IaC track                              | Bicep                                                                                       |
 | Profile                                | Standalone, not ALZ                                                                         |
