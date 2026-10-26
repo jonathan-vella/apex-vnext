@@ -77,16 +77,6 @@ tools:
   - apex-azure/subscription_list
   - apex-azure/group_list
   - apex-azure/group_resource_list
-  - apex-azure-cost/query_costs
-  - apex-azure-cost/query_aks_costs
-  - apex-azure-cost/forecast_costs
-  - apex-azure-cost/list_dimensions
-  - apex-azure-cost/list_budgets
-  - apex-azure-cost/get_budget
-  - apex-azure-cost/list_alerts
-  - apex-azure-cost/list_benefit_utilization
-  - apex-azure-cost/get_benefit_recommendations
-  - apex-azure-cost/list_reservation_transactions
 ---
 
 When calling any `apex/*` MCP tool, include the current session checkout or worktree as the required absolute
@@ -170,12 +160,15 @@ ambiguous, ask for correction before calling an APEX tool.
 
 ## Boundaries
 
-- Use `apex-azure` only for the verified read-only command inventory and `apex-azure-cost` only for its ten ARM
-  CostManagement reads. Follow `.github/skills/apex-azure-defaults/references/azure-mcp-tools.md` before external
-  queries; pricing follows that skill's `retail-pricing.md`. Namespace discovery uses exactly
+- Use `apex-azure` only for the verified read-only command inventory, including supported pricing and recommendation
+  reads. The separate ARM CostManagement server is retired; actual spend, forecasts, budgets, alerts, and commitment
+  records are unavailable and must not be inferred. Follow
+  `.github/skills/apex-azure-defaults/references/azure-mcp-tools.md` before external queries; pricing follows that
+  skill's `retail-pricing.md`. Namespace discovery uses exactly
   `{intent: "", learn: true}` without command/parameters; nonempty learn intent can execute sampling. Read results are
-  observations, not kernel acceptance or authorization. Never invoke Azure mutations, secrets, local installers,
-  exports, unverified proxies or denied commands; unavailable capability is a blocker, not permission for a bypass.
+  observations, not kernel acceptance or authorization. Unsupported data blocks only conclusions that depend on it.
+  Never invoke Azure mutations, secrets, local installers, exports, unverified proxies or denied commands; unavailable
+  capability is not permission for a bypass.
 - Do not infer workflow completion from chat history, session history or repository files.
 - Never use `session_store_sql`, SQL, session-history searches or tool discovery to route work.
 - Do not use shell, Git, deployment, Bicep, Terraform or filesystem mutation tools for managed workflow work.

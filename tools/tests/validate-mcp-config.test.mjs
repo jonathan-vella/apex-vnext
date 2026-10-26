@@ -6,11 +6,6 @@ function validConfig() {
   return {
     servers: {
       github: { type: "http", url: "https://api.githubcopilot.com/mcp/" },
-      "apex-azure-cost": {
-        type: "http",
-        url: "https://mcp.management.azure.com",
-        headers: { "x-mcp-toolset": "CostManagement" },
-      },
     },
   };
 }
@@ -140,14 +135,10 @@ test("rejects Terraform MCP by key, executable, source, path, or toolset signatu
   }
 });
 
-test("requires GitHub and Microsoft ARM MCP", () => {
+test("requires GitHub and does not require a retired Azure cost server", () => {
   const config = validConfig();
-  delete config.servers["apex-azure-cost"];
   delete config.servers.github;
-  assert.deepEqual(validateMcpConfig(config), [
-    "Missing required MCP server: servers.github",
-    "Missing required MCP server: servers.apex-azure-cost",
-  ]);
+  assert.deepEqual(validateMcpConfig(config), ["Missing required MCP server: servers.github"]);
 });
 
 test("rejects Draw.io server by key, executable signature, or embedded source path", () => {
@@ -178,17 +169,25 @@ test("rejects Draw.io server by key, executable signature, or embedded source pa
   ]);
 });
 
-test("rejects ARM MCP endpoint or toolset drift and custom pricing reactivation", () => {
-  const wrongEndpoint = validConfig();
-  wrongEndpoint.servers["apex-azure-cost"].url = "https://example.invalid";
-  assert.deepEqual(validateMcpConfig(wrongEndpoint), [
-    "apex-azure-cost must use the managed endpoint: https://mcp.management.azure.com",
+test("rejects retired ARM CostManagement endpoint by server name or endpoint", () => {
+  const byName = validConfig();
+  byName.servers["apex-azure-cost"] = { type: "http", url: "https://example.invalid" };
+  assert.deepEqual(validateMcpConfig(byName), [
+    "Retired ARM CostManagement MCP server must not be active: servers.apex-azure-cost",
   ]);
 
-  const wrongToolset = validConfig();
-  wrongToolset.servers["apex-azure-cost"].headers["x-mcp-toolset"] = "Pricing";
-  assert.deepEqual(validateMcpConfig(wrongToolset), ["apex-azure-cost must enable x-mcp-toolset: CostManagement"]);
+  const renamed = validConfig();
+  renamed.servers.costs = {
+    type: "http",
+    url: "https://MCP.MANAGEMENT.AZURE.COM./",
+    headers: { "x-mcp-toolset": "CostManagement" },
+  };
+  assert.deepEqual(validateMcpConfig(renamed), [
+    "Retired ARM CostManagement MCP server must not be active: servers.costs",
+  ]);
+});
 
+test("rejects custom pricing reactivation", () => {
   const retired = validConfig();
   retired.servers.legacy = { type: "stdio", command: "python", args: ["-m", "azure_pricing_mcp"] };
   assert.deepEqual(validateMcpConfig(retired), [

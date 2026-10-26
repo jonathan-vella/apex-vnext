@@ -77,17 +77,16 @@ deprecated.
 The plugin ships `com.github.copilot/hooks/hooks.json`, one dependency-free Node script, `apex-hook.mjs`, and the
 generated read-only APEX tool list `apex-mcp-tools.json`. The first `preToolUse` entry matches the subagent tool
 (`task` in Copilot CLI, `Task` or `Agent` in the VS Code payload format) and the tools of the plugin's
-`apex-azure` and `apex-azure-cost` servers. Every entry's `bash` command runs
+`apex-azure` server. Every entry's `bash` command runs
 `node "${PLUGIN_ROOT}/com.github.copilot/hooks/..."` and its `powershell` command (Windows PowerShell 5.1 or
 PowerShell 7) runs the same script from `$env:PLUGIN_ROOT`, so paths with spaces stay one argument. The client writes
 the hook payload to stdin; the script denies a `task` call whose `agent_type` names the user-facing APEX agent
-(`apex:apex`, `APEX`) with `permissionDecision: "deny"` and a reason. It denies ARM `apex-azure-cost` tools outside the
-ten-read allowlist, including writes such as `create_budget`, and validates `apex-azure` commands/parameters against
-the verified read-only registry. Copilot CLI names these tools `apex-azure-<namespace>` and `apex-azure-cost-<tool>`;
-the script also recognizes supported separator forms and denies ambiguous/unknown Azure names. `build-plugin.mjs`
-embeds the reviewed Azure/ARM policies from `tools/registry/azure-mcp.v1.json` and
-`tools/registry/arm-mcp-cost-pricing.v1.json`; an unbuilt script permits no Azure operation. Hidden workers have no
-broad Azure grants. Other tools still use the normal permission flow.
+(`apex:apex`, `APEX`) with `permissionDecision: "deny"` and a reason. It validates `apex-azure`
+commands/parameters against the verified read-only registry, and explicitly denies retired `apex-azure-cost` names.
+Copilot CLI names these tools `apex-azure-<namespace>`; the script also recognizes supported separator forms and
+denies ambiguous/unknown Azure names. `build-plugin.mjs` embeds the reviewed Azure policy from
+`tools/registry/azure-mcp.v1.json`; an unbuilt script permits no Azure operation. Hidden workers have no broad Azure
+grants. Other tools still use the normal permission flow.
 
 `apex-azure` starts exact `@azure/mcp@3.0.0`; a cold `npx` launch may download/cache external platform packages.
 This does not weaken APEX's own bundled offline startup guarantee. Schema-only discovery uses exactly

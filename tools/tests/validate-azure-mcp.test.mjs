@@ -9,7 +9,7 @@ import {
   exactAzureMcpVersion,
   readJson,
 } from "../scripts/_lib/mcp-contracts.mjs";
-import { azureCommandPolicy, pricingReadTools, renderHookScript, renderMcpConfig } from "../scripts/build-plugin.mjs";
+import { azureCommandPolicy, renderHookScript, renderMcpConfig } from "../scripts/build-plugin.mjs";
 import { developerMcpConfig, verifyManagedCapture } from "../scripts/generate-azure-mcp-registry.mjs";
 import { validateMcpConfig } from "../scripts/validate-mcp-config.mjs";
 import { load as loadYaml } from "js-yaml";
@@ -21,8 +21,16 @@ process.env.APEX_REVIEW_HOME = join(scratch, "reviews");
 test.after(() => rmSync(scratch, { recursive: true, force: true }));
 const registry = readJson(azureRegistryPath);
 const source = readFileSync(join(root, "plugin/hooks/apex-hook.mjs"), "utf8");
-const builtSource = renderHookScript(source, await pricingReadTools()).toString();
+const builtSource = renderHookScript(source).toString();
 const hook = await import(`data:text/javascript;base64,${Buffer.from(builtSource).toString("base64")}`);
+const costSkill = readFileSync(
+  join(root, "customizations/.github/skills/apex-azure-cost-optimization/SKILL.md"),
+  "utf8",
+);
+const costGuardrails = readFileSync(
+  join(root, "customizations/.github/skills/apex-azure-cost-optimization/references/cost-tool-guardrails.md"),
+  "utf8",
+);
 const forms = [
   (tool) => `apex-azure-${tool}`,
   (tool) => `apex-azure/${tool}`,
@@ -50,6 +58,23 @@ test("Azure MCP validation and real metadata capture remain required by CI and q
   const workflow = readFileSync(join(root, ".github/workflows/ci.yml"), "utf8");
   assert.match(workflow, /npm run validate:_node-ci/u);
   assert.match(workflow, /npm run test:plugin/u);
+});
+
+test("cost guidance uses guarded Azure MCP only and preserves partial results for mixed requests", () => {
+  assert.match(costSkill, /Use only the exact commands in the guarded `apex-azure` inventory/u);
+  assert.match(costSkill, /For mixed requests, provide supported results and clearly mark unsupported portions/u);
+  assert.match(costGuardrails, /Do not fall back to Azure CLI, REST, Resource Graph CLI,\s+azqr/u);
+  assert.match(costGuardrails, /For mixed requests, return supported recommendations/u);
+  assert.match(costGuardrails, /Historical actual spend or AKS cost allocation/u);
+  for (const template of ["03-des-cost-estimate", "07-ab-cost-estimate"]) {
+    const estimate = readFileSync(
+      join(root, `customizations/.github/skills/apex-artifacts/templates/${template}.template.md`),
+      "utf8",
+    );
+    assert.match(estimate, /Estimated Monthly Total/u);
+    assert.match(estimate, /\[📊 Top 5 Estimated Cost Drivers\]\(#-top-5-estimated-cost-drivers\)/u);
+    assert.doesNotMatch(estimate, /as-built actuals|Commitment\s+discounts do not apply/u);
+  }
 });
 
 function example(schema) {
@@ -253,8 +278,12 @@ test("learn is pure discovery only and malformed arguments cannot reach protecte
     denied("apex-azure-pricing", args);
   denied("apex-azure-subscription_list", { intent: "", learn: true });
   denied("apex-azure-group_resource_list", {});
-  denied("apex-azure-cost-query_costs", []);
-  denied("apex-azure-cost-get_retail_prices", {});
+  for (const name of [
+    "apex-azure-cost-query_costs",
+    "apex-azure-cost-create_budget",
+    "mcp__apex_azure_cost__get_budget",
+  ])
+    denied(name, {});
   for (const name of ["apex-azure", "apex-azure-", "x-apex-azure-pricing", "apex-azure-pricing extra"])
     denied(name, { intent: "", learn: true });
   for (const name of ["apex-azure-pricing", "mcp_apex_azure_pricing", "apex-azure-cost-query_costs"]) {
@@ -306,15 +335,18 @@ test("source and rendered launches derive exact version and namespaces, never a 
   assert.ok(
     npm.ignore.some((entry) => entry["dependency-name"] === "@azure/mcp" && entry.versions.includes(">=4.0.0")),
   );
-  const retailReactivated = structuredClone(sourceConfig);
-  retailReactivated.mcpServers["apex-azure-cost"].headers["x-mcp-toolset"] = "CostManagement,Pricing";
-  assert.throws(() => renderMcpConfig(retailReactivated), /CostManagement only/u);
+  const retiredServerReactivated = structuredClone(sourceConfig);
+  retiredServerReactivated.mcpServers["apex-azure-cost"] = {
+    type: "streamable-http",
+    url: "https://mcp.management.azure.com",
+    headers: { "x-mcp-toolset": "CostManagement" },
+  };
+  assert.throws(() => renderMcpConfig(retiredServerReactivated), /exactly apex and apex-azure/u);
 });
 
 test("developer config generation omits general Azure MCP until equivalent command guards exist", () => {
   const development = developerMcpConfig();
   assert.deepEqual(readJson(".vscode/mcp.json"), development);
-  assert.deepEqual(Object.keys(development.servers), ["github", "apex-azure-cost"]);
+  assert.deepEqual(Object.keys(development.servers), ["github"]);
   assert.deepEqual(validateMcpConfig(development), []);
-  assert.deepEqual(development.servers["apex-azure-cost"].headers, { "x-mcp-toolset": "CostManagement" });
 });

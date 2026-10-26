@@ -244,9 +244,11 @@ without human confirmation.
 
 Architecture must trace decisions to requirements, pricing, security, operations, performance, reliability and cost
 reasoning. Capture alternatives, consequences and rationale once so downstream documents can reuse them. Agents query
-official Azure MCP Server through explicit read-only namespace/command allowlists for general Azure observations and
-retail pricing, and Microsoft ARM MCP through a separate CostManagement-only allowlist for actual costs. Separate
-unpriced items from priced totals and retain source dates and uncertainty; never invent prices or confidence.
+official Azure MCP Server through explicit read-only namespace/command allowlists for general Azure observations,
+retail pricing, and supported Advisor/optimization recommendations. Azure MCP does not provide the retired ARM
+CostManagement actual-spend, forecast, budget, alert, or commitment records; do not claim or synthesize those records.
+Separate observed recommendations, measured utilization, estimates, and retail prices, and retain source dates and
+uncertainty; never invent prices or confidence.
 
 Scope pricing tools to the roles that need them. Reuse matching rows from bounded current pricing evidence rather than
 querying again per line item. Broader queries require a supported provider interface, bounded responses and exact
@@ -257,15 +259,18 @@ failover and capacity details may be described as assumptions or guidance, never
 Policy, security controls and deployment authorization remain binding. Native deployment failures require approved
 corrections, not silent substitutions.
 
-Under [DECISION-038](DECISIONS.md#decision-038-introduce-azure-mcp-server-3-as-a-managed-azure-tool-provider) and
-[CP-31](https://github.com/jonathan-vella/apex-vnext/issues/489), `apex-azure` is a general Azure read-only provider
-for the foreground agent, not a pricing-only server. Retail pricing uses namespace `pricing`, command `pricing_get`;
-the ten existing ARM CostManagement reads remain unchanged under `apex-azure-cost` with no regression to actual costs,
-forecasts, budgets, alerts or commitments. Preserve observed version/row-count/completeness and actual source URI,
-price ID and retrieval-time provenance; this is declared evidence, not cryptographic attestation. A capped response
-(5,000 or more rows) requires narrowing or an explicit unpriced item, never successful zero-price fallback or an
-accepted priced line. See [MCP providers](../reference/mcp.md#azure-mcp-server-3). Local implementation verification
-and separately authorized per-client/live qualification remain distinct.
+Under [DECISION-039](DECISIONS.md#decision-039-retire-the-separate-arm-costmanagement-server), `apex-azure` is the
+general Azure read-only provider for the foreground agent. Retail pricing uses namespace `pricing`, command
+`pricing_get`; supported cost-saving and compute optimization recommendations use the reviewed Advisor and
+`optimization` commands. The separate `apex-azure-cost` ARM CostManagement server is retired. Historical spend,
+AKS cost allocation, forecasts, budget and alert records, and commitment utilization/transactions are unsupported;
+Advisor recommendations and retail prices do not substitute for those records. Missing billing evidence blocks only
+claims that depend on it, not independent recommendation or pricing work. Mixed requests may return supported results
+with explicit capability limits. Preserve observed version/row-count/completeness and actual source URI, price ID and
+retrieval-time provenance; this is declared evidence, not cryptographic attestation. A capped response (5,000 or more
+rows) requires narrowing or an explicit unpriced item, never successful zero-price fallback or an accepted priced line.
+See [MCP providers](../reference/mcp.md#azure-mcp-server-3). Local implementation verification and separately
+authorized per-client/live qualification remain distinct.
 
 ### REQ-GOV-001: Governance And Policy
 
@@ -413,12 +418,12 @@ timeouts, redaction, and safe argv execution. Astro, Terraform, and custom Azure
 active dependencies. Under
 [DECISION-038](DECISIONS.md#decision-038-introduce-azure-mcp-server-3-as-a-managed-azure-tool-provider), supported
 clients connect to the official Azure MCP Server (`apex-azure`, `@azure/mcp@3.0.0`) with explicit read-only
-namespace/command allowlists for general Azure discovery and retail pricing, and directly to Microsoft ARM MCP
-(`apex-azure-cost`) with the ten-tool CostManagement-only allowlist; managed agents must not receive deployment,
-budget-write, pricesheet-operation, unknown, or renamed tools. APEX remains the authority for workflow state, evidence
-acceptance, and gates. The target governance path is `REQ-GOV-001`, not capability-pack execution. Existing unrelated
-packs retain their locks and safety boundaries; this plan does not authorize their removal or a broader pack
-framework.
+namespace/command allowlists for general Azure discovery, retail pricing, and supported recommendation reads. The
+separate ARM CostManagement server is retired; actual billing, forecast, budget, alert, and commitment reporting is
+not an Azure MCP capability and is not promised. Managed agents must not receive deployment, unreviewed, unknown, or
+renamed tools. APEX remains the authority for workflow state, evidence acceptance, and gates. The target governance
+path is `REQ-GOV-001`, not capability-pack execution. Existing unrelated packs retain their locks and safety
+boundaries; this plan does not authorize their removal or a broader pack framework.
 
 ### REQ-SECURITY-001: Security And Supply Chain
 
@@ -761,8 +766,9 @@ Cutover requires all of the following on the exact candidate head:
   outcomes and client-specific authority boundaries.
 - Astro, Terraform, custom pricing, and Draw.io MCP dependencies are absent from active discovery only after their
   applicable replacement gates pass.
-- Azure MCP retail pricing (`apex-azure`), ARM CostManagement (`apex-azure-cost`), and Python diagram replacements
-  satisfy their measured compatibility, reliability, security, and maintainability gates.
+- Azure MCP retail pricing and supported recommendation reads (`apex-azure`), and Python diagram replacements
+  satisfy their measured compatibility, reliability, security, and maintainability gates. ARM CostManagement
+  reporting is explicitly outside the supported capability set.
 - Automatic improvement ingestion meets its precision and privacy thresholds while proposals remain inert.
 - Changed guidance and automation have identified consumers, behavior, diagnostics, security boundaries and proof
   tests. Any executable gate alignment required by this revised plan is complete; no existing check is bypassed.
