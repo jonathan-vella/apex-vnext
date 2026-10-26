@@ -30,8 +30,8 @@ const requiredPolicyKeys = [
   "reported_exemptions",
 ];
 
-function expectedClassification(effect) {
-  if (effect === "deny") return "blocker";
+function expectedClassification(effect, enforcementMode) {
+  if (effect === "deny") return enforcementMode === "DoNotEnforce" ? "informational" : "blocker";
   if (["modify", "deployIfNotExists"].includes(effect)) return "auto-remediate";
   return "informational";
 }
@@ -75,7 +75,7 @@ test("generated ALZ Corp reference baseline matches governance reference contrac
     for (const key of requiredPolicyKeys)
       assert.ok(Object.hasOwn(policy, key), `missing ${key} on ${policy.policy_id}`);
     assert.ok(allowedEffects.has(policy.effect), `unexpected effect ${policy.effect}`);
-    assert.equal(policy.classification, expectedClassification(policy.effect));
+    assert.equal(policy.classification, expectedClassification(policy.effect, policy.enforcementMode));
     assert.match(policy.scope, /^\/providers\/Microsoft\.Management\/managementGroups\/(alz|landingzones|corp)$/u);
     assert.ok(
       policy.assignment_id.startsWith(`${policy.scope}/providers/Microsoft.Authorization/policyAssignments/`),

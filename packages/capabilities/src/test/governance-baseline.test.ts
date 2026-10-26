@@ -290,15 +290,20 @@ function inheritedBaseline() {
   return source;
 }
 
-test("enforcementMode preserves supported modes without weakening desired compliance", () => {
+test("enforcementMode keeps desired constraints but only enforced denies are blockers", () => {
   for (const mode of ["Default", "DoNotEnforce"]) {
+    const classification = mode === "DoNotEnforce" ? "informational" : "blocker";
+    const blockers = mode === "DoNotEnforce" ? 0 : 2;
     const source = inheritedBaseline();
     const entry = source.subscriptions[subscriptionId]!;
     entry.assignment_inventory[0]!.enforcementMode = mode;
-    for (const item of entry.findings)
-      Object.assign(item, { enforcementMode: mode, classification: "blocker", exemption: null });
-    Object.assign(entry.discovery_summary, { blocker_count: 2, informational_count: 0, exempted_count: 0 });
-    source.summary.total_blockers = 2;
+    for (const item of entry.findings) Object.assign(item, { enforcementMode: mode, classification, exemption: null });
+    Object.assign(entry.discovery_summary, {
+      blocker_count: blockers,
+      informational_count: 2 - blockers,
+      exempted_count: 0,
+    });
+    source.summary.total_blockers = blockers;
     const selected = importGovernanceBaseline(source, options, validate);
     assert.equal(selected.constraints.summary.denyCount, 2);
     for (const item of selected.snapshot.findings) {
@@ -306,7 +311,7 @@ test("enforcementMode preserves supported modes without weakening desired compli
         ...item,
         enforcementMode: mode,
         effect: "deny",
-        classification: "blocker",
+        classification,
         exemption: null,
       });
     }
@@ -455,6 +460,34 @@ function descendantsBaseline(assignmentName = "policy") {
   Object.assign(source.summary, { total_findings: 5, total_blockers: 5 });
   return { source, entry, targetScope, scopes };
 }
+
+test("descendants coverage validates deny classifications against explicit and unknown enforcement modes", () => {
+  for (const mode of ["DoNotEnforce", "Default", undefined]) {
+    const { source, entry, targetScope } = descendantsBaseline();
+    const informational = mode === "DoNotEnforce";
+    for (const item of [...entry.assignment_inventory, ...entry.findings])
+      if (mode !== undefined) item.enforcementMode = mode;
+    for (const item of entry.findings) item.classification = informational ? "informational" : "blocker";
+    Object.assign(entry.discovery_summary, {
+      blocker_count: informational ? 0 : 5,
+      informational_count: informational ? 5 : 0,
+    });
+    source.summary.total_blockers = informational ? 0 : 5;
+    const selected = importGovernanceBaseline(source, { ...options, targetScope }, validate);
+    assert.equal(selected.snapshot.findings.length, 4);
+    for (const item of selected.snapshot.findings) {
+      assert.equal(item.classification, informational ? "informational" : "blocker");
+      assert.equal(item.enforcementMode, mode);
+    }
+    for (const item of entry.findings) item.classification = informational ? "blocker" : "informational";
+    Object.assign(entry.discovery_summary, {
+      blocker_count: informational ? 5 : 0,
+      informational_count: informational ? 0 : 5,
+    });
+    source.summary.total_blockers = informational ? 5 : 0;
+    rejected(source, "incomplete");
+  }
+});
 
 test("target projection retains inherited and child policies only after full cache validation", () => {
   const { source, entry, targetScope, scopes } = descendantsBaseline();

@@ -709,16 +709,17 @@ for (const mode of [undefined, "Default", "DoNotEnforce"]) {
         );
         const envelope = assertComplete(collect(context, responses)).subscriptions[subscriptionId];
         assert.ok(envelope.assignment_inventory.every((item) => item.enforcementMode === (mode ?? "Default")));
+        const deniedClassification = mode === "DoNotEnforce" ? "informational" : "blocker";
         assert.deepEqual(
           envelope.findings.map((item) => [item.effect, item.classification, item.enforcementMode]),
           [
-            ["deny", "blocker", mode ?? "Default"],
+            ["deny", deniedClassification, mode ?? "Default"],
             ["modify", "auto-remediate", mode ?? "Default"],
             ["deployIfNotExists", "auto-remediate", mode ?? "Default"],
           ],
         );
         assert.equal(Object.hasOwn(envelope, "policies"), false);
-        assert.equal(envelope.discovery_summary.blocker_count, 1);
+        assert.equal(envelope.discovery_summary.blocker_count, mode === "DoNotEnforce" ? 0 : 1);
         assert.equal(envelope.discovery_summary.auto_remediate_count, 2);
         assert.equal(envelope.discovery_summary.disabled_count, 0);
         assert.equal(envelope.discovery_summary.audit_count, 0);

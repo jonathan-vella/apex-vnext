@@ -293,7 +293,9 @@ function finding(value: unknown, subscriptionId: string, descendants = false): G
     (exemption !== null ||
       classification !==
         (effect === "deny"
-          ? "blocker"
+          ? mode === "DoNotEnforce"
+            ? "informational"
+            : "blocker"
           : ["modify", "deployIfNotExists"].includes(effect)
             ? "auto-remediate"
             : "informational"))

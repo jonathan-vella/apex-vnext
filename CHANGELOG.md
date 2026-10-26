@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Client local sandboxing is no longer a launch requirement or qualification input; sandboxed sessions are deferred
   until after launch. Doctor's host check no longer says the sandbox is assumed on.
+- A policy `deny` in a `DoNotEnforce` assignment is now informational instead of a blocker, in the ALZ reference
+  baseline (142 of 226 blockers), the collector and the importer check. It also needs no Architecture mapping. An unknown
+  mode keeps the deny a blocker.
 - CP-31 adds the general read-only Azure MCP Server `3.0.0` provider for foreground APEX, with verified
   namespace/command grants and cap-aware retail-price provenance. DECISION-039 retires the separate ARM CostManagement
   server and explicitly leaves billing, forecast, budget, alert and commitment records unsupported. Kernel approvals
