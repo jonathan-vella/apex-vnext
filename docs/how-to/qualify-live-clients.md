@@ -210,6 +210,38 @@ Do not launch a second MCP server into a client session or use metadata-free too
 The [2026-10-09 offline probes](../vnext/CLIENT-QUALIFICATION.md#client-038-offline-transport-evidence) already passed
 for the pinned source and published preview. Do not rerun them as a supposed fix or convert them into live-client passes.
 
+### Standard Answer Sheet
+
+Give the same answers in every client and session so results compare. The typed values match the test kit fixture
+(`packages/testkit/src/qualification.ts`). If a question is not listed, answer it consistently, then add its question ID
+and answer here. Never enter real tenant, subscription or account IDs. This sheet is version 1.
+
+| Question or step                       | Answer                                                                                      |
+| -------------------------------------- | ------------------------------------------------------------------------------------------- |
+| First message                          | `Create a small lab project: one Azure App Service web app and one storage account.`        |
+| Project name                           | `qual-lab-webapp`                                                                           |
+| Workload                               | `Qualification lab: one App Service web app and one storage account`                        |
+| Purpose                                | `lab` (also try `production` once and confirm it is rejected)                               |
+| Environment                            | `dev`                                                                                       |
+| Region                                 | `swedencentral`                                                                             |
+| IaC track                              | Bicep                                                                                       |
+| Profile                                | Standalone, not ALZ                                                                         |
+| Azure subscription, tenant or resource | None available. Decline or skip; do not sign in to Azure                                    |
+| Budget                                 | 250 USD, monthly                                                                            |
+| Recovery                               | RTO 60 minutes, RPO 15 minutes                                                              |
+| Data classification                    | `internal`                                                                                  |
+| Compliance                             | `gdpr`                                                                                      |
+| Users and scale                        | About 10 internal users, low traffic                                                        |
+| Availability                           | Single region, no zone redundancy                                                           |
+| Networking and identity                | Public web app endpoint; storage accessed only by managed identity; HTTPS only              |
+| Any other single-select                | The first listed option                                                                     |
+| Any other multi-select                 | The first listed option only                                                                |
+| Deliberate invalid entry               | On the first multi-select, enter `99` once, then give the valid answer                      |
+| Deliberate cancel                      | Cancel the first single-select once, then answer it                                         |
+| Review findings                        | Accept every finding and record it                                                          |
+| Gate 1                                 | Confirm the stated purpose, target and requirements                                         |
+| Continue past Requirements             | `Continue to Architecture, then Plan. Stop before any deployment preview or Azure sign-in.` |
+
 ## 4. Export Only Bounded Evidence
 
 Reuse `tools/scripts/live-qualification.mjs` from the frozen checkout. After human interaction, `input`, `restart`
