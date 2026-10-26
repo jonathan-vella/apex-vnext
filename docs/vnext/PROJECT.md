@@ -395,9 +395,10 @@ atomically invalidates the locked governance dependency closure and Gates 2-4, r
 history, and requires separate re-import and renewed reviews. In-flight or indeterminate deployment blocks revision.
 Dependency hashing consumes invalidation events so superseded artifacts cannot retain deployment authority.
 
-Collector and importer preserve assignment enforcement modes independently of policy effects. `DoNotEnforce` retains
-desired compliance constraints without claiming Azure will deny the request; unsupported modes fail collection. Legacy
-absence remains unknown. Mode changes participate in the selected content digest and require reconciliation.
+Collector and importer preserve assignment enforcement modes independently of policy effects. A `deny` in a
+`DoNotEnforce` assignment is informational, not a blocker, because Azure will not deny the request; it still needs no
+Architecture mapping. Unsupported modes fail collection. Legacy absence remains unknown and a `deny` stays a
+blocker. Mode changes participate in the selected content digest and require reconciliation.
 
 On 2026-09-18, candidate `2e5d004` completed a bounded VS Code Local intake/context/stop and reload/status check.
 Local and Azure telemetry matched the tool sequence and the journal preserved the stop boundary; the run used Allow

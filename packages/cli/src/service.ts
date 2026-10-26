@@ -10616,7 +10616,10 @@ export class ApexService {
       run,
       await this.objects.getJson<GovernanceConstraintsV1>(hash),
     );
-    return snapshot.findings.filter(({ effect }) => ENFORCING_POLICY_EFFECTS.has(effect));
+    return snapshot.findings.filter(
+      ({ effect, enforcementMode }) =>
+        ENFORCING_POLICY_EFFECTS.has(effect) && !(effect === "deny" && enforcementMode === "DoNotEnforce"),
+    );
   }
 
   private async governanceFindingsSummary(run: RunConfigV1, events: EventV1[]) {
@@ -10945,6 +10948,7 @@ export class ApexService {
           ({ resourceTypes }) =>
             resourceTypes.length === 0 || resourceTypes.some((type) => designed.has(type.toLowerCase())),
         )
+        .filter(({ effect, enforcementMode }) => !(effect === "deny" && enforcementMode === "DoNotEnforce"))
         .map(({ effect }) => effect);
     }
     if (descriptor.id === "architecture") {
