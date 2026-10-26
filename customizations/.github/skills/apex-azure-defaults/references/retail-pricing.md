@@ -126,8 +126,8 @@ Variable meters need explicit usage from requirements or telemetry; absent usage
 rates band by band in `tierMinimumUnits` order. A zero line is valid only for a returned zero-price meter or a service
 that has no charge.
 
-## Actual Costs Are Separate
+## Actual Costs Are Not Available Here
 
-`apex-azure-cost/query_costs`, `apex-azure-cost/query_aks_costs`, and `apex-azure-cost/forecast_costs` report actual or
-forecast spend for deployed,
-authorized scopes. They never replace retail prices for proposed resources.
+The guarded Azure MCP integration provides retail prices for proposed resources, not actual bills or forecasts for
+deployed scopes. Historical spend, AKS cost allocation, budget and alert records, and commitment utilization are
+unsupported. Never use retail rates or optimization estimates as substitutes for those records.

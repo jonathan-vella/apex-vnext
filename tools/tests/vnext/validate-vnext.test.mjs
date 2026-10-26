@@ -197,7 +197,6 @@ test("rejects unknown managed agent tool names while accepting the central inven
       ...model.customization.toolInventory.agentReadTools,
       "web_fetch",
       "apex-azure/pricing",
-      "apex-azure-cost/query_costs",
     ];
   });
   assert.ok(!hasRule(inventoryResult, "customization.unknown-tool"));
@@ -322,21 +321,16 @@ test("rejects plugin MCP launch drift", () => {
   assert.ok(hasRule(extraServer, "mcp.plugin-launch"));
 });
 
-test("rejects ARM MCP launch drift", () => {
-  const endpointResult = mutate((model) => {
-    model.customization.pluginMcp.mcpServers["apex-azure-cost"].url = "https://example.invalid";
-  });
-  assert.ok(hasRule(endpointResult, "mcp.plugin-arm-launch"));
-
-  const toolsetResult = mutate((model) => {
-    model.customization.pluginMcp.mcpServers["apex-azure-cost"].headers["x-mcp-toolset"] = "Pricing";
-  });
-  assert.ok(hasRule(toolsetResult, "mcp.plugin-arm-launch"));
-
-  const transportResult = mutate((model) => {
-    model.customization.pluginMcp.mcpServers["apex-azure-cost"].type = "http";
-  });
-  assert.ok(hasRule(transportResult, "mcp.plugin-arm-launch"));
+test("rejects reactivation of the retired Azure cost server", () => {
+  for (const server of [
+    { type: "streamable-http", url: "https://mcp.management.azure.com" },
+    { type: "stdio", command: "npx", args: ["some-cost-server"] },
+  ]) {
+    const result = mutate((model) => {
+      model.customization.pluginMcp.mcpServers["apex-azure-cost"] = server;
+    });
+    assert.ok(hasRule(result, "mcp.plugin-launch"));
+  }
 });
 
 test("rejects plugin settings drift", () => {

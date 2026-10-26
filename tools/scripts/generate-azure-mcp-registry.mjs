@@ -5,7 +5,6 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { format, resolveConfig } from "prettier";
 import {
-  armRegistryPath,
   azureMcpArguments,
   azureRegistryPath,
   contractDigest,
@@ -270,11 +269,6 @@ export function developerMcpConfig() {
   return {
     servers: {
       github: { type: "http", url: "https://api.githubcopilot.com/mcp/" },
-      "apex-azure-cost": {
-        type: "http",
-        url: "https://mcp.management.azure.com",
-        headers: { "x-mcp-toolset": "CostManagement" },
-      },
     },
   };
 }
@@ -312,19 +306,13 @@ async function main() {
     writeFile(path, await format(JSON.stringify(value), { ...formatting, parser: "json" }));
   await writeJson(azureRegistryPath, registry);
   const files = {};
-  for (const file of [azureRegistryPath, armRegistryPath])
-    files[file] = contractDigest(JSON.parse(await readFile(file, "utf8")));
+  files[azureRegistryPath] = contractDigest(JSON.parse(await readFile(azureRegistryPath, "utf8")));
   await writeJson(digestPath, { schemaVersion: "1.0.0", files });
-  const cost = {
-    url: "https://mcp.management.azure.com",
-    headers: { "x-mcp-toolset": "CostManagement" },
-  };
   const plugin = {
     $schema: "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
     mcpServers: {
       apex: { type: "stdio", command: "node", args: ["${PLUGIN_ROOT}/mcp/apex.mjs"] },
       "apex-azure": { type: "stdio", command: "npx", args: azureMcpArguments(registry, "@azure/mcp") },
-      "apex-azure-cost": { type: "streamable-http", ...cost },
     },
   };
   await writeJson("plugin/mcp.json", plugin);

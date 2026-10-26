@@ -106,13 +106,6 @@
         "--namespace",
         "group_resource_list"
       ]
-    },
-    "apex-azure-cost": {
-      "type": "streamable-http",
-      "url": "https://mcp.management.azure.com",
-      "headers": {
-        "x-mcp-toolset": "CostManagement"
-      }
     }
   }
 }

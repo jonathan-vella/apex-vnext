@@ -169,8 +169,8 @@ do not silently substitute a model. Use client UI/log snippets only after redact
 
 The checklist below remains bound to its frozen `0.11.0-next.5` candidate, including that candidate's historical
 `apex-azure-pricing` identity. Do not relabel its evidence after CP-31. A separately authorized CP-31 run must bind its
-own exact candidate and check general `apex-azure` discovery/schema/command permissions, the ten `apex-azure-cost`
-reads and the external Azure MCP install/cache lifecycle; see
+own exact candidate and check general `apex-azure` discovery/schema/command permissions, denial of retired
+`apex-azure-cost` names and the external Azure MCP install/cache lifecycle; see
 [pending Azure MCP qualification](../vnext/CLIENT-QUALIFICATION.md#azure-mcp-server-3-qualification-human-authorization-pending).
 
 | Check                                                           | Human action and required observation                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |

@@ -6,8 +6,8 @@
 ## Canonical Source
 
 The managed source under `customizations/.github` defines the single foreground APEX agent, hidden workers, skills,
-instructions and the plugin settings file. `plugin/mcp.json` defines the plugin's MCP servers: kernel-owned `apex`,
-general read-only `apex-azure` (`@azure/mcp@3.0.0`) and ARM CostManagement-only `apex-azure-cost`.
+instructions and the plugin settings file. `plugin/mcp.json` defines the plugin's MCP servers: kernel-owned `apex`
+and guarded read-only Azure MCP `apex-azure` (`@azure/mcp@3.0.0`).
 `customizations/manifest.json` records workspace files, the plugin declaration and the files it
 owns, roles, the supported target, interaction types and invocation edges.
 
@@ -16,16 +16,15 @@ projection. `tools/scripts/build-plugin.mjs` renders the agents with the same Co
 with the skills, hooks and MCP servers into the `apex` plugin. Packaged assets are derived output and must match
 canonical source.
 
-The plugin cannot restrict which tools a remote MCP server exposes, and the `CostManagement` toolset includes writes
-such as budget creation. A managed `preToolUse` hook therefore denies every `apex-azure-cost` tool outside the ten-read
-allowlist of `tools/registry/arm-mcp-cost-pricing.v1.json`, for every agent in the session. It also validates
-`apex-azure` namespaces, commands and parameters against `tools/registry/azure-mcp.v1.json`; annotations alone grant
-nothing. The foreground agent has 44 explicit Azure namespace/direct grants; hidden workers have no broad Azure grants.
-See [MCP providers](../reference/mcp.md#azure-mcp-server-3) for excluded operations, safe discovery and the external
+The managed `preToolUse` hook validates `apex-azure` namespaces, commands and parameters against
+`tools/registry/azure-mcp.v1.json`; annotations alone grant nothing. The foreground agent has 44 explicit Azure
+namespace/direct grants; hidden workers have no broad Azure grants. Retired `apex-azure-cost` tool names are explicitly
+denied. Azure MCP does not provide historical billing, forecasts, budgets, alerts or commitment records. See
+[MCP providers](../reference/mcp.md#azure-mcp-server-3) for excluded operations, safe discovery and the external
 install/cache lifecycle, which is separate from APEX's bundled offline startup guarantee.
 
-The root developer `.vscode/mcp.json` intentionally omits standalone general `apex-azure` access because the plugin's
-command/parameter guard is not available when the plugin is unloaded; its CostManagement-only endpoint remains.
+The root developer `.vscode/mcp.json` intentionally omits standalone `apex-azure` access because the plugin's
+command/parameter guard is not available when the plugin is unloaded.
 Use a guarded plugin consumer for general Azure tools. Do not duplicate plugin providers in workspace configuration
 or add a broad standalone launch before equivalent guarding exists.
 

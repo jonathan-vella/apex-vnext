@@ -14,7 +14,7 @@
         "WHEN/DO NOT USE FOR description with quoted triggers and (use ...) redirects to shipped skills; explicit user-invocable: false and disable-model-invocation: false",
         "IaC invariants (governance wins, security floor, one stable uniqueness token, AVM-first exact pins, verified lifecycle, explicit network and cost decisions) restated as decision rules that reference runtime securityInvariants and azureDefaults instead of values",
         "CAF abbreviation hints, greenfield tag checklist and tag purposes, tag-casing facts, per-effect CodeGen binding treatment, recurring AVM default and lifecycle pitfalls, AVM version evidence through the APEX agent's allowlisted registry lookups, VNet triggers and subnet sizing starting points with Learn links",
-        "New retail-pricing reference ported from pricing-guidance for apex-azure-pricing/get_retail_prices",
+        "Retail-pricing reference aligned to the guarded apex-azure/pricing pricing_get contract; direct API evidence is not an APEX fallback",
         "Azure CLI and azd guidance restored in references/azure-cli-and-azd.md: the command routing rule (read and diagnostic commands may run directly; commands that change Azure are marked '# Changes Azure' and routed through apex preview, Gate 4 and apex deploy or the approved GitHub Actions pipeline that runs only the locally approved preview (DECISION-035, ADR-0002)), az token validation, azd auth and pipeline OIDC sign-in, azd command classes (APEX never runs azd up; azd provision and azd deploy are separate Gate 4 operations; azd pipeline config runs only after its own preview and Gate 4 decision), governance REST diagnostics, existing-VNet probe, Graph permission preflight, AVM registry curl lookups, cost-monitoring checks and az provider show"
       ],
       "dropped": [
@@ -52,8 +52,8 @@
         "WHEN/DO NOT USE FOR description with quoted triggers and (use ...) redirects to shipped skills; explicit user-invocable: false and disable-model-invocation: false",
         "Rules: single VM unless a fleet is evidenced, Flexible orchestration, two or three candidates, documentation-verified specifications, VMSS price at minimum and maximum instances, commitments as review options",
         "VM family map, decision tree, size-name decoding, trade-offs, orchestration comparison, autoscale patterns and load-balancer choice",
-        "Retail Prices API usage rewritten for apex-azure-pricing/get_retail_prices; quota and availability follow the Architecture assumption rule",
-        "Retail Prices API curl and PowerShell queries restored in references/retail-prices-api.md as a read-only fallback to apex-azure-pricing/get_retail_prices, with example regions replaced by placeholders; read and diagnostic commands may run directly; commands that change Azure are marked '# Changes Azure' and routed through apex preview, Gate 4 and apex deploy or the approved GitHub Actions pipeline that runs only the locally approved preview (DECISION-035, ADR-0002)"
+        "VM pricing uses the guarded apex-azure/pricing pricing_get contract; quota and availability follow the Architecture assumption rule",
+        "Direct Retail Prices API shell examples replaced by an explicit no-fallback boundary; guarded MCP evidence remains subject to the central pricing contract"
       ],
       "dropped": [
         "web_fetch verification steps, apex-azure-prepare provisioning route",
@@ -116,10 +116,9 @@
       "tracking": ["#384", "#401", "#443"],
       "adaptations": [
         "WHEN/DO NOT USE FOR description with quoted triggers and (use ...) redirects to shipped skills; explicit user-invocable: false and disable-model-invocation: false",
-        "Routing to read-only apex-azure-pricing tools (query_costs, query_aks_costs, forecast_costs, get_retail_prices, benefit and reservation reads); whole-bill rule; Redis-only branching rule",
-        "New cost-tool-guardrails reference: scopes, query and forecast limits, evidence labels, error handling",
-        "Storage review signals with tier retention and early-deletion costs",
-        "CLI workflow restored in references/cost-cli-workflow.md (prerequisites, tool fallback table, Redis az commands, azqr, az resource list, Cost Management Query API through az rest, az monitor metrics, report content, pitfalls) and Resource Graph cost and orphan queries in references/azure-resource-graph.md; read and diagnostic commands may run directly; commands that change Azure are marked '# Changes Azure' and routed through apex preview, Gate 4 and apex deploy or the approved GitHub Actions pipeline that runs only the locally approved preview (DECISION-035, ADR-0002)"
+        "Use the guarded apex-azure pricing, Advisor and optimization commands for supported recommendations and proposed-resource retail prices",
+        "Explicitly mark historical spend, AKS cost allocation, forecasts, budgets, alerts, commitments and negotiated rates unavailable; mixed requests return supported results without blocking",
+        "No Azure CLI, REST, Resource Graph CLI, azqr, alternate-server or remembered-data fallback for unsupported billing evidence; route proposed changes through kernel authorization"
       ],
       "dropped": [
         "Redis SDK and report templates",
