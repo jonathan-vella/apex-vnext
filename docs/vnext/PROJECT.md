@@ -121,12 +121,15 @@ The maintainer recorded
 [CP-31](https://github.com/jonathan-vella/apex-vnext/issues/489), tracked under the client pivot
 [epic #387](https://github.com/jonathan-vella/apex-vnext/issues/387), to introduce the official Azure MCP Server as a
 general managed Azure tool provider, closing the DECISION-014 gap and migrating retail pricing from ARM MCP
-`get_retail_prices` to Azure MCP's pricing capability while preserving all ten ARM MCP CostManagement reads under
-their own server identity. Planning merged in [PR #490](https://github.com/jonathan-vella/apex-vnext/pull/490) at
+`get_retail_prices` to Azure MCP's pricing capability. Planning merged in
+[PR #490](https://github.com/jonathan-vella/apex-vnext/pull/490) at
 `42d82a54`; **IMPLEMENTED LOCAL, focused checks passing**, not release or live qualification. Credential-free real
 `3.0.0` discovery grounds 44 explicit namespace/direct grants and curated read-only command schemas. `apex-azure` is
-the general provider; `apex-azure-cost` retains only ARM CostManagement. Exact pinning, cap-aware pricing provenance,
-hooks, skills and tests move together under the [CP-31 checkpoint](ROADMAP.md#azure-mcp-server-3-integration-cp-31).
+the general provider. Exact pinning, cap-aware pricing provenance,
+hooks, skills and tests moved together under the [CP-31 checkpoint](ROADMAP.md#azure-mcp-server-3-integration-cp-31).
+The retained-server scope is superseded by
+[DECISION-039](DECISIONS.md#decision-039-retire-the-separate-arm-costmanagement-server); historical CP-31 evidence
+remains unchanged.
 See [MCP providers](../reference/mcp.md#azure-mcp-server-3). The frozen `0.11.0-next.5` candidate evidence remains
 unchanged; per-client/live qualification and release require separate human authorization.
 

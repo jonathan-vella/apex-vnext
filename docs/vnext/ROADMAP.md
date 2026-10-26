@@ -225,11 +225,12 @@ pending. Planning merged in [PR #490](https://github.com/jonathan-vella/apex-vne
    grants; opaque/unverified `azd`, `arm` and `foundry` proxies are not granted.
 2. **Exact version.** Manifest and launch declarations use `3.0.0`, not floating `latest`/`@3`/`@3.x`. Stable 3.x
    updates require focused discovery/schema/grant review; a new major requires an explicit decision.
-3. **Coherent implementation slice.** `apex-azure` provides general Azure reads/guidance/pricing; `apex-azure-cost`
-   retains the ten ARM CostManagement reads. Curated command/parameter hooks, registries, pricing
-   provenance/contracts, managed skills and tests move together. `pricing_get` results at or above 5,000 rows require
-   narrowing or explicit unpriced items, never a complete priced line or fake zero. Kernel approvals and APEX SDK
-   v2/protocol remain unchanged.
+3. **Coherent implementation slice.** `apex-azure` provides general Azure reads/guidance, retail pricing, and
+   supported recommendation reads. DECISION-039 supersedes the ten-read ARM CostManagement retention scope:
+   actual-spend, forecast, budget/alert and commitment reporting is retired rather than replaced or inferred.
+   Curated command/parameter hooks, registries, pricing provenance/contracts, managed skills and tests move together.
+   `pricing_get` results at or above 5,000 rows require narrowing or explicit unpriced items, never a complete priced
+   line or fake zero. Kernel approvals and APEX SDK v2/protocol remain unchanged.
 4. **Local qualification stages passed.** Focused checks, credential-free capture and the `qualify:vnext`
    validation/workspace/validator stages pass. After the missing jq host prerequisite was restored, the final pack
    rerun passed 131/131; the HIGH-fix regressions pass 52/52. Final-head CI remains pending. These local results do

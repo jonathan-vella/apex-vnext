@@ -495,3 +495,30 @@ No release or supported-client/live qualification is implied.
 See [CP-31](https://github.com/jonathan-vella/apex-vnext/issues/489) for the implementation backlog, acceptance
 checklist and task order, and [docs/reference/mcp.md](../reference/mcp.md#azure-mcp-server-3) for the split-provider
 contract.
+
+## DECISION-039: Retire The Separate ARM CostManagement Server
+
+Maintainer decision on 2026-10-23. This supersedes the ARM CostManagement retention statements in DECISION-038 and
+narrows the current capability contract in [REQ-ARCH-001](PRD.md#req-arch-001-architecture-cost-and-assumptions) and
+[REQ-CAPABILITY-001](PRD.md#req-capability-001-capabilities-and-optional-packs). It does not rewrite the historical
+DECISION-038 record or its qualification evidence.
+
+- **Decision.** Retire the separate remote `apex-azure-cost` server and use the existing, exact-pinned official Azure
+  MCP Server integration for supported retail pricing, Advisor recommendations, optimization recommendations, and
+  bounded supporting Azure reads. Do not add a compatibility alias, alternate CostManagement endpoint, custom billing
+  adapter, or new server.
+- **Intentional capability reduction.** Actual spend, AKS cost allocation, cost dimensions, forecasts, budgets, alerts,
+  benefit utilization/recommendations, and reservation transactions are no longer provided. Advisor savings and
+  retail prices are distinct evidence and do not substitute for bill, forecast, budget, or commitment records.
+  Unsupported billing evidence blocks only conclusions that depend on it. Mixed requests may return supported
+  recommendations or prices with the unavailable portions stated plainly; they must not invent actual charges,
+  whole-bill denominators, forecasts, or realized savings.
+- **Guardrails and scope.** Azure MCP remains limited to the reviewed namespace/command/parameter inventory and
+  read-only launch. Kernel authority, identity and subscription scope, human approvals, mutation/deployment controls,
+  worker restrictions, and pricing provenance/completeness rules are unchanged. The cost-assessment skill uses Azure
+  MCP only; its CLI, REST, Resource Graph CLI, and azqr fallback procedures are removed. This does not change
+  deployment tooling or unrelated skills' separately authorized operations.
+- **Verification boundary.** Repository configuration, generators, managed projections, guards, guidance and tests
+  must retire the endpoint together. Local/package qualification does not update installed plugins or existing
+  consumers, and does not establish supported-client, authenticated Azure, live, release, or issue #386 acceptance.
+  Such work requires separate authorization.

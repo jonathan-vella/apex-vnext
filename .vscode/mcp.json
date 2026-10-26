@@ -3,13 +3,6 @@
     "github": {
       "type": "http",
       "url": "https://api.githubcopilot.com/mcp/"
-    },
-    "apex-azure-cost": {
-      "type": "http",
-      "url": "https://mcp.management.azure.com",
-      "headers": {
-        "x-mcp-toolset": "CostManagement"
-      }
     }
   }
 }
