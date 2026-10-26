@@ -23,7 +23,6 @@ Complete the native Windows steps in [Prepare Windows 11](../how-to/prepare-wind
 
 - VS Code 1.140 or later, or the GitHub Copilot app, signed in with a Copilot-enabled account;
 - Git, Node.js 24.21.0 (LTS) or later, Copilot CLI, Azure CLI and Bicep or Terraform;
-- local sandboxing turned on for your client;
 - the `apex` plugin installed once through the Copilot CLI store.
 
 ## Create A Workspace
@@ -59,8 +58,7 @@ In VS Code:
 2. If you installed or updated the plugin while VS Code was open, run **Developer: Restart Local Agent Host**.
 3. Open a new chat, set the session target to **Copilot** and pick **APEX** in the Agent picker.
 
-In the GitHub Copilot app, add `C:\src\contoso-platform` as a project, check that **Sandbox new sessions** is on for
-it, and start a new local session with the **APEX** agent.
+In the GitHub Copilot app, add `C:\src\contoso-platform` as a project and start a new local session with the **APEX** agent.
 
 Ask APEX what is next at any point. It reads kernel state, continues in the same APEX agent and delegates only to its
 hidden workers.

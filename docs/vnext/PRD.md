@@ -163,9 +163,10 @@ Native-Windows Copilot CLI and the VS Code Local harness are unsupported; VS Cod
 desktop are best effort and not qualified. Each workspace uses one host; runs do not move between a Windows client and
 the WSL CLI.
 
-Client local sandboxing is a documented prerequisite. APEX assumes it is on and does not check it; outbound network
-stays allowed. Users must not need Docker, a devcontainer, a source-repository clone, or repository development tools.
-Document and check operational prerequisites, including Node 24 LTS or later, through existing setup/doctor surfaces
+Client local sandboxing is not a launch requirement; qualification and support for sandboxed sessions are deferred
+until after launch (maintainer direction 2026-10-22). APEX neither requires nor checks it. Users must not need
+Docker, a devcontainer, a source-repository clone, or repository development tools. Document and check operational
+prerequisites, including Node 24 LTS or later, through existing setup/doctor surfaces
 on each host; require only tools needed for the selected track and requested stage. Process launching, path handling
 and file replacement work on native Windows, and Windows CI covers the runtime. The first-time installer provisions
 client and IaC toolchains under `REQ-ONBOARDING-001`; operational readiness checks remain stage-scoped.
@@ -477,8 +478,8 @@ import/change workflows on each supported client.
 **Active again under DECISION-033**; it was deferred on 2026-09-21. The
 [GitHub Copilot app](https://github.com/github/app) on native Windows is a supported client. It installs the APEX
 plugin from the shared Copilot CLI store and runs sessions in app-created git worktrees by default; APEX supports them
-through the explicit workspace path and the shared `.apex/` in the main checkout. Users turn on local sandboxing in
-the app's project settings, because no repository file can set it. The app does not apply per-agent `model` pins
+through the explicit workspace path and the shared `.apex/` in the main checkout. Local sandboxing is not required
+for launch. The app does not apply per-agent `model` pins
 (github/app#4097), and APEX no longer pins models. It does not enforce per-parent subagent limits (github/app#4098); a
 managed hook denies the APEX agent as a subagent target, and kernel authorization still owns state changes. Historical
 desktop probes and the parked desktop plan are provenance, not qualification evidence.
