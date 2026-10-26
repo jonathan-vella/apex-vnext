@@ -108,7 +108,9 @@ requires human observation, not an inferred support-matrix edit. Record the actu
 
 Before starting a new session, leave local sandboxing off in every client (VS Code `chat.agent.sandbox.enabled=off`,
 the app's **Sandbox new sessions** off, CLI `/sandbox disable`; a bare `copilot` session is unsandboxed unless
-`--sandbox` or the saved setting turns it on). Sandboxed runs are post-launch work. Use explicit tool grants.
+`--sandbox` or the saved setting turns it on). Sandboxed runs are post-launch work. Allow All tool permissions are
+acceptable in qualification sessions; record the approval mode used. They do not replace gate decisions or the separate
+authorization for Azure sign-in and deployment.
 
 Close every VS Code window before changing the Windows plugin store. In the human's disposable testing profile,
 remove any old APEX copy before installing the frozen local folder:
