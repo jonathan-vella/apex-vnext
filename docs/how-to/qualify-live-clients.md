@@ -214,7 +214,8 @@ for the pinned source and published preview. Do not rerun them as a supposed fix
 
 Give the same answers in every client and session so results compare. The typed values match the test kit fixture
 (`packages/testkit/src/qualification.ts`). If a question is not listed, answer it consistently, then add its question ID
-and answer here. Never enter real tenant, subscription or account IDs. This sheet is version 1.
+and answer here. Never enter real tenant, subscription or account IDs. Type `none` for an optional field with no value;
+do not answer "no preference". This sheet is version 2.
 
 | Question or step                       | Answer                                                                                      |
 | -------------------------------------- | ------------------------------------------------------------------------------------------- |
@@ -228,21 +229,30 @@ and answer here. Never enter real tenant, subscription or account IDs. This shee
 | Purpose                                | `lab` (also try `production` once and confirm it is rejected)                               |
 | Region                                 | `swedencentral`                                                                             |
 | IaC track                              | Bicep                                                                                       |
-| Profile                                | Standalone, not ALZ                                                                         |
+| Profile                                | `standalone-lab`, not ALZ                                                                   |
+| Industry                               | `technology`                                                                                |
+| Delivery scenario                      | `greenfield`                                                                                |
+| Target environments                    | `dev` only                                                                                  |
+| Workload pattern                       | Customize: keep one App Service web app and one storage account                             |
 | Azure subscription, tenant or resource | None available. Decline or skip; do not sign in to Azure                                    |
-| Budget                                 | 250 USD, monthly                                                                            |
+| Budget                                 | 250 USD, monthly. Do not defer                                                              |
 | Recovery                               | RTO 60 minutes, RPO 15 minutes                                                              |
 | Data classification                    | `internal`                                                                                  |
 | Compliance                             | `gdpr`                                                                                      |
 | Users and scale                        | About 10 internal users, low traffic                                                        |
-| Availability                           | Single region, no zone redundancy                                                           |
-| Networking and identity                | Public web app endpoint; storage accessed only by managed identity; HTTPS only              |
+| Prohibited services                    | `none` (type it; an empty Enter is not accepted)                                            |
+| Availability                           | `single-region-availability`                                                                |
+| Security controls and authentication   | Accept the recommended sets                                                                 |
+| Operations                             | `azure-monitor`                                                                             |
+| Network exposure                       | `private-only` (the reference baseline denies public endpoints)                             |
+| Networking and identity                | Private connectivity; storage accessed only by managed identity; HTTPS only                 |
 | Any other single-select                | The first listed option                                                                     |
 | Any other multi-select                 | The first listed option only                                                                |
 | Deliberate invalid entry               | On the first multi-select, enter `99` once, then give the valid answer                      |
-| Deliberate cancel                      | Cancel the first single-select once, then answer it                                         |
-| Review findings                        | Accept every finding and record it                                                          |
-| Gate 1                                 | Confirm the stated purpose, target and requirements                                         |
+| Deliberate cancel                      | Press Esc on the first single-select once, then answer it                                   |
+| Review disposition                     | "Accept the findings as valid and correct them through revision and fresh review"           |
+| Accountable owner                      | `partner` (never `customer`; correct the agent if it proposes another owner)                |
+| Gate 1                                 | After the final review is resolved, type `Gate 1 is approved` when it asks for confirmation |
 | Continue past Requirements             | `Continue to Architecture, then Plan. Stop before any deployment preview or Azure sign-in.` |
 
 ## 4. Export Only Bounded Evidence
