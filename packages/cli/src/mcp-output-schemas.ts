@@ -4,6 +4,8 @@ import {
   ImprovementObservationV1Schema,
   ImprovementProposalV1Schema,
   InputRequestV1Schema,
+  RecordedInputV1Schema,
+  InputAmendmentProposalV1Schema,
   InputValueV1Schema,
   IsoDateTimeSchema,
   NonEmptyStringSchema,
@@ -277,6 +279,17 @@ export const MCP_OUTPUT_SCHEMAS = {
     { pageable: true },
   ),
   recordInput: contract(object({ recorded: Type.Literal(true), requestId: NonEmptyStringSchema })),
+  inputHistory: contract(object({ inputs: Type.Array(RecordedInputV1Schema) }), { pageable: true }),
+  previewInputAmendment: contract(InputAmendmentProposalV1Schema),
+  amendInput: contract(
+    object({
+      amended: Type.Literal(true),
+      requestId: NonEmptyStringSchema,
+      proposalHash: Sha256Schema,
+      invalidatedNodes: strings,
+      deploymentAuthorized: Type.Literal(false),
+    }),
+  ),
   governanceImport: contract(object({ outputHash: Sha256Schema, summary: Type.String() })),
   governanceSelect: contract(
     Type.Union([

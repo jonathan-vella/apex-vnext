@@ -18,6 +18,9 @@ tools:
   - apex/projectUse
   - apex/projectDelete
   - apex/recordInput
+  - apex/inputHistory
+  - apex/previewInputAmendment
+  - apex/amendInput
   - apex/taskContext
   - apex/readTaskInput
   - apex/requirementsComplete

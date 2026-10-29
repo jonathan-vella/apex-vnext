@@ -58,10 +58,16 @@ export function needsInput(taskId: string, questions: QuestionV1[]): TaskResultV
 
 export function validateInputAnswers(questions: QuestionV1[], submitted: InputAnswerV1[]): InputAnswerV1[] {
   const answers = new Map<string, InputAnswerV1["value"]>();
+  const submittedIds = new Set<string>();
   for (const answer of submitted) {
-    if (answers.has(answer.questionId)) throw new Error(`Duplicate answer: ${answer.questionId}`);
+    if (submittedIds.has(answer.questionId)) throw new Error(`Duplicate answer: ${answer.questionId}`);
+    submittedIds.add(answer.questionId);
     const question = questions.find(({ id }) => id === answer.questionId);
-    if (question?.optional === true && typeof answer.value === "string" && answer.value.trim().length === 0) {
+    if (
+      question?.optional === true &&
+      typeof answer.value === "string" &&
+      (answer.value.trim().length === 0 || /^none$/iu.test(answer.value.trim()))
+    ) {
       continue;
     }
     answers.set(answer.questionId, answer.value);

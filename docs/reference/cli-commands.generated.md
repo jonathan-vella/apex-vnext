@@ -42,6 +42,9 @@ This file is generated from [packages/cli/src/cli.ts](../../packages/cli/src/cli
 - `governance revise`
 - `governance select`
 - `init`
+- `input amend`
+- `input history`
+- `input preview-amendment`
 - `inventory`
 - `mcp serve`
 - `preview`

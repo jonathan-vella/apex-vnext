@@ -250,6 +250,21 @@ test("kernel validates freeform, single-select, and multi-select answers", () =>
     multiSelect: true,
     valueType: "compliance" as const,
   };
+  const optional = [{ id: "scale", prompt: "Scale?", optional: true }];
+  for (const value of ["", "  ", "none"])
+    assert.deepEqual(validateInputAnswers(optional, [{ questionId: "scale", value }]), []);
+  assert.throws(
+    () =>
+      validateInputAnswers(optional, [
+        { questionId: "scale", value: "" },
+        { questionId: "scale", value: "10 users" },
+      ]),
+    /Duplicate answer/u,
+  );
+  assert.throws(
+    () => validateInputAnswers([{ id: "required", prompt: "Required?" }], [{ questionId: "required", value: "" }]),
+    /explicitly provided/u,
+  );
   assert.deepEqual(
     validateInputAnswers(
       [complianceQuestion],

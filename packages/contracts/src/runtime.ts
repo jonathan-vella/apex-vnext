@@ -292,16 +292,67 @@ export const InputAnswerV1Schema = Type.Object(
   { additionalProperties: false },
 );
 
+const SubmittedInputAnswerV1Schema = Type.Object(
+  { questionId: NonEmptyStringSchema, value: Type.Union([Type.String(), InputValueV1Schema]) },
+  { additionalProperties: false },
+);
+
 export const InputSubmissionV1Schema = Type.Object(
   {
     schemaVersion: ContractVersionSchema,
     requestId: TaskIdSchema,
     expectedHead: Sha256Schema,
     ownerEpoch: Type.Integer({ minimum: 1 }),
-    answers: Type.Array(InputAnswerV1Schema, { minItems: 1 }),
+    answers: Type.Array(SubmittedInputAnswerV1Schema, { minItems: 1 }),
   },
   { $id: "https://schemas.apexops.dev/input-submission-v1.json", additionalProperties: false },
 );
+
+export const InputAmendmentV1Schema = Type.Object(
+  {
+    schemaVersion: ContractVersionSchema,
+    requestId: TaskIdSchema,
+    baseAnswersHash: Sha256Schema,
+    answers: Type.Array(SubmittedInputAnswerV1Schema, { minItems: 1, maxItems: 128 }),
+  },
+  { $id: "https://schemas.apexops.dev/input-amendment-v1.json", additionalProperties: false },
+);
+export type InputAmendmentV1 = Static<typeof InputAmendmentV1Schema>;
+
+export const RecordedInputV1Schema = Type.Object(
+  {
+    requestId: TaskIdSchema,
+    kind: Type.Union([Type.Literal("requirements"), Type.Literal("architecture")]),
+    baseAnswersHash: Sha256Schema,
+    questions: Type.Array(QuestionV1Schema, { minItems: 1 }),
+    answers: Type.Array(InputAnswerV1Schema),
+  },
+  { additionalProperties: false },
+);
+export type RecordedInputV1 = Static<typeof RecordedInputV1Schema>;
+
+export const InputAmendmentProposalV1Schema = Type.Object(
+  {
+    schemaVersion: ContractVersionSchema,
+    projectId: ProjectIdSchema,
+    runId: RunIdSchema,
+    expectedHead: Sha256Schema,
+    ownerEpoch: Type.Integer({ minimum: 1 }),
+    amendment: Type.Object(InputAmendmentV1Schema.properties, { additionalProperties: false }),
+    kind: Type.Union([Type.Literal("requirements"), Type.Literal("architecture")]),
+    previousAnswers: Type.Array(InputAnswerV1Schema),
+    answers: Type.Array(InputAnswerV1Schema),
+    reason: Type.String({ minLength: 1, maxLength: 2048 }),
+    invalidatedNodes: Type.Array(NonEmptyStringSchema, { uniqueItems: true }),
+    invalidatedGates: Type.Array(Type.Integer({ minimum: 1, maximum: 4 }), { uniqueItems: true }),
+    reapprovalPath: NonEmptyStringSchema,
+    filesModified: Type.Literal(false),
+    deploymentAuthorized: Type.Literal(false),
+    proposalHash: Sha256Schema,
+  },
+  { $id: "https://schemas.apexops.dev/input-amendment-proposal-v1.json", additionalProperties: false },
+);
+export type InputAmendmentProposalV1 = Static<typeof InputAmendmentProposalV1Schema>;
 
 export const TaskResultV1Schema = Type.Union([
   Type.Object(

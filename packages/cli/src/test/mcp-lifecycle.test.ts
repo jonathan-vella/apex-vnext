@@ -503,6 +503,7 @@ test("only bounded read tools accept cursors and mutations are never paged", asy
     "doctorChecks",
     "improvementObservations",
     "improvementProposals",
+    "inputHistory",
     "inventory",
     "preview",
     "projectList",

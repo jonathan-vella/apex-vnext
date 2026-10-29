@@ -88,6 +88,43 @@ The reader does not resolve branch names, synchronize updates, recover confirmed
 consumer governance. Do not use state
 transfer as a substitute for archetype import. See [project operation](../how-to/operate-project.md#reuse-a-local-archetype).
 
+## Correcting Recorded Intake Answers
+
+Correct a mistaken Requirements intake or current Architecture decision without deleting the project.
+`input history --json` returns recorded questions, effective answers, request IDs and current `baseAnswersHash`
+values. Governance reuse/refresh answers use the separate governance selection flow.
+
+```json
+{
+  "schemaVersion": "1.0.0",
+  "requestId": "RECORDED_REQUEST_ID",
+  "baseAnswersHash": "CURRENT_ANSWERS_SHA256",
+  "answers": [{ "questionId": "workload-profile", "value": "standalone-lab" }]
+}
+```
+
+Only list the answers being corrected; other answers remain unchanged.
+
+```bash
+apex input history --json
+apex input preview-amendment --file answer-correction.json --reason "Correct mistaken profile" --json
+apex input amend --file answer-correction.json --reason "Correct mistaken profile" --expected-hash PROPOSAL_HASH --yes --json
+```
+
+The preview shows before/after answers, affected stages and gates, and the re-approval path. Application requires
+explicit confirmation bound to that exact proposal, reason, journal head, selected run, answer base and writer epoch.
+It appends one workflow invalidation with the amendment; original answers and review/approval records remain audit
+evidence, not current approval. Corrected answers rerun affected stages and reviews. Requirements corrections require
+fresh human Gate 1 and Gate 4 decisions; Architecture corrections retain Gate 1 and require a human Gate 4 decision for
+the fresh preview. In lab runs, Gate 2 and Gate 3 readiness are recorded automatically when required reviews and checks
+pass. Resume with `task next` and use the fresh task context. No generated files are changed by applying an amendment,
+and no deployment is authorized.
+
+Stale, repeated, malformed, unchanged or mismatched amendments are rejected. Only current Architecture requests may
+be amended; a Requirements revision requires new Architecture decisions. In-flight or indeterminate deployment blocks
+application. A pending rubber-duck capture must finish or be stopped and cancelled before application. Autopilot or
+Allow All is not confirmation of the preview or approval of any gate.
+
 ## Requirements Adoption And Change
 
 Use a consumer-scoped `requirements-v1` JSON document to recover decisions from imported or manually copied code and
