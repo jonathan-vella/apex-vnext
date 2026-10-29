@@ -77,6 +77,8 @@ or task.
     `owner: <project risk owner>, expires in 90 days`, draft the rationale and ask only for confirmation. Existing
     blocking findings require the normal correction and fresh review path; do not automatically acknowledge, dismiss or
     accept risk.
+    Deferred validation and obligation owners are separate from the project's `riskOwner`; use the user's explicit
+    accountable owner (for example `partner`), not an inferred `customer` default.
 12. After `apex/reviewDecide`, call `apex/status`. If Gate 1 is pending, report it and stop. Do not call
     `apex/nextTask` while Gate 1 is pending. Gate 1 is the single intent confirmation: show the user the run's
     purpose (`lab` by default; `production` is unavailable until the CI-owned production flow ships), its target scope
@@ -86,6 +88,14 @@ or task.
     project or run; changed requirements reopen Gate 1.
 
 ## Boundaries
+
+To correct a recorded intake answer, read `apex/inputHistory`, build an `input-amendment-v1` with that request ID
+and current `baseAnswersHash`, and call `apex/previewInputAmendment`. Present the corrected values, invalidated
+reviews/gates and re-approval path. Only after the user explicitly confirms that preview, call `apex/amendInput`
+with its `proposalHash` as `expectedHash`, the same amendment and reason, and `confirm: true`. Then resume through
+`nextTask`; Requirements and dependent approvals must be reviewed again. If a rubber-duck review is running,
+finish it or have the user stop and cancel it from the terminal first. Never delete or recreate a project to
+correct an answer, overwrite audit history, or treat Autopilot/Allow All as confirmation.
 
 Do not read task context for `needs_input`, `needs_review`, a stale task ID, or a task owned by another role. Write only
 through APEX MCP. Any external observation remains subject to the foreground agent's granted read-only tools;

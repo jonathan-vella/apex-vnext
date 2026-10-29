@@ -1164,6 +1164,7 @@ test("MCP registers only narrow tools and calls the service", async () => {
     client.callTool({ name, arguments: { workspace: service.root, ...args } });
   const tools = await client.listTools();
   assert.deepEqual(tools.tools.map(({ name }) => name).sort(), [
+    "amendInput",
     "architectureComplete",
     "capabilityList",
     "capabilityStatus",
@@ -1178,10 +1179,12 @@ test("MCP registers only narrow tools and calls the service", async () => {
     "improvementObservations",
     "improvementObserve",
     "improvementProposals",
+    "inputHistory",
     "inventory",
     "nextTask",
     "planComplete",
     "preview",
+    "previewInputAmendment",
     "projectCreate",
     "projectDelete",
     "projectList",

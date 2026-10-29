@@ -4,6 +4,13 @@ import { MCP_OUTPUT_SCHEMAS } from "../mcp-output-schemas.js";
 export const hash = "a".repeat(64);
 export const timestamp = "2026-09-18T00:00:00.000Z";
 export const selection = { projectId: "demo", runId: "run-1" };
+export const inputAmendment = {
+  schemaVersion: "1.0.0",
+  requestId: "request-1",
+  baseAnswersHash: hash,
+  answers: [{ questionId: "workload", value: "web" }],
+};
+export const amendmentOptions = { reason: "Correction", expectedHash: hash, confirm: true };
 export const run = {
   schemaVersion: "1.0.0",
   ...selection,
@@ -117,6 +124,31 @@ export const approval = {
 };
 export type ToolName = keyof typeof MCP_OUTPUT_SCHEMAS;
 export const fixtures: Record<ToolName, Record<string, unknown>> = {
+  inputHistory: { inputs: [] },
+  previewInputAmendment: {
+    schemaVersion: "1.0.0",
+    ...selection,
+    expectedHead: hash,
+    ownerEpoch: 1,
+    amendment: inputAmendment,
+    kind: "requirements",
+    previousAnswers: inputAmendment.answers,
+    answers: inputAmendment.answers,
+    reason: "Correction",
+    invalidatedNodes: ["requirements"],
+    invalidatedGates: [1, 2, 3, 4],
+    reapprovalPath: "Regenerate and review Requirements, then request Gate 1 again.",
+    filesModified: false,
+    deploymentAuthorized: false,
+    proposalHash: hash,
+  },
+  amendInput: {
+    amended: true,
+    requestId: "request-1",
+    proposalHash: hash,
+    invalidatedNodes: ["requirements"],
+    deploymentAuthorized: false,
+  },
   status,
   releaseWriter: { released: true, projectId: "demo", runId: "run-1" },
   capabilityList: { packs: [capability] },

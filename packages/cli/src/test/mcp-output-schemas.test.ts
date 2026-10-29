@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
 import { test } from "./test-shard.js";
 import { z } from "zod";
 import { ResourceInventoryV1Schema } from "@apexops/contracts";
@@ -13,6 +15,8 @@ import { nextTaskAfterInput, requirements, tempRoot } from "./helpers.js";
 import { connectMcp, connectMcpFactory } from "./mcp-client.js";
 import {
   hash,
+  inputAmendment,
+  amendmentOptions,
   timestamp,
   selection,
   run,
@@ -248,7 +252,7 @@ test("output schema coverage matches every registered MCP tool", async () => {
       assert.equal(tool.inputSchema.additionalProperties, false, tool.name);
       assert.ok(tool.inputSchema.properties?.workspace, tool.name);
       assert.ok(tool.inputSchema.required?.includes("workspace"), tool.name);
-      const readOnly = ["status", "projectList"].includes(tool.name);
+      const readOnly = ["status", "projectList", "inputHistory", "previewInputAmendment"].includes(tool.name);
       assert.equal(tool.annotations?.readOnlyHint, readOnly, tool.name);
       assert.equal(tool.annotations?.idempotentHint, readOnly, tool.name);
       assert.equal(tool.annotations?.destructiveHint, !readOnly, tool.name);
@@ -324,6 +328,17 @@ test("actual MCP handlers wrap service fixtures and sanitize failures for every 
     [Method in keyof ApexService]: ApexService[Method] extends (...args: never[]) => unknown ? Method : never;
   }[keyof ApexService];
   const cases: Record<ToolName, { method: ServiceMethod; input: Record<string, unknown>; args: unknown[] }> = {
+    inputHistory: { method: "inputHistory", input: {}, args: [] },
+    previewInputAmendment: {
+      method: "previewInputAmendment",
+      input: { amendment: inputAmendment, reason: amendmentOptions.reason },
+      args: [inputAmendment, amendmentOptions.reason],
+    },
+    amendInput: {
+      method: "amendInput",
+      input: { amendment: inputAmendment, ...amendmentOptions },
+      args: [inputAmendment, amendmentOptions],
+    },
     status: { method: "status", input: {}, args: [] },
     releaseWriter: { method: "releaseWriter", input: {}, args: [] },
     capabilityList: { method: "capabilityList", input: {}, args: [] },
@@ -387,6 +402,7 @@ test("actual MCP handlers wrap service fixtures and sanitize failures for every 
     },
   };
   const service = new ApexService(await tempRoot());
+  await mkdir(join(service.root, ".apex"));
   const workspace = service.root;
   const responses = { ...fixtures };
   const calls: Array<{ method: keyof ApexService; args: unknown[] }> = [];

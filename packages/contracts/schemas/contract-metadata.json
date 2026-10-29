@@ -169,6 +169,16 @@
     "maxBytes": 65536,
     "sensitivity": "confidential"
   },
+  "https://schemas.apexops.dev/input-amendment-proposal-v1.json": {
+    "compatibility": "strict-v1",
+    "maxBytes": 1048576,
+    "sensitivity": "confidential"
+  },
+  "https://schemas.apexops.dev/input-amendment-v1.json": {
+    "compatibility": "strict-v1",
+    "maxBytes": 262144,
+    "sensitivity": "confidential"
+  },
   "https://schemas.apexops.dev/input-request-v1.json": {
     "compatibility": "strict-v1",
     "maxBytes": 65536,

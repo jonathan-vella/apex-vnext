@@ -8,7 +8,7 @@ import { MCP_TOOL_EFFECTS } from "../mcp.js";
 import { compareRuntimeVersions, workspaceRuntimeBinding, WORKSPACE_RUNTIME_LOCK } from "../runtime-binding.js";
 import { ApexService } from "../service.js";
 import { APEX_VERSION } from "../version.js";
-import { hash, selection, type ToolName } from "./mcp-fixtures.js";
+import { hash, selection, inputAmendment, amendmentOptions, type ToolName } from "./mcp-fixtures.js";
 import { tempRoot } from "./helpers.js";
 import { connectMcp } from "./mcp-client.js";
 import { test } from "./test-shard.js";
@@ -19,6 +19,9 @@ type ErrorEnvelope = { error?: { code?: string; message?: string; remediation?: 
 // Minimal arguments that pass each tool's input schema, so every call reaches the workspace runtime binding check.
 // The record is keyed by the tool registry type and checked against tools/list, so a new tool cannot skip the check.
 const toolArguments: Record<ToolName, Record<string, unknown>> = {
+  inputHistory: {},
+  previewInputAmendment: { amendment: inputAmendment, reason: amendmentOptions.reason },
+  amendInput: { amendment: inputAmendment, ...amendmentOptions },
   status: {},
   projectList: {},
   doctorChecks: {},
@@ -240,6 +243,7 @@ test("every MCP tool reaches the service when the workspace lock matches this ru
 
 test("uninitialized workspaces keep their existing behavior", async (context) => {
   const root = await realpath(await tempRoot());
+  await mkdir(join(root, ".git"));
   const spied = spyService(root);
   const spyClient = await connect(context, spied.service);
   for (const name of await listedTools(spyClient)) {
