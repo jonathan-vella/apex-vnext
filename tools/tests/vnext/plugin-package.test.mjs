@@ -176,7 +176,7 @@ test("plugin layout, manifests, agents, skills and bundle are valid", async (con
   );
   const policy = await readJson(join(outputDirectory, "com.github.copilot/hooks/apex-mcp-tools.json"));
   assert.deepEqual(policy, mcpToolPolicy(), "the deny hook policy is derived from the MCP adapter");
-  assert.deepEqual(policy.readOnly, ["projectList", "status"]);
+  assert.deepEqual(policy.readOnly, ["inputHistory", "previewInputAmendment", "projectList", "status"]);
   assert.equal(
     await readFile(join(outputDirectory, "com.github.copilot/hooks/apex-hook.mjs"), "utf8"),
     renderHookScript(
@@ -283,6 +283,9 @@ test("plugin agents and skills carry the guidance the retired workspace copies c
     "apex/projectUse",
     "apex/projectDelete",
     "apex/recordInput",
+    "apex/inputHistory",
+    "apex/previewInputAmendment",
+    "apex/amendInput",
     "apex/taskContext",
     "apex/readTaskInput",
     "apex/requirementsComplete",

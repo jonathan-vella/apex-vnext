@@ -6,6 +6,7 @@ This file is generated from [packages/cli/src/mcp.ts](../../packages/cli/src/mcp
 
 ## Inventory
 
+- `amendInput`
 - `architectureComplete`
 - `capabilityList`
 - `capabilityStatus`
@@ -20,10 +21,12 @@ This file is generated from [packages/cli/src/mcp.ts](../../packages/cli/src/mcp
 - `improvementObservations`
 - `improvementObserve`
 - `improvementProposals`
+- `inputHistory`
 - `inventory`
 - `nextTask`
 - `planComplete`
 - `preview`
+- `previewInputAmendment`
 - `projectCreate`
 - `projectDelete`
 - `projectList`

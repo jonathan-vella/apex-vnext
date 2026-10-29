@@ -20,6 +20,31 @@ const invocations: Record<
   ReviewGuardedTool,
   { mcp: (taskId: string) => Record<string, unknown>; service: Array<(service: ApexService) => Promise<unknown>> }
 > = {
+  amendInput: {
+    mcp: () => ({
+      amendment: {
+        schemaVersion: "1.0.0",
+        requestId: "missing",
+        baseAnswersHash: hash,
+        answers: [{ questionId: "q", value: "v" }],
+      },
+      reason: "Correction",
+      expectedHash: hash,
+      confirm: true,
+    }),
+    service: [
+      (service) =>
+        service.amendInput(
+          {
+            schemaVersion: "1.0.0",
+            requestId: "missing",
+            baseAnswersHash: hash,
+            answers: [{ questionId: "q", value: "v" }],
+          },
+          { reason: "Correction", expectedHash: hash, confirm: true },
+        ),
+    ],
+  },
   recordInput: {
     mcp: () => ({
       schemaVersion: "1.0.0",

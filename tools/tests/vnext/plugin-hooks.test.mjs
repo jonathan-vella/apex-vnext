@@ -543,7 +543,7 @@ test("a reviewer mutation is denied while rubber-duck runs, and allowed again af
   await resetReviewHome();
   const policy = new Set(mcpToolPolicy().readOnly);
   const stateChanging = mcpToolPolicy().tools.filter((tool) => !policy.has(tool));
-  assert.deepEqual([...policy].sort(), ["projectList", "status"]);
+  assert.deepEqual([...policy].sort(), ["inputHistory", "previewInputAmendment", "projectList", "status"]);
   assert.ok(stateChanging.includes("reviewComplete") && stateChanging.includes("gateDecide"));
   assertAllowed(decide("subagentStart", subagentStart()));
   assert.equal(activeRubberDuckMarks().length, 1);
@@ -825,7 +825,12 @@ test("APEX tool names parse in every client form, and the shipped policy loader 
   context.after(() => rm(folder, { recursive: true, force: true }));
   const path = join(folder, "apex-mcp-tools.json");
   await writeFile(path, JSON.stringify(mcpToolPolicy()));
-  assert.deepEqual([...loadToolPolicy(path)].sort(), ["projectList", "status"]);
+  assert.deepEqual([...loadToolPolicy(path)].sort(), [
+    "inputHistory",
+    "previewInputAmendment",
+    "projectList",
+    "status",
+  ]);
   for (const bad of [{}, { server: "other", readOnly: [] }, { server: "apex", readOnly: [1] }]) {
     await writeFile(path, JSON.stringify(bad));
     assert.throws(() => loadToolPolicy(path), /malformed/u);

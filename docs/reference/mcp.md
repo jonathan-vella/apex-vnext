@@ -105,29 +105,42 @@ timeouts or cancellations, route human decisions through `ask_user`, and explain
 
 ## Workflow Tools
 
-| Tool                   | Purpose                                                                                       |
-| ---------------------- | --------------------------------------------------------------------------------------------- |
-| `status`               | Read selected project and run status, or report a runtime version mismatch.                   |
-| `releaseWriter`        | Release this workspace's writer lease for the selected run.                                   |
-| `nextTask`             | Get the next input, review decision, task, or terminal status.                                |
-| `taskContext`          | Read context for the exact task ID returned by `nextTask`.                                    |
-| `readTaskInput`        | Read externalized active-task context in bounded chunks.                                      |
-| `recordInput`          | Submit answers for the exact pending requirements input request.                              |
-| `stageArtifact`        | Stage one or more typed outputs for a task.                                                   |
-| `stageFile`            | Stage a bounded file for a task, optionally with an expected SHA-256.                         |
-| `generateIac`          | Generate the selected task's Bicep or Terraform batch.                                        |
-| `validateTask`         | Validate staged or supplied task outputs without completion.                                  |
-| `completeTask`         | Atomically accept a complete typed output bundle.                                             |
-| `requirementsComplete` | Complete Requirements without constructing a generic bundle.                                  |
-| `architectureComplete` | Complete Architecture, cost, and decisions atomically.                                        |
-| `reviewComplete`       | Complete a review from rubber-duck's captured output; takes only the task ID.                 |
-| `reviewDecide`         | Revise, acknowledge obligations, or accept risk with project owner and 90-day default expiry. |
-| `planComplete`         | Complete a plan with an APEX-derived intent binding.                                          |
+| Tool                    | Purpose                                                                                       |
+| ----------------------- | --------------------------------------------------------------------------------------------- |
+| `status`                | Read selected project and run status, or report a runtime version mismatch.                   |
+| `releaseWriter`         | Release this workspace's writer lease for the selected run.                                   |
+| `nextTask`              | Get the next input, review decision, task, or terminal status.                                |
+| `taskContext`           | Read context for the exact task ID returned by `nextTask`.                                    |
+| `readTaskInput`         | Read externalized active-task context in bounded chunks.                                      |
+| `recordInput`           | Submit answers for the exact pending requirements input request.                              |
+| `inputHistory`          | Read effective recorded intake/Architecture answers and their correction base hashes.         |
+| `previewInputAmendment` | Preview a correction and dependent invalidation without changing state.                       |
+| `amendInput`            | Append the explicitly confirmed correction, invalidating dependent reviews and gates.         |
+| `stageArtifact`         | Stage one or more typed outputs for a task.                                                   |
+| `stageFile`             | Stage a bounded file for a task, optionally with an expected SHA-256.                         |
+| `generateIac`           | Generate the selected task's Bicep or Terraform batch.                                        |
+| `validateTask`          | Validate staged or supplied task outputs without completion.                                  |
+| `completeTask`          | Atomically accept a complete typed output bundle.                                             |
+| `requirementsComplete`  | Complete Requirements without constructing a generic bundle.                                  |
+| `architectureComplete`  | Complete Architecture, cost, and decisions atomically.                                        |
+| `reviewComplete`        | Complete a review from rubber-duck's captured output; takes only the task ID.                 |
+| `reviewDecide`          | Revise, acknowledge obligations, or accept risk with project owner and 90-day default expiry. |
+| `planComplete`          | Complete a plan with an APEX-derived intent binding.                                          |
 
 Handle `needs_input` before requesting task context. Only a `nextTask` result with `status=task` provides a valid task
 ID. New Requirements runs return three adaptive panels before the task. Handle `needs_review` through the returned
 finding actions and `reviewDecide`.
 The returned request ID, expected head, and owner epoch are required for `recordInput`.
+For an already recorded answer, use `inputHistory`, then `previewInputAmendment` with an `input-amendment-v1` and
+reason. Present its impact and obtain explicit confirmation before `amendInput` with the same amendment and reason,
+`expectedHash: proposalHash` and `confirm: true`. This preserves audit history and reopens dependent approvals;
+it never authorizes a gate or deployment. Corrected stages and reviews must be rerun; lab Gate 2/3 readiness is
+automatic, while human Gate 1 and Gate 4 decisions remain genuine. See
+[answer correction](cli.md#correcting-recorded-intake-answers).
+Do not delete a project to fix an answer. Autopilot and Allow All do not authorize amendment confirmation.
+For explicitly optional questions, omit the answer or submit a blank string or `none` to leave it unspecified.
+Blank required answers still fail validation; `none` for required questions is accepted only when the question supports
+that value. Empty optional answers are not persisted as preferences.
 `projectCreate` requires `riskOwner` (`partner` or `customer`). `reviewDecide` accept-risk decisions derive owner from
 that project value; omit `expiresAt` to use the 90-day default.
 `projectCreate` and `promote` accept an optional `purpose` (`lab`, the default, or `production`). A run's purpose cannot

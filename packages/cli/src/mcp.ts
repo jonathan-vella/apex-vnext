@@ -466,12 +466,16 @@ const inputSubmission = z
         z
           .object({
             questionId: z.string().min(1),
-            value: inputValue,
+            value: z.union([z.string(), inputValue]),
           })
           .strict(),
       )
       .min(1),
   })
+  .strict();
+const inputAmendment = inputSubmission
+  .pick({ schemaVersion: true, requestId: true, answers: true })
+  .extend({ baseAnswersHash: z.string().regex(/^[0-9a-f]{64}$/u) })
   .strict();
 const projectCreateInput = z
   .object({
@@ -863,6 +867,38 @@ export function createMcpServerFactory(
       inputSchema: inputSubmission,
     },
     async (input) => result(await service.recordInput(input)),
+  );
+  registerTool(
+    "inputHistory",
+    {
+      description:
+        "Read recorded Requirements intake and current Architecture answers and base hashes for correction. Never delete a project to correct an answer.",
+      inputSchema: { cursor: cursorInput },
+    },
+    async () => result(await service.inputHistory()),
+  );
+  registerTool(
+    "previewInputAmendment",
+    {
+      description:
+        "Preview an append-only correction to recorded answers, including dependent review/gate invalidation and re-approval. Does not apply it.",
+      inputSchema: { amendment: inputAmendment, reason: z.string().min(1).max(2048) },
+    },
+    async ({ amendment, reason }) => result(await service.previewInputAmendment(amendment, reason)),
+  );
+  registerTool(
+    "amendInput",
+    {
+      description:
+        "Apply only after the user explicitly confirms the exact preview and impact. Preserves original audit history; does not approve any gate or authorize deployment.",
+      inputSchema: {
+        amendment: inputAmendment,
+        reason: z.string().min(1).max(2048),
+        expectedHash: z.string().regex(/^[0-9a-f]{64}$/u),
+        confirm: z.literal(true),
+      },
+    },
+    async ({ amendment, ...options }) => result(await service.amendInput(amendment, options)),
   );
   registerTool(
     "governanceImport",

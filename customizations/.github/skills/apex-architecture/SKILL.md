@@ -32,6 +32,12 @@ review or task.
 2. For `status=task`, read `apex/taskContext` with the exact task ID. If the result is externalized, use
    `apex/readTaskInput` until the bounded context is complete. Use its inputs, decisions, evidence and output templates
    as authoritative; ask targeted follow-ups only for unresolved user-owned decisions.
+   To correct a recorded Architecture answer, use `apex/inputHistory` and `apex/previewInputAmendment` with the
+   request ID, current base-answer hash and corrected answers. Explain the affected reviews, gates and re-approval
+   path, then obtain explicit user confirmation before `apex/amendInput` with the exact proposal hash and
+   `confirm: true`. Resume with `nextTask`; Gate 1 remains unchanged, but dependent approvals need fresh review.
+   Never delete a project, replace audit history, reuse invalidated approval, or infer confirmation from Autopilot
+   or Allow All. A running rubber-duck review must finish or be stopped and cancelled from the terminal first.
 3. Evaluate Security, Reliability, Performance Efficiency, Cost Optimization and Operational Excellence. Submit the
    qualitative `wellArchitectedAssessment` shape from the task template, including status, accepted requirements,
    evidence references, recommendations and trade-offs for every pillar. Treat performance and scale numbers as later

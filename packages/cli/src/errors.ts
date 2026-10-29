@@ -77,6 +77,13 @@ const RUNTIME_MISMATCH_REMEDIATION: Record<RuntimeMismatchReason, string> = {
 // Remediation is a fixed hint per stable code (and, for a runtime mismatch, per fixed reason) so error details,
 // causes, and paths never reach MCP clients.
 export function remediationForApexError(error: ApexError): string {
+  if (error.code === "APEX_CONFLICT") {
+    const reason = (error.details as { reason?: unknown } | undefined)?.reason;
+    if (reason === "ONLY_PROJECT" || reason === "INPUT_ALREADY_RECORDED")
+      return "Do not delete or recreate a project to correct a recorded answer. Read inputHistory, previewInputAmendment, obtain explicit confirmation of its impact, then call amendInput. CLI: apex input history, apex input preview-amendment, apex input amend --yes.";
+    if (reason === "INPUT_NOT_RECORDED")
+      return "Read inputHistory for current recorded Requirements or Architecture requests; use recordInput only for a pending request. Superseded requests and governance choices cannot be amended here.";
+  }
   if (error.code === "APEX_RUNTIME_MISMATCH") {
     const reason = (error.details as { reason?: unknown } | undefined)?.reason;
     if (typeof reason === "string" && Object.hasOwn(RUNTIME_MISMATCH_REMEDIATION, reason))

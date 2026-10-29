@@ -24,8 +24,12 @@ import {
   IacBindingV1Schema,
   IacHandoffV1Schema,
   InputRequestV1Schema,
-  InputValueV1Schema,
   InputSubmissionV1Schema,
+  InputAmendmentV1Schema,
+  InputAmendmentProposalV1Schema,
+  type InputAmendmentV1,
+  type InputAmendmentProposalV1,
+  type RecordedInputV1,
   ImplementationIntentV1Schema,
   LogicalResourceManifestV1Schema,
   OperationRecordV1Schema,
@@ -2172,7 +2176,12 @@ export class ApexService {
       throw new ApexError("APEX_NOT_FOUND", `Project not found: ${projectId}`, EXIT_CODES.notFound);
     }
     if (projects.length <= 1) {
-      throw new ApexError("APEX_CONFLICT", "Cannot delete the only project in a workspace", EXIT_CODES.conflict);
+      throw new ApexError(
+        "APEX_CONFLICT",
+        "Cannot delete the only project in a workspace. To correct a recorded answer, use input history, preview-amendment and amend instead.",
+        EXIT_CODES.conflict,
+        { reason: "ONLY_PROJECT" },
+      );
     }
     const selection = await this.selection();
     const nextSelection =
@@ -2885,8 +2894,17 @@ export class ApexService {
       await this.assertGovernanceCandidate(run, governanceInput.request, "reuse");
     }
     if (requirements === undefined) {
+      const lastRequirementsInvalidation = events.findLast(
+        (event) =>
+          event.type === "workflow.invalidated" &&
+          (event.payload as { nodeIds?: string[] }).nodeIds?.includes("requirements"),
+      );
+      const correctedIntake =
+        lastRequirementsInvalidation !== undefined &&
+        this.inputAmendment(lastRequirementsInvalidation)?.kind === "requirements";
       const pending =
-        this.pendingRequirementsRevision(events) === undefined && this.previousRequirementsHash(events) === undefined
+        this.pendingRequirementsRevision(events) === undefined &&
+        (correctedIntake || this.previousRequirementsHash(events) === undefined)
           ? this.nextRequirementsIntakeRound(events)
           : undefined;
       if (pending !== undefined)
@@ -3013,7 +3031,9 @@ export class ApexService {
           (event.payload as { requestId?: unknown } | null)?.requestId === request.requestId,
       )
     ) {
-      throw new ApexError("APEX_CONFLICT", "Input request was already recorded", EXIT_CODES.conflict);
+      throw new ApexError("APEX_CONFLICT", "Input request was already recorded", EXIT_CODES.conflict, {
+        reason: "INPUT_ALREADY_RECORDED",
+      });
     }
     if (input.requestId !== request.requestId) {
       throw new ApexError("APEX_CONFLICT", "Input request ID does not match the pending request", EXIT_CODES.conflict);
@@ -3066,6 +3086,220 @@ export class ApexService {
       throw error;
     }
     return { recorded: true, requestId: request.requestId };
+  }
+
+  async inputHistory(): Promise<{ inputs: RecordedInputV1[] }> {
+    const run = await this.run(await this.selection(), { readOnly: true });
+    return { inputs: this.recordedInputs(await this.journal(run).replay()) };
+  }
+
+  async previewInputAmendment(amendment: InputAmendmentV1, reason: string): Promise<InputAmendmentProposalV1> {
+    amendment = structuredClone(amendment);
+    if (
+      !Value.Check(InputAmendmentV1Schema, amendment) ||
+      Buffer.byteLength(JSON.stringify(amendment), "utf8") > 262_144 ||
+      typeof reason !== "string" ||
+      reason.trim().length === 0 ||
+      reason.length > 2048
+    )
+      throw new ApexError("APEX_VALIDATION", "Invalid or oversized input amendment or reason", EXIT_CODES.validation);
+    const run = await this.run(await this.selection(), { readOnly: true });
+    const events = await this.journal(run).replay();
+    const recorded = this.recordedInputs(events).find(({ requestId }) => requestId === amendment.requestId);
+    if (recorded === undefined)
+      throw new ApexError(
+        "APEX_CONFLICT",
+        "Amendment requires a recorded Requirements or Architecture input",
+        EXIT_CODES.conflict,
+        { reason: "INPUT_NOT_RECORDED" },
+      );
+    if (recorded.baseAnswersHash !== amendment.baseAnswersHash)
+      throw new ApexError("APEX_STALE", "Input amendment base answers are not current", EXIT_CODES.stale);
+    let changes;
+    try {
+      const ids = new Set(amendment.answers.map(({ questionId }) => questionId));
+      if (amendment.answers.some(({ questionId }) => !recorded.questions.some(({ id }) => id === questionId)))
+        throw new Error("Input amendment contains an unknown question");
+      changes = validateInputAnswers(
+        recorded.questions.filter(({ id }) => ids.has(id)),
+        amendment.answers,
+      );
+    } catch (error) {
+      throw new ApexError(
+        "APEX_VALIDATION",
+        error instanceof Error ? error.message : "Invalid amendment answers",
+        EXIT_CODES.validation,
+      );
+    }
+    const answers = validateInputAnswers(recorded.questions, [
+      ...recorded.answers.filter(
+        ({ questionId }) => !amendment.answers.some((change) => change.questionId === questionId),
+      ),
+      ...changes,
+    ]);
+    if (sha256Json(answers) === recorded.baseAnswersHash)
+      throw new ApexError("APEX_VALIDATION", "Input answers are unchanged", EXIT_CODES.validation);
+    const workflow = await this.lockedWorkflowEngine(run);
+    const nodeIds = new Set([
+      recorded.kind,
+      ...workflow.invalidationPlan(recorded.kind, reason.trim()).map(({ nodeId }) => nodeId),
+    ]);
+    for (const descriptor of TASKS)
+      if (descriptor.reviewSubject !== undefined && nodeIds.has(descriptor.reviewSubject)) nodeIds.add(descriptor.id);
+    const body = {
+      schemaVersion: CONTRACT_VERSION,
+      projectId: run.projectId,
+      runId: run.runId,
+      expectedHead: events.at(-1)!.hash,
+      ownerEpoch: run.ownerEpoch,
+      amendment,
+      kind: recorded.kind,
+      previousAnswers: recorded.answers,
+      answers,
+      reason: reason.trim(),
+      invalidatedNodes: [...nodeIds].sort(),
+      invalidatedGates: run.gates.filter(({ gate }) => nodeIds.has(`gate-${gate}`)).map(({ gate }) => gate),
+      reapprovalPath:
+        recorded.kind === "requirements"
+          ? "Recollect dependent intake panels if their questions changed, regenerate Requirements from corrected intake, and rerun affected stages and reviews. Human Gate 1 and Gate 4 decisions remain required; lab Gate 2 and Gate 3 readiness is recorded automatically when required reviews and checks pass."
+          : "Regenerate Architecture from corrected decisions and rerun affected stages and reviews. Gate 1 remains unchanged; a human Gate 4 decision is required for the fresh preview. Lab Gate 2 and Gate 3 readiness is recorded automatically when required reviews and checks pass.",
+      filesModified: false as const,
+      deploymentAuthorized: false as const,
+    };
+    const proposal = { ...body, proposalHash: sha256Json(body) };
+    if (!Value.Check(InputAmendmentProposalV1Schema, proposal))
+      throw new ApexError("APEX_VALIDATION", "Invalid input amendment proposal", EXIT_CODES.validation);
+    return proposal;
+  }
+
+  async amendInput(amendment: InputAmendmentV1, options: { reason: string; expectedHash: string; confirm: boolean }) {
+    await this.assertNoPendingReview("amendInput");
+    if (options.confirm !== true)
+      throw new ApexError(
+        "APEX_AUTHORIZATION",
+        "Input amendment requires explicit confirmation",
+        EXIT_CODES.authorization,
+      );
+    const proposal = await this.previewInputAmendment(amendment, options.reason);
+    if (proposal.proposalHash !== options.expectedHash)
+      throw new ApexError(
+        "APEX_STALE",
+        "Input amendment proposal is stale or differs from the confirmed answers",
+        EXIT_CODES.stale,
+      );
+    const run = await this.currentRun();
+    const events = await this.journal(run).replay();
+    if (
+      run.projectId !== proposal.projectId ||
+      run.runId !== proposal.runId ||
+      run.ownerEpoch !== proposal.ownerEpoch ||
+      events.at(-1)?.hash !== proposal.expectedHead
+    )
+      throw new ApexError("APEX_STALE", "Input amendment state is stale", EXIT_CODES.stale);
+    const transfers = new WriterTransferStore(this.projects.runDirectory(run.projectId, run.runId), this.clock);
+    await this.assertCurrentWriterAuthority(run, transfers);
+    this.assertNoInFlightDeployment(events);
+    await this.acquireRunWriterLease(run);
+    const proposalHash = await this.objects.putJson(proposal);
+    const payload = {
+      reason: proposal.reason,
+      nodeIds: proposal.invalidatedNodes,
+      artifactKinds: [
+        ...new Set(TASKS.filter(({ id }) => proposal.invalidatedNodes.includes(id)).flatMap(({ outputs }) => outputs)),
+      ],
+      inputAmendment: proposal,
+      proposalHash,
+    };
+    const dependencyHash = this.dependencyRevision(run, [
+      ...events,
+      { type: "workflow.invalidated", payload } as EventV1,
+    ]);
+    await this.assertCurrentWriterAuthority(run, transfers);
+    await this.mutateRun(
+      run,
+      {
+        ...run,
+        gates: run.gates.map((gate) =>
+          proposal.invalidatedGates.includes(gate.gate) ? invalidateGate(gate, dependencyHash, proposal.reason) : gate,
+        ),
+      },
+      "workflow.invalidated",
+      payload,
+      proposal.expectedHead,
+    );
+    return {
+      amended: true as const,
+      requestId: amendment.requestId,
+      proposalHash,
+      invalidatedNodes: proposal.invalidatedNodes,
+      deploymentAuthorized: false as const,
+    };
+  }
+
+  private recordedInputs(events: EventV1[]): RecordedInputV1[] {
+    const records = new Map<string, RecordedInputV1>();
+    for (const event of events) {
+      if (event.type === "requirements.input-recorded" || event.type === "architecture.decision-recorded") {
+        const submission = event.payload as { requestId: string; answers: InputSubmissionV1["answers"] };
+        const requested = events.find(
+          (entry) =>
+            entry.type ===
+              (event.type === "requirements.input-recorded"
+                ? "requirements.input-requested"
+                : "architecture.decision-requested") &&
+            (entry.payload as { requestId?: unknown }).requestId === submission.requestId,
+        );
+        if (requested === undefined)
+          throw new ApexError("APEX_INTERNAL", "Recorded input has no request", EXIT_CODES.internal);
+        const request =
+          event.type === "requirements.input-recorded"
+            ? this.inputRequest(requested, requested.ownerEpoch)
+            : this.architectureDecisionRequest(requested, requested.ownerEpoch);
+        const answers = validateInputAnswers(request.questions, submission.answers);
+        records.set(submission.requestId, {
+          requestId: submission.requestId,
+          kind: event.type === "requirements.input-recorded" ? "requirements" : "architecture",
+          questions: request.questions,
+          answers,
+          baseAnswersHash: sha256Json(answers),
+        });
+      }
+      const amendment = this.inputAmendment(event);
+      if (amendment !== undefined) {
+        const record = records.get(amendment.amendment.requestId);
+        if (
+          record === undefined ||
+          record.kind !== amendment.kind ||
+          record.baseAnswersHash !== amendment.amendment.baseAnswersHash
+        )
+          throw new ApexError("APEX_INTERNAL", "Persisted input amendment base is invalid", EXIT_CODES.internal);
+        record.answers = amendment.answers;
+        record.baseAnswersHash = sha256Json(record.answers);
+      }
+    }
+    const architectureRequest = this.currentArchitectureInputEvents(events).findLast(
+      ({ type }) => type === "architecture.decision-requested",
+    );
+    const architectureRequestId = (architectureRequest?.payload as { requestId?: string } | undefined)?.requestId;
+    const requirementsRequests = new Map<string, string>();
+    for (const event of events) {
+      if (event.type !== "requirements.input-requested") continue;
+      const payload = event.payload as { requestId: string; intake: { round: string } };
+      requirementsRequests.set(payload.intake.round, payload.requestId);
+    }
+    const currentRequirements = new Set(requirementsRequests.values());
+    return [...records.values()].filter(({ kind, requestId }) =>
+      kind === "requirements" ? currentRequirements.has(requestId) : requestId === architectureRequestId,
+    );
+  }
+
+  private inputAmendment(event: EventV1): InputAmendmentProposalV1 | undefined {
+    if (event.type !== "workflow.invalidated") return undefined;
+    const amendment = (event.payload as { inputAmendment?: unknown }).inputAmendment;
+    if (amendment === undefined) return undefined;
+    if (!Value.Check(InputAmendmentProposalV1Schema, amendment))
+      throw new ApexError("APEX_INTERNAL", "Persisted input amendment is invalid", EXIT_CODES.internal);
+    return amendment;
   }
 
   private async taskReviewMetadata(
@@ -3174,7 +3408,16 @@ export class ApexService {
     if (task.taskType === "policy-refresh")
       outputTemplates["policy-property-map"] = (await this.refreshedPolicyMap(run, events)).policyMap;
     const requirementsRevision = this.pendingRequirementsRevision(events);
-    const requirementsCandidateHash = requirementsRevision?.candidateHash ?? this.previousRequirementsHash(events);
+    const invalidation = events.findLast(
+      (event) =>
+        event.type === "workflow.invalidated" &&
+        (event.payload as { nodeIds?: string[] }).nodeIds?.includes("requirements"),
+    );
+    const requirementsCandidateHash =
+      requirementsRevision?.candidateHash ??
+      (invalidation !== undefined && this.inputAmendment(invalidation)?.kind === "requirements"
+        ? undefined
+        : this.previousRequirementsHash(events));
     if (task.taskType === "requirements" && requirementsCandidateHash !== undefined)
       outputTemplates.requirements = await this.objects.getJson<RequirementsV1>(requirementsCandidateHash);
     const artifactHashes = Object.fromEntries(
@@ -3194,7 +3437,7 @@ export class ApexService {
       })),
       artifactHashes,
       recordedInput: task.taskType === "requirements" ? this.recordedRequirementsInput(events) : null,
-      decisions: task.taskType === "architecture" ? this.architectureDecisionValues(events, task.taskId) : {},
+      decisions: task.taskType === "architecture" ? this.architectureDecisionValues(events) : {},
       ...(task.taskType === "architecture"
         ? { governanceFindings: await this.governanceFindingsSummary(run, events) }
         : task.taskType === "policy-refresh"
@@ -4899,24 +5142,7 @@ export class ApexService {
       throw new ApexError("APEX_STALE", "Requirements change state is stale", EXIT_CODES.stale);
     const transfers = new WriterTransferStore(this.projects.runDirectory(run.projectId, run.runId), this.clock);
     await this.assertCurrentWriterAuthority(run, transfers);
-    for (const [index, event] of events.entries()) {
-      if (!["deployment.started", "deployment.executed", "deployment.indeterminate"].includes(event.type)) continue;
-      const previewHash = (event.payload as { previewHash?: string }).previewHash;
-      if (
-        !events
-          .slice(index + 1)
-          .some(
-            (entry) =>
-              entry.type === "deployment.completed" &&
-              (entry.payload as { previewHash?: string }).previewHash === previewHash,
-          )
-      )
-        throw new ApexError(
-          "APEX_CONFLICT",
-          "Deployment is in-flight or indeterminate; reconcile before requirements revision",
-          EXIT_CODES.conflict,
-        );
-    }
+    this.assertNoInFlightDeployment(events);
     await this.acquireRunWriterLease(run);
     const candidateHash = await this.objects.putJson(candidate);
     const proposalHash = await this.objects.putJson(proposal);
@@ -4951,6 +5177,27 @@ export class ApexService {
       invalidatedNodes: proposal.invalidatedNodes,
       deploymentAuthorized: false as const,
     };
+  }
+
+  private assertNoInFlightDeployment(events: EventV1[]): void {
+    for (const [index, event] of events.entries()) {
+      if (!["deployment.started", "deployment.executed", "deployment.indeterminate"].includes(event.type)) continue;
+      const previewHash = (event.payload as { previewHash?: string }).previewHash;
+      if (
+        !events
+          .slice(index + 1)
+          .some(
+            (entry) =>
+              entry.type === "deployment.completed" &&
+              (entry.payload as { previewHash?: string }).previewHash === previewHash,
+          )
+      )
+        throw new ApexError(
+          "APEX_CONFLICT",
+          "Deployment is in-flight or indeterminate; reconcile before changing workflow inputs",
+          EXIT_CODES.conflict,
+        );
+    }
   }
 
   private pendingRequirementsRevision(events: EventV1[]) {
@@ -8932,7 +9179,9 @@ export class ApexService {
     taskId?: string;
     staleTaskId?: string;
   } {
-    const requested = [...events].reverse().find((event) => event.type === "architecture.decision-requested");
+    const requested = this.currentArchitectureInputEvents(events).findLast(
+      (event) => event.type === "architecture.decision-requested",
+    );
     if (requested === undefined) return {};
     const request = this.architectureDecisionRequest(requested, requested.ownerEpoch);
     const recorded = events.some(
@@ -8949,27 +9198,18 @@ export class ApexService {
 
   private architectureDecisionValues(
     events: Awaited<ReturnType<EventJournal["replay"]>>,
-    taskId: string,
   ): Record<string, InputValueV1> {
-    const result: Record<string, InputValueV1> = {};
-    for (const event of events) {
-      if (event.type !== "architecture.decision-recorded") continue;
-      const payload = event.payload as { decision?: { taskId?: unknown; id?: unknown }; answers?: unknown };
-      if (
-        payload.decision?.taskId !== taskId ||
-        typeof payload.decision.id !== "string" ||
-        !Array.isArray(payload.answers)
-      ) {
-        continue;
-      }
-      for (const answer of payload.answers) {
-        const value = answer as { questionId?: unknown; value?: unknown };
-        if (typeof value.questionId === "string" && Value.Check(InputValueV1Schema, value.value)) {
-          result[value.questionId] = value.value;
-        }
-      }
-    }
-    return result;
+    const recorded = this.recordedInputs(events).find(({ kind }) => kind === "architecture");
+    return Object.fromEntries((recorded?.answers ?? []).map(({ questionId, value }) => [questionId, value]));
+  }
+
+  private currentArchitectureInputEvents(events: EventV1[]): EventV1[] {
+    const invalidation = events.findLastIndex(
+      (event) =>
+        event.type === "workflow.invalidated" &&
+        (event.payload as { nodeIds?: string[] }).nodeIds?.includes("requirements"),
+    );
+    return events.slice(invalidation + 1);
   }
 
   private async issueArchitectureDecision(run: RunConfigV1, task: TaskEnvelopeV1): Promise<InputRequestV1> {
@@ -9007,21 +9247,25 @@ export class ApexService {
       ),
     );
     const catalog = REQUIREMENTS_INTAKE;
-    const latest = requests.at(-1);
-    if (latest !== undefined && !recordedRequestIds.has((latest.payload as { requestId: string }).requestId)) {
-      const intake = (latest.payload as { intake: { ordinal?: unknown; round?: unknown; total?: unknown } }).intake;
-      const ordinal = intake.ordinal;
-      const round = typeof ordinal === "number" && Number.isInteger(ordinal) ? catalog[ordinal - 1] : undefined;
-      if (round === undefined || intake.round !== round.round || intake.total !== catalog.length) {
-        throw new ApexError(
-          "APEX_CONFLICT",
-          "Requirements intake is incompatible; start a new run",
-          EXIT_CODES.conflict,
-        );
-      }
-      return round;
+    for (const round of catalog) {
+      const latest = requests.findLast(
+        (event) => (event.payload as { intake: { round: string } }).intake.round === round.round,
+      );
+      if (latest === undefined || !recordedRequestIds.has((latest.payload as { requestId: string }).requestId))
+        return round;
+      const original = this.inputRequest(latest, latest.ownerEpoch).questions;
+      const current = this.requirementsIntakeQuestions(round, events);
+      const shape = (questions: InputRequestV1["questions"]) =>
+        questions.map(({ id, options, multiSelect, valueType, optional }) => ({
+          id,
+          options: options ?? null,
+          multiSelect: multiSelect ?? false,
+          valueType: valueType ?? null,
+          optional: optional ?? false,
+        }));
+      if (sha256Json(shape(original)) !== sha256Json(shape(current))) return round;
     }
-    return catalog[recordedRequestIds.size];
+    return undefined;
   }
 
   private async issueRequirementsInput(run: RunConfigV1, round: RequirementsIntakeRound): Promise<InputRequestV1> {
@@ -9037,7 +9281,12 @@ export class ApexService {
           event.type === "requirements.input-recorded" &&
           (event.payload as { requestId?: unknown }).requestId === (latest.payload as { requestId: string }).requestId,
       );
-      if (!recorded && latest.hash === events.at(-1)?.hash && latest.ownerEpoch === run.ownerEpoch) {
+      if (
+        !recorded &&
+        latest.hash === events.at(-1)?.hash &&
+        latest.ownerEpoch === run.ownerEpoch &&
+        (latest.payload as { intake: { round: string } }).intake.round === round.round
+      ) {
         return this.inputRequest(latest, run.ownerEpoch);
       }
     }
@@ -9539,21 +9788,9 @@ export class ApexService {
     events: Awaited<ReturnType<EventJournal["replay"]>>,
   ): Record<string, InputValueV1> | null {
     const result: Record<string, InputValueV1> = {};
-    let recorded = false;
-    for (const event of events) {
-      if (event.type !== "requirements.input-recorded") continue;
-      const answers = (event.payload as { answers?: unknown }).answers;
-      if (!Array.isArray(answers)) continue;
-      recorded = true;
-      for (const answer of answers) {
-        const value = answer as { questionId?: unknown; value?: unknown };
-        if (typeof value.questionId !== "string" || !Value.Check(InputValueV1Schema, value.value)) {
-          throw new ApexError("APEX_INTERNAL", "Recorded requirements input is invalid", EXIT_CODES.internal);
-        }
-        result[value.questionId] = value.value as InputValueV1;
-      }
-    }
-    return recorded ? result : null;
+    const records = this.recordedInputs(events).filter(({ kind }) => kind === "requirements");
+    for (const record of records) for (const { questionId, value } of record.answers) result[questionId] = value;
+    return records.length > 0 ? result : null;
   }
 
   private outputTemplate(

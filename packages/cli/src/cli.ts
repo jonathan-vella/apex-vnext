@@ -11,6 +11,7 @@ import {
   type QualityScorecardV1,
   type RequirementsV1,
   type RequirementsAmendmentV1,
+  type InputAmendmentV1,
   type GovernanceSetupConfigV1,
   type RepositoryPublishConfigV1,
   type ArchetypeBatchConfigV1,
@@ -753,6 +754,17 @@ async function dispatch(
       });
     case "status":
       return service.workspaceStatus();
+    case "input history":
+      return service.inputHistory();
+    case "input preview-amendment":
+      return service.previewInputAmendment((await inputJson(flags)) as InputAmendmentV1, required(flags, "reason"));
+    case "input amend":
+      confirmed(flags, "input amend");
+      return service.amendInput((await inputJson(flags)) as InputAmendmentV1, {
+        reason: required(flags, "reason"),
+        expectedHash: required(flags, "expected-hash"),
+        confirm: true,
+      });
     case "requirements preview-change":
       return service.previewRequirementsChange((await inputJson(flags)) as RequirementsV1, required(flags, "reason"));
     case "requirements preview-amendment":

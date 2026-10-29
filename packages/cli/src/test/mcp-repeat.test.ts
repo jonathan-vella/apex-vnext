@@ -20,7 +20,16 @@ import {
 import { execute, resolveMcpWorkspace } from "../cli.js";
 import { MCP_TOOL_EFFECTS, type McpServiceResolver } from "../mcp.js";
 import { ApexService } from "../service.js";
-import { fixtures, hash, request, selection, task, type ToolName } from "./mcp-fixtures.js";
+import {
+  fixtures,
+  hash,
+  request,
+  selection,
+  task,
+  inputAmendment,
+  amendmentOptions,
+  type ToolName,
+} from "./mcp-fixtures.js";
 import {
   captureReview,
   inputAnswers,
@@ -49,6 +58,7 @@ const guardedTools = (Object.keys(MCP_TOOL_EFFECTS) as ToolName[]).filter(
 
 // One duplicate-call case per state-changing tool. The coverage test fails when a guarded tool has no case here.
 const duplicateCases: Record<GuardedTool, ToolCase> = {
+  amendInput: { method: "amendInput", input: { amendment: inputAmendment, ...amendmentOptions } },
   releaseWriter: { method: "releaseWriter", input: {} },
   nextTask: { method: "nextTask", input: {} },
   recordInput: {
@@ -110,6 +120,11 @@ const duplicateCases: Record<GuardedTool, ToolCase> = {
 };
 
 const readCases: Partial<Record<ToolName, ToolCase>> = {
+  inputHistory: { method: "inputHistory", input: {} },
+  previewInputAmendment: {
+    method: "previewInputAmendment",
+    input: { amendment: inputAmendment, reason: amendmentOptions.reason },
+  },
   status: { method: "workspaceStatus", input: {} },
   projectList: { method: "listProjects", input: {} },
   doctorChecks: { method: "doctor", input: {} },

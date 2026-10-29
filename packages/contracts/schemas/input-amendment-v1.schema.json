@@ -1,0 +1,208 @@
+{
+  "$id": "https://schemas.apexops.dev/input-amendment-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "answers": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "questionId": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "anyOf": [
+                  {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "items": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "minItems": 1,
+                    "type": "array",
+                    "uniqueItems": true
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "deferred",
+                        "type": "string"
+                      },
+                      "owner": {
+                        "minLength": 1,
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "owner"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "unknown",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "amount": {
+                        "minimum": 0,
+                        "type": "number"
+                      },
+                      "cadence": {
+                        "const": "monthly",
+                        "type": "string"
+                      },
+                      "currency": {
+                        "pattern": "^[A-Z]{3}$",
+                        "type": "string"
+                      },
+                      "kind": {
+                        "const": "budget",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "amount",
+                      "currency",
+                      "cadence"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "recovery",
+                        "type": "string"
+                      },
+                      "rpoMinutes": {
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "rtoMinutes": {
+                        "minimum": 0,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "rtoMinutes",
+                      "rpoMinutes"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "classification": {
+                        "anyOf": [
+                          {
+                            "const": "public",
+                            "type": "string"
+                          },
+                          {
+                            "const": "internal",
+                            "type": "string"
+                          },
+                          {
+                            "const": "confidential",
+                            "type": "string"
+                          },
+                          {
+                            "const": "restricted",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "kind": {
+                        "const": "data-classification",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "classification"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "compliance",
+                        "type": "string"
+                      },
+                      "scopes": {
+                        "items": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "minItems": 1,
+                        "type": "array",
+                        "uniqueItems": true
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "scopes"
+                    ],
+                    "type": "object"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "required": [
+          "questionId",
+          "value"
+        ],
+        "type": "object"
+      },
+      "maxItems": 128,
+      "minItems": 1,
+      "type": "array"
+    },
+    "baseAnswersHash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "requestId": {
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "requestId",
+    "baseAnswersHash",
+    "answers"
+  ],
+  "type": "object"
+}
