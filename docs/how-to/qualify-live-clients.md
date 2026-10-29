@@ -212,48 +212,64 @@ for the pinned source and published preview. Do not rerun them as a supposed fix
 
 ### Standard Answer Sheet
 
-Give the same answers in every client and session so results compare. The typed values match the test kit fixture
-(`packages/testkit/src/qualification.ts`). If a question is not listed, answer it consistently, then add its question ID
-and answer here. Never enter real tenant, subscription or account IDs. Type `none` for an optional field with no value;
-do not answer "no preference". This sheet is version 2.
+Use this reviewed happy-path fixture across clients so results compare. Its budget, recovery, data classification and
+compliance values match `packages/testkit/src/qualification.ts`; the rest records the live qualification choices, not
+the whole test kit. This sheet is version 3. Record the frozen candidate and sheet version with each run.
 
-| Question or step                       | Answer                                                                                      |
-| -------------------------------------- | ------------------------------------------------------------------------------------------- |
-| First message                          | `Create a small lab project: one Azure App Service web app and one storage account.`        |
-| Project ID                             | `qual-lab-webapp`                                                                           |
-| Display name                           | `Qualification lab web app`                                                                 |
-| Environment name                       | `dev`                                                                                       |
-| Target scope                           | `local` (the local-only option; no Azure target)                                            |
-| Risk owner                             | `partner` (the only valid values are `partner` and `customer`)                              |
-| Workload                               | `Qualification lab: one App Service web app and one storage account`                        |
-| Purpose                                | `lab` (also try `production` once and confirm it is rejected)                               |
-| Region                                 | `swedencentral`                                                                             |
-| IaC track                              | Bicep                                                                                       |
-| Profile                                | `standalone-lab`, not ALZ                                                                   |
-| Industry                               | `technology`                                                                                |
-| Delivery scenario                      | `greenfield`                                                                                |
-| Target environments                    | `dev` only                                                                                  |
-| Workload pattern                       | Customize: keep one App Service web app and one storage account                             |
-| Azure subscription, tenant or resource | None available. Decline or skip; do not sign in to Azure                                    |
-| Budget                                 | 250 USD, monthly. Do not defer                                                              |
-| Recovery                               | RTO 60 minutes, RPO 15 minutes                                                              |
-| Data classification                    | `internal`                                                                                  |
-| Compliance                             | `gdpr`                                                                                      |
-| Users and scale                        | About 10 internal users, low traffic                                                        |
-| Prohibited services                    | `none` (type it; an empty Enter is not accepted)                                            |
-| Availability                           | `single-region-availability`                                                                |
-| Security controls and authentication   | Accept the recommended sets                                                                 |
-| Operations                             | `azure-monitor`                                                                             |
-| Network exposure                       | `private-only` (the reference baseline denies public endpoints)                             |
-| Networking and identity                | Private connectivity; storage accessed only by managed identity; HTTPS only                 |
-| Any other single-select                | The first listed option                                                                     |
-| Any other multi-select                 | The first listed option only                                                                |
-| Deliberate invalid entry               | On the first multi-select, enter `99` once, then give the valid answer                      |
-| Deliberate cancel                      | Press Esc on the first single-select once, then answer it                                   |
-| Review disposition                     | "Accept the findings as valid and correct them through revision and fresh review"           |
-| Accountable owner                      | `partner` (never `customer`; correct the agent if it proposes another owner)                |
-| Gate 1                                 | After the final review is resolved, type `Gate 1 is approved` when it asks for confirmation |
-| Continue past Requirements             | `Continue to Architecture, then Plan. Stop before any deployment preview or Azure sign-in.` |
+If a question or offered value is missing from this sheet, pause for a scope decision and add its question ID and
+reviewed answer before proceeding. Never default to the first option, invent consent or enter real tenant,
+subscription or account IDs. Supporting resources beyond the web app and storage account need explicit scope review;
+do not accept an expanded recommended set automatically. Recovery values below are targets, not evidence that the
+design can meet them.
+
+| Question or step                       | Answer                                                                                                                                 |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| First message                          | `Create a small lab project: one Azure App Service web app and one storage account.`                                                   |
+| Project ID                             | `qual-lab-webapp`                                                                                                                      |
+| Display name                           | `Qualification lab web app`                                                                                                            |
+| Environment name                       | `dev`                                                                                                                                  |
+| Target scope                           | `local` (the local-only option; no Azure target)                                                                                       |
+| Risk owner                             | `partner` (the only valid values are `partner` and `customer`)                                                                         |
+| Workload                               | `Qualification lab: one App Service web app and one storage account`                                                                   |
+| Purpose                                | `lab`                                                                                                                                  |
+| Region                                 | `swedencentral`                                                                                                                        |
+| IaC track                              | Bicep                                                                                                                                  |
+| Profile                                | `standalone-lab`, not ALZ                                                                                                              |
+| Industry                               | `technology`                                                                                                                           |
+| Delivery scenario                      | `greenfield`                                                                                                                           |
+| Target environments                    | `dev` only                                                                                                                             |
+| Workload pattern                       | Customize: keep one App Service web app and one storage account                                                                        |
+| Azure subscription, tenant or resource | None available. Decline or skip; do not sign in to Azure                                                                               |
+| Budget                                 | 250 USD, monthly. Do not defer                                                                                                         |
+| Recovery targets                       | RTO 60 minutes, RPO 15 minutes; do not claim measured feasibility                                                                      |
+| Data classification                    | `internal`                                                                                                                             |
+| Compliance                             | `gdpr`                                                                                                                                 |
+| Users and scale                        | About 10 internal users, low traffic                                                                                                   |
+| Prohibited services                    | `none` (required field; an empty answer must not stand in for explicit none)                                                           |
+| Unused optional fields                 | Leave blank where supported; use `none` only when the prompt supports it, not "no preference"                                          |
+| Availability                           | `single-region-availability`                                                                                                           |
+| Security controls and authentication   | Managed identity, Microsoft Entra ID, platform-managed encryption and diagnostic logging; review extra resources before accepting them |
+| Operations                             | `azure-monitor`                                                                                                                        |
+| Network exposure                       | `private-only` (the reference baseline denies public endpoints)                                                                        |
+| Networking and identity                | Private connectivity; storage accessed only by managed identity; HTTPS only                                                            |
+| Unlisted single-select or multi-select | Pause for a reviewed answer; never choose the first option automatically                                                               |
+| Review disposition                     | Assess each finding; revise valid findings and obtain fresh review. Do not blanket-accept risks                                        |
+| Deferred-validation obligation owner   | `partner` for this fixture; this is a separate free-text responsibility, not the risk-owner enum                                       |
+| Gate 1                                 | Pause for the human's actual intent confirmation after review; never supply a canned approval                                          |
+| Continue past Requirements             | Only within explicit run authorization: `Continue to Architecture, then Plan. Stop before any deployment preview or Azure sign-in.`    |
+
+Keep invalid-entry, cancellation and production-rejection probes separate from this happy path, and run them only
+when the case is authorized. Do not perform destructive or tamper tests under permission for ordinary input checks.
+Label automated form entry as automated-interactive evidence, not human-driven input or a full scenario pass.
+
+If a candidate rejects an empty optional value, record the limitation rather than generalizing that every optional
+field requires `none`. Required fields still need their explicit answer.
+
+For a mistaken recorded answer, use the candidate's supported answer-history and amendment flow: inspect the original,
+preview the correction's impact, obtain explicit confirmation and append the correction. Preserve the original audit
+record, invalidate dependent reviews and gates, and return to the required review and human reapproval. If the frozen
+candidate lacks that flow, preserve the run and record a blocker; do not recommend delete/recreate as input recovery or
+edit persisted state directly.
 
 ## 4. Export Only Bounded Evidence
 
