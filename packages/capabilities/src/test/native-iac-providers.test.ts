@@ -2055,7 +2055,7 @@ test("azd preview normalization resolves azd's type and name to accepted resourc
 
 test("azd preview display types resolve by unique accepted name and fail closed otherwise", () => {
   const rg = "/subscriptions/s/resourceGroups/rg/providers";
-  const account = `${rg}/Microsoft.Storage/storageAccounts/stapexe2edevswc01`;
+  const account = `${rg}/Microsoft.Storage/storageAccounts/stfixture01`;
   const accepted = [
     { resourceId: account },
     { resourceId: `${account}/blobServices/default` },
@@ -2066,7 +2066,7 @@ test("azd preview display types resolve by unique accepted name and fail closed 
   const events = (changes: Parameters<typeof azdPreviewStdout>[0]) => azdPreviewStdout(changes);
   const resolved = normalizeAzdPreview(
     events([
-      { Name: "stapexe2edevswc01", Operation: "Create", Type: "Storage account" },
+      { Name: "stfixture01", Operation: "Create", Type: "Storage account" },
       { Name: "law-apexe2e-dev-swc", Operation: "Ignore", Type: "Log Analytics workspace" },
     ]),
     accepted,
@@ -2079,7 +2079,7 @@ test("azd preview display types resolve by unique accepted name and fail closed 
   assert.equal(resolved.changes[1]!.material, false);
 
   const arm = normalizeAzdPreview(
-    events([{ Name: "stapexe2edevswc01", Operation: "Create", Type: "Microsoft.Storage/storageAccounts" }]),
+    events([{ Name: "stfixture01", Operation: "Create", Type: "Microsoft.Storage/storageAccounts" }]),
     accepted,
   );
   assert.deepEqual(arm.blockers, []);
