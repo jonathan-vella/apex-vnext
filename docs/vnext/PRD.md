@@ -476,7 +476,7 @@ import/change workflows on each supported client.
 ### REQ-COPILOT-APP-001: GitHub Copilot App
 
 **Active again under DECISION-033**; it was deferred on 2026-09-21. The
-[GitHub Copilot app](https://github.com/github/app) on native Windows is a supported client. It installs the APEX
+[GitHub Copilot app](https://docs.github.com/en/copilot) on native Windows is a supported client. It installs the APEX
 plugin from the shared Copilot CLI store and runs sessions in app-created git worktrees by default; APEX supports them
 through the explicit workspace path and the shared `.apex/` in the main checkout. Local sandboxing is not required
 for launch. The app does not apply per-agent `model` pins
