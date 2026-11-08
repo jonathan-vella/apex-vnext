@@ -2085,10 +2085,17 @@ test("azd preview display types resolve by unique accepted name and fail closed 
   assert.deepEqual(arm.blockers, []);
   assert.equal(arm.changes[0]!.resourceId, account);
 
+  const sameName = normalizeAzdPreview(
+    events([{ Name: "dup", Operation: "Create", Type: "Storage account" }]),
+    accepted,
+  );
+  assert.deepEqual(sameName.blockers, []);
+  assert.equal(sameName.changes[0]!.resourceId, `${rg}/Microsoft.Storage/storageAccounts/dup`);
+
   for (const change of [
-    { Name: "dup", Operation: "Create", Type: "Storage account" },
     { Name: "unknown-account", Operation: "Create", Type: "Storage account" },
     { Name: "default", Operation: "Create", Type: "Blob service" },
+    { Name: "stfixture01", Operation: "Create", Type: "Key vault" },
   ]) {
     const blocked = normalizeAzdPreview(events([change]), accepted);
     assert.equal(blocked.blockers.length, 1, change.Name);

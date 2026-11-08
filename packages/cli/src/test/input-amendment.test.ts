@@ -398,6 +398,48 @@ test("MCP amendment preview elides long answers and keeps the proposal hash", ()
   assert.equal(boundedAmendmentPreview(small as typeof proposal), small);
 });
 
+test("MCP inputHistory pages a history that exceeds the result budget", async () => {
+  const service = new ApexService(await tempRoot());
+  await service.init({ projectId: "demo", riskOwner: "partner" });
+  let next = await service.nextTask();
+  while (next.status === "needs_input") {
+    const answers = inputAnswers(next.request.questions);
+    const text = answers.filter(({ value }) => typeof value === "string" && value.startsWith("test-"));
+    for (const answer of text) answer.value = "z".repeat(Math.floor((20 * 1024) / text.length));
+    await service.recordInput({
+      schemaVersion: "1.0.0",
+      requestId: next.request.requestId,
+      expectedHead: next.request.expectedHead,
+      ownerEpoch: next.request.ownerEpoch,
+      answers,
+    });
+    next = await service.nextTask();
+  }
+  const expected = (await service.inputHistory()).inputs;
+  assert.ok(expected.length >= 2, "the fixture records more than one input");
+  const connection = await connectMcp(service);
+  try {
+    const inputs: unknown[] = [];
+    let cursor: string | undefined;
+    let pages = 0;
+    do {
+      const response = await connection.client.callTool({
+        name: "inputHistory",
+        arguments: { workspace: service.root, ...(cursor === undefined ? {} : { cursor }) },
+      });
+      assert.equal(response.isError, undefined);
+      const page = response.structuredContent as { inputs: unknown[]; nextCursor?: string };
+      inputs.push(...page.inputs);
+      cursor = page.nextCursor;
+      pages += 1;
+    } while (cursor !== undefined);
+    assert.ok(pages > 1, "the history needed more than one page");
+    assert.deepEqual(inputs, expected);
+  } finally {
+    await connection.close();
+  }
+});
+
 test("scenario amendments recollect changed panels without reviving obsolete answers", async () => {
   const service = new ApexService(await tempRoot());
   await service.init({ projectId: "demo", riskOwner: "partner" });

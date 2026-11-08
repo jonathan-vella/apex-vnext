@@ -385,6 +385,7 @@ function writeCapture(home, key, { nonce, sessionId, toolName, agentType, prompt
 // A review's agent ID, as in "agent_id: <id>". Letters, digits, "_" and "-" only, so it is safe as a file name.
 const AGENT_ID_PATTERN = /^[0-9A-Za-z][0-9A-Za-z_-]{0,63}$/u;
 const REVIEW_FENCE_LINE = /^[ \t]*(?:`{3,}|~{3,})[ \t]*apex-review[ \t]*\r?$/mu;
+const AGENT_COMPLETED_LINE = /^\s*Agent completed\b/u;
 
 /** The agent ID of a "moved to background" notice, "" when it names none, `null` for any other text. */
 function backgroundNoticeAgentId(text) {
@@ -474,14 +475,21 @@ function readPendingReview(home, agentId, sessionId) {
 /**
  * postToolUse for `read_agent`: when it returns the finished review of a pending background rubber-duck run (same
  * session, signed record, same agent ID), save the capture as the synchronous path does and remove the pending record.
- * A result without an apex-review block is still running or not a review and is ignored.
+ * A result without an apex-review block, or one that does not begin with the host's "Agent completed" status line
+ * (a running agent can already show a draft block), is ignored and leaves the pending record for the next read.
  */
 export function ingestBackgroundReview({ payload, toolName, args }, { env = process.env, now = new Date() } = {}) {
   if (toolName !== "read_agent" || typeof args.agent_id !== "string" || !AGENT_ID_PATTERN.test(args.agent_id))
     return null;
   const sessionId = sessionOf(payload);
   const response = toolResultText(payload);
-  if (sessionId === "" || response === undefined || !REVIEW_FENCE_LINE.test(response)) return null;
+  if (
+    sessionId === "" ||
+    response === undefined ||
+    !AGENT_COMPLETED_LINE.test(response) ||
+    !REVIEW_FENCE_LINE.test(response)
+  )
+    return null;
   const home = reviewHome(env);
   if (!plainDirectory(home, false)) return null;
   const pending = readPendingReview(home, args.agent_id, sessionId);

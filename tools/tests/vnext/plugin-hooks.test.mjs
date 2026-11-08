@@ -624,7 +624,11 @@ test("read_agent returning the finished review becomes the capture the kernel ve
 
 test("read_agent for a run that is still going leaves the pending record for the next read", async () => {
   await startBackgroundReview();
-  for (const text of ["Agent is still running. Partial output so far.", "Agent is running.\n```json\n{}\n```"])
+  for (const text of [
+    "Agent is still running. Partial output so far.",
+    "Agent is running.\n```json\n{}\n```",
+    `Agent is running.\n\n${rubberDuckAnswer}`,
+  ])
     assertAllowed(
       decide("postToolUse", readAgentCall({ toolResult: { resultType: "success", textResultForLlm: text } })),
     );

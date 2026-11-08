@@ -53,6 +53,13 @@ function azdIdentity(resourceId: string): string | undefined {
   return `${types.join("/")}\u0000${names.join("/")}`.toLowerCase();
 }
 
+function displayKey(type: string, name: string): string {
+  return `${type
+    .toLowerCase()
+    .replaceAll(/[^a-z]/g, "")
+    .replace(/s$/u, "")}\u0000${name.toLowerCase()}`;
+}
+
 function azdPreviewEnvelopes(stdout: string): unknown[] {
   const envelopes: unknown[] = [];
   for (const line of stdout.split(/\r?\n/u)) {
@@ -95,13 +102,14 @@ export function normalizeAzdPreview(
   }
   const raw = previews[0] === null ? [] : (previews[0] as unknown[]);
   const byIdentity = new Map<string, string | null>();
-  const byName = new Map<string, string | null>();
+  const byDisplay = new Map<string, string | null>();
   for (const { resourceId } of accepted) {
     const identity = azdIdentity(resourceId);
     if (identity === undefined) continue;
     byIdentity.set(identity, byIdentity.has(identity) ? null : resourceId);
-    const name = identity.slice(identity.indexOf("\u0000") + 1);
-    byName.set(name, byName.has(name) ? null : resourceId);
+    const [types = "", name = ""] = identity.split("\u0000");
+    const key = displayKey(types.split("/").at(-1) ?? "", name);
+    byDisplay.set(key, byDisplay.has(key) ? null : resourceId);
   }
   const blockers: string[] = [];
   const changes: DeploymentPreviewV1["changes"] = raw.map((entry, index) => {
@@ -113,11 +121,12 @@ export function normalizeAzdPreview(
       blockers.push(`azd preview change ${index} is malformed`);
     }
     const identity = `${type ?? ""}\u0000${name ?? ""}`.toLowerCase();
-    // azd 1.35 reports display types such as "Storage account" rather than ARM types; a unique accepted name resolves them.
+    // azd 1.35 reports display types such as "Storage account" rather than ARM types; one is matched to the ARM type's
+    // final segment (storageAccounts) and the name, so a different resource type with the same name stays unresolved.
     const resolved = byIdentity.has(identity)
       ? byIdentity.get(identity)
       : type !== undefined && !type.includes("/") && name !== undefined
-        ? byName.get(name.toLowerCase())
+        ? byDisplay.get(displayKey(type, name))
         : undefined;
     const resourceId = resolved ?? `azd-unresolved:${type ?? "unknown"}/${name ?? index}`;
     const normalized = rawType.toLowerCase().replaceAll(/[^a-z]/g, "");
