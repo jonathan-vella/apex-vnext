@@ -38,6 +38,7 @@ This file is generated from [packages/cli/src/cli.ts](../../packages/cli/src/cli
 - `doctor`
 - `evidence accept`
 - `gate decide`
+- `gate delegated`
 - `governance import`
 - `governance revise`
 - `governance select`
@@ -46,6 +47,9 @@ This file is generated from [packages/cli/src/cli.ts](../../packages/cli/src/cli
 - `input history`
 - `input preview-amendment`
 - `inventory`
+- `lab delegation-confirm`
+- `lab delegation-revoke`
+- `lab delegation-show`
 - `mcp serve`
 - `preview`
 - `project create`

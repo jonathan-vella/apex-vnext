@@ -286,6 +286,7 @@ const STAGE_FOLDERS = {
 } as const;
 const TASK_TTL_MS = 24 * 60 * 60 * 1000;
 const PREVIEW_TTL_MS = 24 * 60 * 60 * 1000;
+const INPUT_AMENDMENT_MAX_PROPOSAL_BYTES = 512 * 1024;
 /** Workspace setup files that bootstrap, init, update and customization repair change outside any run. */
 const WORKSPACE_STATE_FILES = [
   ".apex/config.json",
@@ -3226,6 +3227,14 @@ export class ApexService {
     const proposal = { ...body, proposalHash: sha256Json(body) };
     if (!Value.Check(InputAmendmentProposalV1Schema, proposal))
       throw new ApexError("APEX_VALIDATION", "Invalid input amendment proposal", EXIT_CODES.validation);
+    // The proposal is embedded in one journal event next to the run transaction, and replay rejects events over 1 MiB.
+    if (Buffer.byteLength(JSON.stringify(proposal), "utf8") > INPUT_AMENDMENT_MAX_PROPOSAL_BYTES)
+      throw new ApexError(
+        "APEX_VALIDATION",
+        "Input amendment is too large to record; shorten the corrected answers",
+        EXIT_CODES.validation,
+        { reason: "INPUT_AMENDMENT_TOO_LARGE", maxBytes: INPUT_AMENDMENT_MAX_PROPOSAL_BYTES },
+      );
     return proposal;
   }
 

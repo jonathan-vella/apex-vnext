@@ -4186,7 +4186,7 @@ async function materialGovernanceFixture(track: "bicep" | "terraform", native = 
     service,
     runId,
     track,
-    native && track === "bicep" ? configureNativeBicepPlan : undefined,
+    track === "bicep" ? configureNativeBicepPlan : undefined,
     false,
     path,
   );

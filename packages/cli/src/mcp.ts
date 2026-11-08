@@ -61,6 +61,7 @@ const pagePaths: Partial<Record<keyof typeof MCP_OUTPUT_SCHEMAS, readonly string
   taskContext: ["inputs"],
   readTaskInput: ["content"],
   projectList: ["projects"],
+  inputHistory: ["inputs"],
   preview: ["markdown"],
   inventory: ["resources"],
   improvementObservations: ["observations"],
@@ -221,7 +222,37 @@ function assertBoundedInput(value: unknown): void {
 
 const resultEnvelopeBytes = mcpResultEnvelopeBytes;
 const MCP_DOCTOR_SUMMARY_BYTES = 48 * 1024;
+const MCP_ELIDE_ANSWER_ABOVE_BYTES = 2048;
 type DoctorReport = Awaited<ReturnType<ApexService["doctor"]>>;
+type AmendmentProposal = Awaited<ReturnType<ApexService["previewInputAmendment"]>>;
+
+function elideLongAnswer<T extends { value: unknown }>(answer: T): T {
+  if (typeof answer.value !== "string") return answer;
+  const bytes = Buffer.byteLength(answer.value, "utf8");
+  if (bytes <= MCP_ELIDE_ANSWER_ABOVE_BYTES) return answer;
+  const digest = createHash("sha256").update(answer.value).digest("hex");
+  return { ...answer, value: `[elided ${bytes} bytes; sha256 ${digest}]` };
+}
+
+/**
+ * Keeps an amendment preview inside the MCP result budget. When it would not fit, long text answers are replaced by
+ * their size and SHA-256, first in the previous and merged answers and then in the submitted correction. The caller
+ * already holds the correction it submitted and can check each digest; `proposalHash` still binds the complete,
+ * unelided proposal, which amendInput recomputes before applying. The CLI preview keeps every value.
+ */
+export function boundedAmendmentPreview(proposal: AmendmentProposal): AmendmentProposal {
+  if (resultEnvelopeBytes(proposal) <= MCP_MAX_SERIALIZED_RESULT_BYTES) return proposal;
+  const bounded = {
+    ...proposal,
+    previousAnswers: proposal.previousAnswers.map(elideLongAnswer),
+    answers: proposal.answers.map(elideLongAnswer),
+  };
+  if (resultEnvelopeBytes(bounded) <= MCP_MAX_SERIALIZED_RESULT_BYTES) return bounded;
+  return {
+    ...bounded,
+    amendment: { ...bounded.amendment, answers: bounded.amendment.answers.map(elideLongAnswer) },
+  };
+}
 
 /**
  * Bounds a doctor report for MCP. Failing checks come first, then passing checks other than per-file `managed:`
@@ -889,10 +920,11 @@ export function createMcpServerFactory(
     "previewInputAmendment",
     {
       description:
-        "Preview an append-only correction to recorded answers, including dependent review/gate invalidation and re-approval. Does not apply it.",
+        "Preview an append-only correction to recorded answers, including dependent review/gate invalidation and re-approval. Does not apply it. Long text answers are shown as size and SHA-256 when the preview would exceed the result budget; proposalHash still binds the complete proposal.",
       inputSchema: { amendment: inputAmendment, reason: z.string().min(1).max(2048) },
     },
-    async ({ amendment, reason }) => result(await service.previewInputAmendment(amendment, reason)),
+    async ({ amendment, reason }) =>
+      result(boundedAmendmentPreview(await service.previewInputAmendment(amendment, reason))),
   );
   registerTool(
     "amendInput",

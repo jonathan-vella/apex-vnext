@@ -135,7 +135,9 @@ For an already recorded answer, use `inputHistory`, then `previewInputAmendment`
 reason. Present its impact and obtain explicit confirmation before `amendInput` with the same amendment and reason,
 `expectedHash: proposalHash` and `confirm: true`. This preserves audit history and reopens dependent approvals;
 it never authorizes a gate or deployment. Corrected stages and reviews must be rerun; lab Gate 2/3 readiness is
-automatic, while human Gate 1 and Gate 4 decisions remain genuine. See
+automatic, while human Gate 1 and Gate 4 decisions remain genuine. An amendment above 512 KiB is rejected. When the
+MCP preview would exceed the 64 KiB result budget, long answers are shown as their size and SHA-256 and
+`proposalHash` still binds the complete proposal; the CLI preview keeps every value. See
 [answer correction](cli.md#correcting-recorded-intake-answers).
 Do not delete a project to fix an answer. Autopilot and Allow All do not authorize amendment confirmation.
 For explicitly optional questions, omit the answer or submit a blank string or `none` to leave it unspecified.

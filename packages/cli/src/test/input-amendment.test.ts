@@ -17,6 +17,7 @@ import {
 } from "./helpers.js";
 import { connectMcp } from "./mcp-client.js";
 import { execute } from "../cli.js";
+import { boundedAmendmentPreview } from "../mcp.js";
 import { writeFile } from "node:fs/promises";
 
 async function correction(service: ApexService, kind: "requirements" | "architecture" = "requirements") {
@@ -366,6 +367,35 @@ test("optional answer amendment can clear scale while preserving original input"
   const task = await service.nextTask();
   if (task.status !== "task") throw new Error("Expected Requirements");
   assert.equal((await service.taskContext(task.task.taskId)).recordedInput?.scale, undefined);
+});
+
+test("amendment preview rejects a proposal too large to record in the journal", async () => {
+  const service = new ApexService(await tempRoot());
+  await service.init({ projectId: "demo", riskOwner: "partner" });
+  await nextTaskAfterInput(service);
+  const { amendment } = await correction(service);
+  const answers = [{ questionId: "workload", value: "x".repeat(600 * 1024) }];
+  await assert.rejects(service.previewInputAmendment({ ...amendment, answers }, "Too large"), {
+    code: "APEX_VALIDATION",
+  });
+});
+
+test("MCP amendment preview elides long answers and keeps the proposal hash", () => {
+  const answer = (questionId: string, value: string) => ({ questionId, value });
+  const long = "y".repeat(20 * 1024);
+  const proposal = {
+    proposalHash: "a".repeat(64),
+    previousAnswers: [answer("workload", long), answer("scale", "small")],
+    answers: [answer("workload", long), answer("scale", "small")],
+    amendment: { answers: [answer("workload", long)] },
+  } as unknown as Parameters<typeof boundedAmendmentPreview>[0];
+  const bounded = boundedAmendmentPreview(proposal);
+  assert.equal(bounded.proposalHash, proposal.proposalHash);
+  assert.match(String(bounded.answers[0]?.value), /^\[elided 20480 bytes; sha256 [0-9a-f]{64}\]$/);
+  assert.equal(bounded.answers[1]?.value, "small");
+  assert.ok(Buffer.byteLength(JSON.stringify(bounded)) < 64 * 1024);
+  const small = { ...proposal, previousAnswers: [], answers: [answer("scale", "small")] };
+  assert.equal(boundedAmendmentPreview(small as typeof proposal), small);
 });
 
 test("scenario amendments recollect changed panels without reviving obsolete answers", async () => {
