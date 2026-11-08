@@ -21,7 +21,7 @@ The current candidate is the published **`0.11.0-next.5`** preview. Its plugin w
 `@apexops/*` npm packages were built from `ab892a8f20ece801d2360586b349dd9804e68a42` (the CLI `gitHead`). The plugin
 tree SHA-256 (`apex-plugin-tree-sha256-v1`, 1169 files) is
 `e1a1794d7c9a189eb40b8e8f33b5f5737a0da99c6f90ef334ba3e22d0e53c2eb`, recorded in the
-[marketplace provenance](https://github.com/jonathan-vella/apex-plugins/blob/298194df5ad5309f53c6d35c37b33656ed788b79/.github/plugin/provenance.json)
+[marketplace provenance](https://raw.githubusercontent.com/jonathan-vella/apex-plugins/298194df5ad5309f53c6d35c37b33656ed788b79/.github/plugin/provenance.json)
 (file SHA-256 `8f0d8041e8994894faff937455afceeedb18bcd296816325dffb3b97fdcc4af8`) at marketplace commit
 `298194df5ad5309f53c6d35c37b33656ed788b79` (apex-plugins PR #7). Retain that commit and the provenance file hash when
 testing the release. This release includes the azd Bicep executor (CP-26) and the #483 skill fixes; Bicep live runs stay
