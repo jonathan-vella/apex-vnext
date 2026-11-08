@@ -1,10 +1,9 @@
 targetScope = 'resourceGroup'
 
-@description('Short project identifier used in the storage account name.')
-param projectName string
-
-@description('Qualification environment identifier.')
-param environment string
+@description('Exact storage account name; the APEX plan binds the same name as the managed physical resource.')
+@minLength(3)
+@maxLength(24)
+param storageAccountName string
 
 @description('Azure region for the qualification workload.')
 param location string = resourceGroup().location
@@ -14,12 +13,6 @@ param tags object
 
 @description('Resource ID of the shared Log Analytics workspace.')
 param logAnalyticsWorkspaceResourceId string
-
-var uniqueSuffix = take(uniqueString(resourceGroup().id), 6)
-var storageAccountName = take(
-  toLower('st${take(replace(projectName, '-', ''), 8)}${take(environment, 4)}${uniqueSuffix}'),
-  24
-)
 
 module storageAccount 'br/public:avm/res/storage/storage-account:0.32.1' = {
   name: 'qualification-storage'

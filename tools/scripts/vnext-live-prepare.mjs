@@ -381,6 +381,7 @@ export async function buildQualificationArtifacts({ root, track, subscription, r
   const versionMatch =
     track === "bicep" ? mainSource.match(/storage-account:([^']+)'/) : mainSource.match(/version\s*=\s*"([^"]+)"/);
   if (versionMatch?.[1] === undefined) throw new Error(`Unable to resolve ${track} storage module version`);
+  const storageAccountName = `stvnextq${sha256Bytes(`${subscription}/${targetResourceGroup}`).slice(0, 12)}`;
   const binding = {
     schemaVersion: "1.0.0",
     projectId: PROJECT_ID,
@@ -391,10 +392,22 @@ export async function buildQualificationArtifacts({ root, track, subscription, r
       "qualification-storage": {
         implementation:
           track === "bicep"
-            ? "br/public:avm/res/storage/storage-account"
-            : "Azure/avm-res-storage-storageaccount/azurerm",
+            ? `avm:avm/res/storage/storage-account@${versionMatch[1]}`
+            : `avm:Azure/avm-res-storage-storageaccount/azurerm@${versionMatch[1]}`,
         version: versionMatch[1],
         parameters: { location: LOCATION, resourceGroup: targetResourceGroup, sku: "Standard_LRS" },
+        ...(track === "bicep"
+          ? {
+              physicalResources: [
+                {
+                  resourceId: `${targetScope}/providers/Microsoft.Storage/storageAccounts/${storageAccountName}`,
+                  type: "Microsoft.Storage/storageAccounts",
+                  ownership: "managed",
+                  role: "primary",
+                },
+              ],
+            }
+          : {}),
       },
     },
   };
@@ -407,6 +420,7 @@ export async function buildQualificationArtifacts({ root, track, subscription, r
       location: { kind: "value", value: LOCATION },
       resourceGroup: { kind: "value", value: targetResourceGroup },
       subscriptionId: { kind: "value", value: subscription },
+      ...(track === "bicep" ? { storageAccountName: { kind: "value", value: storageAccountName } } : {}),
     },
   };
   const logicalManifest = {
