@@ -7424,7 +7424,7 @@ export class ApexService {
     actor: string,
     options: GateDecisionOptions = {},
   ): Promise<ApprovalEvidenceV1> {
-    await this.assertNoPendingReview("gateDecide");
+    await this.assertNoPendingReview(options.delegation === undefined ? "gateDecide" : "gateDelegate");
     if (options.delegation !== undefined && (decision !== "approved" || (gateNumber !== 1 && gateNumber !== 4)))
       throw new ApexError(
         "APEX_USAGE",
