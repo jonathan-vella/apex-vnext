@@ -6,6 +6,7 @@ export * from "./deployment.js";
 export * from "./evidence.js";
 export * from "./governance-observation.js";
 export * from "./improvement.js";
+export * from "./lab-delegation.js";
 export * from "./native-validation.js";
 export * from "./onboarding.js";
 export * from "./pricing.js";
@@ -21,6 +22,7 @@ import {
   RequirementsChangeProposalV1Schema,
 } from "./artifacts.js";
 import { AzdBindingV1Schema } from "./azd-binding.js";
+import { LabDelegationPolicyV1Schema, LabDelegationConsentV1Schema, LabApplyScopeV1Schema } from "./lab-delegation.js";
 import {
   ArchetypeSourceProposalV1Schema,
   ArchetypeBatchConfigV1Schema,
@@ -97,6 +99,9 @@ import {
 } from "./targets.js";
 
 export const contractSchemas = [
+  LabDelegationPolicyV1Schema,
+  LabDelegationConsentV1Schema,
+  LabApplyScopeV1Schema,
   GovernanceProvisionPlanV1Schema,
   RepositoryPublishConfigV1Schema,
   RepositoryPublishPlanV1Schema,
@@ -182,6 +187,9 @@ const metadata = (maxBytes: number, sensitivity: ContractSensitivity = "internal
 });
 
 export const contractMetadata: Readonly<Record<string, ContractMetadata>> = {
+  "https://schemas.apexops.dev/lab-delegation-policy-v1.json": metadata(65_536, "confidential"),
+  "https://schemas.apexops.dev/lab-delegation-consent-v1.json": metadata(8_192, "confidential"),
+  "https://schemas.apexops.dev/lab-apply-scope-v1.json": metadata(65_536, "confidential"),
   "https://schemas.apexops.dev/governance-provision-plan-v1.json": metadata(65_536, "confidential"),
   "https://schemas.apexops.dev/repository-publish-config-v1.json": metadata(16_384, "confidential"),
   "https://schemas.apexops.dev/repository-publish-plan-v1.json": metadata(262_144, "confidential"),

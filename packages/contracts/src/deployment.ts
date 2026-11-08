@@ -91,8 +91,40 @@ export const ApprovalContextV1Schema = Type.Object(
   { $id: "https://schemas.apexops.dev/approval-context-v1.json", additionalProperties: false },
 );
 
+const delegatedApprovalProperties = {
+  ...approvalEvidenceProperties,
+  decision: Type.Literal("approved"),
+  mechanism: Type.Literal("lab-delegation"),
+  recipientIdentity: NonEmptyStringSchema,
+  policyHash: Sha256Schema,
+  consentHash: Sha256Schema,
+  evaluator: Type.Literal("kernel-lab-delegation-v1"),
+  writerTransferClaimHash: Type.Optional(Type.Never()),
+  expiresAt: IsoDateTimeSchema,
+};
+
 export const ApprovalEvidenceV1Schema = Type.Union(
   [
+    Type.Object(
+      {
+        ...delegatedApprovalProperties,
+        gate: Type.Literal(1),
+        previewHash: Type.Optional(Type.Never()),
+        approvalContextHash: Type.Optional(Type.Never()),
+        scopeEvidenceHash: Type.Optional(Type.Never()),
+      },
+      { additionalProperties: false },
+    ),
+    Type.Object(
+      {
+        ...delegatedApprovalProperties,
+        gate: Type.Literal(4),
+        previewHash: Sha256Schema,
+        approvalContextHash: Sha256Schema,
+        scopeEvidenceHash: Sha256Schema,
+      },
+      { additionalProperties: false },
+    ),
     Type.Object(
       {
         ...approvalEvidenceProperties,

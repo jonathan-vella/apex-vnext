@@ -2,6 +2,10 @@ import {
   ApprovalContextV1Schema,
   type ApprovalContextV1,
   ApprovalEvidenceV1Schema,
+  LabDelegationPolicyV1Schema,
+  LabDelegationConsentV1Schema,
+  type LabDelegationPolicyV1,
+  type LabDelegationConsentV1,
   ArchetypeBatchConfigV1Schema,
   ArchetypeBatchPlanV1Schema,
   type ArchetypeBatchConfigV1,
@@ -147,6 +151,11 @@ import {
 } from "@apexops/capabilities";
 import {
   ContentCache,
+  LabDelegationError,
+  assertLabDelegationPolicy,
+  evaluateLabDelegation,
+  verifyLabDelegationApproval,
+  type LabDelegationContext,
   EvidencePolicy,
   EvidenceStore,
   EventJournal,
@@ -250,11 +259,13 @@ import { assertDeploymentPurposeUsable, DEFAULT_DEPLOYMENT_PURPOSE } from "./pur
 import { currentHostEnvironment, firstReleaseVersion, hostDoctorChecks, type HostEnvironment } from "./host-profile.js";
 import { ApexError, EXIT_CODES, governanceBaselineApexError, retiredProjectionError } from "./errors.js";
 import { MCP_TOOL_REVIEW_GUARDS, type ReviewGuardedTool } from "./mcp-tool-effects.js";
+import { MCP_MAX_SERIALIZED_RESULT_BYTES, mcpResultEnvelopeBytes } from "./mcp-limits.js";
 import { APEX_VERSION, meetsMinimumVersion, MINIMUM_NODE_VERSION } from "./version.js";
 import { bundledToolchainMinimums, type BundledToolchainMinimums } from "./toolchain-pin.js";
 import {
   registerWorkflowValidators,
   resolveNativeBicepResourceOwnership,
+  bicepResourceGroupScopePattern,
   taskWorkflowValidatorInput,
   type WorkflowGateValidatorContext,
   type WorkflowDeployValidatorContext,
@@ -343,6 +354,24 @@ interface Selection {
 
 export interface GateDecisionOptions {
   recipientIdentity?: string;
+  delegation?: DelegatedGateOptions;
+}
+
+export interface DelegatedGateOptions {
+  policyHash: string;
+  consentHash: string;
+  previewHash?: string;
+  approvalContextHash?: string;
+}
+
+function delegationCheck<T>(check: () => T): T {
+  try {
+    return check();
+  } catch (error) {
+    if (error instanceof LabDelegationError)
+      throw new ApexError("APEX_AUTHORIZATION", error.message, EXIT_CODES.authorization, { reason: error.reason });
+    throw error;
+  }
 }
 
 interface ManagedFile {
@@ -531,6 +560,16 @@ const ARTIFACTS = {
 
 export type ArtifactKind = keyof typeof ARTIFACTS;
 export const SUPPORTED_ARTIFACT_KINDS = Object.keys(ARTIFACTS) as ArtifactKind[];
+/** Largest single task input that taskContext inlines; larger inputs are read through readTaskInput. */
+export const TASK_CONTEXT_INLINE_INPUT_MAX_BYTES = 32 * 1024;
+// Room a taskContext page keeps for the nextCursor the MCP adapter adds.
+const TASK_CONTEXT_PAGE_RESERVE_BYTES = 1024;
+/**
+ * Hidden workers (CodeGen, Validator) have no file view tool, and Copilot CLI saves a large tool result to a temp file
+ * instead of returning it. Their taskContext stays under this size and they read inputs through readTaskInput.
+ */
+export const WORKER_TASK_CONTEXT_MAX_BYTES = 14 * 1024;
+const WORKER_TASK_ROLES: ReadonlySet<string> = new Set(["bicep-codegen", "terraform-codegen", "validator"]);
 
 interface WorkflowTaskDescriptor {
   id: string;
@@ -879,6 +918,8 @@ export class ApexService {
     this.cache = new ContentCache(this.root);
     for (const [, [validator, schema]] of Object.entries(ARTIFACTS)) this.validators.register(validator, schema);
     this.validators.register("approval", ApprovalEvidenceV1Schema);
+    this.validators.register("lab-delegation-policy", LabDelegationPolicyV1Schema);
+    this.validators.register("lab-delegation-consent", LabDelegationConsentV1Schema);
     this.validators.register("approval-context", ApprovalContextV1Schema);
     this.validators.register("runtime-lock", RuntimeBundleLockV1Schema);
     this.validators.register("quality-measurements", QualityMeasurementsV1Schema);
@@ -2857,11 +2898,15 @@ export class ApexService {
     task: string | null;
     blockers: string[];
     satisfiedGates: number[];
+    delegation?: { policyHash: string; consentHash: string; expiresAt: string; gates: (1 | 4)[]; revoked: boolean };
   }> {
     const selection = await this.selection();
     const run = await this.run(selection, { readOnly: true });
     const events = await this.journal(run).replay();
     const route = await this.route(run, events);
+    const delegation = events.some(({ type }) => type === "lab.delegation-consented")
+      ? await this.readLabDelegation(events)
+      : undefined;
     return {
       run,
       head: events.at(-1)?.hash ?? null,
@@ -2869,6 +2914,17 @@ export class ApexService {
       task: route.task?.id ?? null,
       blockers: route.blockers,
       satisfiedGates: run.gates.flatMap((gate) => (this.gateSatisfied(run, gate.gate, events) ? [gate.gate] : [])),
+      ...(delegation === undefined
+        ? {}
+        : {
+            delegation: {
+              policyHash: delegation.policyHash,
+              consentHash: delegation.consentHash,
+              expiresAt: delegation.policy.expiresAt,
+              gates: delegation.policy.gates,
+              revoked: delegation.revoked,
+            },
+          }),
     };
   }
 
@@ -2877,6 +2933,7 @@ export class ApexService {
     | { status: "needs_review"; review: Awaited<ReturnType<ApexService["pendingReview"]>> }
     | { status: "task"; task: TaskEnvelopeV1 }
   > {
+    await this.reopenExpiredDelegatedGates();
     const selection = await this.selection();
     let run = await this.run(selection);
     let events = await this.journal(run).replay();
@@ -3481,10 +3538,17 @@ export class ApexService {
         "Task context metadata exceeds the locked input byte limit",
         EXIT_CODES.validation,
       );
+    const inlineBudget = WORKER_TASK_ROLES.has(descriptor.role) ? WORKER_TASK_CONTEXT_MAX_BYTES : limits.maxInputBytes;
     for (const [index, value] of values.entries()) {
+      // A larger input stays a reference: the MCP adapter pages taskContext only along `inputs`, so one inlined input
+      // that cannot fit a page alone (the result carries its JSON twice, plus a cursor) would make the whole result
+      // unreturnable. Agents read it with readTaskInput in bounded chunks.
+      if (context.inputReferences[index]!.bytes > TASK_CONTEXT_INLINE_INPUT_MAX_BYTES) continue;
+      const alone = { ...context, inputs: [value] };
+      if (mcpResultEnvelopeBytes(alone) > MCP_MAX_SERIALIZED_RESULT_BYTES - TASK_CONTEXT_PAGE_RESERVE_BYTES) continue;
       context.inputs.push(value);
       context.inputReferences[index]!.inlined = true;
-      if (Buffer.byteLength(JSON.stringify(context)) > limits.maxInputBytes) {
+      if (Buffer.byteLength(JSON.stringify(context)) > inlineBudget) {
         context.inputs.pop();
         context.inputReferences[index]!.inlined = false;
       }
@@ -4599,6 +4663,70 @@ export class ApexService {
     return { taskId, path, bytes: bytes.byteLength, hash, idempotent };
   }
 
+  /** The generator's rejection of an accepted binding is a validation failure the planner can fix, not an internal error. */
+  private generateIacTree(
+    run: RunConfigV1,
+    intent: ImplementationIntentV1,
+    binding: IacBindingV1,
+    options: GenerateIacOptions = {},
+  ) {
+    try {
+      return run.iacTool === "bicep"
+        ? generateBicepTree(intent, binding, {
+            ...(options.existingResources === undefined ? {} : { existingResources: options.existingResources }),
+          })
+        : generateTerraformTree(intent, binding, {
+            ...(options.existingResources === undefined ? {} : { existingResources: options.existingResources }),
+            ...(options.azurermProviderConstraint === undefined
+              ? {}
+              : { azurermProviderConstraint: options.azurermProviderConstraint }),
+            ...(options.azapiProviderConstraint === undefined
+              ? {}
+              : { azapiProviderConstraint: options.azapiProviderConstraint }),
+            ...(options.lockFileContent === undefined ? {} : { lockFileContent: options.lockFileContent }),
+          });
+    } catch (error) {
+      if (error instanceof ApexError) throw error;
+      throw new ApexError(
+        "APEX_VALIDATION",
+        `IaC binding cannot be generated: ${error instanceof Error ? error.message : String(error)}`,
+        EXIT_CODES.validation,
+      );
+    }
+  }
+
+  /**
+   * Fail fast at plan time: dry-run the selected track's generator on the submitted plan, so a binding the generator
+   * rejects is refused here instead of after the review gates. For Bicep, ownership is also resolved when the run
+   * targets an exact resource group; without one, only AVM bindings with no physical resource map are refused here.
+   */
+  private assertPlanGeneratable(run: RunConfigV1, intent: ImplementationIntentV1, binding: IacBindingV1): void {
+    const tree = this.generateIacTree(run, intent, binding);
+    if (run.iacTool !== "bicep") return;
+    const issues = bicepResourceGroupScopePattern.test(run.targetScope)
+      ? resolveNativeBicepResourceOwnership({
+          intent,
+          binding,
+          manifest: tree.logicalManifest,
+          targetScope: run.targetScope,
+        }).issues
+      : Object.entries(binding.resourceBindings)
+          .filter(([, entry]) => entry.implementation.startsWith("avm:") && entry.physicalResources === undefined)
+          .map(([id]) => ({
+            path: `/binding/resourceBindings/${id}`,
+            message: "Bicep module ownership is unresolved; AVM requires a bounded exact physical resource map",
+          }));
+    if (issues.length > 0)
+      throw new ApexError(
+        "APEX_VALIDATION",
+        `IaC binding is not accepted: ${issues
+          .slice(0, 8)
+          .map(({ path, message }) => `${path}: ${message}`)
+          .join("; ")}`,
+        EXIT_CODES.validation,
+      );
+  }
+
   async generateIac(
     taskId: string,
     options: GenerateIacOptions = {},
@@ -4631,21 +4759,7 @@ export class ApexService {
         EXIT_CODES.validation,
       );
     }
-    const tree =
-      run.iacTool === "bicep"
-        ? generateBicepTree(intent, binding, {
-            ...(options.existingResources === undefined ? {} : { existingResources: options.existingResources }),
-          })
-        : generateTerraformTree(intent, binding, {
-            ...(options.existingResources === undefined ? {} : { existingResources: options.existingResources }),
-            ...(options.azurermProviderConstraint === undefined
-              ? {}
-              : { azurermProviderConstraint: options.azurermProviderConstraint }),
-            ...(options.azapiProviderConstraint === undefined
-              ? {}
-              : { azapiProviderConstraint: options.azapiProviderConstraint }),
-            ...(options.lockFileContent === undefined ? {} : { lockFileContent: options.lockFileContent }),
-          });
+    const tree = this.generateIacTree(run, intent, binding, options);
     const files: StagedFile[] = [];
     const sourceRoot =
       previousHandoff?.treeHash === tree.treeHash
@@ -7103,6 +7217,198 @@ export class ApexService {
     }
   }
 
+  async labDelegation(): Promise<{
+    policyHash: string;
+    consentHash: string;
+    policy: LabDelegationPolicyV1;
+    consent: LabDelegationConsentV1;
+    revoked: boolean;
+  }> {
+    const run = await this.currentRun();
+    const events = await this.journal(run).replay();
+    return this.readLabDelegation(events);
+  }
+
+  private async readLabDelegation(events: Awaited<ReturnType<EventJournal["replay"]>>): Promise<{
+    policyHash: string;
+    consentHash: string;
+    policy: LabDelegationPolicyV1;
+    consent: LabDelegationConsentV1;
+    revoked: boolean;
+  }> {
+    const event = [...events].reverse().find(({ type }) => type === "lab.delegation-consented");
+    const payload = event?.payload as { policyHash?: string; consentHash?: string } | undefined;
+    if (payload?.policyHash === undefined || payload.consentHash === undefined)
+      throw new ApexError(
+        "APEX_AUTHORIZATION",
+        "No human lab delegation consent has been recorded",
+        EXIT_CODES.authorization,
+      );
+    const policy = await this.objects.getJson<LabDelegationPolicyV1>(payload.policyHash);
+    const consent = await this.objects.getJson<LabDelegationConsentV1>(payload.consentHash);
+    if (sha256Json(policy) !== payload.policyHash || sha256Json(consent) !== payload.consentHash)
+      throw new ApexError(
+        "APEX_AUTHORIZATION",
+        "Delegation receipt content does not match its hash",
+        EXIT_CODES.authorization,
+      );
+    return {
+      policyHash: payload.policyHash,
+      consentHash: payload.consentHash,
+      policy,
+      consent,
+      revoked: events.some(
+        ({ type, payload: value, sequence }) =>
+          type === "lab.delegation-revoked" &&
+          sequence > event!.sequence &&
+          (value as { policyHash?: string }).policyHash === payload.policyHash,
+      ),
+    };
+  }
+
+  async confirmLabDelegation(
+    policy: LabDelegationPolicyV1,
+    confirm: (policyHash: string) => Promise<{ actor: string }>,
+  ): Promise<Awaited<ReturnType<ApexService["labDelegation"]>>> {
+    await this.assertNoPendingReview("gateDecide");
+    this.assertValid("lab-delegation-policy", policy);
+    const run = await this.currentRun();
+    await this.assertCurrentWriterAuthority(
+      run,
+      new WriterTransferStore(this.projects.runDirectory(run.projectId, run.runId), this.clock),
+    );
+    const events = await this.journal(run).replay();
+    const requirementsHash = this.artifactHash(events, "requirements");
+    if (requirementsHash === undefined)
+      throw new ApexError(
+        "APEX_AUTHORIZATION",
+        "Accepted Requirements must exist before human policy confirmation",
+        EXIT_CODES.authorization,
+      );
+    const requirements = await this.objects.getJson<RequirementsV1>(requirementsHash);
+    const recipient = await this.currentRecipientIdentity(run);
+    delegationCheck(() => assertLabDelegationPolicy(policy, run, requirements, recipient, this.clock().toISOString()));
+    const policyHash = sha256Json(policy);
+    const { actor } = await this.waitOutsideWorkspaceLock(() => confirm(policyHash));
+    const consent: LabDelegationConsentV1 = {
+      schemaVersion: CONTRACT_VERSION,
+      policyHash,
+      actor,
+      mechanism: "terminal-policy-confirmation",
+      userOwnedScopeConfirmed: true,
+      syntheticNonSensitiveConfirmed: true,
+      futurePreviewReviewed: false,
+      consentedAt: this.clock().toISOString(),
+      expiresAt: policy.expiresAt,
+    };
+    this.assertValid("lab-delegation-consent", consent);
+    delegationCheck(() => assertLabDelegationPolicy(policy, run, requirements, recipient, consent.consentedAt));
+    await this.acquireRunWriterLease(run);
+    await this.objects.putJson(policy);
+    const consentHash = await this.objects.putJson(consent);
+    await this.mutateRun(
+      run,
+      run,
+      "lab.delegation-consented",
+      { policyHash, consentHash },
+      events.at(-1)?.hash ?? null,
+    );
+    return this.labDelegation();
+  }
+
+  async revokeLabDelegation(policyHash: string): Promise<{ revoked: string }> {
+    const current = await this.labDelegation();
+    if (current.policyHash !== policyHash || current.revoked)
+      throw new ApexError("APEX_AUTHORIZATION", "The requested delegation is not active", EXIT_CODES.authorization);
+    const run = await this.currentRun();
+    const events = await this.journal(run).replay();
+    await this.acquireRunWriterLease(run);
+    await this.mutateRun(run, run, "lab.delegation-revoked", { policyHash }, events.at(-1)?.hash ?? null);
+    return { revoked: policyHash };
+  }
+
+  private async delegatedContext(
+    run: RunConfigV1,
+    gate: 1 | 4,
+    options: DelegatedGateOptions,
+    events: Awaited<ReturnType<EventJournal["replay"]>>,
+    preview?: DeploymentPreviewV1,
+    approvalContextHash?: string,
+  ): Promise<LabDelegationContext> {
+    const transfers = new WriterTransferStore(this.projects.runDirectory(run.projectId, run.runId), this.clock);
+    await this.assertCurrentWriterAuthority(run, transfers);
+    const lease = await transfers.leaseStore().current();
+    const current = await this.readLabDelegation(events);
+    if (current.revoked || current.policyHash !== options.policyHash || current.consentHash !== options.consentHash)
+      throw new ApexError(
+        "APEX_AUTHORIZATION",
+        "Delegation consent is revoked or does not match the request",
+        EXIT_CODES.authorization,
+      );
+    const requirementsHash = this.artifactHash(events, "requirements");
+    if (requirementsHash === undefined)
+      throw new ApexError("APEX_AUTHORIZATION", "Current accepted Requirements are required", EXIT_CODES.authorization);
+    const requirements = await this.objects.getJson<RequirementsV1>(requirementsHash);
+    const providerEvent = [...events].reverse().find(({ type }) => type === "preview.created");
+    const providerName = (providerEvent?.payload as { provider?: string } | undefined)?.provider;
+    let scope: LabDelegationContext["scope"];
+    if (gate === 4) {
+      if (preview?.operation !== "apply")
+        throw new ApexError(
+          "APEX_AUTHORIZATION",
+          "Delegated destroy is unsupported; use its own preview and normal human approval",
+          EXIT_CODES.authorization,
+          { reason: "LAB_DELEGATION_DESTROY_UNSUPPORTED" },
+        );
+      if (options.previewHash !== preview.previewHash || options.approvalContextHash !== approvalContextHash)
+        throw new ApexError(
+          "APEX_STALE",
+          "Delegation must request the exact current preview and immutable context",
+          EXIT_CODES.stale,
+        );
+      await this.readApprovalContext(run, preview.previewHash, approvalContextHash);
+      const provider = providerName === "bicep" ? this.providers.bicep : undefined;
+      if (provider?.labApplyScope === undefined || provider.validationMode === "simulated")
+        throw new ApexError(
+          "APEX_AUTHORIZATION",
+          "Native azd scope observations are unavailable; fake previews and external ledgers cannot authorize delegated apply",
+          EXIT_CODES.authorization,
+          { reason: "LAB_DELEGATION_SCOPE_UNPROVEN" },
+        );
+      scope = await this.whileExternalProcessRuns(() => provider.labApplyScope!(preview.previewHash));
+      await this.objects.putJson(scope);
+    } else if (options.previewHash !== undefined || options.approvalContextHash !== undefined) {
+      throw new ApexError("APEX_USAGE", "Gate 1 has no deployment preview context", EXIT_CODES.usage);
+    }
+    return {
+      policy: current.policy,
+      consent: current.consent,
+      consentHash: options.consentHash,
+      activePolicyHash: current.policyHash,
+      activeConsentHash: current.consentHash,
+      run,
+      gate,
+      now: this.clock().toISOString(),
+      recipientIdentity: await this.currentRecipientIdentity(run),
+      requirements,
+      reviewBlockers: (gate === 1
+        ? ["requirements-review"]
+        : ["requirements-review", "architecture-review", "plan-review"]
+      ).flatMap((node) => this.reviewBlockers(events, node)),
+      dependencyRevision: this.dependencyRevision(run, events),
+      ...(lease === null ? {} : { authorityExpiresAt: lease.expiresAt }),
+      ...(preview === undefined ? {} : { preview }),
+      ...(approvalContextHash === undefined ? {} : { approvalContextHash }),
+      ...(scope === undefined ? {} : { scope }),
+    };
+  }
+
+  async decideDelegatedGate(gate: 1 | 4, options: DelegatedGateOptions): Promise<ApprovalEvidenceV1> {
+    if (gate !== 1 && gate !== 4)
+      throw new ApexError("APEX_USAGE", "Only Gate 1 and apply Gate 4 may be delegated", EXIT_CODES.usage);
+    return this.decideGateNumber(gate, "approved", "agent", { delegation: options });
+  }
+
   async decideGateNumber(
     gateNumber: number,
     decision: "approved" | "rejected",
@@ -7110,6 +7416,15 @@ export class ApexService {
     options: GateDecisionOptions = {},
   ): Promise<ApprovalEvidenceV1> {
     await this.assertNoPendingReview("gateDecide");
+    if (options.delegation !== undefined && (decision !== "approved" || (gateNumber !== 1 && gateNumber !== 4)))
+      throw new ApexError(
+        "APEX_USAGE",
+        "Delegation is limited to approved Gate 1 or apply Gate 4 decisions",
+        EXIT_CODES.usage,
+      );
+    if (options.delegation !== undefined && options.recipientIdentity !== undefined)
+      throw new ApexError("APEX_USAGE", "Delegation cannot override its current execution recipient", EXIT_CODES.usage);
+    await this.reopenExpiredDelegatedGates();
     const run = await this.currentRun();
     if (isReadinessGate(run.purpose, gateNumber)) {
       throw new ApexError(
@@ -7193,11 +7508,25 @@ export class ApexService {
       decidedAt,
       ...(approvalExpiresAt === undefined ? {} : { expiresAt: approvalExpiresAt }),
     };
-    const approval: ApprovalEvidenceV1 = {
-      ...commonApproval,
-      mechanism: "tty",
-      recipientIdentity: approvalRecipientIdentity,
-    };
+    const delegation =
+      options.delegation === undefined
+        ? undefined
+        : await this.delegatedContext(
+            run,
+            gateNumber as 1 | 4,
+            options.delegation,
+            events,
+            preview,
+            approvalContextHash,
+          );
+    const approval: ApprovalEvidenceV1 =
+      delegation === undefined
+        ? {
+            ...commonApproval,
+            mechanism: "tty",
+            recipientIdentity: approvalRecipientIdentity,
+          }
+        : delegationCheck(() => evaluateLabDelegation(delegation));
     this.assertValid("approval", approval);
     const validatorIds =
       decision === "approved"
@@ -7213,7 +7542,9 @@ export class ApexService {
     const approvalHash = await this.objects.putJson(approval);
     const updated = {
       ...run,
-      gates: run.gates.map((item) => (item.gate === gateNumber ? decideGate(item, decision, decidedAt) : item)),
+      gates: run.gates.map((item) =>
+        item.gate === gateNumber ? decideGate(item, decision, approval.decidedAt) : item,
+      ),
     };
     await this.mutateRun(
       run,
@@ -7225,8 +7556,17 @@ export class ApexService {
         ...(previewHash === undefined ? {} : { previewHash }),
         ...(approvalContextHash === undefined ? {} : { approvalContextHash }),
         ...(validatorIds.length === 0 ? {} : { validatorIds }),
+        ...(approval.mechanism !== "lab-delegation"
+          ? {}
+          : {
+              mechanism: approval.mechanism,
+              policyHash: approval.policyHash,
+              consentHash: approval.consentHash,
+              expiresAt: approval.expiresAt!,
+              writerEpoch: approval.writerEpoch,
+            }),
       },
-      gateNumber === 4 ? (events.at(-1)?.hash ?? null) : undefined,
+      gateNumber === 4 || delegation !== undefined ? (events.at(-1)?.hash ?? null) : undefined,
       preview !== undefined && approvalContextHash !== undefined
         ? async (lockedRun) => {
             if (decision === "approved")
@@ -7238,11 +7578,29 @@ export class ApexService {
                 approvalRecipientIdentity,
                 lockedRun,
               );
+            if (delegation !== undefined)
+              delegationCheck(() =>
+                evaluateLabDelegation({ ...delegation, run: lockedRun, now: this.clock().toISOString() }),
+              );
             await this.assertApprovalContextReviewed(run, preview.previewHash, approvalContextHash);
             if (approval.expiresAt === undefined || Date.parse(approval.expiresAt) <= this.clock().getTime())
               throw new ApexError("APEX_STALE", "Approval authority expired before commit", EXIT_CODES.stale);
           }
-        : undefined,
+        : delegation === undefined
+          ? undefined
+          : async (lockedRun) => {
+              delegationCheck(() =>
+                evaluateLabDelegation({ ...delegation, run: lockedRun, now: this.clock().toISOString() }),
+              );
+              await this.validateGateValidators(
+                lockedRun,
+                gate,
+                events,
+                approval,
+                approvalRecipientIdentity,
+                lockedRun,
+              );
+            },
     );
     if (gateNumber === 4) await this.materializeOperationsApprovalPackage(run, approval, approvalHash);
     return approval;
@@ -8014,6 +8372,22 @@ export class ApexService {
         "Approval does not bind the immutable preview review context",
         EXIT_CODES.authorization,
       );
+    if (approval.mechanism === "lab-delegation") {
+      const context = await this.delegatedContext(
+        run,
+        4,
+        {
+          policyHash: approval.policyHash,
+          consentHash: approval.consentHash,
+          previewHash: preview.previewHash,
+          ...(approvalContextHash === undefined ? {} : { approvalContextHash }),
+        },
+        events,
+        preview,
+        approvalContextHash,
+      );
+      delegationCheck(() => verifyLabDelegationApproval(context, approval));
+    }
     const providerName = [...events].reverse().find((event) => event.type === "preview.created")?.payload as
       { provider?: unknown } | undefined;
     const provider =
@@ -8305,7 +8679,11 @@ export class ApexService {
     const inherited = promoted.gates.map((gate) => {
       const sourceGate = source.gates.find(({ gate: number }) => number === gate.gate)!;
       // Gate 1 binds the target, so a changed target needs a fresh human confirmation in the new run.
-      const inheritable = sameScope && gate.gate <= 3;
+      const sourceDecision = sourceEvents.findLast(
+        (event) => event.type === "gate.decided" && (event.payload as { gate?: number }).gate === gate.gate,
+      );
+      const delegated = (sourceDecision?.payload as { mechanism?: string } | undefined)?.mechanism === "lab-delegation";
+      const inheritable = sameScope && gate.gate <= 3 && !delegated;
       return inheritable && (sourceGate.state === "approved" || sourceGate.state === "inherited")
         ? inheritGate(sourceGate, source.runId, sourceGate.dependencyHash, this.clock().toISOString())
         : gate;
@@ -10364,9 +10742,65 @@ export class ApexService {
     events: Awaited<ReturnType<EventJournal["replay"]>>,
   ): boolean {
     const gate = run.gates.find((candidate) => candidate.gate === gateNumber);
-    if (gate?.state === "approved" || gate?.state === "inherited") return true;
+    if (gate?.state === "approved" || gate?.state === "inherited") {
+      const decision = events.findLast(
+        (event) => event.type === "gate.decided" && (event.payload as { gate?: number }).gate === gateNumber,
+      );
+      const payload = decision?.payload as
+        | {
+            mechanism?: string;
+            policyHash?: string;
+            consentHash?: string;
+            expiresAt?: string;
+            writerEpoch?: number;
+          }
+        | undefined;
+      if (payload?.mechanism !== "lab-delegation") return true;
+      const consent = events.findLast(({ type }) => type === "lab.delegation-consented");
+      const active = consent?.payload as { policyHash?: string; consentHash?: string } | undefined;
+      return (
+        run.purpose === "lab" &&
+        gate.state === "approved" &&
+        payload.writerEpoch === run.ownerEpoch &&
+        payload.expiresAt !== undefined &&
+        Date.parse(payload.expiresAt) > this.clock().getTime() &&
+        active?.policyHash === payload.policyHash &&
+        active?.consentHash === payload.consentHash &&
+        !events.some(
+          (event) =>
+            event.type === "lab.delegation-revoked" &&
+            event.sequence > (consent?.sequence ?? 0) &&
+            (event.payload as { policyHash?: string }).policyHash === payload.policyHash,
+        )
+      );
+    }
     if (gate?.state !== "ready" || !isReadinessGate(run.purpose, gateNumber)) return false;
     return this.readinessProven(run, gate, events);
+  }
+
+  private async reopenExpiredDelegatedGates(): Promise<void> {
+    const run = await this.currentRun();
+    const events = await this.journal(run).replay();
+    const expired = run.gates.filter(
+      (gate) => gate.state === "approved" && !this.gateSatisfied(run, gate.gate, events),
+    );
+    if (expired.length === 0) return;
+    await this.acquireRunWriterLease(run);
+    for (const gate of expired) {
+      const current = await this.currentRun();
+      const updated = {
+        ...current,
+        gates: current.gates.map((item) =>
+          item.gate !== gate.gate
+            ? item
+            : openGate(
+                invalidateGate(item, item.dependencyHash, "Delegation expired, was revoked, or changed writer"),
+                item.dependencyHash,
+              ),
+        ),
+      };
+      await this.mutateRun(current, updated, "gate.opened", { gate: gate.gate, dependencyHash: gate.dependencyHash });
+    }
   }
 
   /**
@@ -10651,6 +11085,7 @@ export class ApexService {
           EXIT_CODES.validation,
         );
       }
+      this.assertPlanGeneratable(run, intent, binding);
     }
     if (descriptor.id.startsWith("codegen-")) {
       const manifest = byKind["logical-resource-manifest"] as LogicalResourceManifestV1;

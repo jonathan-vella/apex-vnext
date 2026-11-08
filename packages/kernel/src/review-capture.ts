@@ -162,6 +162,7 @@ export function buildReviewPrompt(request: ReviewPromptRequest): string {
     `${REVIEW_ANSWER_FENCE} and whose content is one JSON object in this shape:`,
     shape,
     `severity is one of ${SEVERITIES.join(", ")}. Use "findings": [] when there are no problems.`,
+    "Each finding uses only id, severity, title and detail; the kernel adds evidence references, and extra fields are discarded.",
     `Report at most ${REVIEW_MAX_FINDINGS} findings and keep all titles and details together under ` +
       `${Math.floor(REVIEW_MAX_FINDINGS_BYTES / 2048)} KB; merge related problems.`,
     ...(request.wellArchitected
@@ -240,7 +241,8 @@ function exactKeys(value: Record<string, unknown>, allowed: readonly string[], f
 
 /**
  * Derives findings from rubber-duck's captured output: exactly one ```apex-review fenced JSON block, checked strictly.
- * Text outside the block is ignored. Findings without an id get F-1, F-2, ... in answer order.
+ * Text outside the block is ignored. Findings without an id get F-1, F-2, ... in answer order. The top-level object is
+ * strict; unsupported fields inside a finding or criteria entry are dropped, and only the fields read below are kept.
  */
 export function parseReviewAnswer(response: string, options: { wellArchitected: boolean }): ReviewAnswer {
   const fence = /^[ \t]*(`{3,}|~{3,})[ \t]*apex-review[ \t]*\r?\n([\s\S]*?)\r?\n[ \t]*\1[ \t]*$/gmu;
@@ -265,7 +267,6 @@ export function parseReviewAnswer(response: string, options: { wellArchitected: 
     );
   const findings = value.findings.map((finding, index) => {
     if (!isPlainObject(finding)) throw new ReviewCaptureError("unparseable", "Each review finding must be an object");
-    exactKeys(finding, ["id", "severity", "title", "detail"], `finding ${index + 1}`);
     const id = finding.id === undefined ? `F-${index + 1}` : finding.id;
     if (typeof id !== "string" || !FINDING_ID_PATTERN.test(id))
       throw new ReviewCaptureError("unparseable", `Review finding ${index + 1} has an invalid id`);
@@ -298,7 +299,6 @@ export function parseReviewAnswer(response: string, options: { wellArchitected: 
     throw new ReviewCaptureError("unparseable", "Review answer criteria must cover the five Well-Architected pillars");
   const criteria = value.criteria.map((criterion) => {
     if (!isPlainObject(criterion)) throw new ReviewCaptureError("unparseable", "Each criteria entry must be an object");
-    exactKeys(criterion, ["criterionId", "outcome", "rationale", "findingIds"], "criteria entry");
     if (!PILLARS.includes(criterion.criterionId as ReviewPillar))
       throw new ReviewCaptureError("unparseable", `Criteria entry pillar must be one of ${PILLARS.join(", ")}`);
     if (!OUTCOMES.includes(criterion.outcome as (typeof OUTCOMES)[number]))

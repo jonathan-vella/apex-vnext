@@ -189,6 +189,21 @@
     "maxBytes": 65536,
     "sensitivity": "confidential"
   },
+  "https://schemas.apexops.dev/lab-apply-scope-v1.json": {
+    "compatibility": "strict-v1",
+    "maxBytes": 65536,
+    "sensitivity": "confidential"
+  },
+  "https://schemas.apexops.dev/lab-delegation-consent-v1.json": {
+    "compatibility": "strict-v1",
+    "maxBytes": 8192,
+    "sensitivity": "confidential"
+  },
+  "https://schemas.apexops.dev/lab-delegation-policy-v1.json": {
+    "compatibility": "strict-v1",
+    "maxBytes": 65536,
+    "sensitivity": "confidential"
+  },
   "https://schemas.apexops.dev/live-qualification-v1.json": {
     "compatibility": "strict-v1",
     "maxBytes": 1048576,

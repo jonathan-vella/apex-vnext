@@ -14,6 +14,9 @@ Use this skill only inside the hidden CodeGen worker.
 ## Prerequisites
 
 - `apex/taskContext` supplies approved intent, one selected-track binding, policy obligations, output paths, and limits.
+  Call it once. It is intentionally small: inputs listed with `inlined: false` in `inputReferences` are not in `inputs`.
+  Read every input listed in `inputReferences`, in order, with `apex/readTaskInput` by `inputHash`, in bounded chunks
+  following `nextOffset` until it is absent, before generating.
 - The task identifies a single dependency-sized generation batch.
 
 ## Workflow

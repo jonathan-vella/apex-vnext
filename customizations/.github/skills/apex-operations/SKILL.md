@@ -59,6 +59,12 @@ inventory, diagnosis, reconciliation or quality work.
 
 ## Boundaries
 
+For an existing recorded lab delegation, use the narrow
+[delegated gate path](../apex-workflow/SKILL.md#delegated-lab-gates) instead of the human Gate 4 stop only for apply.
+It requires exact current preview/context hashes and native provider observations. Updates, deletes, replacements,
+unknowns, pre-existing creates, material no-ops and out-of-policy resources are blocked. Destroy still needs its own
+preview and normal human approval; `azd-env-name` tags and an external cleanup ledger are not run-creation proof.
+
 Required validation, authorization, freshness, writer epoch and approval checks are kernel-controlled. Do not invent
 operations, retry effects, mutate infrastructure, run shell/Git/Bicep/Terraform commands, or claim provider inspection
 that the current APEX MCP result does not contain. Retail pricing, supported cost-saving recommendations, and general

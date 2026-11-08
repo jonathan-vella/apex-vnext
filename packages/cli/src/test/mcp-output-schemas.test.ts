@@ -358,6 +358,11 @@ test("actual MCP handlers wrap service fixtures and sanitize failures for every 
       input: { gate: 1, decision: "approved", confirm: true },
       args: [1, "approved"],
     },
+    gateDelegate: {
+      method: "decideDelegatedGate",
+      input: { gate: 1, policyHash: hash, consentHash: hash },
+      args: [1, { policyHash: hash, consentHash: hash }],
+    },
     reviewDecide: { method: "decideReview", input: { reviewHash: hash, decisions }, args: [hash, decisions] },
     stageArtifact: { method: "stageArtifact", input: { taskId, ...output }, args: [taskId, output] },
     stageFile: {

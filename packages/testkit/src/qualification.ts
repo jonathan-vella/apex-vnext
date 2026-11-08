@@ -770,7 +770,13 @@ function planBundle(context: TrackContext, sourceHashes: Record<string, string>)
         runId: context.runId,
         track: context.track,
         intentHash: sha256Json(intent),
-        resourceBindings: { api: { implementation: "fake/service", version: "1", parameters: {} } },
+        resourceBindings: {
+          api: {
+            implementation: "native:Microsoft.Storage/storageAccounts@2023-05-01",
+            version: "2023-05-01",
+            parameters: { name: "apidemo", location: "swedencentral", parentId: "/", properties: {} },
+          },
+        },
       },
     },
     {

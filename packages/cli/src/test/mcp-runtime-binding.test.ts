@@ -57,6 +57,7 @@ const toolArguments: Record<ToolName, Record<string, unknown>> = {
   projectUse: { projectId: "demo" },
   projectDelete: { projectId: "other", confirm: true },
   gateDecide: { gate: 1, decision: "approved", confirm: true },
+  gateDelegate: { gate: 1, policyHash: hash, consentHash: hash },
   reviewDecide: { reviewHash: hash, decisions: [{ findingId: "f", action: "revise" }] },
   stageArtifact: { taskId: "task-1", kind: "requirements", value: { a: 1 } },
   stageFile: { taskId: "task-1", path: "main.bicep", content: "{}" },

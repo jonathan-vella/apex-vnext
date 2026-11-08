@@ -314,6 +314,7 @@ test("managed role projections retain required tools and exclude unrelated grant
       "reviewComplete",
       "reviewDecide",
       "gateDecide",
+      "gateDelegate",
       "governanceImport",
       "governanceSelect",
       "preview",
@@ -321,8 +322,8 @@ test("managed role projections retain required tools and exclude unrelated grant
       "inventory",
       "diagnose",
     ],
-    "code-generation": ["taskContext", "stageFile", "generateIac"],
-    validation: ["taskContext", "validateTask", "completeTask"],
+    "code-generation": ["taskContext", "readTaskInput", "stageFile", "generateIac"],
+    validation: ["taskContext", "readTaskInput", "validateTask", "completeTask"],
   };
   const readTools = ["view", "glob", "rg"];
   const explorers = ["coordinator"];
@@ -355,6 +356,8 @@ test("managed role projections retain required tools and exclude unrelated grant
         label,
       );
       const interactive = ["ask_user", "task"];
+      // The coordinator reads a backgrounded rubber-duck review back with read_agent; workers never do.
+      assert.equal(metadata.tools.includes("read_agent"), role.id === "coordinator", `${label}: read_agent`);
       if (client === "github-copilot-cli")
         assert.equal(
           metadata.tools.includes("task"),
@@ -392,6 +395,7 @@ test("managed role projections retain required tools and exclude unrelated grant
         ...apexTools,
         ...azureTools,
         ...interactive,
+        ...(role.id === "coordinator" ? ["read_agent"] : []),
         ...nativeRead,
         ...(webTools[role.id] ?? []),
       ]);

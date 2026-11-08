@@ -104,7 +104,7 @@ function request(overrides: Partial<PreviewRequest> = {}): PreviewRequest {
   };
 }
 
-function approval(preview: DeploymentPreviewV1): ApprovalEvidenceV1 {
+function approval(preview: DeploymentPreviewV1): Extract<ApprovalEvidenceV1, { mechanism: "tty" }> {
   return {
     schemaVersion: "1.0.0",
     projectId: preview.projectId,
@@ -390,6 +390,72 @@ for (const track of ["bicep", "terraform"] as const) {
     assert.equal(fixture.bindings.values.size, 0);
   });
 }
+
+test("native bicep validateSource failures name the failing command and mappings without leaking values", async (context) => {
+  const fixture = await nativePolicyFixture(context, "bicep");
+  const policyValidation = fixture.policyRequest.policyValidation!;
+  const input: NativeValidationRequest = {
+    projectId: "project",
+    runId: "run",
+    sourceHash: hashes.iac,
+    generatedSource: fixture.generatedSource,
+    policyHash: sha256(policyValidation.policyMap),
+    inputHash: hashes.input,
+    policyValidation,
+  };
+  fixture.source.value = "actual-private-mismatch";
+  const failure = await fixture
+    .makeProvider()
+    .validateSource(input)
+    .catch((error: unknown) => error);
+  assert.ok(failure instanceof IacProviderError);
+  assert.equal(failure.code, "NATIVE_VALIDATION_FAILED");
+  assert.match(
+    failure.message,
+    /^Native policy property validation failed: 3 of 3 mappings \(logicalResourceId \| propertyPath \| effect \| reason\): storage \| properties\.security \| deny \| value-mismatch; storage \| properties\.security \| modify \| value-mismatch; /,
+  );
+  assert.doesNotMatch(failure.message, /actual-private-mismatch|native-value-must-not-leak/);
+
+  fixture.source.value = "native-value-must-not-leak";
+  fixture.source.compileFailed = true;
+  const compile = await fixture
+    .makeProvider()
+    .validateSource(input)
+    .catch((error: unknown) => error);
+  assert.ok(compile instanceof IacProviderError);
+  assert.equal(compile.message, "Native validation command failed: bicep:build");
+});
+
+test("native bicep validateSource requests unredacted compiler JSON so secret-like symbolic names stay observable", async (context) => {
+  const fixture = await nativePolicyFixture(context, "bicep");
+  const policyValidation = {
+    ...fixture.policyRequest.policyValidation!,
+    logicalResourceManifest: { storage: { codeSymbol: "secret_vault" } },
+  };
+  const run = fixture.runner.run.bind(fixture.runner);
+  const rawFlags: Array<boolean | undefined> = [];
+  fixture.runner.run = async (process) => {
+    const result = await run(process);
+    if (process.args[0] !== "build") return result;
+    rawFlags.push(process.rawOutput);
+    const stdout = JSON.stringify({
+      resources: { secret_vault: { properties: { security: fixture.source.value } } },
+    });
+    // A real runner replaces secret-like keys unless the request asks for raw output.
+    return { ...result, stdout: process.rawOutput === true ? stdout : stdout.replace("secret_vault", "[REDACTED]") };
+  };
+  const receipt = await fixture.makeProvider().validateSource({
+    projectId: "project",
+    runId: "run",
+    sourceHash: hashes.iac,
+    generatedSource: fixture.generatedSource,
+    policyHash: sha256(policyValidation.policyMap),
+    inputHash: hashes.input,
+    policyValidation,
+  });
+  assert.deepEqual(rawFlags, [true]);
+  assert.equal(receipt.policyValidation?.outcome, "pass");
+});
 
 test("native terraform validateSource leaves accepted source pristine for fresh validation and preview", async (context) => {
   const fixture = await nativePolicyFixture(context, "terraform");
@@ -1233,7 +1299,8 @@ for (const track of ["bicep", "terraform"] as const) {
             (error: unknown) => {
               assert.ok(error instanceof IacProviderError);
               assert.equal(error.code, "NATIVE_VALIDATION_FAILED");
-              assert.equal(error.message, "Native validation command failed");
+              assert.equal(error.message.startsWith(`Native validation command failed: ${command.validatorId}`), true);
+              assert.match(error.message, /^[A-Za-z0-9:_ .,()-]+$/);
               assert.deepEqual(Object.keys(error).sort(), ["code", "name"]);
               assert.equal(JSON.stringify(error).includes("private-"), false);
               return true;
@@ -1812,7 +1879,13 @@ function managed(...entries: readonly { type: string; name: string }[]) {
 
 async function azdFixture(
   context: TestContext,
-  options: { azdVersion?: string | undefined; azureYaml?: string; state?: Partial<FakeAzdState> } = {},
+  options: {
+    azdVersion?: string | undefined;
+    azureYaml?: string;
+    state?: Partial<FakeAzdState>;
+    currentAuthority?: () => Promise<CurrentDeploymentAuthority>;
+    now?: () => Date;
+  } = {},
 ) {
   const root = await mkdtemp(join(tmpdir(), "apex-azd-provider-"));
   context.after(async () => rm(root, { recursive: true, force: true }));
@@ -1823,8 +1896,8 @@ async function azdFixture(
   const build = (target: Partial<ConstructorParameters<typeof AzdBicepProvider>[0]["target"]> = {}) =>
     new AzdBicepProvider({
       runner,
-      currentAuthority: async () => authority,
-      now: () => clock.value,
+      currentAuthority: options.currentAuthority ?? (async () => authority),
+      now: options.now ?? (() => clock.value),
       nextId: () => "operation",
       bindingStore: bindings,
       target: {
@@ -1849,6 +1922,94 @@ async function azdFixture(
     );
   return { root, state, runner, bindings, build, preview, executions, provider: build() };
 }
+
+for (const outcome of ["approved", "expired", "revoked"] as const) {
+  test(`lab delegation boundary ${outcome} rechecks current authority after native preflight`, async (context) => {
+    let currentTime = new Date("2026-07-13T01:00:00.000Z");
+    let authorizations = 0;
+    const activeLabDelegation = { policyHash: "1".repeat(64), consentHash: "2".repeat(64) };
+    const f = await azdFixture(context, {
+      now: () => currentTime,
+      currentAuthority: async () => {
+        authorizations += 1;
+        if (authorizations === 2 && outcome === "expired") currentTime = new Date(currentTime.getTime() + 2000);
+        return { ...authority, ...(authorizations === 2 && outcome === "revoked" ? {} : { activeLabDelegation }) };
+      },
+      state: { preview: [{ Operation: "Create", Type: STORAGE.type, Name: STORAGE.name }], resources: [] },
+    });
+    const preview = await f.provider.previewApply(f.preview());
+    const scope = await f.provider.labApplyScope(preview.previewHash);
+    const decision: ApprovalEvidenceV1 = {
+      schemaVersion: "1.0.0",
+      projectId: preview.projectId,
+      runId: preview.runId,
+      gate: 4,
+      decision: "approved",
+      mechanism: "lab-delegation",
+      actor: `agent:${authority.recipientIdentity}`,
+      recipientIdentity: authority.recipientIdentity,
+      evaluator: "kernel-lab-delegation-v1",
+      ...activeLabDelegation,
+      dependencyHash: preview.previewHash,
+      previewHash: preview.previewHash,
+      approvalContextHash: "3".repeat(64),
+      scopeEvidenceHash: sha256(scope),
+      writerEpoch: authority.ownerEpoch,
+      decidedAt: currentTime.toISOString(),
+      expiresAt: new Date(currentTime.getTime() + 1000).toISOString(),
+    };
+    if (outcome === "approved") {
+      const operation = await f.provider.apply(preview, decision, authority);
+      assert.equal(operation.state, "succeeded");
+      assert.equal(f.executions().length, 1);
+    } else {
+      await assert.rejects(
+        f.provider.apply(preview, decision, authority),
+        (error: unknown) =>
+          error instanceof IacProviderError &&
+          error.code === (outcome === "expired" ? "APPROVAL_EXPIRED" : "APPROVAL_REJECTED"),
+      );
+      assert.equal(f.executions().length, 0);
+    }
+    assert.equal(authorizations, 2);
+  });
+}
+
+test("lab delegation scope observes exact native identities and unlisted resource presence without execution", async (context) => {
+  const f = await azdFixture(context, {
+    state: {
+      preview: [
+        { Operation: "Create", Type: STORAGE.type, Name: STORAGE.name },
+        { Operation: "NoChange", Type: BLOB.type, Name: BLOB.name },
+      ],
+      resources: [{ ...BLOB, id: BLOB_ID, unlisted: true }],
+    },
+  });
+  const preview = await f.provider.previewApply(f.preview());
+  const scope = await f.build().labApplyScope(preview.previewHash);
+  assert.equal(scope.previewHash, preview.previewHash);
+  assert.equal(scope.cloud, "AzureCloud");
+  assert.equal(scope.tenantId, AZD_TENANT);
+  assert.equal(scope.subscriptionId, AZD_SUBSCRIPTION);
+  assert.equal(scope.targetScope, AZD_SCOPE);
+  assert.deepEqual(scope.resourceStates, [
+    { resourceId: STORAGE_ID, state: "absent" },
+    { resourceId: BLOB_ID, state: "present" },
+  ]);
+  assert.equal(f.executions().length, 0);
+  assert.ok(f.state.calls.some(({ args }) => args[0] === "resource" && args[1] === "show"));
+});
+
+test("lab delegation scope refuses unresolved azd no-ops without executing", async (context) => {
+  const f = await azdFixture(context, {
+    state: {
+      preview: [{ Operation: "Ignore", Type: "Microsoft.Network/virtualNetworks", Name: "outside" }],
+    },
+  });
+  const preview = await f.provider.previewApply(f.preview());
+  await assert.rejects(f.provider.labApplyScope(preview.previewHash), /unresolved or out-of-scope/u);
+  assert.equal(f.executions().length, 0);
+});
 
 test("azd preview normalization resolves azd's type and name to accepted resource IDs and blocks the rest", () => {
   const accepted = managed(STORAGE, BLOB);
@@ -1892,6 +2053,48 @@ test("azd preview normalization resolves azd's type and name to accepted resourc
   assert.match(ambiguous.blockers.join("\n"), /does not resolve to exactly one/);
 });
 
+test("azd preview display types resolve by unique accepted name and fail closed otherwise", () => {
+  const rg = "/subscriptions/s/resourceGroups/rg/providers";
+  const account = `${rg}/Microsoft.Storage/storageAccounts/stapexe2edevswc01`;
+  const accepted = [
+    { resourceId: account },
+    { resourceId: `${account}/blobServices/default` },
+    { resourceId: `${account}/providers/Microsoft.Insights/diagnosticSettings/logs` },
+    { resourceId: `${rg}/Microsoft.Storage/storageAccounts/dup` },
+    { resourceId: `${rg}/Microsoft.KeyVault/vaults/dup` },
+  ];
+  const events = (changes: Parameters<typeof azdPreviewStdout>[0]) => azdPreviewStdout(changes);
+  const resolved = normalizeAzdPreview(
+    events([
+      { Name: "stapexe2edevswc01", Operation: "Create", Type: "Storage account" },
+      { Name: "law-apexe2e-dev-swc", Operation: "Ignore", Type: "Log Analytics workspace" },
+    ]),
+    accepted,
+  );
+  assert.deepEqual(resolved.blockers, []);
+  assert.equal(resolved.changes[0]!.resourceId, account);
+  assert.equal(resolved.changes[0]!.action, "create");
+  assert.equal(resolved.changes[0]!.material, true);
+  assert.equal(resolved.changes[1]!.action, "no-op");
+  assert.equal(resolved.changes[1]!.material, false);
+
+  const arm = normalizeAzdPreview(
+    events([{ Name: "stapexe2edevswc01", Operation: "Create", Type: "Microsoft.Storage/storageAccounts" }]),
+    accepted,
+  );
+  assert.deepEqual(arm.blockers, []);
+  assert.equal(arm.changes[0]!.resourceId, account);
+
+  for (const change of [
+    { Name: "dup", Operation: "Create", Type: "Storage account" },
+    { Name: "unknown-account", Operation: "Create", Type: "Storage account" },
+    { Name: "default", Operation: "Create", Type: "Blob service" },
+  ]) {
+    const blocked = normalizeAzdPreview(events([change]), accepted);
+    assert.equal(blocked.blockers.length, 1, change.Name);
+    assert.match(blocked.blockers[0]!, /does not resolve to exactly one accepted resource/);
+  }
+});
 test("azd preview normalization reads only the single preview event and fails closed otherwise", () => {
   assert.deepEqual(normalizeAzdPreview(azdPreviewStdout([]), []), { changes: [], blockers: [] });
   assert.deepEqual(normalizeAzdPreview(`warning text\n${azdPreviewStdout([])}\n\n`, []).changes, []);
@@ -1908,6 +2111,23 @@ test("azd preview normalization reads only the single preview event and fails cl
   assert.equal(malformed.blockers.filter((blocker) => /malformed/.test(blocker)).length, 3);
 });
 
+test("azd preview events printed only on stderr normalize like stdout-only output", async (context) => {
+  const state = { preview: [{ Operation: "Create", Type: STORAGE.type, Name: STORAGE.name }] };
+  const stdoutOnly = await azdFixture(context, { state });
+  const expected = await stdoutOnly.provider.previewApply(stdoutOnly.preview());
+  assert.equal(expected.changes.length, 1);
+
+  const stderrOnly = await azdFixture(context, { state });
+  const run = stderrOnly.runner.run.bind(stderrOnly.runner);
+  stderrOnly.runner.run = async (process) => {
+    const result = await run(process);
+    return process.args.includes("--preview") ? { ...result, stdout: "", stderr: result.stdout } : result;
+  };
+  const preview = await stderrOnly.provider.previewApply(stderrOnly.preview());
+  assert.deepEqual(preview.changes, expected.changes);
+  assert.deepEqual(preview.blockers, expected.blockers);
+  assert.equal(preview.previewHash, expected.previewHash);
+});
 test("azd owned-state normalizers accept only the tagged environment and the approved group", () => {
   assert.deepEqual(
     normalizeAzdTaggedGroups(
@@ -2026,6 +2246,25 @@ test("azd provisions only after approval of the exact preview and records its ow
   );
 });
 
+test("azd inventory in a fresh process restores the approved target from the persisted apply binding", async (context) => {
+  const fixture = await azdFixture(context, {
+    state: { preview: [{ Operation: "Create", Type: STORAGE.type, Name: STORAGE.name }] },
+  });
+  await fixture.provider.previewApply(fixture.preview());
+  fixture.state.resources = [{ id: STORAGE_ID, type: STORAGE.type, name: "stlab", location: "swedencentral" }];
+  const restarted = fixture.build();
+  const inventory = await restarted.inventory("project", "run");
+  assert.deepEqual(
+    inventory.resources.map(({ resourceId: id }) => id),
+    [STORAGE_ID],
+  );
+
+  const empty = await azdFixture(context);
+  await assert.rejects(empty.build().inventory("project", "run"), {
+    code: "PREVIEW_HASH_MISMATCH",
+    message: "No approved azd target is known for this run",
+  });
+});
 test("azd apply is refused when anything bound at preview time has changed", async (context) => {
   const cases: Record<string, (fixture: Awaited<ReturnType<typeof azdFixture>>) => Promise<void>> = {
     "Bicep source": (fixture) => writeFile(join(fixture.root, "infra", "main.bicep"), "targetScope = 'subscription'\n"),

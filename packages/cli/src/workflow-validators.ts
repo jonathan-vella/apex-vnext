@@ -127,7 +127,7 @@ export interface NativeBicepResourceOwnership {
   readonly issues: readonly ValidationIssue[];
 }
 
-const bicepResourceGroupScopePattern =
+export const bicepResourceGroupScopePattern =
   /^\/subscriptions\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/resourceGroups\/[A-Za-z0-9_()-][A-Za-z0-9_.()-]*$(?![\s\S])/i;
 const bicepPhysicalResourcesSchema =
   IacBindingV1Schema.properties.resourceBindings.patternProperties["^(.*)$"]!.properties.physicalResources;

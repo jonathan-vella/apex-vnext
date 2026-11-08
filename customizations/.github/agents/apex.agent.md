@@ -6,6 +6,7 @@ disable-model-invocation: true
 tools:
   - ask_user
   - task
+  - read_agent
   - view
   - glob
   - rg
@@ -30,6 +31,7 @@ tools:
   - apex/reviewComplete
   - apex/reviewDecide
   - apex/gateDecide
+  - apex/gateDelegate
   - apex/governanceImport
   - apex/governanceSelect
   - apex/preview
@@ -162,6 +164,11 @@ ambiguous, ask for correction before calling an APEX tool.
    the route.
 
 ## Boundaries
+
+The opt-in lab exception is kernel-recorded delegation, not inferred permission. When status includes `delegation`,
+follow the [delegated gate path](../skills/apex-workflow/SKILL.md#delegated-lab-gates) in the same foreground agent.
+Otherwise every human-gate stop above remains unchanged. Delegation never answers intake, architecture or governance
+questions, accepts risks, or permits production or destroy.
 
 - Use `apex-azure` only for the verified read-only command inventory, including supported pricing and recommendation
   reads. The separate ARM CostManagement server is retired; actual spend, forecasts, budgets, alerts, and commitment

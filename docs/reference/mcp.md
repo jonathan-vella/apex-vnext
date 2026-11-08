@@ -161,6 +161,10 @@ The Requirements, Architecture and Plan reviews (`requirements-review`, `archite
 3. The managed `postToolUse` hook saves the prompt and rubber-duck's exact output (`toolResult.textResultForLlm`) as an
    HMAC-signed `review-capture-v1` record under `$APEX_REVIEW_HOME/captures/` (default `~/.apex/reviews/`). The key,
    `capture.key`, is created there with mode 0600 by whichever side runs first.
+   When Copilot CLI moves a sync call to the background, the `task` result is only an `Agent moved to background`
+   notice. The hook saves no capture for it; it writes a signed record under `pending/` with the agent ID, the session
+   and the prompt. The APEX agent then calls `read_agent` with `wait: true` for that agent ID, and the hook turns the
+   completed result into the same capture and removes the pending record. A result that is still running is ignored.
 4. `reviewComplete` takes only the task ID. The kernel accepts exactly one capture for the nonce, verifies its signature,
    hashes and rubber-duck origin, compares the prompt with the issued prompt (line endings and trailing whitespace
    aside), checks that the reviewed artifact is unchanged, and parses findings only from one fenced `apex-review` JSON
@@ -173,6 +177,8 @@ The Requirements, Architecture and Plan reviews (`requirements-review`, `archite
 The answer block is one JSON object: `findings` lists `{ "id"?, "severity", "title", "detail" }` with severity
 `critical`, `high`, `medium`, `low` or `info`, and IDs default to `F-1`, `F-2` and so on. The Architecture review also
 returns `criteria` with one entry per Well-Architected pillar (`criterionId`, `outcome`, `rationale`, `findingIds`).
+The top-level object accepts only those keys. Other fields inside a finding or a criteria entry, such as `impact` or
+`evidenceRefs`, are discarded; the kernel adds each finding's evidence references itself.
 
 A missing capture leaves the request open: run rubber-duck once more with the same prompt. A second capture for the same
 nonce, an edited or forged record, a different prompt, a nonce from another request, a changed artifact, an edited or

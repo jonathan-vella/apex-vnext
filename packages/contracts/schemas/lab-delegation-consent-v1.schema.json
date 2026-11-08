@@ -1,0 +1,55 @@
+{
+  "$id": "https://schemas.apexops.dev/lab-delegation-consent-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "actor": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "consentedAt": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "expiresAt": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "futurePreviewReviewed": {
+      "const": false,
+      "type": "boolean"
+    },
+    "mechanism": {
+      "const": "terminal-policy-confirmation",
+      "type": "string"
+    },
+    "policyHash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "syntheticNonSensitiveConfirmed": {
+      "const": true,
+      "type": "boolean"
+    },
+    "userOwnedScopeConfirmed": {
+      "const": true,
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "policyHash",
+    "actor",
+    "mechanism",
+    "userOwnedScopeConfirmed",
+    "syntheticNonSensitiveConfirmed",
+    "futurePreviewReviewed",
+    "consentedAt",
+    "expiresAt"
+  ],
+  "type": "object"
+}

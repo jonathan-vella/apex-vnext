@@ -5,6 +5,7 @@ import type {
   IacTool,
   NativeValidationReceiptV1,
   LogicalResourceManifestV1,
+  LabApplyScopeV1,
   IacBindingV1,
   Operation,
   OperationRecordV1,
@@ -98,6 +99,10 @@ export interface CurrentDeploymentAuthority {
   readonly previousOwnerEpoch?: number;
   readonly writerTransferClaimHash?: string;
   readonly recipientIdentity: string;
+  readonly activeLabDelegation?: {
+    readonly policyHash: string;
+    readonly consentHash: string;
+  };
 }
 
 export interface ProviderExecutionEvidence {
@@ -119,6 +124,19 @@ export interface PreviewAuthorizationContext {
 
 export function authorizeDeploymentPreview(context: PreviewAuthorizationContext): void {
   const { operation, track, preview, approval, authority, now, latestPreviewHash } = context;
+  if (
+    approval.mechanism === "lab-delegation" &&
+    (operation !== "apply" || track !== "bicep" || approval.scopeEvidenceHash === undefined)
+  )
+    throw new IacProviderError("PREVIEW_BLOCKED", "Delegation supports only scope-bound native Bicep apply");
+  if (
+    approval.mechanism === "lab-delegation" &&
+    (authority.activeLabDelegation?.policyHash !== approval.policyHash ||
+      authority.activeLabDelegation.consentHash !== approval.consentHash ||
+      preview.ownerEpoch !== authority.ownerEpoch ||
+      approval.writerEpoch !== authority.ownerEpoch)
+  )
+    throw new IacProviderError("APPROVAL_REJECTED", "Delegation consent or its exact writer is no longer current");
   if (preview.track !== track) {
     throw new IacProviderError("PREVIEW_TRACK_MISMATCH", `Preview track '${preview.track}' is not '${track}'`);
   }
@@ -205,6 +223,8 @@ export interface IacProvider {
   policyValidation?(previewHash: string): PolicyValidationV1 | undefined;
   /** Reviewer-facing inventory and warnings for the exact bound preview, when the executor has any. */
   approvalMaterial?(previewHash: string): AzdApprovalMaterial | undefined;
+  /** Read-only native observations for delegated apply; never an ownership or creation receipt. */
+  labApplyScope?(previewHash: string): Promise<LabApplyScopeV1>;
 }
 
 export interface FakeIaCProviderOptions {

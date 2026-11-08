@@ -89,6 +89,10 @@ or task.
 
 ## Boundaries
 
+An existing recorded lab delegation may replace only the Gate 1 stop in step 12 through
+[Delegated lab gates](../apex-workflow/SKILL.md#delegated-lab-gates). It binds exact accepted Requirements and does not
+confirm any intake answer, unknown, deferral, obligation or risk on the user's behalf.
+
 To correct a recorded intake answer, read `apex/inputHistory`, build an `input-amendment-v1` with that request ID
 and current `baseAnswersHash`, and call `apex/previewInputAmendment`. Present the corrected values, invalidated
 reviews/gates and re-approval path. Only after the user explicitly confirms that preview, call `apex/amendInput`

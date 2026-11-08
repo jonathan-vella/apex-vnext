@@ -198,7 +198,7 @@ test("plugin layout, manifests, agents, skills and bundle are valid", async (con
     Object.fromEntries(Object.entries(hooks.hooks).map(([event, entries]) => [event, entries.map((e) => e.matcher)])),
     {
       preToolUse: ["task|Task|Agent|.*apex[-_]azure.*", "apex-.*|apex/.*|mcp__apex__.*"],
-      postToolUse: ["task|Task|Agent"],
+      postToolUse: ["task|Task|Agent|read_agent"],
       postToolUseFailure: [undefined],
       subagentStart: ["rubber-duck"],
       subagentStop: [undefined],
@@ -226,7 +226,8 @@ test("plugin layout, manifests, agents, skills and bundle are valid", async (con
   for (const name of ["bash", "view", "apex-status", "tasks", "agent"]) assert.ok(!matcher.test(name), name);
   // Every subagent tool name the hook script handles reaches it through the postToolUse capture entry too.
   const capture = new RegExp(`^(?:${hooks.hooks.postToolUse[0].matcher})$`, "u");
-  for (const name of ["task", "Task", "Agent"]) assert.ok(capture.test(name), name);
+  for (const name of ["task", "Task", "Agent", "read_agent"]) assert.ok(capture.test(name), name);
+  assert.ok(!matcher.test("read_agent"), "read_agent never reaches the preToolUse deny rules");
   const packagedHook = await readFile(join(outputDirectory, "com.github.copilot/hooks/apex-hook.mjs"), "utf8");
   assert.ok(packagedHook.includes("RETIRED_COST_SERVER_MARK"));
   assert.ok(!packagedHook.includes("PRICING_READ_TOOLS"));
@@ -271,6 +272,7 @@ test("plugin agents and skills carry the guidance the retired workspace copies c
   assert.deepEqual(frontmatter.tools, [
     "ask_user",
     "task",
+    "read_agent",
     "view",
     "glob",
     "rg",
@@ -295,6 +297,7 @@ test("plugin agents and skills carry the guidance the retired workspace copies c
     "apex/reviewComplete",
     "apex/reviewDecide",
     "apex/gateDecide",
+    "apex/gateDelegate",
     "apex/governanceImport",
     "apex/governanceSelect",
     "apex/preview",

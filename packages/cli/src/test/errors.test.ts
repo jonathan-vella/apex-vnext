@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "./test-shard.js";
-import { GovernanceBaselineError } from "@apexops/capabilities";
+import { GovernanceBaselineError, IacProviderError } from "@apexops/capabilities";
 import { EXIT_CODES, governanceBaselineApexError, normalizeError } from "../errors.js";
 
 test("governance baseline rejections map to typed errors with an actionable hint", () => {
@@ -25,4 +25,18 @@ test("governance baseline rejections map to typed errors with an actionable hint
   assert.match(reference.message, /bundled governance reference is unusable/u);
   assert.doesNotMatch(reference.message, /collect-governance-baseline/u);
   assert.deepEqual(reference.details, { reason: "GOVERNANCE_REFERENCE_INCOMPLETE" });
+});
+
+test("native provider failures keep their code and bounded detail instead of becoming APEX_INTERNAL", () => {
+  const mapped = normalizeError(
+    new IacProviderError("NATIVE_VALIDATION_FAILED", "Native policy property validation failed: 1 of 1 mappings"),
+  );
+  assert.equal(mapped.code, "APEX_VALIDATION");
+  assert.equal(mapped.exitCode, EXIT_CODES.validation);
+  assert.equal(
+    mapped.message,
+    "Native validation failed: NATIVE_VALIDATION_FAILED: Native policy property validation failed: 1 of 1 mappings",
+  );
+  assert.ok(normalizeError(new IacProviderError("NATIVE_VALIDATION_FAILED", "x\n".repeat(5000))).message.length < 2200);
+  assert.equal(normalizeError(new Error("boom")).code, "APEX_INTERNAL");
 });

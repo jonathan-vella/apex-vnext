@@ -114,6 +114,15 @@ const status = object({
   task: Type.Union([NonEmptyStringSchema, Type.Null()]),
   blockers: strings,
   satisfiedGates: Type.Array(Type.Integer({ minimum: 1, maximum: 4 }), { uniqueItems: true, maxItems: 4 }),
+  delegation: Type.Optional(
+    object({
+      policyHash: Sha256Schema,
+      consentHash: Sha256Schema,
+      expiresAt: IsoDateTimeSchema,
+      gates: Type.Array(Type.Union([Type.Literal(1), Type.Literal(4)]), { minItems: 1, uniqueItems: true }),
+      revoked: Type.Boolean(),
+    }),
+  ),
 });
 /** Maximum checks listed in a doctor MCP summary; the doctorChecks tool pages the complete list. */
 export const MCP_DOCTOR_CHECK_LIMIT = 32;
@@ -311,6 +320,7 @@ export const MCP_OUTPUT_SCHEMAS = {
   projectUse: contract(selection),
   projectDelete: contract(object({ deleted: NonEmptyStringSchema, selected: Type.Optional(selection) })),
   gateDecide: contract(ApprovalEvidenceV1Schema),
+  gateDelegate: contract(ApprovalEvidenceV1Schema),
   reviewDecide: contract(
     object({ status: Type.Union([Type.Literal("revision_requested"), Type.Literal("resolved")]) }),
   ),

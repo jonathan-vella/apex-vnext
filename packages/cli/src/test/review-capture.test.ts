@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { chmod, mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { test } from "./test-shard.js";
 import {
   EventJournal,
@@ -144,6 +145,74 @@ test("findings are derived only from the captured rubber-duck output and bound t
   );
   assert.deepEqual(await captureFiles(request!.nonce), [], "ingested captures leave the review home");
   await assert.rejects(service.completeReview(taskId), /stale|head|completed/iu);
+});
+
+test("unsupported reviewer fields are dropped, and the kernel alone sets evidence references", async () => {
+  const { root, service, subjectHash, taskId } = await setup();
+  const answer = {
+    findings: [
+      {
+        id: "F-1",
+        severity: "high",
+        title: "No recovery owner",
+        detail: "Assign an owner.",
+        impact: "Restore drills fail.",
+        evidenceRefs: ["forged"],
+        disposition: "dismissed",
+      },
+    ],
+  };
+  await captureReview(service, taskId, `Notes.\n\`\`\`apex-review\n${JSON.stringify(answer)}\n\`\`\`\n`);
+  const completed = await service.completeReview(taskId);
+  const review = await new ObjectStore(root).getJson<ReviewFindingsV1>(completed.outputHashes["review-findings"]!);
+  assert.deepEqual(review.findings, [
+    {
+      id: "F-1",
+      severity: "high",
+      title: "No recovery owner",
+      detail: "Assign an owner.",
+      disposition: "open",
+      evidenceRefs: [subjectHash, review.capture.captureHash],
+    },
+  ]);
+  assert.ok(!JSON.stringify(review).includes("Restore drills fail"));
+});
+
+test("a review the hook ingested through a backgrounded task and read_agent completes in the kernel", async () => {
+  const { service, taskId } = await setup();
+  const request = (await service.taskContext(taskId)).reviewRequest!;
+  const hook = (await import(
+    pathToFileURL(join(import.meta.dirname, "../../../../plugin/hooks/apex-hook.mjs")).href
+  )) as {
+    run(event: string, text: string, options: { stderr: { write(text: string): void } }): string;
+  };
+  const stderr = { write: (text: string) => assert.fail(text) };
+  const sessionId = "hook-session";
+  const agentId = "0b6f7a52-5c1a-4f0a-9d53-7a3a4b6a1c21";
+  const task = {
+    sessionId,
+    cwd: "/workspace",
+    toolName: "task",
+    toolArgs: { agent_type: "rubber-duck", mode: "sync", prompt: request.prompt },
+    toolResult: {
+      resultType: "success",
+      textResultForLlm: `Agent moved to background (agent_id: ${agentId}). The agent is actively working. Use read_agent to check for results.`,
+    },
+  };
+  assert.equal(hook.run("postToolUse", JSON.stringify(task), { stderr }), "");
+  assert.deepEqual(await captureFiles(request.nonce), [], "the start notice is not a capture");
+  await rejectsWith(() => service.completeReview(taskId), "REVIEW_CAPTURE_MISSING");
+  const read = {
+    sessionId,
+    cwd: "/workspace",
+    toolName: "read_agent",
+    toolArgs: { agent_id: agentId, wait: true },
+    toolResult: { resultType: "success", textResultForLlm: `Agent completed.\n${reviewAnswer({ findings })}` },
+  };
+  assert.equal(hook.run("postToolUse", JSON.stringify(read), { stderr }), "");
+  assert.equal((await captureFiles(request.nonce)).length, 1);
+  const completed = await service.completeReview(taskId);
+  assert.ok(completed.outputHashes["review-findings"]);
 });
 
 test("a missing capture fails closed without using up the request", async () => {

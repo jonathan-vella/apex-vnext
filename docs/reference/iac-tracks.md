@@ -25,6 +25,11 @@ exact preview, approval evidence, an operation record, and inventory.
 
 A track cannot reuse the other track's preview or approval.
 
+Logical resource ids start with a letter or underscore and use letters, digits, hyphens or underscores. They stay
+unchanged in intent, bindings, manifests and policy maps; the generator replaces `-` with `_` only for the Bicep
+symbolic name or Terraform label, which the manifest records as `executionAddress`. Two ids that map to the same
+symbolic name are rejected.
+
 Generated Bicep trees are azd projects: `azure.yaml` (no hooks, extensions, layers or services), `infra/main.bicep`
 and `infra/bicepconfig.json` with symbolic-name code generation enabled. The configuration participates in the source
 tree hash, so compiled resource identity does not depend on an ambient workspace setting. A conflicting staged

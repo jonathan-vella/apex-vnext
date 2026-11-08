@@ -95,10 +95,13 @@ export function normalizeAzdPreview(
   }
   const raw = previews[0] === null ? [] : (previews[0] as unknown[]);
   const byIdentity = new Map<string, string | null>();
+  const byName = new Map<string, string | null>();
   for (const { resourceId } of accepted) {
     const identity = azdIdentity(resourceId);
     if (identity === undefined) continue;
     byIdentity.set(identity, byIdentity.has(identity) ? null : resourceId);
+    const name = identity.slice(identity.indexOf("\u0000") + 1);
+    byName.set(name, byName.has(name) ? null : resourceId);
   }
   const blockers: string[] = [];
   const changes: DeploymentPreviewV1["changes"] = raw.map((entry, index) => {
@@ -110,7 +113,12 @@ export function normalizeAzdPreview(
       blockers.push(`azd preview change ${index} is malformed`);
     }
     const identity = `${type ?? ""}\u0000${name ?? ""}`.toLowerCase();
-    const resolved = byIdentity.get(identity);
+    // azd 1.35 reports display types such as "Storage account" rather than ARM types; a unique accepted name resolves them.
+    const resolved = byIdentity.has(identity)
+      ? byIdentity.get(identity)
+      : type !== undefined && !type.includes("/") && name !== undefined
+        ? byName.get(name.toLowerCase())
+        : undefined;
     const resourceId = resolved ?? `azd-unresolved:${type ?? "unknown"}/${name ?? index}`;
     const normalized = rawType.toLowerCase().replaceAll(/[^a-z]/g, "");
     const action =

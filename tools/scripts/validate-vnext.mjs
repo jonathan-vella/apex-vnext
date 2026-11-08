@@ -99,6 +99,8 @@ const RETIRED_INTERACTIVE_AGENT_SOURCES = new Set([
 const MODEL_PIN_FIELDS = ["model", "model-policy", "reasoning-effort"];
 const RETIRED_AGENT_TOOLS = ["vscode/askQuestions", "agent"];
 const EXPLICIT_WEB_TOOLS = ["web_fetch"];
+// The foreground agent reads a backgrounded rubber-duck review back through read_agent.
+const DELEGATE_RESULT_TOOLS = ["read_agent"];
 const SECRET_KEY = /(secret|password|passwd|token|privateKey|clientSecret|connectionString)/i;
 const SOURCE_IMPORT = /(?:from\s+|import\s*\()["']([^"']+)["']/g;
 const AZURE_MCP_TOOLS = Object.keys(readMcpJson(azureRegistryPath).namespaces);
@@ -995,6 +997,16 @@ function validateCustomizations(model, findings) {
       }
       if (FORBIDDEN_TOOL.test(tool)) {
         finding(findings, "customization.forbidden-tool", `${name} references forbidden tool ${tool}`, agent.path);
+        continue;
+      }
+      if (DELEGATE_RESULT_TOOLS.includes(tool)) {
+        if (!interactive)
+          finding(
+            findings,
+            "customization.worker-read-tool",
+            `${name} is a hidden worker and cannot hold delegate result tool ${tool}`,
+            agent.path,
+          );
         continue;
       }
       if (clientAgentTools.has(tool)) {

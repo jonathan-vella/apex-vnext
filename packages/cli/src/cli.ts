@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 import { mkdir, readFile, realpath, writeFile } from "node:fs/promises";
+import { userInfo } from "node:os";
+import { createInterface } from "node:readline/promises";
 import { AzdBicepProvider, NativeTerraformProvider, ProcessRunner, type IacProvider } from "@apexops/capabilities";
 import {
   CONTRACT_VERSION,
@@ -15,6 +17,7 @@ import {
   type GovernanceSetupConfigV1,
   type RepositoryPublishConfigV1,
   type ArchetypeBatchConfigV1,
+  type LabDelegationPolicyV1,
 } from "@apexops/contracts";
 import { Value } from "@sinclair/typebox/value";
 import {
@@ -195,13 +198,30 @@ async function configuredProviders(
     const journal = new EventJournal(join(runDirectory, "journal"));
     const events = await journal.replay();
     const dependencyRevision = calculateDependencyRevision(run, events);
+    const consentEvent = events.findLast(({ type }) => type === "lab.delegation-consented");
+    const consent = consentEvent?.payload as { policyHash: string; consentHash: string } | undefined;
+    const revoked =
+      consentEvent !== undefined &&
+      events.some(
+        ({ type, sequence, payload }) =>
+          type === "lab.delegation-revoked" &&
+          sequence > consentEvent.sequence &&
+          (payload as { policyHash?: string }).policyHash === consent?.policyHash,
+      );
+    const delegationAuthority = consent === undefined || revoked ? {} : { activeLabDelegation: consent };
     let recipientIdentity = "local";
     let previousOwnerEpoch: number | undefined;
     let writerTransferClaimHash: string | undefined;
     try {
       const ownership = await new WriterTransferStore(runDirectory).currentActiveOwnership();
       if (ownership === null)
-        return { head: dependencyRevision, dependencyRevision, ownerEpoch: run.ownerEpoch, recipientIdentity };
+        return {
+          head: dependencyRevision,
+          dependencyRevision,
+          ownerEpoch: run.ownerEpoch,
+          recipientIdentity,
+          ...delegationAuthority,
+        };
       if (ownership.ownerEpoch === run.ownerEpoch && typeof ownership.ownerId === "string") {
         recipientIdentity = ownership.ownerId;
         if (
@@ -225,6 +245,7 @@ async function configuredProviders(
         ? {}
         : { previousOwnerEpoch, writerTransferClaimHash }),
       recipientIdentity,
+      ...delegationAuthority,
     };
   };
   const providers: Partial<Record<"bicep" | "terraform", IacProvider>> = {};
@@ -864,6 +885,57 @@ async function dispatch(
         typeof flags.recipient === "string" ? { recipientIdentity: flags.recipient } : {},
       );
     }
+    case "lab delegation-confirm": {
+      if (
+        !process.stdin.isTTY ||
+        !process.stderr.isTTY ||
+        flags.yes !== undefined ||
+        flags.actor !== undefined ||
+        flags.json !== undefined
+      )
+        throw new ApexError(
+          "APEX_AUTHORIZATION",
+          "Human policy confirmation requires an interactive terminal; --yes, --actor, --json and piped input are not consent",
+          EXIT_CODES.authorization,
+        );
+      const policy = JSON.parse(await readFile(required(flags, "file"), "utf8")) as LabDelegationPolicyV1;
+      return service.confirmLabDelegation(policy, async (policyHash) => {
+        process.stderr.write(
+          `Lab delegation policy ${policyHash}\n${JSON.stringify(policy, null, 2)}\n\n` +
+            "Confirm that this exact resource-group scope is yours to authorize and the workload is synthetic and non-sensitive. " +
+            "Only allowlisted absent-resource creates and non-material no-ops are delegated for apply. " +
+            "No destroy, production, updates, risk acceptance or other human questions are delegated. " +
+            "This consents to the bounded policy, NOT human review of an unseen future preview.\n",
+        );
+        const terminal = createInterface({ input: process.stdin, output: process.stderr });
+        try {
+          const answer = await terminal.question(`Type DELEGATE ${policyHash} to consent until ${policy.expiresAt}: `);
+          if (answer !== `DELEGATE ${policyHash}`)
+            throw new ApexError("APEX_AUTHORIZATION", "Delegation was not confirmed", EXIT_CODES.authorization);
+          const actor = userInfo().username;
+          if (!actor.trim())
+            throw new ApexError(
+              "APEX_AUTHORIZATION",
+              "Local consent identity is unavailable",
+              EXIT_CODES.authorization,
+            );
+          return { actor };
+        } finally {
+          terminal.close();
+        }
+      });
+    }
+    case "lab delegation-show":
+      return service.labDelegation();
+    case "lab delegation-revoke":
+      return service.revokeLabDelegation(required(flags, "policy"));
+    case "gate delegated":
+      return service.decideDelegatedGate(Number(required(flags, "gate")) as 1 | 4, {
+        policyHash: required(flags, "policy"),
+        consentHash: required(flags, "consent"),
+        ...(typeof flags.preview === "string" ? { previewHash: flags.preview } : {}),
+        ...(typeof flags.context === "string" ? { approvalContextHash: flags.context } : {}),
+      });
     case "validate":
       return service.validate();
     case "preview":

@@ -87,6 +87,7 @@ const duplicateCases: Record<GuardedTool, ToolCase> = {
   projectUse: { method: "use", input: { projectId: "demo" } },
   projectDelete: { method: "deleteProject", input: { projectId: "other", confirm: true } },
   gateDecide: { method: "decideInteractiveGate", input: { gate: 1, decision: "approved", confirm: true } },
+  gateDelegate: { method: "decideDelegatedGate", input: { gate: 1, policyHash: hash, consentHash: hash } },
   reviewDecide: {
     method: "decideReview",
     input: { reviewHash: hash, decisions: [{ findingId: "f", action: "revise" }] },

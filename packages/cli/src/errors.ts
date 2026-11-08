@@ -1,4 +1,4 @@
-import { GovernanceBaselineError } from "@apexops/capabilities";
+import { GovernanceBaselineError, IacProviderError } from "@apexops/capabilities";
 import { RunConfigInvalidError, RunWriterConflictError } from "@apexops/kernel";
 import { APEX_VERSION } from "./version.js";
 
@@ -118,6 +118,15 @@ export function normalizeError(error: unknown): ApexError {
   }
   if (error instanceof Error && (error as NodeJS.ErrnoException).code === "ENOENT") {
     return new ApexError("APEX_NOT_FOUND", error.message, EXIT_CODES.notFound, undefined, { cause: error });
+  }
+  if (error instanceof IacProviderError) {
+    return new ApexError(
+      "APEX_VALIDATION",
+      `Native validation failed: ${error.code}: ${error.message.replace(/[\r\n]+/g, " ").slice(0, 2048)}`,
+      EXIT_CODES.validation,
+      undefined,
+      { cause: error },
+    );
   }
   return new ApexError(
     "APEX_INTERNAL",

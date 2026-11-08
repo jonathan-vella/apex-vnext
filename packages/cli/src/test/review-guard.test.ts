@@ -75,6 +75,10 @@ const invocations: Record<
       (service) => service.decideInteractiveGate(3, "approved"),
     ],
   },
+  gateDelegate: {
+    mcp: () => ({ gate: 1, policyHash: "a".repeat(64), consentHash: "b".repeat(64) }),
+    service: [(service) => service.decideDelegatedGate(1, { policyHash: "a".repeat(64), consentHash: "b".repeat(64) })],
+  },
   reviewDecide: {
     mcp: () => ({ reviewHash: hash, decisions: [{ findingId: "F-1", action: "dismiss", rationale: "test" }] }),
     service: [

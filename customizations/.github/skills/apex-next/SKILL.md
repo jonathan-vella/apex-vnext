@@ -71,6 +71,9 @@ active and loads the mapped skill, delegates one hidden worker, or runs one capt
 
 ## Rubber-duck reviews
 
+The only exception to the human Gate 1/Gate 4 stop rules above is an existing recorded lab delegation, evaluated
+through [Delegated lab gates](../apex-workflow/SKILL.md#delegated-lab-gates). It does not alter review or question routing.
+
 The Requirements, Architecture and Plan reviews run in the built-in `rubber-duck` agent. A managed hook saves its exact
 output and the kernel derives the findings from that capture; this agent never writes, edits or restates findings.
 
@@ -78,6 +81,8 @@ output and the kernel derives the findings from that capture; this agent never w
 2. Call `task` once with `agent_type: "rubber-duck"`, `mode: "sync"` and `prompt` set to `reviewRequest.prompt`
    exactly as returned. Copy it character for character; add nothing before or after it and do not summarize or
    extend it. Do not provide model, model-policy or reasoning-effort.
+   If the `task` result is only an `Agent moved to background` notice (with an `agent_id`), do not call
+   `apex/reviewComplete` on it: call `read_agent` for that `agent_id` with `wait: true` (repeat until it completes).
 3. Call `apex/reviewComplete` with only the task ID. Do not pass, interpret or correct rubber-duck's answer.
 4. If `apex/reviewComplete` fails, branch on the error. For a missing capture, run rubber-duck once more with the same
    prompt. For `APEX_CONFLICT` or `APEX_STALE`, do not run rubber-duck: call `apex/nextTask` and follow what it returns.
