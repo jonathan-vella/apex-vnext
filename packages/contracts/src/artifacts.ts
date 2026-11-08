@@ -141,7 +141,7 @@ export const IacBindingV1Schema = Type.Object(
           implementation: NonEmptyStringSchema,
           version: NonEmptyStringSchema,
           parameters: Type.Record(NonEmptyStringSchema, Type.Unknown()),
-          scopeLogicalId: Type.Optional(Type.String({ pattern: "^[A-Za-z_][A-Za-z0-9_]*$", maxLength: 256 })),
+          scopeLogicalId: Type.Optional(Type.String({ pattern: "^[A-Za-z_][A-Za-z0-9_-]*$", maxLength: 256 })),
           physicalResources: Type.Optional(
             Type.Array(
               Type.Object(

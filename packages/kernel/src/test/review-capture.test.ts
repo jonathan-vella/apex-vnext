@@ -111,7 +111,6 @@ test("findings derive only from exactly one apex-review block", () => {
     answer({ findings: [], extra: true }),
     answer({ findings: [{ severity: "urgent", title: "t", detail: "d" }] }),
     answer({ findings: [{ severity: "high", title: "", detail: "d" }] }),
-    answer({ findings: [{ severity: "high", title: "t", detail: "d", disposition: "dismissed" }] }),
     answer({ findings: [{ id: "a b", severity: "high", title: "t", detail: "d" }] }),
     answer({
       findings: [
@@ -127,6 +126,40 @@ test("findings derive only from exactly one apex-review block", () => {
     answer({ findings: [{ severity: "low", title: "t", detail: '"\\'.repeat(2_600) }] }),
   ])
     assert.throws(() => parseReviewAnswer(bad, { wellArchitected: false }), failure("unparseable"), bad.slice(0, 60));
+});
+
+test("unsupported fields inside findings and criteria entries are dropped", () => {
+  const pillars = ["security", "reliability", "performance-efficiency", "cost-optimization", "operational-excellence"];
+  const parsed = parseReviewAnswer(
+    answer({
+      findings: [
+        {
+          id: "F-1",
+          severity: "high",
+          title: "No RPO",
+          detail: "Add one.",
+          impact: "Data loss",
+          evidenceRefs: ["forged"],
+          disposition: "dismissed",
+        },
+      ],
+      criteria: pillars.map((criterionId) => ({
+        criterionId,
+        outcome: criterionId === "security" ? "finding" : "pass",
+        rationale: "Reviewed.",
+        findingIds: criterionId === "security" ? ["F-1"] : [],
+        confidence: "high",
+      })),
+    }),
+    { wellArchitected: true },
+  );
+  assert.deepEqual(parsed.findings, [{ id: "F-1", severity: "high", title: "No RPO", detail: "Add one." }]);
+  assert.deepEqual(Object.keys(parsed.criteria?.[0] ?? {}), ["criterionId", "outcome", "rationale", "findingIds"]);
+  assert.match(prompt(false), /extra fields are discarded/u);
+  assert.throws(
+    () => parseReviewAnswer(answer({ findings: [], impact: "x" }), { wellArchitected: false }),
+    failure("unparseable"),
+  );
 });
 
 test("architecture answers need exactly one criteria entry per Well-Architected pillar", () => {

@@ -72,6 +72,7 @@ interface ResourceContext {
 }
 
 const IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const LOGICAL_ID = /^[A-Za-z_][A-Za-z0-9_-]*$/;
 const EXACT_VERSION = /^(?:=\s*)?[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$/;
 const NATIVE_IMPLEMENTATION =
   /^native:([A-Za-z][A-Za-z0-9.]*\.[A-Za-z][A-Za-z0-9]*(?:\/[A-Za-z][A-Za-z0-9]*)+)@([0-9]{4}-[0-9]{2}-[0-9]{2}(?:-preview)?)$/;
@@ -79,6 +80,18 @@ const AVM_IMPLEMENTATION = /^avm:([^@\s]+)@([^@\s]+)$/;
 
 function assertIdentifier(value: string, label: string): void {
   if (!IDENTIFIER.test(value)) throw new TypeError(`${label} '${value}' is not a valid IaC identifier`);
+}
+
+/** Logical ids keep their hyphens everywhere; only the generated symbolic name or resource label replaces them. */
+function assertLogicalId(value: string, label: string): void {
+  if (!LOGICAL_ID.test(value))
+    throw new TypeError(
+      `${label} '${value}' is not a valid IaC identifier: start with a letter or underscore, then use letters, digits, hyphens or underscores`,
+    );
+}
+
+function symbolicName(logicalId: string): string {
+  return logicalId.replaceAll("-", "_");
 }
 
 function normalizeRelativePath(value: string): string {
@@ -123,12 +136,22 @@ function resourceContexts(intent: ImplementationIntentV1, binding: IacBindingV1)
   if (bindingIds.length !== intentIds.size || bindingIds.some((id) => !intentIds.has(id))) {
     throw new TypeError("Binding must cover every logical resource exactly once");
   }
+  const symbols = new Map<string, string>();
+  for (const { id } of intent.resources) {
+    assertLogicalId(id, "Logical resource id");
+    const previous = symbols.get(symbolicName(id));
+    if (previous !== undefined)
+      throw new TypeError(
+        `Logical resource ids '${previous}' and '${id}' map to the same IaC symbolic name '${symbolicName(id)}'`,
+      );
+    symbols.set(symbolicName(id), id);
+  }
   return [...intent.resources]
     .sort((left, right) => left.id.localeCompare(right.id))
     .map((resource) => {
-      assertIdentifier(resource.id, "Logical resource id");
+      assertLogicalId(resource.id, "Logical resource id");
       for (const dependency of resource.dependsOn) {
-        assertIdentifier(dependency, "Dependency id");
+        assertLogicalId(dependency, "Dependency id");
         if (!intentIds.has(dependency))
           throw new TypeError(`Resource '${resource.id}' has unknown dependency '${dependency}'`);
       }
@@ -152,7 +175,7 @@ function resourceContexts(intent: ImplementationIntentV1, binding: IacBindingV1)
       return {
         resource,
         binding: resourceBinding,
-        declaration: resource.id,
+        declaration: symbolicName(resource.id),
         parsed: parseBinding(resourceBinding.implementation, resourceBinding.version),
       };
     });
@@ -347,7 +370,7 @@ export function generateBicepTree(
   const existing = new Set(options.existingResources ?? []);
   const logicalIds = new Set(contexts.map(({ resource }) => resource.id));
   for (const logicalId of existing) {
-    assertIdentifier(logicalId, "Existing resource id");
+    assertLogicalId(logicalId, "Existing resource id");
     if (!logicalIds.has(logicalId))
       throw new TypeError(`Existing resource '${logicalId}' is not present in the intent`);
   }
@@ -367,13 +390,14 @@ export function generateBicepTree(
           ? ""
           : `\n  dependsOn: [\n${[...context.resource.dependsOn]
               .sort()
-              .map((id) => `    ${id}`)
+              .map((id) => `    ${symbolicName(id)}`)
               .join("\n")}\n  ]`;
       const bodyFields = Object.entries(parameters.bodyFields)
         .sort(([left], [right]) => left.localeCompare(right))
         .map(([name, value]) => `  ${bicepObjectKey(name)}: ${renderBicepValue(value, 2)}`)
         .join("\n");
-      const placement = scope === undefined ? `location: ${bicepString(parameters.location)}` : `scope: ${scope}`;
+      const placement =
+        scope === undefined ? `location: ${bicepString(parameters.location)}` : `scope: ${symbolicName(scope)}`;
       return `resource ${context.declaration} '${context.parsed.source}@${context.parsed.version}' = {\n  name: ${bicepString(parameters.name)}\n  ${placement}${bodyFields.length === 0 ? "" : `\n${bodyFields}`}\n  properties: ${renderBicepValue(secureStorageProperties(context.resource.type, parameters.properties), 2)}${dependencies}\n}`;
     }
     if (existing.has(context.resource.id)) {
@@ -393,7 +417,7 @@ export function generateBicepTree(
         ? ""
         : `\n  dependsOn: [\n${[...context.resource.dependsOn]
             .sort()
-            .map((id) => `    ${id}`)
+            .map((id) => `    ${symbolicName(id)}`)
             .join("\n")}\n  ]`;
     return `module ${context.declaration} '${moduleReference}:${context.parsed.version}' = {\n  name: ${bicepString(`${context.resource.id}-deployment`)}\n  params: {\n${renderedParameters.join("\n")}\n  }${dependencies}\n}`;
   });
@@ -456,7 +480,7 @@ export function generateTerraformTree(
   const existing = new Set(options.existingResources ?? []);
   const logicalIds = new Set(contexts.map(({ resource }) => resource.id));
   for (const logicalId of existing) {
-    assertIdentifier(logicalId, "Existing resource id");
+    assertLogicalId(logicalId, "Existing resource id");
     if (!logicalIds.has(logicalId))
       throw new TypeError(`Existing resource '${logicalId}' is not present in the intent`);
   }
@@ -730,8 +754,8 @@ export async function validateGeneratedTree(
     }
     const declaration =
       tree.logicalManifest.track === "bicep"
-        ? new RegExp(`(?:resource|module)\\s+${resource.logicalId}\\s`)
-        : new RegExp(`(?:resource\\s+"[^"]+"|data\\s+"[^"]+"|module)\\s+"${resource.logicalId}"`);
+        ? new RegExp(`(?:resource|module)\\s+${symbolicName(resource.logicalId)}\\s`)
+        : new RegExp(`(?:resource\\s+"[^"]+"|data\\s+"[^"]+"|module)\\s+"${symbolicName(resource.logicalId)}"`);
     if (!declaration.test(source.content))
       issues.push(`Logical resource '${resource.logicalId}' declaration is missing`);
   }

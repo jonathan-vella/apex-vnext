@@ -32,7 +32,12 @@ Use this skill only when the kernel routes the active foreground `APEX` agent to
    diagnostics, outputs, rollback boundaries and environment obligations. Keep dependencies acyclic.
 5. Put modules, providers, API versions, parameters, variables, phases, backend and state ownership in the selected
    IaC binding. Bind only the selected task track and trace every binding obligation to intent and projected policy
-   requirements.
+   requirements. Write each `implementation` and `version` in the grammar of
+   [Binding Grammar](../apex-azure-defaults/references/avm-binding-guidance.md#binding-grammar): Bicep AVM
+   `avm:br/public:avm/res/<group>/<module>@<exact version>` with `version` equal to that pin and a `physicalResources`
+   map, native `native:<ResourceType>@<api-version>` with `version` equal to the API version. Keep each logical resource
+   id exactly as the Architecture names it; hyphens are allowed. A binding that does not
+   follow it is rejected by `apex/planComplete`; fix it from the message and resubmit.
 6. Pin every binding to an exact published stable version. For the Terraform track, read it with `apex-azure/azureterraform`
    (`azureterraform_avm_versions`, then `azureterraform_avm_get` for the exact module and version, and
    `azureterraform_azurerm_get` for azurerm resource arguments); for the Bicep track, confirm resource-type schemas with

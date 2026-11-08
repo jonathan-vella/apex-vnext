@@ -23,6 +23,9 @@
  *   starts with the kernel's `APEX-REVIEW: nonce=<32 hex>` header, as a record signed with the per-user key the APEX
  *   kernel verifies (packages/kernel/src/review-capture.ts holds the same format; a test keeps them aligned). Records
  *   live in the review home (`$APEX_REVIEW_HOME`, else `~/.apex/reviews`), outside every workspace.
+ *   When Copilot CLI moves the call to the background, the `task` result is only a start notice: the hook then writes a
+ *   signed record under `pending/` (agent ID, session, prompt), and a later `read_agent` result for that agent ID, in
+ *   the same session, that holds an apex-review block becomes the capture and removes the pending record.
  * - subagentStart marks a rubber-duck run as active for its parent session and folder; subagentStop and
  *   postToolUseFailure clear one mark; marks expire after MARKER_TTL_MS. A rubber-duck call that preToolUse denied
  *   leaves a denial record, which its postToolUseFailure event consumes instead of clearing the running run's mark;
@@ -33,7 +36,7 @@
  *   The read-only APEX tools come from apex-mcp-tools.json, which the plugin build derives from the MCP server.
  */
 
-import { createHash, createHmac, randomBytes } from "node:crypto";
+import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import {
   closeSync,
   lstatSync,
@@ -82,6 +85,7 @@ export function isApexAgent(value) {
 
 export const REVIEW_AGENT_ID = "rubber-duck";
 export const REVIEW_CAPTURE_SCHEMA = "apex-review-capture-v1";
+export const REVIEW_PENDING_SCHEMA = "apex-review-pending-v1";
 export const MARKER_TTL_MS = 30 * 60 * 1000;
 export const TOOL_POLICY_FILE = "apex-mcp-tools.json";
 
@@ -349,9 +353,51 @@ function taskAgentType(args) {
   return args.agent_type ?? args.agentType;
 }
 
+function toolResultText(payload) {
+  const result = payload.toolResult ?? payload.tool_result;
+  const text = typeof result === "string" ? result : (result?.textResultForLlm ?? result?.text_result_for_llm);
+  const resultType = isObject(result) ? (result.resultType ?? result.result_type) : undefined;
+  return typeof text !== "string" || (resultType !== undefined && resultType !== "success") ? undefined : text;
+}
+
+const sign = (record, key) => createHmac("sha256", key).update(canonicalJson(record)).digest("hex");
+
+/** Signs and publishes one capture record, exactly as the kernel expects to verify it. */
+function writeCapture(home, key, { nonce, sessionId, toolName, agentType, prompt, response }, now) {
+  const record = {
+    schema: REVIEW_CAPTURE_SCHEMA,
+    nonce,
+    sessionId,
+    toolName,
+    agentType,
+    prompt,
+    requestSha256: sha256(prompt),
+    response,
+    responseSha256: sha256(response),
+    capturedAt: now.toISOString(),
+  };
+  record.signature = sign(record, key);
+  const directory = join(home, "captures");
+  plainDirectory(directory, true);
+  writeNewFile(join(directory, `${nonce}-${record.responseSha256.slice(0, 16)}.json`), `${JSON.stringify(record)}\n`);
+}
+
+// A review's agent ID, as in "agent_id: <id>". Letters, digits, "_" and "-" only, so it is safe as a file name.
+const AGENT_ID_PATTERN = /^[0-9A-Za-z][0-9A-Za-z_-]{0,63}$/u;
+const REVIEW_FENCE_LINE = /^[ \t]*(?:`{3,}|~{3,})[ \t]*apex-review[ \t]*\r?$/mu;
+const AGENT_COMPLETED_LINE = /^\s*Agent completed\b/u;
+
+/** The agent ID of a "moved to background" notice, "" when it names none, `null` for any other text. */
+function backgroundNoticeAgentId(text) {
+  if (!/Agent moved to background/u.test(text) || REVIEW_FENCE_LINE.test(text)) return null;
+  return /\bagent_id:\s*([0-9A-Za-z][0-9A-Za-z_-]{0,63})(?![0-9A-Za-z_-])/u.exec(text)?.[1] ?? "";
+}
+
 /**
- * postToolUse: save a kernel-requested rubber-duck review exactly as the parent received it. Other rubber-duck calls,
- * background runs (their result is only a start notice) and failed results are not captured. Never blocks.
+ * postToolUse: save a kernel-requested rubber-duck review exactly as the parent received it. Other rubber-duck calls
+ * and failed results are not captured. A call that Copilot moved to the background returns only a start notice: it
+ * leaves a signed pending record, which ingestBackgroundReview turns into the capture once `read_agent` returns the
+ * finished review. Never blocks.
  */
 export function captureRubberDuckReview({ payload, toolName, args }, { env = process.env, now = new Date() } = {}) {
   if (!TASK_TOOLS.has(toolName) || !isRubberDuck(taskAgentType(args))) return null;
@@ -359,28 +405,99 @@ export function captureRubberDuckReview({ payload, toolName, args }, { env = pro
   if (nonce === undefined) return null;
   if (args.mode === "background")
     throw new Error("a background rubber-duck review is not captured; run it in sync mode");
-  const result = payload.toolResult ?? payload.tool_result;
-  const response = typeof result === "string" ? result : (result?.textResultForLlm ?? result?.text_result_for_llm);
-  const resultType = isObject(result) ? (result.resultType ?? result.result_type) : undefined;
-  if (typeof response !== "string" || (resultType !== undefined && resultType !== "success")) return null;
+  const response = toolResultText(payload);
+  if (response === undefined) return null;
   const home = reviewHome(env);
   const key = captureKey(home);
-  const record = {
-    schema: REVIEW_CAPTURE_SCHEMA,
-    nonce,
-    sessionId: typeof payload.sessionId === "string" ? payload.sessionId : (payload.session_id ?? null),
-    toolName,
-    agentType: taskAgentType(args),
-    prompt: args.prompt,
-    requestSha256: sha256(args.prompt),
-    response,
-    responseSha256: sha256(response),
-    capturedAt: now.toISOString(),
-  };
-  record.signature = createHmac("sha256", key).update(canonicalJson(record)).digest("hex");
-  const directory = join(home, "captures");
-  plainDirectory(directory, true);
-  writeNewFile(join(directory, `${nonce}-${record.responseSha256.slice(0, 16)}.json`), `${JSON.stringify(record)}\n`);
+  const sessionId = typeof payload.sessionId === "string" ? payload.sessionId : (payload.session_id ?? null);
+  const agentId = backgroundNoticeAgentId(response);
+  if (agentId !== null) {
+    if (!AGENT_ID_PATTERN.test(agentId) || typeof sessionId !== "string" || sessionId === "") return null;
+    const pending = {
+      schema: REVIEW_PENDING_SCHEMA,
+      nonce,
+      sessionId,
+      agentId,
+      toolName,
+      agentType: taskAgentType(args),
+      prompt: args.prompt,
+      requestSha256: sha256(args.prompt),
+      createdAt: now.toISOString(),
+    };
+    pending.signature = sign(pending, key);
+    const directory = join(home, "pending");
+    plainDirectory(directory, true);
+    writeNewFile(join(directory, `${agentId}.json`), `${JSON.stringify(pending)}\n`);
+    return null;
+  }
+  writeCapture(
+    home,
+    key,
+    { nonce, sessionId, toolName, agentType: taskAgentType(args), prompt: args.prompt, response },
+    now,
+  );
+  return null;
+}
+
+/** The pending record for this agent, or undefined unless it is signed, intact and from this session. */
+function readPendingReview(home, agentId, sessionId) {
+  const directory = join(home, "pending");
+  if (!plainDirectory(directory, false)) return undefined;
+  const path = join(directory, `${agentId}.json`);
+  const info = lstatSync(path, { throwIfNoEntry: false });
+  if (info === undefined || info.isSymbolicLink() || !info.isFile() || info.size > 1024 * 1024) return undefined;
+  if (process.platform !== "win32" && ((info.mode & 0o077) !== 0 || info.uid !== process.getuid())) return undefined;
+  let record;
+  try {
+    record = JSON.parse(readFileSync(path, "utf8"));
+  } catch {
+    return undefined;
+  }
+  if (!isObject(record) || typeof record.signature !== "string" || !/^[0-9a-f]{64}$/u.test(record.signature))
+    return undefined;
+  const { signature, ...unsigned } = record;
+  const expected = Buffer.from(sign(unsigned, captureKey(home)), "hex");
+  if (!timingSafeEqual(expected, Buffer.from(signature, "hex"))) return undefined;
+  if (
+    record.schema !== REVIEW_PENDING_SCHEMA ||
+    record.agentId !== agentId ||
+    record.sessionId !== sessionId ||
+    typeof record.prompt !== "string" ||
+    record.requestSha256 !== sha256(record.prompt) ||
+    record.nonce !== reviewNonce(record.prompt) ||
+    !TASK_TOOLS.has(record.toolName) ||
+    !isRubberDuck(record.agentType)
+  )
+    return undefined;
+  return { record, path };
+}
+
+/**
+ * postToolUse for `read_agent`: when it returns the finished review of a pending background rubber-duck run (same
+ * session, signed record, same agent ID), save the capture as the synchronous path does and remove the pending record.
+ * A result without an apex-review block, or one that does not begin with the host's "Agent completed" status line
+ * (a running agent can already show a draft block), is ignored and leaves the pending record for the next read.
+ */
+export function ingestBackgroundReview({ payload, toolName, args }, { env = process.env, now = new Date() } = {}) {
+  if (toolName !== "read_agent" || typeof args.agent_id !== "string" || !AGENT_ID_PATTERN.test(args.agent_id))
+    return null;
+  const sessionId = sessionOf(payload);
+  const response = toolResultText(payload);
+  if (
+    sessionId === "" ||
+    response === undefined ||
+    !AGENT_COMPLETED_LINE.test(response) ||
+    !REVIEW_FENCE_LINE.test(response)
+  )
+    return null;
+  const home = reviewHome(env);
+  if (!plainDirectory(home, false)) return null;
+  const pending = readPendingReview(home, args.agent_id, sessionId);
+  if (pending === undefined) return null;
+  const key = captureKey(home);
+  const { nonce, toolName: pendingTool, agentType, prompt } = pending.record;
+  writeCapture(home, key, { nonce, sessionId, toolName: pendingTool, agentType, prompt, response }, now);
+  rmSync(pending.path, { force: true });
   return null;
 }
 
@@ -606,7 +723,7 @@ export const handlers = Object.freeze({
     denyNestedRubberDuck,
     denyApexMutationDuringRubberDuck,
   ]),
-  postToolUse: Object.freeze([captureRubberDuckReview]),
+  postToolUse: Object.freeze([captureRubberDuckReview, ingestBackgroundReview]),
   postToolUseFailure: Object.freeze([clearRubberDuckMark]),
   subagentStart: Object.freeze([markRubberDuckStart]),
   subagentStop: Object.freeze([clearRubberDuckMark]),

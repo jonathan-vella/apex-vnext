@@ -5,6 +5,7 @@ export * from "./evidence-store.js";
 export * from "./event-journal.js";
 export * from "./files.js";
 export * from "./gates.js";
+export * from "./lab-delegation.js";
 export * from "./improvement-store.js";
 export * from "./lease-store.js";
 export * from "./object-store.js";

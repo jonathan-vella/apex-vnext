@@ -20,6 +20,31 @@ const invocations: Record<
   ReviewGuardedTool,
   { mcp: (taskId: string) => Record<string, unknown>; service: Array<(service: ApexService) => Promise<unknown>> }
 > = {
+  amendInput: {
+    mcp: () => ({
+      amendment: {
+        schemaVersion: "1.0.0",
+        requestId: "missing",
+        baseAnswersHash: hash,
+        answers: [{ questionId: "q", value: "v" }],
+      },
+      reason: "Correction",
+      expectedHash: hash,
+      confirm: true,
+    }),
+    service: [
+      (service) =>
+        service.amendInput(
+          {
+            schemaVersion: "1.0.0",
+            requestId: "missing",
+            baseAnswersHash: hash,
+            answers: [{ questionId: "q", value: "v" }],
+          },
+          { reason: "Correction", expectedHash: hash, confirm: true },
+        ),
+    ],
+  },
   recordInput: {
     mcp: () => ({
       schemaVersion: "1.0.0",
@@ -49,6 +74,10 @@ const invocations: Record<
       (service) => service.decideGateNumber(3, "approved", "tester"),
       (service) => service.decideInteractiveGate(3, "approved"),
     ],
+  },
+  gateDelegate: {
+    mcp: () => ({ gate: 1, policyHash: "a".repeat(64), consentHash: "b".repeat(64) }),
+    service: [(service) => service.decideDelegatedGate(1, { policyHash: "a".repeat(64), consentHash: "b".repeat(64) })],
   },
   reviewDecide: {
     mcp: () => ({ reviewHash: hash, decisions: [{ findingId: "F-1", action: "dismiss", rationale: "test" }] }),

@@ -7,6 +7,7 @@ import type { Readable, Writable } from "node:stream";
 import { realpath } from "node:fs/promises";
 import { isAbsolute, resolve } from "node:path";
 import { ApexService, SUPPORTED_ARTIFACT_KINDS } from "./service.js";
+import { MCP_MAX_SERIALIZED_RESULT_BYTES, mcpResultEnvelopeBytes } from "./mcp-limits.js";
 import { APEX_VERSION } from "./version.js";
 import { ApexError, EXIT_CODES, normalizeError, remediationForApexError, type ApexErrorCode } from "./errors.js";
 import { SECRET_VALUE_PATTERN } from "@apexops/contracts";
@@ -48,10 +49,11 @@ export const MCP_SERVER_INSTRUCTIONS = [
   "Do not retry mutations blindly after timeout, cancellation, or conflict; refresh status and confirm intent first.",
   "Use ask_user for human approvals, risk decisions, missing inputs, and any choice the kernel requires.",
   "Never ask the user to approve a kernel-recorded readiness checkpoint (Gates 2 and 3 in a lab run); report the blocking review or validation finding instead.",
+  "gateDelegate evaluates only already recorded, time-bounded human lab policy consent. It cannot create consent, accept risks, approve production or destroy. Human approvals remain the default.",
   "Large read results may include nextCursor; call the same tool with the same workspace and cursor until it is absent.",
 ].join(" ");
 
-export const MCP_MAX_SERIALIZED_RESULT_BYTES = 64 * 1024;
+export { MCP_MAX_SERIALIZED_RESULT_BYTES };
 
 const cursorInput = z.string().min(1).max(4096).optional();
 
@@ -59,6 +61,7 @@ const pagePaths: Partial<Record<keyof typeof MCP_OUTPUT_SCHEMAS, readonly string
   taskContext: ["inputs"],
   readTaskInput: ["content"],
   projectList: ["projects"],
+  inputHistory: ["inputs"],
   preview: ["markdown"],
   inventory: ["resources"],
   improvementObservations: ["observations"],
@@ -217,18 +220,39 @@ function assertBoundedInput(value: unknown): void {
     throw new ApexError("APEX_VALIDATION", "Input budget exceeded", EXIT_CODES.validation);
 }
 
-const resultEnvelopeBytes = (structuredContent: Record<string, unknown>) => {
-  const text = JSON.stringify(structuredContent);
-  return Buffer.byteLength(
-    JSON.stringify({
-      content: [{ type: "text", text }],
-      structuredContent,
-    }),
-    "utf8",
-  );
-};
+const resultEnvelopeBytes = mcpResultEnvelopeBytes;
 const MCP_DOCTOR_SUMMARY_BYTES = 48 * 1024;
+const MCP_ELIDE_ANSWER_ABOVE_BYTES = 2048;
 type DoctorReport = Awaited<ReturnType<ApexService["doctor"]>>;
+type AmendmentProposal = Awaited<ReturnType<ApexService["previewInputAmendment"]>>;
+
+function elideLongAnswer<T extends { value: unknown }>(answer: T): T {
+  if (typeof answer.value !== "string") return answer;
+  const bytes = Buffer.byteLength(answer.value, "utf8");
+  if (bytes <= MCP_ELIDE_ANSWER_ABOVE_BYTES) return answer;
+  const digest = createHash("sha256").update(answer.value).digest("hex");
+  return { ...answer, value: `[elided ${bytes} bytes; sha256 ${digest}]` };
+}
+
+/**
+ * Keeps an amendment preview inside the MCP result budget. When it would not fit, long text answers are replaced by
+ * their size and SHA-256, first in the previous and merged answers and then in the submitted correction. The caller
+ * already holds the correction it submitted and can check each digest; `proposalHash` still binds the complete,
+ * unelided proposal, which amendInput recomputes before applying. The CLI preview keeps every value.
+ */
+export function boundedAmendmentPreview(proposal: AmendmentProposal): AmendmentProposal {
+  if (resultEnvelopeBytes(proposal) <= MCP_MAX_SERIALIZED_RESULT_BYTES) return proposal;
+  const bounded = {
+    ...proposal,
+    previousAnswers: proposal.previousAnswers.map(elideLongAnswer),
+    answers: proposal.answers.map(elideLongAnswer),
+  };
+  if (resultEnvelopeBytes(bounded) <= MCP_MAX_SERIALIZED_RESULT_BYTES) return bounded;
+  return {
+    ...bounded,
+    amendment: { ...bounded.amendment, answers: bounded.amendment.answers.map(elideLongAnswer) },
+  };
+}
 
 /**
  * Bounds a doctor report for MCP. Failing checks come first, then passing checks other than per-file `managed:`
@@ -466,12 +490,16 @@ const inputSubmission = z
         z
           .object({
             questionId: z.string().min(1),
-            value: inputValue,
+            value: z.union([z.string(), inputValue]),
           })
           .strict(),
       )
       .min(1),
   })
+  .strict();
+const inputAmendment = inputSubmission
+  .pick({ schemaVersion: true, requestId: true, answers: true })
+  .extend({ baseAnswersHash: z.string().regex(/^[0-9a-f]{64}$/u) })
   .strict();
 const projectCreateInput = z
   .object({
@@ -508,6 +536,21 @@ const gateDecisionInput = z
     gate: z.union([z.literal(1), z.literal(2), z.literal(3)]),
     decision: z.enum(["approved", "rejected"]),
     confirm: z.literal(true),
+  })
+  .strict();
+const delegatedGateInput = z
+  .object({
+    gate: z.union([z.literal(1), z.literal(4)]),
+    policyHash: z.string().regex(/^[0-9a-f]{64}$/),
+    consentHash: z.string().regex(/^[0-9a-f]{64}$/),
+    previewHash: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/)
+      .optional(),
+    approvalContextHash: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/)
+      .optional(),
   })
   .strict();
 const reviewDecisionInput = z
@@ -865,6 +908,39 @@ export function createMcpServerFactory(
     async (input) => result(await service.recordInput(input)),
   );
   registerTool(
+    "inputHistory",
+    {
+      description:
+        "Read recorded Requirements intake and current Architecture answers and base hashes for correction. Never delete a project to correct an answer.",
+      inputSchema: { cursor: cursorInput },
+    },
+    async () => result(await service.inputHistory()),
+  );
+  registerTool(
+    "previewInputAmendment",
+    {
+      description:
+        "Preview an append-only correction to recorded answers, including dependent review/gate invalidation and re-approval. Does not apply it. Long text answers are shown as size and SHA-256 when the preview would exceed the result budget; proposalHash still binds the complete proposal.",
+      inputSchema: { amendment: inputAmendment, reason: z.string().min(1).max(2048) },
+    },
+    async ({ amendment, reason }) =>
+      result(boundedAmendmentPreview(await service.previewInputAmendment(amendment, reason))),
+  );
+  registerTool(
+    "amendInput",
+    {
+      description:
+        "Apply only after the user explicitly confirms the exact preview and impact. Preserves original audit history; does not approve any gate or authorize deployment.",
+      inputSchema: {
+        amendment: inputAmendment,
+        reason: z.string().min(1).max(2048),
+        expectedHash: z.string().regex(/^[0-9a-f]{64}$/u),
+        confirm: z.literal(true),
+      },
+    },
+    async ({ amendment, ...options }) => result(await service.amendInput(amendment, options)),
+  );
+  registerTool(
     "governanceImport",
     {
       description:
@@ -928,6 +1004,23 @@ export function createMcpServerFactory(
       inputSchema: gateDecisionInput,
     },
     async ({ gate, decision }) => result(await service.decideInteractiveGate(gate, decision)),
+  );
+  registerTool(
+    "gateDelegate",
+    {
+      description:
+        "Evaluate Gate 1 or exact apply Gate 4 under an existing human-confirmed lab delegation policy. Records agent, consent and kernel provenance, never a human TTY approval. Supply the recorded policy/consent hashes and, for Gate 4, the exact current preview/context hashes. Native AzureCloud Bicep only; no updates, deletes, replacements, unknowns, material no-ops, production or delegated destroy. Missing facts or expired/revoked consent fail closed. Consent registration remains interactive CLI-only.",
+      inputSchema: delegatedGateInput,
+    },
+    async ({ gate, policyHash, consentHash, previewHash, approvalContextHash }) =>
+      result(
+        await service.decideDelegatedGate(gate, {
+          policyHash,
+          consentHash,
+          ...(previewHash === undefined ? {} : { previewHash }),
+          ...(approvalContextHash === undefined ? {} : { approvalContextHash }),
+        }),
+      ),
   );
   registerTool(
     "reviewDecide",

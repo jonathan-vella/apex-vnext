@@ -28,6 +28,7 @@ import type {
   PolicyValidationBinding,
   PolicyValidationV1,
   ResourceInventoryV1,
+  LabApplyScopeV1,
 } from "@apexops/contracts";
 import { AzureCliReadAdapter, TerraformCommandAdapter, type CommandPlan } from "./command-plans.js";
 import {
@@ -60,7 +61,7 @@ import {
   type AzdOwnedResource,
   type NormalizedPreview,
 } from "./iac-normalizers.js";
-import { ProcessRunnerError, type ProcessRunnerLike } from "./process-runner.js";
+import { ProcessRunnerError, type ProcessResult, type ProcessRunnerLike } from "./process-runner.js";
 import { secretFreeProperties } from "./secret-redaction.js";
 import { LocalEncryptedPlanTransport, type LocalEncryptedPlan } from "./local-plan-transport.js";
 import {
@@ -196,6 +197,20 @@ interface GeneratedSourceSnapshot {
 function pathEscapes(parent: string, child: string): boolean {
   const relation = relative(parent, child);
   return relation === "" || relation === ".." || relation.startsWith(`..${sep}`) || isAbsolute(relation);
+}
+
+/** Bounded failure list for an agent: ids, paths, effects and reasons only, never expected or observed values. */
+function policyFailureSummary(validation: PolicyValidationV1): string {
+  const bounded = (value: string): string => value.replace(/[\r\n\t]+/g, " ").slice(0, 160);
+  const failing = validation.results.filter(({ outcome }) => outcome !== "pass");
+  const shown = failing
+    .slice(0, 10)
+    .map(
+      ({ logicalResourceId, propertyPath, effect, reason }) =>
+        `${bounded(logicalResourceId)} | ${bounded(propertyPath)} | ${effect} | ${reason}`,
+    );
+  if (shown.length === 0) return `outcome ${validation.outcome} with no mapping results`;
+  return `${failing.length} of ${validation.results.length} mappings (logicalResourceId | propertyPath | effect | reason): ${shown.join("; ")}${failing.length > shown.length ? `; and ${failing.length - shown.length} more` : ""}`;
 }
 
 function sourceBindingError(): IacProviderError {
@@ -339,15 +354,25 @@ abstract class NativeProviderBase {
   }
 
   protected async run(plan: CommandPlan): Promise<string> {
-    const result = await this.runner.run({
+    return (await this.execute(plan)).stdout;
+  }
+
+  /** azd 1.35 prints its `--output json` console events on stderr, so the preview parser reads both streams. */
+  protected async runWithStderr(plan: CommandPlan): Promise<string> {
+    const result = await this.execute(plan);
+    return `${result.stdout}\n${result.stderr}`;
+  }
+
+  private async execute(plan: CommandPlan): Promise<ProcessResult> {
+    return await this.runner.run({
       executable: plan.executable,
       args: plan.args,
       ...(plan.cwd === undefined ? {} : { cwd: plan.cwd }),
       ...(plan.env === undefined ? {} : { env: { ...process.env, ...plan.env } }),
+      ...(plan.rawOutput === true ? { rawOutput: true } : {}),
       timeoutMs: this.#timeoutMs,
       maxOutputBytes: this.#maxOutputBytes,
     });
-    return result.stdout;
   }
 
   protected async validateBoundSource(
@@ -491,11 +516,13 @@ abstract class NativeProviderBase {
       let compiledTemplate: string | undefined;
       for (const command of commands) {
         await verify();
+        let failure = `Native validation command failed: ${command.validatorId}`;
         try {
           const result = await this.runner.run({
             executable: command.executable,
             args: [...command.args],
             cwd: scratchRoot,
+            ...(command.validatorId === "bicep:build" ? { rawOutput: true } : {}),
             timeoutMs: this.#timeoutMs,
             maxOutputBytes: this.#maxOutputBytes,
           });
@@ -504,11 +531,15 @@ abstract class NativeProviderBase {
             result.signal !== null ||
             result.timedOut !== false ||
             result.outputTruncated !== false
-          )
+          ) {
+            failure += ` (exit ${result.exitCode ?? "none"}${result.signal === null ? "" : `, signal ${result.signal}`}${result.timedOut ? ", timed out" : ""}${result.outputTruncated ? ", output truncated" : ""})`;
             throw new Error();
+          }
           if (command.validatorId === "bicep:build") compiledTemplate = result.stdout;
-        } catch {
-          throw new IacProviderError("NATIVE_VALIDATION_FAILED", "Native validation command failed");
+        } catch (error) {
+          const code = (error as { code?: unknown }).code;
+          if (typeof code === "string" && /^[A-Z_]{1,64}$/.test(code)) failure += ` (${code})`;
+          throw new IacProviderError("NATIVE_VALIDATION_FAILED", failure);
         } finally {
           await verify();
         }
@@ -551,7 +582,8 @@ abstract class NativeProviderBase {
         receipt.receiptHash = calculateNativeValidationReceiptHash(updated);
       }
       if (track === "bicep" && policyInput !== undefined && hasActionablePolicyMappings(policyInput.policyMap)) {
-        let policyValidation: PolicyValidationV1;
+        let policyValidation: PolicyValidationV1 | undefined;
+        let failure = "Native policy property validation failed";
         try {
           policyValidation = validatePolicyProperties({
             ...policyInput,
@@ -560,12 +592,14 @@ abstract class NativeProviderBase {
             policyMapHash: receipt.policyHash,
             json: compiledTemplate ?? "",
           });
-          if (policyValidation.outcome !== "pass") throw new Error();
+          if (policyValidation.outcome !== "pass") failure += `: ${policyFailureSummary(policyValidation)}`;
         } catch {
-          throw new IacProviderError("NATIVE_VALIDATION_FAILED", "Native policy property validation failed");
+          policyValidation = undefined;
         } finally {
           await verify();
         }
+        if (policyValidation === undefined || policyValidation.outcome !== "pass")
+          throw new IacProviderError("NATIVE_VALIDATION_FAILED", failure);
         receipt.policyValidation = policyValidation;
         const { receiptHash, ...updated } = receipt;
         if (!receiptHash)
@@ -837,6 +871,59 @@ export class AzdBicepProvider extends NativeProviderBase implements IacProvider 
     return undefined;
   }
 
+  async labApplyScope(previewHash: string): Promise<LabApplyScopeV1> {
+    const restored = await this.bindingStore?.load(previewHash);
+    const binding =
+      [...this.#bindings.values()].find((item) => item.preview.previewHash === previewHash) ??
+      (restored?.kind === "bicep" ? restored : undefined);
+    if (
+      binding === undefined ||
+      binding.preview.operation !== "apply" ||
+      binding.azdBinding.hooks.length !== 0 ||
+      binding.azdBinding.extensions.length !== 0 ||
+      binding.azdBinding.executionEnvelope.identityPreflight.cloud !== "AzureCloud"
+    )
+      throw new IacProviderError(
+        "PREVIEW_BLOCKED",
+        "Delegation needs a hook-free, extension-free AzureCloud azd apply binding",
+      );
+    const preview = binding.preview;
+    if (
+      preview.artifactHash !== binding.providerBindingHash ||
+      preview.artifactHash !==
+        this.#providerBindingHash(binding.azdBinding.bindingHash, binding.ownedStateHash, binding)
+    )
+      throw new IacProviderError("PREVIEW_HASH_MISMATCH", "Delegated preview binding is invalid");
+    const target = this.#approvedTarget(preview);
+    const azdVersion = await this.#assertAzd();
+    const current = await this.#assertInputsUnchanged(binding.azdBinding, target, azdVersion);
+    await this.#assertIdentity(current);
+    const owned = await this.#ownedState(target);
+    if (owned.hash !== binding.ownedStateHash || this.#ownershipBlockers(target, owned).length > 0)
+      throw new IacProviderError("PREVIEW_HASH_MISMATCH", "Resource-group state changed after the delegated preview");
+    const ids = preview.changes.map(({ resourceId }) => resourceId);
+    if (ids.length > 256 || ids.some((id) => !id.startsWith(`${target.scope}/providers/`)))
+      throw new IacProviderError("PREVIEW_BLOCKED", "Delegated preview contains unresolved or out-of-scope resources");
+    const resources = [...owned.resources, ...(await this.#readUnlisted(target, owned.resources, ids))];
+    const existing = new Set(resources.map(({ resourceId }) => resourceId.toLowerCase()));
+    const identity = current.executionEnvelope.identityPreflight;
+    return {
+      schemaVersion: "1.0.0",
+      previewHash,
+      cloud: "AzureCloud",
+      tenantId: identity.tenantId,
+      subscriptionId: identity.subscriptionId,
+      targetScope: target.scope,
+      executor: "azd",
+      hooksAbsent: true,
+      extensionsAbsent: true,
+      resourceStates: ids.map((resourceId) => ({
+        resourceId,
+        state: existing.has(resourceId.toLowerCase()) ? "present" : "absent",
+      })),
+    };
+  }
+
   async previewApply(request: PreviewRequest): Promise<DeploymentPreviewV1> {
     if (request.policyValidation !== undefined) {
       try {
@@ -853,7 +940,7 @@ export class AzdBicepProvider extends NativeProviderBase implements IacProvider 
     const inspected = await this.#inspect(target, azdVersion);
     await this.#assertIdentity(inspected);
     const [stdout, owned] = await Promise.all([
-      this.run(this.#azdPlan("provision-preview", inspected)),
+      this.runWithStderr(this.#azdPlan("provision-preview", inspected)),
       this.#ownedState(target),
     ]);
     const normalized = normalizeAzdPreview(stdout, request.resources);
@@ -925,7 +1012,11 @@ export class AzdBicepProvider extends NativeProviderBase implements IacProvider 
   }
 
   async inventory(projectId: string, runId: string): Promise<ResourceInventoryV1> {
-    const target = this.#targets.get(`${projectId}\u0000${runId}`);
+    let target = this.#targets.get(`${projectId}\u0000${runId}`);
+    if (target === undefined) {
+      const latest = await this.bindingStore?.loadLatest?.(projectId, runId, "apply");
+      if (latest?.kind === "bicep") target = this.#approvedTarget({ projectId, runId, target: latest.preview.target });
+    }
     if (target === undefined)
       throw new IacProviderError("PREVIEW_HASH_MISMATCH", "No approved azd target is known for this run");
     const owned = await this.#ownedState(target);
@@ -1205,6 +1296,7 @@ export class AzdBicepProvider extends NativeProviderBase implements IacProvider 
       executable: "bicep",
       args: ["build", BICEP_TEMPLATE, "--stdout"],
       cwd: this.#target.projectRoot,
+      rawOutput: true,
     });
   }
 
@@ -1277,6 +1369,13 @@ export class AzdBicepProvider extends NativeProviderBase implements IacProvider 
         "PREVIEW_HASH_MISMATCH",
         "The azd environment's resource group or resources changed after preview",
       );
+    }
+    if (approval.mechanism === "lab-delegation") {
+      if (operation !== "apply") throw new IacProviderError("PREVIEW_BLOCKED", "Delegated destroy is unsupported");
+      const scope = await this.labApplyScope(preview.previewHash);
+      if (approval.scopeEvidenceHash !== sha256(scope))
+        throw new IacProviderError("PREVIEW_HASH_MISMATCH", "Delegated resource observations changed before execution");
+      await this.authorize(this.track, operation, preview, approval, suppliedAuthority, binding.preview.previewHash);
     }
     this.#targets.set(`${target.projectId}\u0000${target.runId}`, target);
     this.rememberPolicy(preview, binding);

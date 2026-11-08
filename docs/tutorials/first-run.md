@@ -94,10 +94,10 @@ This does not weaken APEX's own bundled offline startup guarantee. Schema-only d
 [MCP providers](../reference/mcp.md#azure-mcp-server-3) for safe reads and qualification boundaries.
 
 The other entries serve [rubber-duck reviews](../reference/mcp.md#rubber-duck-reviews): `postToolUse`, matched on the
-same subagent tool names, saves a kernel-requested rubber-duck answer, `subagentStart`, `subagentStop` and
-`postToolUseFailure` track active rubber-duck runs, and a second `preToolUse` entry, matched on APEX tool names, denies
-state-changing APEX tools to the rubber-duck run. Captures, the signing key, run marks and denial records live in
-`~/.apex/reviews/`, or in `APEX_REVIEW_HOME` when set.
+same subagent tool names and `read_agent`, saves a kernel-requested rubber-duck answer, `subagentStart`, `subagentStop`
+and `postToolUseFailure` track active rubber-duck runs, and a second `preToolUse` entry, matched on APEX tool names,
+denies state-changing APEX tools to the rubber-duck run. Captures, pending background reviews, the signing key, run
+marks and denial records live in `~/.apex/reviews/`, or in `APEX_REVIEW_HOME` when set.
 
 The script always exits 0, because Copilot denies a `preToolUse` call when a command hook exits non-zero. Input it
 cannot parse is allowed (fail open), unless a raw-text scan still reads a `task` call that targets APEX, a call to the

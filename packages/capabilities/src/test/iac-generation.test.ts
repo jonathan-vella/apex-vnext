@@ -288,6 +288,130 @@ test("AVM generators preserve exact pins, harden storage, and only include suppl
   assert.equal(terraform.files.find(({ path }) => path === ".terraform.lock.hcl")!.content, lock);
 });
 
+test("hyphenated logical ids keep their ids and emit underscore symbolic names", async () => {
+  const source = intent([
+    {
+      id: "log-analytics",
+      type: "Microsoft.OperationalInsights/workspaces",
+      purpose: "Logs",
+      dependsOn: [],
+      controls: [],
+    },
+    {
+      id: "storage-account",
+      type: "Microsoft.Storage/storageAccounts",
+      purpose: "Store",
+      dependsOn: ["log-analytics"],
+      controls: [],
+    },
+    {
+      id: "storage-diag",
+      type: "Microsoft.Insights/diagnosticSettings",
+      purpose: "Monitor",
+      dependsOn: ["storage-account"],
+      controls: [],
+    },
+  ]);
+  const bindingFor = (track: "bicep" | "terraform"): IacBindingV1 => ({
+    schemaVersion: "1.0.0",
+    projectId: "project",
+    runId: "run-0001",
+    track,
+    intentHash: HASH,
+    resourceBindings: {
+      "log-analytics": {
+        implementation: "native:Microsoft.OperationalInsights/workspaces@2023-09-01",
+        version: "2023-09-01",
+        parameters: { name: "law", location: "swedencentral", parentId: "/", properties: {} },
+      },
+      "storage-account": {
+        implementation: "native:Microsoft.Storage/storageAccounts@2023-05-01",
+        version: "2023-05-01",
+        parameters: nativeParameters,
+      },
+      "storage-diag": {
+        implementation: "native:Microsoft.Insights/diagnosticSettings@2021-05-01-preview",
+        version: "2021-05-01-preview",
+        ...(track === "bicep" ? { scopeLogicalId: "storage-account" } : {}),
+        parameters: { name: "logs", location: "swedencentral", parentId: "/", properties: {} },
+      },
+    },
+  });
+  const bicepBinding = bindingFor("bicep");
+  const bicep = generateBicepTree(source, bicepBinding);
+  const bicepSource = bicep.files.find(({ path }) => path === "infra/main.bicep")!.content;
+  assert.match(bicepSource, /^resource storage_account '/m);
+  assert.match(bicepSource, /^resource log_analytics '/m);
+  assert.match(bicepSource, /scope: storage_account/);
+  assert.match(bicepSource, /dependsOn: \[\n {4}log_analytics\n {2}\]/);
+  assert.doesNotMatch(bicepSource, /resource [a-z_]*-|scope: storage-|^ {4}[a-z]+-[a-z]+$/m);
+  assertExecutionAddresses(bicep, bicepBinding);
+  assert.deepEqual(
+    bicep.logicalManifest.resources.map(({ logicalId, executionAddress, generatedDependencies }) => [
+      logicalId,
+      executionAddress,
+      generatedDependencies,
+    ]),
+    [
+      ["log-analytics", "log_analytics", []],
+      ["storage-account", "storage_account", ["log-analytics"]],
+      ["storage-diag", "storage_diag", ["storage-account"]],
+    ],
+  );
+  assert.deepEqual((await validateGeneratedTree(bicep)).issues, []);
+
+  const terraformBinding = bindingFor("terraform");
+  const terraform = generateTerraformTree(source, terraformBinding);
+  const terraformSource = terraform.files.find(({ path }) => path === "main.tf")!.content;
+  assert.match(terraformSource, /resource "azapi_resource" "storage_account"/);
+  assert.match(terraformSource, /depends_on = \[azapi_resource\.log_analytics\]/);
+  assertExecutionAddresses(terraform, terraformBinding);
+  assert.deepEqual((await validateGeneratedTree(terraform)).issues, []);
+  assert.equal(compareLogicalParity(bicep, terraform).equal, true);
+
+  const existing = generateTerraformTree(source, terraformBinding, { existingResources: ["log-analytics"] });
+  assert.match(
+    existing.files.find(({ path }) => path === "main.tf")!.content,
+    /data "azapi_resource" "log_analytics"[\s\S]*depends_on = \[data\.azapi_resource\.log_analytics\]/,
+  );
+});
+
+test("logical ids that map to the same symbolic name or use unsupported characters are rejected", () => {
+  const clash = intent([
+    { id: "a-b", type: "Microsoft.Storage/storageAccounts", purpose: "x", dependsOn: [], controls: [] },
+    { id: "a_b", type: "Microsoft.Storage/storageAccounts", purpose: "y", dependsOn: [], controls: [] },
+  ]);
+  const entry = {
+    implementation: "native:Microsoft.Storage/storageAccounts@2023-05-01",
+    version: "2023-05-01",
+    parameters: nativeParameters,
+  };
+  for (const track of ["bicep", "terraform"] as const) {
+    const generate = track === "bicep" ? generateBicepTree : generateTerraformTree;
+    assert.throws(
+      () =>
+        generate(clash, {
+          ...binding(track, entry.implementation, entry.version, nativeParameters),
+          resourceBindings: { "a-b": entry, a_b: entry },
+        }),
+      /ids 'a_b' and 'a-b' map to the same IaC symbolic name 'a_b'|ids 'a-b' and 'a_b' map to the same IaC symbolic name 'a_b'/,
+    );
+    for (const id of ["1st", "a.b", "a b", "-a"]) {
+      const odd = intent([
+        { id, type: "Microsoft.Storage/storageAccounts", purpose: "x", dependsOn: [], controls: [] },
+      ]);
+      assert.throws(
+        () =>
+          generate(odd, {
+            ...binding(track, entry.implementation, entry.version, nativeParameters),
+            resourceBindings: { [id]: entry },
+          }),
+        /not a valid IaC identifier/,
+      );
+    }
+  }
+});
+
 test("generation rejects traversal-like identifiers, incomplete native parameters, and non-exact pins", () => {
   const invalidIntent = intent([
     { id: "../storage", type: "Microsoft.Storage/storageAccounts", purpose: "x", dependsOn: [], controls: [] },

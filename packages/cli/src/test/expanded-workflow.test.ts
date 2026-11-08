@@ -14,6 +14,8 @@ import type {
   NativeValidationReceiptV1,
   PolicyPropertyMapV1,
   PolicyValidationV1,
+  ApprovalEvidenceV1,
+  LabDelegationPolicyV1,
 } from "@apexops/contracts";
 import {
   calculatePolicyValidationHash,
@@ -38,7 +40,7 @@ import { dependencyRevision } from "../dependency-revision.js";
 import { connectMcp } from "./mcp-client.js";
 import { createFakeAzd, handleFakeAzd, writeAzdProject } from "./azd-fake.js";
 import { MCP_OUTPUT_SCHEMAS } from "../mcp-output-schemas.js";
-import { ApexService, type TaskOutput } from "../service.js";
+import { ApexService, WORKER_TASK_CONTEXT_MAX_BYTES, type TaskOutput } from "../service.js";
 import { registerWorkflowValidators } from "../workflow-validators.js";
 import { createFileProviderRuntime, hashTerraformConfiguration } from "../provider-runtime.js";
 import {
@@ -300,6 +302,67 @@ function configureNativeBicepPlan(plan: ReturnType<typeof planBundle>): void {
   const intent = plan.find(({ kind }) => kind === "implementation-intent")!.value as ImplementationIntentV1;
   intent.resources.find(({ id }) => id === "api")!.type = "Microsoft.Storage/storageAccounts";
   const binding = plan.find(({ kind }) => kind === "iac-binding")!.value as IacBindingV1;
+  binding.intentHash = sha256Json(intent);
+}
+
+function configureDelegatedStoragePlan(plan: ReturnType<typeof planBundle>): void {
+  configureNativeBicepPlan(plan);
+  const intent = plan[0]!.value as ImplementationIntentV1;
+  const binding = plan[1]!.value as IacBindingV1;
+  const account = binding.resourceBindings.api!;
+  account.parameters = {
+    ...account.parameters,
+    identity: { type: "SystemAssigned" },
+    properties: {
+      supportsHttpsTrafficOnly: true,
+      minimumTlsVersion: "TLS1_2",
+      allowBlobPublicAccess: false,
+      allowSharedKeyAccess: false,
+      publicNetworkAccess: "Disabled",
+      defaultToOAuthAuthentication: true,
+      networkAcls: { defaultAction: "Deny", bypass: "None", ipRules: [], virtualNetworkRules: [] },
+      encryption: {
+        keySource: "Microsoft.Storage",
+        requireInfrastructureEncryption: true,
+        services: { blob: { enabled: true }, file: { enabled: true } },
+      },
+    },
+  };
+  for (const child of ["blobServices", "fileServices", "queueServices", "tableServices"]) {
+    const type = `Microsoft.Storage/storageAccounts/${child}`;
+    const diagnostic = `${child}Diagnostic`;
+    intent.resources.push(
+      { id: child, type, purpose: "Storage service", dependsOn: ["api"], controls: [] },
+      {
+        id: diagnostic,
+        type: "Microsoft.Insights/diagnosticSettings",
+        purpose: "Service monitoring",
+        dependsOn: [child],
+        controls: [],
+      },
+    );
+    binding.resourceBindings[child] = {
+      implementation: `native:${type}@2023-05-01`,
+      version: "2023-05-01",
+      parameters: { name: "apidemo/default", parentId: "/", location: "swedencentral", properties: {} },
+    };
+    binding.resourceBindings[diagnostic] = {
+      implementation: "native:Microsoft.Insights/diagnosticSettings@2021-05-01-preview",
+      version: "2021-05-01-preview",
+      scopeLogicalId: child,
+      parameters: {
+        name: "logs",
+        parentId: "/",
+        location: "swedencentral",
+        properties: {
+          workspaceId:
+            "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-test/providers/Microsoft.OperationalInsights/workspaces/accepted-logs",
+          logs: [{ categoryGroup: "allLogs", enabled: true }],
+          metrics: [{ category: "Transaction", enabled: true }],
+        },
+      },
+    };
+  }
   binding.intentHash = sha256Json(intent);
 }
 
@@ -1817,6 +1880,60 @@ test("task-bound workflow validators reject semantic and evidence mutations", as
   (incompleteCodegen[1]!.value as { logicalResourceManifestHash: string }).logicalResourceManifestHash =
     sha256Json(incompleteManifest);
   const codegenTask = await task(service, "codegen-bicep");
+  // The hidden CodeGen worker reads any input the context leaves out by its hash, in bounded chunks.
+  const codegenContext = await service.taskContext(codegenTask);
+  assert.ok(codegenContext.inputReferences.length > 0);
+  for (const reference of codegenContext.inputReferences) {
+    let content = "";
+    let offset: number | undefined = 0;
+    while (offset !== undefined) {
+      const chunk = await service.readTaskInput(codegenTask, offset, 6_000, reference.hash);
+      assert.ok(Buffer.byteLength(chunk.content) <= 6_000);
+      content += chunk.content;
+      offset = chunk.nextOffset;
+    }
+    assert.equal(Buffer.byteLength(content), reference.bytes);
+  }
+  await assert.rejects(
+    service.readTaskInput(codegenTask, 0, 500, "f".repeat(64)),
+    /Input hash is not a current task dependency/,
+  );
+  // A worker's context stays small: it has no file view tool, and the client saves a large result to a temp file.
+  assert.ok(Buffer.byteLength(JSON.stringify(codegenContext)) < WORKER_TASK_CONTEXT_MAX_BYTES);
+  {
+    const taskPath = join(root, ".apex", "projects", "demo", "runs", runId, "tasks", `${codegenTask}.json`);
+    const originalTask = await readFile(taskPath, "utf8");
+    const internal = service as unknown as { inputRefs(...args: unknown[]): Promise<string[]> };
+    const originalInputRefs = internal.inputRefs;
+    const objects = new ObjectStore(root);
+    const extra: string[] = [];
+    for (const [index, size] of [20_000, 30_000, 40_000].entries())
+      extra.push(await objects.putJson({ note: `input ${index}`, text: "x".repeat(size) }));
+    try {
+      internal.inputRefs = async (...args) => [...(await originalInputRefs.apply(service, args)), ...extra];
+      const task = JSON.parse(originalTask) as { inputRefs: string[] };
+      await writeFile(taskPath, JSON.stringify({ ...task, inputRefs: [...task.inputRefs, ...extra] }));
+      const large = await service.taskContext(codegenTask);
+      assert.ok(Buffer.byteLength(JSON.stringify(large)) < WORKER_TASK_CONTEXT_MAX_BYTES);
+      assert.equal(large.inputReferences.length, codegenContext.inputReferences.length + 3);
+      assert.ok(large.inputReferences.slice(-3).every(({ inlined }) => !inlined));
+      assert.equal(large.inputs.length, large.inputReferences.filter(({ inlined }) => inlined).length);
+      for (const reference of large.inputReferences.slice(-3)) {
+        assert.ok(reference.bytes >= 20_000);
+        let content = "";
+        let offset: number | undefined = 0;
+        while (offset !== undefined) {
+          const chunk = await service.readTaskInput(codegenTask, offset, 6_000, reference.hash);
+          content += chunk.content;
+          offset = chunk.nextOffset;
+        }
+        assert.equal(Buffer.byteLength(content), reference.bytes);
+      }
+    } finally {
+      internal.inputRefs = originalInputRefs;
+      await writeFile(taskPath, originalTask);
+    }
+  }
   await assert.rejects(service.completeTaskOutputs(codegenTask, incompleteCodegen), /business:bicep-binding-coverage/);
   await service.completeTaskOutputs(codegenTask, validCodegen);
 
@@ -2152,6 +2269,264 @@ for (const track of ["bicep", "terraform"] as const) {
   });
 }
 
+for (const outcome of ["apply", "scope-drift", "late-revocation"] as const) {
+  test(`delegated Gate 4 wired native MCP integration ${outcome}`, async () => {
+    const root = await tempRoot();
+    const now = new Date("2026-10-31T12:00:00.000Z");
+    const targetScope = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-test";
+    const bootstrap = new ApexService(root, { clock: () => now });
+    const { runId } = await bootstrap.init({ projectId: "demo", riskOwner: "partner", iacTool: "bicep", targetScope });
+    const generated = await reachCodegen(bootstrap, runId, "bicep", configureDelegatedStoragePlan);
+    const binding = generated.plan[1]!.value as IacBindingV1;
+    const intent = generated.plan[0]!.value as ImplementationIntentV1;
+    const sourceRoot = join(root, ".apex", "work", runId, generated.taskId, "code");
+    const resources = Object.fromEntries(
+      intent.resources.map((resource) => {
+        const entry = binding.resourceBindings[resource.id]!;
+        const { parentId, ...parameters } = entry.parameters;
+        assert.equal(parentId, "/");
+        return [
+          resource.id,
+          {
+            type: resource.type,
+            apiVersion: entry.version,
+            ...parameters,
+            dependsOn: resource.dependsOn,
+            ...(entry.scopeLogicalId === undefined
+              ? {}
+              : {
+                  scope: `[resourceId('${binding.resourceBindings[entry.scopeLogicalId]!.implementation.split("@")[0]!.slice(7)}', split('apidemo/default', '/')[0], split('apidemo/default', '/')[1])]`,
+                }),
+          },
+        ];
+      }),
+    );
+    const compiled = JSON.stringify({ languageVersion: "2.0", resources });
+    const azd = createFakeAzd({
+      groups: [{ name: "rg-test", tags: { "azd-env-name": "dev" } }],
+      preview: [{ Operation: "Create", Type: "Microsoft.Storage/storageAccounts", Name: "apidemo" }],
+    });
+    const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", runId, "journal"));
+    const runtime = await createFileProviderRuntime(root);
+    let service: ApexService;
+    let armed = false;
+    let authorityReads = 0;
+    let receipt: Awaited<ReturnType<ApexService["labDelegation"]>>;
+    const provider = new AzdBicepProvider({
+      now: () => now,
+      bindingStore: runtime.bindingStores.bicep,
+      target: {
+        projectRoot: sourceRoot,
+        environmentName: "dev",
+        tenantId: "22222222-2222-2222-2222-222222222222",
+        location: "swedencentral",
+        azdVersion: "1.35.1",
+      },
+      runner: {
+        run: async (command) => {
+          let stdout: string | undefined;
+          if (command.executable === "bicep" && command.args[0] === "build") stdout = compiled;
+          else if (command.executable === "bicep" && ["format", "lint"].includes(command.args[0]!)) stdout = "";
+          else stdout = await handleFakeAzd(azd, command);
+          if (stdout === undefined)
+            throw new Error(`Unexpected fixture process: ${command.executable} ${command.args.join(" ")}`);
+          return { exitCode: 0, signal: null, stdout, stderr: "", timedOut: false, outputTruncated: false };
+        },
+      },
+      currentAuthority: async () => {
+        if (armed && ++authorityReads === 2 && outcome === "late-revocation")
+          await service.revokeLabDelegation(receipt.policyHash);
+        const run = (await service.status()).run;
+        const revision = dependencyRevision(run, await journal.replay());
+        let activeLabDelegation: { policyHash: string; consentHash: string } | undefined;
+        if (receipt !== undefined) {
+          const current = await service.labDelegation();
+          if (!current.revoked)
+            activeLabDelegation = { policyHash: current.policyHash, consentHash: current.consentHash };
+        }
+        return {
+          head: revision,
+          dependencyRevision: revision,
+          ownerEpoch: run.ownerEpoch,
+          recipientIdentity: "local",
+          ...(activeLabDelegation === undefined ? {} : { activeLabDelegation }),
+        };
+      },
+    });
+    service = new ApexService(root, { clock: () => now, providers: { bicep: provider } });
+    await service.generateIac(generated.taskId);
+    const validationTask = await task(service, "validation-bicep");
+    const checked = await service.validateTask(validationTask);
+    assert.equal(checked.valid, true, JSON.stringify(checked));
+    assert.equal(checked.execution?.mode, "native");
+    assert.equal(checked.execution?.securityBaseline?.outcome, "pass");
+    assert.ok(checked.execution?.executedValidatorIds.includes("business:logical-resource-parity"));
+    assert.deepEqual(checked.execution?.blockedValidatorIds, []);
+    await service.completeTaskOutputs(validationTask, checked.outputs!);
+    const preview = await service.preview({ operation: "apply", provider: "bicep" });
+    assert.deepEqual(preview.changes, [
+      {
+        resourceId: `${targetScope}/providers/Microsoft.Storage/storageAccounts/apidemo`,
+        action: "create",
+        material: true,
+        details: "azd operation: Create",
+      },
+    ]);
+    const run = (await service.status()).run;
+    const policy: LabDelegationPolicyV1 = {
+      schemaVersion: "1.0.0",
+      projectId: "demo",
+      runId,
+      purpose: "lab",
+      environment: "dev",
+      track: "bicep",
+      cloud: "AzureCloud",
+      tenantId: "22222222-2222-2222-2222-222222222222",
+      subscriptionId: "11111111-1111-1111-1111-111111111111",
+      targetScope,
+      requirementsHash: sha256Json(requirements()),
+      resourceIds: preview.changes.map(({ resourceId }) => resourceId),
+      gates: [4],
+      operation: "apply",
+      writerEpoch: run.ownerEpoch,
+      recipientIdentity: "local",
+      expiresAt: "2026-10-31T13:00:00.000Z",
+    };
+    receipt = await service.confirmLabDelegation(policy, async () => ({ actor: "synthetic-human-fixture" }));
+    const created = (await journal.replay()).findLast(({ type }) => type === "preview.created")!;
+    const { approvalContextHash } = created.payload as { approvalContextHash: string };
+    const { client, close } = await connectMcp(service);
+    try {
+      const result = await client.callTool({
+        name: "gateDelegate",
+        arguments: {
+          workspace: root,
+          gate: 4,
+          policyHash: receipt.policyHash,
+          consentHash: receipt.consentHash,
+          previewHash: preview.previewHash,
+          approvalContextHash,
+        },
+      });
+      assert.notEqual(result.isError, true, JSON.stringify(result));
+      const approval = result.structuredContent as ApprovalEvidenceV1;
+      assert.equal(approval.mechanism, "lab-delegation");
+      assert.equal(approval.actor, "agent:local");
+      assert.equal(approval.previewHash, preview.previewHash);
+      assert.equal(approval.approvalContextHash, approvalContextHash);
+      assert.deepEqual(await service.currentApproval(), approval);
+      if (outcome === "scope-drift")
+        azd.resources.push({
+          id: preview.changes[0]!.resourceId,
+          type: "Microsoft.Storage/storageAccounts",
+          name: "apidemo",
+        });
+      armed = true;
+      if (outcome === "apply") {
+        azd.duringExecute = async () => {
+          azd.resources.push({
+            id: preview.changes[0]!.resourceId,
+            type: "Microsoft.Storage/storageAccounts",
+            name: "apidemo",
+          });
+        };
+        await service.deploy(preview.previewHash);
+        const executed = (await journal.replay()).findLast(({ type }) => type === "deployment.executed")!;
+        const payload = executed.payload as {
+          executionEvidence: { mode: string; previewHash: string; validatorIds: string[] };
+          operation: { approvalHash: string };
+        };
+        assert.equal(payload.executionEvidence.mode, "native");
+        assert.equal(payload.executionEvidence.previewHash, preview.previewHash);
+        assert.ok(payload.executionEvidence.validatorIds.includes("deploy:bicep-azd-execution"));
+        assert.equal(payload.operation.approvalHash, sha256Json(approval));
+        assert.equal(
+          (await journal.replay()).some(({ type }) => type === "deployment.completed"),
+          true,
+        );
+      } else {
+        await assert.rejects(
+          service.deploy(preview.previewHash),
+          outcome === "scope-drift" ? /changed after the delegated preview/u : /no longer current/u,
+        );
+        assert.equal(
+          (await journal.replay()).some(({ type }) => type === "deployment.executed"),
+          false,
+        );
+      }
+      assert.equal(
+        azd.calls.filter(
+          ({ executable, args }) => executable === "azd" && args[0] === "provision" && !args.includes("--preview"),
+        ).length,
+        outcome === "apply" ? 1 : 0,
+      );
+    } finally {
+      await close();
+    }
+  });
+}
+
+test("delegated Gate 4 rejects stale contexts and simulated native-shape previews without execution", async () => {
+  const now = new Date("2026-10-31T12:00:00.000Z");
+  const root = await tempRoot();
+  const provider = bicepPreviewProvider(now);
+  let executed = false;
+  provider.apply = async () => {
+    executed = true;
+    throw new Error("Delegation must not execute this simulated provider");
+  };
+  const service = new ApexService(root, { clock: () => now, providers: { bicep: provider } });
+  const { runId } = await service.init({
+    projectId: "demo",
+    riskOwner: "partner",
+    iacTool: "bicep",
+    targetScope: "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-test",
+  });
+
+  await reachValidation(service, runId, "bicep", configureNativeBicepPlan);
+  const preview = await service.preview({ operation: "apply", provider: "bicep" });
+  const receipt = await service.confirmLabDelegation(
+    {
+      schemaVersion: "1.0.0",
+      projectId: "demo",
+      runId,
+      purpose: "lab",
+      environment: "dev",
+      track: "bicep",
+      cloud: "AzureCloud",
+      tenantId: "22222222-2222-2222-2222-222222222222",
+      subscriptionId: "11111111-1111-1111-1111-111111111111",
+      targetScope: preview.target,
+      requirementsHash: sha256Json(requirements()),
+      resourceIds: preview.changes.map(({ resourceId }) => resourceId),
+      gates: [4],
+      operation: "apply",
+      writerEpoch: 1,
+      recipientIdentity: "local",
+      expiresAt: "2026-10-31T13:00:00.000Z",
+    },
+    async () => ({ actor: "synthetic-human-fixture" }),
+  );
+  const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", runId, "journal"));
+  const created = (await journal.replay()).findLast(({ type }) => type === "preview.created")!;
+  const { approvalContextHash } = created.payload as { approvalContextHash: string };
+  const options = {
+    policyHash: receipt.policyHash,
+    consentHash: receipt.consentHash,
+    previewHash: preview.previewHash,
+    approvalContextHash,
+  };
+  await assert.rejects(
+    service.decideDelegatedGate(4, { ...options, approvalContextHash: "0".repeat(64) }),
+    /exact current preview/u,
+  );
+  await assert.rejects(service.decideDelegatedGate(4, options), /fake previews and external ledgers/u);
+  assert.equal((await service.status()).run.gates[3]!.state, "open");
+  assert.equal(executed, false);
+  const human = await service.decideGateNumber(4, "approved", "synthetic-human-fixture");
+  assert.equal(human.mechanism, "tty");
+});
+
 test("native Bicep deploy records azd execution evidence in manifest order", async () => {
   const now = new Date("2026-01-01T00:00:00.000Z");
   const root = await tempRoot();
@@ -2395,7 +2770,7 @@ for (const track of ["bicep", "terraform"] as const) {
           iacTool: track,
           targetScope: "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-test",
         });
-        const codegen = await reachCodegen(service, runId, track, (plan) => {
+        const configureModulePlan = (plan: ReturnType<typeof planBundle>) => {
           configureNativeBicepPlan(plan);
           const binding = plan[1]!.value as IacBindingV1;
           binding.resourceBindings.api!.implementation =
@@ -2403,12 +2778,24 @@ for (const track of ["bicep", "terraform"] as const) {
               ? "avm:br/public:avm/res/storage/storage-account@0.9.0"
               : "avm:Azure/avm-res-storage-storageaccount/azurerm@0.9.0";
           binding.resourceBindings.api!.version = "0.9.0";
-        });
+        };
+        if (track === "bicep") {
+          // A Bicep module without its exact physical resource map no longer reaches preview: planning refuses it.
+          await assert.rejects(
+            reachCodegen(service, runId, track, configureModulePlan),
+            (error: unknown) =>
+              error instanceof ApexError &&
+              error.code === "APEX_VALIDATION" &&
+              /physical resource map/.test(error.message),
+          );
+          return;
+        }
+        const codegen = await reachCodegen(service, runId, track, configureModulePlan);
         const bundle = codegenBundle(runId, track, codegen.plan);
         const manifest = bundle.find(({ kind }) => kind === "logical-resource-manifest")!
           .value as LogicalResourceManifestV1;
         manifest.resources[0]!.implementationKind = "module";
-        manifest.resources[0]!.executionAddress = track === "bicep" ? "api" : "module.api";
+        manifest.resources[0]!.executionAddress = "module.api";
         const handoff = bundle.find(({ kind }) => kind === "iac-handoff")!.value as {
           logicalResourceManifestHash: string;
         };
@@ -3438,8 +3825,62 @@ test("plan rejects wrong track and secret literals", async () => {
       ),
       /secret-reference/i,
     );
+    // The grammar the generator requires is enforced at plan time, with an actionable message.
+    const withImplementation = (implementation: string, version: string) => {
+      const bundle = planBundle(initialized.runId, "bicep", {}, sourceHashes);
+      const binding = bundle[1]!.value as IacBindingV1;
+      binding.resourceBindings.api = { ...binding.resourceBindings.api!, implementation, version };
+      return bundle;
+    };
+    for (const [implementation, version, message] of [
+      ["Microsoft.Storage/storageAccounts", "2023-05-01", /Unsupported binding implementation 'Microsoft\.Storage/],
+      ["br/public:avm/res/storage/storage-account", "0.31.0", /Unsupported binding implementation 'br\/public:avm/],
+      ["avm:br/public:avm/res/storage/storage-account@0.31.0", "0.30.0", /does not match implementation pin/],
+    ] as const)
+      await assert.rejects(
+        isolated.completeTaskOutputs(planTask, withImplementation(implementation, version)),
+        (error: unknown) =>
+          error instanceof ApexError &&
+          error.code === "APEX_VALIDATION" &&
+          /IaC binding cannot be generated/.test(error.message) &&
+          message.test(error.message),
+      );
+    // A Bicep AVM module without its physical resource map is refused before the plan is accepted.
+    await assert.rejects(
+      isolated.completeTaskOutputs(
+        planTask,
+        withImplementation("avm:br/public:avm/res/storage/storage-account@0.31.0", "0.31.0"),
+      ),
+      (error: unknown) =>
+        error instanceof ApexError && error.code === "APEX_VALIDATION" && /physical resource map/.test(error.message),
+    );
     assert.equal((await isolated.status()).head, before.head);
   });
+});
+
+test("hyphenated logical ids pass planComplete and generateIac on both tracks", async () => {
+  for (const track of ["bicep", "terraform"] as const) {
+    const root = await tempRoot();
+    const service = new ApexService(root);
+    const { runId } = await service.init({ projectId: "demo", riskOwner: "partner", iacTool: track });
+    const generated = await reachCodegen(service, runId, track, (plan) => {
+      const intent = plan[0]!.value as ImplementationIntentV1;
+      const binding = plan[1]!.value as IacBindingV1;
+      intent.resources[0]!.id = "api-gateway";
+      binding.resourceBindings["api-gateway"] = binding.resourceBindings.api!;
+      delete binding.resourceBindings.api;
+      binding.intentHash = sha256Json(intent);
+    });
+    const output = await service.generateIac(generated.taskId);
+    const manifest = await new ObjectStore(root).getJson<LogicalResourceManifestV1>(
+      output.outputHashes["logical-resource-manifest"]!,
+    );
+    assert.equal(manifest.resources[0]!.logicalId, "api-gateway");
+    assert.equal(
+      manifest.resources[0]!.executionAddress,
+      track === "bicep" ? "api_gateway" : "azapi_resource.api_gateway",
+    );
+  }
 });
 
 test("MCP completeTask accepts an output bundle", async () => {
@@ -3745,7 +4186,7 @@ async function materialGovernanceFixture(track: "bicep" | "terraform", native = 
     service,
     runId,
     track,
-    native && track === "bicep" ? configureNativeBicepPlan : undefined,
+    track === "bicep" ? configureNativeBicepPlan : undefined,
     false,
     path,
   );

@@ -32,6 +32,12 @@ review or task.
 2. For `status=task`, read `apex/taskContext` with the exact task ID. If the result is externalized, use
    `apex/readTaskInput` until the bounded context is complete. Use its inputs, decisions, evidence and output templates
    as authoritative; ask targeted follow-ups only for unresolved user-owned decisions.
+   To correct a recorded Architecture answer, use `apex/inputHistory` and `apex/previewInputAmendment` with the
+   request ID, current base-answer hash and corrected answers. Explain the affected reviews, gates and re-approval
+   path, then obtain explicit user confirmation before `apex/amendInput` with the exact proposal hash and
+   `confirm: true`. Resume with `nextTask`; Gate 1 remains unchanged, but dependent approvals need fresh review.
+   Never delete a project, replace audit history, reuse invalidated approval, or infer confirmation from Autopilot
+   or Allow All. A running rubber-duck review must finish or be stopped and cancelled from the terminal first.
 3. Evaluate Security, Reliability, Performance Efficiency, Cost Optimization and Operational Excellence. Submit the
    qualitative `wellArchitectedAssessment` shape from the task template, including status, accepted requirements,
    evidence references, recommendations and trade-offs for every pillar. Treat performance and scale numbers as later
@@ -53,6 +59,14 @@ review or task.
    informational and need no mapping. Architecture acceptance rejects any `blocked` row and names it: change the
    design so the control is `satisfied` or `planned`, or ask the user how to proceed. A review disposition never
    changes a mapping.
+   The policy-property validator evaluates a mapping's `propertyPath` on the compiled template resource that the
+   logical resource's code symbol points to, as dotted names only (no array indexes). For a Bicep resource deployed
+   through an AVM module that resource is the module deployment, so an ARM path such as
+   `properties.publicNetworkAccess` is never found (`missing-property`). For a `planned` Bicep AVM mapping with an
+   `expectedValue`, use the translated module-parameter path `properties.parameters.<module parameter>.value`, adding
+   nested names after `value` when the parameter is an object (for example
+   `properties.parameters.publicNetworkAccess.value` with expected value `"Disabled"`). The Plan must bind exactly that
+   module parameter to the expected literal. A native Bicep resource uses the ARM property path.
 7. Assume selected Azure services and SKUs are regionally available and quota is sufficient. Mention material regional,
    zonal, recovery or capacity assumptions in documentation when useful; do not request, validate, gate or create
    findings for regional support, quota, deployment, restore, failover or unresolved retail meters.

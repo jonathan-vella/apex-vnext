@@ -4,6 +4,8 @@ export interface CommandPlan {
   readonly cwd?: string;
   /** Extra environment variables merged over the process environment. */
   readonly env?: Readonly<Record<string, string>>;
+  /** Keep stdout unredacted for in-memory compiler JSON whose symbolic names may look secret-like. */
+  readonly rawOutput?: boolean;
 }
 
 /** Bicep source validation with the Bicep CLI; it only compiles and never talks to Azure. */

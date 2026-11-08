@@ -30,6 +30,8 @@ import {
   ImprovementRecurrenceV1Schema,
   InputRequestV1Schema,
   InputSubmissionV1Schema,
+  InputAmendmentV1Schema,
+  InputAmendmentProposalV1Schema,
   LogicalResourceManifestV1Schema,
   NativeValidationReceiptV1Schema,
   NATIVE_VALIDATION_COMMANDS,
@@ -89,6 +91,53 @@ import {
   type RequirementsV1,
   type RuntimeBundleLockV1,
 } from "../index.js";
+
+it("input amendments and impact proposals are strict base-bound versioned contracts", () => {
+  const hash = "a".repeat(64);
+  const amendment = {
+    schemaVersion: "1.0.0",
+    requestId: "request-1",
+    baseAnswersHash: hash,
+    answers: [{ questionId: "workload-profile", value: "standalone-lab" }],
+  };
+  assert.equal(Value.Check(InputAmendmentV1Schema, amendment), true);
+  for (const invalid of [
+    { ...amendment, schemaVersion: "0" },
+    { ...amendment, baseAnswersHash: "stale" },
+    { ...amendment, answers: [] },
+    { ...amendment, overwrite: true },
+    { ...amendment, answers: [{ questionId: "scale", value: { arbitrary: true } }] },
+  ])
+    assert.equal(Value.Check(InputAmendmentV1Schema, invalid), false);
+  const proposal = {
+    schemaVersion: "1.0.0",
+    projectId: "demo",
+    runId: "run-1",
+    expectedHead: hash,
+    ownerEpoch: 1,
+    amendment,
+    kind: "requirements",
+    previousAnswers: amendment.answers,
+    answers: amendment.answers,
+    reason: "Correction",
+    invalidatedNodes: ["requirements"],
+    invalidatedGates: [1, 2, 3, 4],
+    reapprovalPath: "Regenerate and review Requirements, then request Gate 1 again.",
+    filesModified: false,
+    deploymentAuthorized: false,
+    proposalHash: hash,
+  };
+  assert.equal(Value.Check(InputAmendmentProposalV1Schema, proposal), true);
+  for (const invalid of [
+    { ...proposal, ownerEpoch: 0 },
+    { ...proposal, invalidatedGates: [5] },
+    { ...proposal, deploymentAuthorized: true },
+    { ...proposal, filesModified: true },
+    { ...proposal, kind: "governance" },
+    { ...proposal, extra: true },
+  ])
+    assert.equal(Value.Check(InputAmendmentProposalV1Schema, invalid), false);
+});
 import {
   CONTRACT_METADATA_FILENAME,
   JSON_SCHEMA_DIALECT,

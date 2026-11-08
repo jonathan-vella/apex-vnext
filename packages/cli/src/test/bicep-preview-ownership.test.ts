@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { test } from "./test-shard.js";
 import type { IacBindingV1, ImplementationIntentV1, LogicalResourceManifestV1 } from "@apexops/contracts";
 import { sha256Json, ValidatorRegistry } from "@apexops/kernel";
+import { ApexError } from "../errors.js";
+import { ApexService } from "../service.js";
 import { registerWorkflowValidators, resolveNativeBicepResourceOwnership } from "../workflow-validators.js";
+import { tempRoot } from "./helpers.js";
 
 const targetScope = "/subscriptions/11111111-2222-3333-4444-555555555555/resourceGroups/workload";
 const resourceType = "Microsoft.Storage/storageAccounts";
@@ -722,5 +725,50 @@ test("Terraform no-op labels cannot conceal foreign material changes", () => {
       "terraform",
     ).valid,
     true,
+  );
+});
+
+type PlanDryRun = {
+  assertPlanGeneratable(run: unknown, intent: ImplementationIntentV1, binding: IacBindingV1): void;
+  generateIacTree(run: unknown, intent: ImplementationIntentV1, binding: IacBindingV1): unknown;
+};
+
+test("plan dry-run accepts a complete Bicep AVM binding and refuses the unresolved ones with APEX_VALIDATION", async () => {
+  const service = new ApexService(await tempRoot()) as unknown as PlanDryRun;
+  const run = { iacTool: "bicep", targetScope };
+  const valid = avmFixture();
+  assert.doesNotThrow(() => service.assertPlanGeneratable(run, valid.intent, valid.binding));
+
+  const withoutMap = avmFixture();
+  delete withoutMap.binding.resourceBindings.storage!.physicalResources;
+  const looseScope = { iacTool: "bicep", targetScope: "local" };
+  for (const [scopedRun, expected] of [
+    [run, /physical/i],
+    [looseScope, /physical resource map/],
+  ] as const)
+    assert.throws(
+      () => service.assertPlanGeneratable(scopedRun, withoutMap.intent, withoutMap.binding),
+      (error: unknown) =>
+        error instanceof ApexError && error.code === "APEX_VALIDATION" && expected.test(error.message),
+    );
+
+  const unprefixed = fixture();
+  unprefixed.binding.resourceBindings.storage!.implementation = resourceType;
+  assert.throws(
+    () => service.assertPlanGeneratable(run, unprefixed.intent, unprefixed.binding),
+    (error: unknown) =>
+      error instanceof ApexError &&
+      error.code === "APEX_VALIDATION" &&
+      /IaC binding cannot be generated: Unsupported binding implementation/.test(error.message),
+  );
+});
+
+test("generateIac maps generator TypeErrors on input-shaped bindings to APEX_VALIDATION", async () => {
+  const service = new ApexService(await tempRoot()) as unknown as PlanDryRun;
+  const context = avmFixture();
+  context.binding.resourceBindings.storage!.implementation = "br/public:avm/res/storage/storage-account";
+  assert.throws(
+    () => service.generateIacTree({ iacTool: "bicep", targetScope }, context.intent, context.binding),
+    (error: unknown) => error instanceof ApexError && error.code === "APEX_VALIDATION",
   );
 });

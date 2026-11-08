@@ -2,6 +2,10 @@ import {
   ApprovalContextV1Schema,
   type ApprovalContextV1,
   ApprovalEvidenceV1Schema,
+  LabDelegationPolicyV1Schema,
+  LabDelegationConsentV1Schema,
+  type LabDelegationPolicyV1,
+  type LabDelegationConsentV1,
   ArchetypeBatchConfigV1Schema,
   ArchetypeBatchPlanV1Schema,
   type ArchetypeBatchConfigV1,
@@ -24,8 +28,12 @@ import {
   IacBindingV1Schema,
   IacHandoffV1Schema,
   InputRequestV1Schema,
-  InputValueV1Schema,
   InputSubmissionV1Schema,
+  InputAmendmentV1Schema,
+  InputAmendmentProposalV1Schema,
+  type InputAmendmentV1,
+  type InputAmendmentProposalV1,
+  type RecordedInputV1,
   ImplementationIntentV1Schema,
   LogicalResourceManifestV1Schema,
   OperationRecordV1Schema,
@@ -143,6 +151,11 @@ import {
 } from "@apexops/capabilities";
 import {
   ContentCache,
+  LabDelegationError,
+  assertLabDelegationPolicy,
+  evaluateLabDelegation,
+  verifyLabDelegationApproval,
+  type LabDelegationContext,
   EvidencePolicy,
   EvidenceStore,
   EventJournal,
@@ -246,11 +259,13 @@ import { assertDeploymentPurposeUsable, DEFAULT_DEPLOYMENT_PURPOSE } from "./pur
 import { currentHostEnvironment, firstReleaseVersion, hostDoctorChecks, type HostEnvironment } from "./host-profile.js";
 import { ApexError, EXIT_CODES, governanceBaselineApexError, retiredProjectionError } from "./errors.js";
 import { MCP_TOOL_REVIEW_GUARDS, type ReviewGuardedTool } from "./mcp-tool-effects.js";
+import { MCP_MAX_SERIALIZED_RESULT_BYTES, mcpResultEnvelopeBytes } from "./mcp-limits.js";
 import { APEX_VERSION, meetsMinimumVersion, MINIMUM_NODE_VERSION } from "./version.js";
 import { bundledToolchainMinimums, type BundledToolchainMinimums } from "./toolchain-pin.js";
 import {
   registerWorkflowValidators,
   resolveNativeBicepResourceOwnership,
+  bicepResourceGroupScopePattern,
   taskWorkflowValidatorInput,
   type WorkflowGateValidatorContext,
   type WorkflowDeployValidatorContext,
@@ -271,6 +286,7 @@ const STAGE_FOLDERS = {
 } as const;
 const TASK_TTL_MS = 24 * 60 * 60 * 1000;
 const PREVIEW_TTL_MS = 24 * 60 * 60 * 1000;
+const INPUT_AMENDMENT_MAX_PROPOSAL_BYTES = 512 * 1024;
 /** Workspace setup files that bootstrap, init, update and customization repair change outside any run. */
 const WORKSPACE_STATE_FILES = [
   ".apex/config.json",
@@ -339,6 +355,24 @@ interface Selection {
 
 export interface GateDecisionOptions {
   recipientIdentity?: string;
+  delegation?: DelegatedGateOptions;
+}
+
+export interface DelegatedGateOptions {
+  policyHash: string;
+  consentHash: string;
+  previewHash?: string;
+  approvalContextHash?: string;
+}
+
+function delegationCheck<T>(check: () => T): T {
+  try {
+    return check();
+  } catch (error) {
+    if (error instanceof LabDelegationError)
+      throw new ApexError("APEX_AUTHORIZATION", error.message, EXIT_CODES.authorization, { reason: error.reason });
+    throw error;
+  }
 }
 
 interface ManagedFile {
@@ -527,6 +561,16 @@ const ARTIFACTS = {
 
 export type ArtifactKind = keyof typeof ARTIFACTS;
 export const SUPPORTED_ARTIFACT_KINDS = Object.keys(ARTIFACTS) as ArtifactKind[];
+/** Largest single task input that taskContext inlines; larger inputs are read through readTaskInput. */
+export const TASK_CONTEXT_INLINE_INPUT_MAX_BYTES = 32 * 1024;
+// Room a taskContext page keeps for the nextCursor the MCP adapter adds.
+const TASK_CONTEXT_PAGE_RESERVE_BYTES = 1024;
+/**
+ * Hidden workers (CodeGen, Validator) have no file view tool, and Copilot CLI saves a large tool result to a temp file
+ * instead of returning it. Their taskContext stays under this size and they read inputs through readTaskInput.
+ */
+export const WORKER_TASK_CONTEXT_MAX_BYTES = 14 * 1024;
+const WORKER_TASK_ROLES: ReadonlySet<string> = new Set(["bicep-codegen", "terraform-codegen", "validator"]);
 
 interface WorkflowTaskDescriptor {
   id: string;
@@ -875,6 +919,8 @@ export class ApexService {
     this.cache = new ContentCache(this.root);
     for (const [, [validator, schema]] of Object.entries(ARTIFACTS)) this.validators.register(validator, schema);
     this.validators.register("approval", ApprovalEvidenceV1Schema);
+    this.validators.register("lab-delegation-policy", LabDelegationPolicyV1Schema);
+    this.validators.register("lab-delegation-consent", LabDelegationConsentV1Schema);
     this.validators.register("approval-context", ApprovalContextV1Schema);
     this.validators.register("runtime-lock", RuntimeBundleLockV1Schema);
     this.validators.register("quality-measurements", QualityMeasurementsV1Schema);
@@ -2172,7 +2218,12 @@ export class ApexService {
       throw new ApexError("APEX_NOT_FOUND", `Project not found: ${projectId}`, EXIT_CODES.notFound);
     }
     if (projects.length <= 1) {
-      throw new ApexError("APEX_CONFLICT", "Cannot delete the only project in a workspace", EXIT_CODES.conflict);
+      throw new ApexError(
+        "APEX_CONFLICT",
+        "Cannot delete the only project in a workspace. To correct a recorded answer, use input history, preview-amendment and amend instead.",
+        EXIT_CODES.conflict,
+        { reason: "ONLY_PROJECT" },
+      );
     }
     const selection = await this.selection();
     const nextSelection =
@@ -2848,11 +2899,15 @@ export class ApexService {
     task: string | null;
     blockers: string[];
     satisfiedGates: number[];
+    delegation?: { policyHash: string; consentHash: string; expiresAt: string; gates: (1 | 4)[]; revoked: boolean };
   }> {
     const selection = await this.selection();
     const run = await this.run(selection, { readOnly: true });
     const events = await this.journal(run).replay();
     const route = await this.route(run, events);
+    const delegation = events.some(({ type }) => type === "lab.delegation-consented")
+      ? await this.readLabDelegation(events)
+      : undefined;
     return {
       run,
       head: events.at(-1)?.hash ?? null,
@@ -2860,6 +2915,17 @@ export class ApexService {
       task: route.task?.id ?? null,
       blockers: route.blockers,
       satisfiedGates: run.gates.flatMap((gate) => (this.gateSatisfied(run, gate.gate, events) ? [gate.gate] : [])),
+      ...(delegation === undefined
+        ? {}
+        : {
+            delegation: {
+              policyHash: delegation.policyHash,
+              consentHash: delegation.consentHash,
+              expiresAt: delegation.policy.expiresAt,
+              gates: delegation.policy.gates,
+              revoked: delegation.revoked,
+            },
+          }),
     };
   }
 
@@ -2868,6 +2934,7 @@ export class ApexService {
     | { status: "needs_review"; review: Awaited<ReturnType<ApexService["pendingReview"]>> }
     | { status: "task"; task: TaskEnvelopeV1 }
   > {
+    await this.reopenExpiredDelegatedGates();
     const selection = await this.selection();
     let run = await this.run(selection);
     let events = await this.journal(run).replay();
@@ -2885,8 +2952,17 @@ export class ApexService {
       await this.assertGovernanceCandidate(run, governanceInput.request, "reuse");
     }
     if (requirements === undefined) {
+      const lastRequirementsInvalidation = events.findLast(
+        (event) =>
+          event.type === "workflow.invalidated" &&
+          (event.payload as { nodeIds?: string[] }).nodeIds?.includes("requirements"),
+      );
+      const correctedIntake =
+        lastRequirementsInvalidation !== undefined &&
+        this.inputAmendment(lastRequirementsInvalidation)?.kind === "requirements";
       const pending =
-        this.pendingRequirementsRevision(events) === undefined && this.previousRequirementsHash(events) === undefined
+        this.pendingRequirementsRevision(events) === undefined &&
+        (correctedIntake || this.previousRequirementsHash(events) === undefined)
           ? this.nextRequirementsIntakeRound(events)
           : undefined;
       if (pending !== undefined)
@@ -3013,7 +3089,9 @@ export class ApexService {
           (event.payload as { requestId?: unknown } | null)?.requestId === request.requestId,
       )
     ) {
-      throw new ApexError("APEX_CONFLICT", "Input request was already recorded", EXIT_CODES.conflict);
+      throw new ApexError("APEX_CONFLICT", "Input request was already recorded", EXIT_CODES.conflict, {
+        reason: "INPUT_ALREADY_RECORDED",
+      });
     }
     if (input.requestId !== request.requestId) {
       throw new ApexError("APEX_CONFLICT", "Input request ID does not match the pending request", EXIT_CODES.conflict);
@@ -3066,6 +3144,228 @@ export class ApexService {
       throw error;
     }
     return { recorded: true, requestId: request.requestId };
+  }
+
+  async inputHistory(): Promise<{ inputs: RecordedInputV1[] }> {
+    const run = await this.run(await this.selection(), { readOnly: true });
+    return { inputs: this.recordedInputs(await this.journal(run).replay()) };
+  }
+
+  async previewInputAmendment(amendment: InputAmendmentV1, reason: string): Promise<InputAmendmentProposalV1> {
+    amendment = structuredClone(amendment);
+    if (
+      !Value.Check(InputAmendmentV1Schema, amendment) ||
+      Buffer.byteLength(JSON.stringify(amendment), "utf8") > 262_144 ||
+      typeof reason !== "string" ||
+      reason.trim().length === 0 ||
+      reason.length > 2048
+    )
+      throw new ApexError("APEX_VALIDATION", "Invalid or oversized input amendment or reason", EXIT_CODES.validation);
+    const run = await this.run(await this.selection(), { readOnly: true });
+    const events = await this.journal(run).replay();
+    const recorded = this.recordedInputs(events).find(({ requestId }) => requestId === amendment.requestId);
+    if (recorded === undefined)
+      throw new ApexError(
+        "APEX_CONFLICT",
+        "Amendment requires a recorded Requirements or Architecture input",
+        EXIT_CODES.conflict,
+        { reason: "INPUT_NOT_RECORDED" },
+      );
+    if (recorded.baseAnswersHash !== amendment.baseAnswersHash)
+      throw new ApexError("APEX_STALE", "Input amendment base answers are not current", EXIT_CODES.stale);
+    let changes;
+    try {
+      const ids = new Set(amendment.answers.map(({ questionId }) => questionId));
+      if (amendment.answers.some(({ questionId }) => !recorded.questions.some(({ id }) => id === questionId)))
+        throw new Error("Input amendment contains an unknown question");
+      changes = validateInputAnswers(
+        recorded.questions.filter(({ id }) => ids.has(id)),
+        amendment.answers,
+      );
+    } catch (error) {
+      throw new ApexError(
+        "APEX_VALIDATION",
+        error instanceof Error ? error.message : "Invalid amendment answers",
+        EXIT_CODES.validation,
+      );
+    }
+    const answers = validateInputAnswers(recorded.questions, [
+      ...recorded.answers.filter(
+        ({ questionId }) => !amendment.answers.some((change) => change.questionId === questionId),
+      ),
+      ...changes,
+    ]);
+    if (sha256Json(answers) === recorded.baseAnswersHash)
+      throw new ApexError("APEX_VALIDATION", "Input answers are unchanged", EXIT_CODES.validation);
+    const workflow = await this.lockedWorkflowEngine(run);
+    const nodeIds = new Set([
+      recorded.kind,
+      ...workflow.invalidationPlan(recorded.kind, reason.trim()).map(({ nodeId }) => nodeId),
+    ]);
+    for (const descriptor of TASKS)
+      if (descriptor.reviewSubject !== undefined && nodeIds.has(descriptor.reviewSubject)) nodeIds.add(descriptor.id);
+    const body = {
+      schemaVersion: CONTRACT_VERSION,
+      projectId: run.projectId,
+      runId: run.runId,
+      expectedHead: events.at(-1)!.hash,
+      ownerEpoch: run.ownerEpoch,
+      amendment,
+      kind: recorded.kind,
+      previousAnswers: recorded.answers,
+      answers,
+      reason: reason.trim(),
+      invalidatedNodes: [...nodeIds].sort(),
+      invalidatedGates: run.gates.filter(({ gate }) => nodeIds.has(`gate-${gate}`)).map(({ gate }) => gate),
+      reapprovalPath:
+        recorded.kind === "requirements"
+          ? "Recollect dependent intake panels if their questions changed, regenerate Requirements from corrected intake, and rerun affected stages and reviews. Human Gate 1 and Gate 4 decisions remain required; lab Gate 2 and Gate 3 readiness is recorded automatically when required reviews and checks pass."
+          : "Regenerate Architecture from corrected decisions and rerun affected stages and reviews. Gate 1 remains unchanged; a human Gate 4 decision is required for the fresh preview. Lab Gate 2 and Gate 3 readiness is recorded automatically when required reviews and checks pass.",
+      filesModified: false as const,
+      deploymentAuthorized: false as const,
+    };
+    const proposal = { ...body, proposalHash: sha256Json(body) };
+    if (!Value.Check(InputAmendmentProposalV1Schema, proposal))
+      throw new ApexError("APEX_VALIDATION", "Invalid input amendment proposal", EXIT_CODES.validation);
+    // The proposal is embedded in one journal event next to the run transaction, and replay rejects events over 1 MiB.
+    if (Buffer.byteLength(JSON.stringify(proposal), "utf8") > INPUT_AMENDMENT_MAX_PROPOSAL_BYTES)
+      throw new ApexError(
+        "APEX_VALIDATION",
+        "Input amendment is too large to record; shorten the corrected answers",
+        EXIT_CODES.validation,
+        { reason: "INPUT_AMENDMENT_TOO_LARGE", maxBytes: INPUT_AMENDMENT_MAX_PROPOSAL_BYTES },
+      );
+    return proposal;
+  }
+
+  async amendInput(amendment: InputAmendmentV1, options: { reason: string; expectedHash: string; confirm: boolean }) {
+    await this.assertNoPendingReview("amendInput");
+    if (options.confirm !== true)
+      throw new ApexError(
+        "APEX_AUTHORIZATION",
+        "Input amendment requires explicit confirmation",
+        EXIT_CODES.authorization,
+      );
+    const proposal = await this.previewInputAmendment(amendment, options.reason);
+    if (proposal.proposalHash !== options.expectedHash)
+      throw new ApexError(
+        "APEX_STALE",
+        "Input amendment proposal is stale or differs from the confirmed answers",
+        EXIT_CODES.stale,
+      );
+    const run = await this.currentRun();
+    const events = await this.journal(run).replay();
+    if (
+      run.projectId !== proposal.projectId ||
+      run.runId !== proposal.runId ||
+      run.ownerEpoch !== proposal.ownerEpoch ||
+      events.at(-1)?.hash !== proposal.expectedHead
+    )
+      throw new ApexError("APEX_STALE", "Input amendment state is stale", EXIT_CODES.stale);
+    const transfers = new WriterTransferStore(this.projects.runDirectory(run.projectId, run.runId), this.clock);
+    await this.assertCurrentWriterAuthority(run, transfers);
+    this.assertNoInFlightDeployment(events);
+    await this.acquireRunWriterLease(run);
+    const proposalHash = await this.objects.putJson(proposal);
+    const payload = {
+      reason: proposal.reason,
+      nodeIds: proposal.invalidatedNodes,
+      artifactKinds: [
+        ...new Set(TASKS.filter(({ id }) => proposal.invalidatedNodes.includes(id)).flatMap(({ outputs }) => outputs)),
+      ],
+      inputAmendment: proposal,
+      proposalHash,
+    };
+    const dependencyHash = this.dependencyRevision(run, [
+      ...events,
+      { type: "workflow.invalidated", payload } as EventV1,
+    ]);
+    await this.assertCurrentWriterAuthority(run, transfers);
+    await this.mutateRun(
+      run,
+      {
+        ...run,
+        gates: run.gates.map((gate) =>
+          proposal.invalidatedGates.includes(gate.gate) ? invalidateGate(gate, dependencyHash, proposal.reason) : gate,
+        ),
+      },
+      "workflow.invalidated",
+      payload,
+      proposal.expectedHead,
+    );
+    return {
+      amended: true as const,
+      requestId: amendment.requestId,
+      proposalHash,
+      invalidatedNodes: proposal.invalidatedNodes,
+      deploymentAuthorized: false as const,
+    };
+  }
+
+  private recordedInputs(events: EventV1[]): RecordedInputV1[] {
+    const records = new Map<string, RecordedInputV1>();
+    for (const event of events) {
+      if (event.type === "requirements.input-recorded" || event.type === "architecture.decision-recorded") {
+        const submission = event.payload as { requestId: string; answers: InputSubmissionV1["answers"] };
+        const requested = events.find(
+          (entry) =>
+            entry.type ===
+              (event.type === "requirements.input-recorded"
+                ? "requirements.input-requested"
+                : "architecture.decision-requested") &&
+            (entry.payload as { requestId?: unknown }).requestId === submission.requestId,
+        );
+        if (requested === undefined)
+          throw new ApexError("APEX_INTERNAL", "Recorded input has no request", EXIT_CODES.internal);
+        const request =
+          event.type === "requirements.input-recorded"
+            ? this.inputRequest(requested, requested.ownerEpoch)
+            : this.architectureDecisionRequest(requested, requested.ownerEpoch);
+        const answers = validateInputAnswers(request.questions, submission.answers);
+        records.set(submission.requestId, {
+          requestId: submission.requestId,
+          kind: event.type === "requirements.input-recorded" ? "requirements" : "architecture",
+          questions: request.questions,
+          answers,
+          baseAnswersHash: sha256Json(answers),
+        });
+      }
+      const amendment = this.inputAmendment(event);
+      if (amendment !== undefined) {
+        const record = records.get(amendment.amendment.requestId);
+        if (
+          record === undefined ||
+          record.kind !== amendment.kind ||
+          record.baseAnswersHash !== amendment.amendment.baseAnswersHash
+        )
+          throw new ApexError("APEX_INTERNAL", "Persisted input amendment base is invalid", EXIT_CODES.internal);
+        record.answers = amendment.answers;
+        record.baseAnswersHash = sha256Json(record.answers);
+      }
+    }
+    const architectureRequest = this.currentArchitectureInputEvents(events).findLast(
+      ({ type }) => type === "architecture.decision-requested",
+    );
+    const architectureRequestId = (architectureRequest?.payload as { requestId?: string } | undefined)?.requestId;
+    const requirementsRequests = new Map<string, string>();
+    for (const event of events) {
+      if (event.type !== "requirements.input-requested") continue;
+      const payload = event.payload as { requestId: string; intake: { round: string } };
+      requirementsRequests.set(payload.intake.round, payload.requestId);
+    }
+    const currentRequirements = new Set(requirementsRequests.values());
+    return [...records.values()].filter(({ kind, requestId }) =>
+      kind === "requirements" ? currentRequirements.has(requestId) : requestId === architectureRequestId,
+    );
+  }
+
+  private inputAmendment(event: EventV1): InputAmendmentProposalV1 | undefined {
+    if (event.type !== "workflow.invalidated") return undefined;
+    const amendment = (event.payload as { inputAmendment?: unknown }).inputAmendment;
+    if (amendment === undefined) return undefined;
+    if (!Value.Check(InputAmendmentProposalV1Schema, amendment))
+      throw new ApexError("APEX_INTERNAL", "Persisted input amendment is invalid", EXIT_CODES.internal);
+    return amendment;
   }
 
   private async taskReviewMetadata(
@@ -3174,7 +3474,16 @@ export class ApexService {
     if (task.taskType === "policy-refresh")
       outputTemplates["policy-property-map"] = (await this.refreshedPolicyMap(run, events)).policyMap;
     const requirementsRevision = this.pendingRequirementsRevision(events);
-    const requirementsCandidateHash = requirementsRevision?.candidateHash ?? this.previousRequirementsHash(events);
+    const invalidation = events.findLast(
+      (event) =>
+        event.type === "workflow.invalidated" &&
+        (event.payload as { nodeIds?: string[] }).nodeIds?.includes("requirements"),
+    );
+    const requirementsCandidateHash =
+      requirementsRevision?.candidateHash ??
+      (invalidation !== undefined && this.inputAmendment(invalidation)?.kind === "requirements"
+        ? undefined
+        : this.previousRequirementsHash(events));
     if (task.taskType === "requirements" && requirementsCandidateHash !== undefined)
       outputTemplates.requirements = await this.objects.getJson<RequirementsV1>(requirementsCandidateHash);
     const artifactHashes = Object.fromEntries(
@@ -3194,7 +3503,7 @@ export class ApexService {
       })),
       artifactHashes,
       recordedInput: task.taskType === "requirements" ? this.recordedRequirementsInput(events) : null,
-      decisions: task.taskType === "architecture" ? this.architectureDecisionValues(events, task.taskId) : {},
+      decisions: task.taskType === "architecture" ? this.architectureDecisionValues(events) : {},
       ...(task.taskType === "architecture"
         ? { governanceFindings: await this.governanceFindingsSummary(run, events) }
         : task.taskType === "policy-refresh"
@@ -3238,10 +3547,17 @@ export class ApexService {
         "Task context metadata exceeds the locked input byte limit",
         EXIT_CODES.validation,
       );
+    const inlineBudget = WORKER_TASK_ROLES.has(descriptor.role) ? WORKER_TASK_CONTEXT_MAX_BYTES : limits.maxInputBytes;
     for (const [index, value] of values.entries()) {
+      // A larger input stays a reference: the MCP adapter pages taskContext only along `inputs`, so one inlined input
+      // that cannot fit a page alone (the result carries its JSON twice, plus a cursor) would make the whole result
+      // unreturnable. Agents read it with readTaskInput in bounded chunks.
+      if (context.inputReferences[index]!.bytes > TASK_CONTEXT_INLINE_INPUT_MAX_BYTES) continue;
+      const alone = { ...context, inputs: [value] };
+      if (mcpResultEnvelopeBytes(alone) > MCP_MAX_SERIALIZED_RESULT_BYTES - TASK_CONTEXT_PAGE_RESERVE_BYTES) continue;
       context.inputs.push(value);
       context.inputReferences[index]!.inlined = true;
-      if (Buffer.byteLength(JSON.stringify(context)) > limits.maxInputBytes) {
+      if (Buffer.byteLength(JSON.stringify(context)) > inlineBudget) {
         context.inputs.pop();
         context.inputReferences[index]!.inlined = false;
       }
@@ -4356,6 +4672,70 @@ export class ApexService {
     return { taskId, path, bytes: bytes.byteLength, hash, idempotent };
   }
 
+  /** The generator's rejection of an accepted binding is a validation failure the planner can fix, not an internal error. */
+  private generateIacTree(
+    run: RunConfigV1,
+    intent: ImplementationIntentV1,
+    binding: IacBindingV1,
+    options: GenerateIacOptions = {},
+  ) {
+    try {
+      return run.iacTool === "bicep"
+        ? generateBicepTree(intent, binding, {
+            ...(options.existingResources === undefined ? {} : { existingResources: options.existingResources }),
+          })
+        : generateTerraformTree(intent, binding, {
+            ...(options.existingResources === undefined ? {} : { existingResources: options.existingResources }),
+            ...(options.azurermProviderConstraint === undefined
+              ? {}
+              : { azurermProviderConstraint: options.azurermProviderConstraint }),
+            ...(options.azapiProviderConstraint === undefined
+              ? {}
+              : { azapiProviderConstraint: options.azapiProviderConstraint }),
+            ...(options.lockFileContent === undefined ? {} : { lockFileContent: options.lockFileContent }),
+          });
+    } catch (error) {
+      if (error instanceof ApexError) throw error;
+      throw new ApexError(
+        "APEX_VALIDATION",
+        `IaC binding cannot be generated: ${error instanceof Error ? error.message : String(error)}`,
+        EXIT_CODES.validation,
+      );
+    }
+  }
+
+  /**
+   * Fail fast at plan time: dry-run the selected track's generator on the submitted plan, so a binding the generator
+   * rejects is refused here instead of after the review gates. For Bicep, ownership is also resolved when the run
+   * targets an exact resource group; without one, only AVM bindings with no physical resource map are refused here.
+   */
+  private assertPlanGeneratable(run: RunConfigV1, intent: ImplementationIntentV1, binding: IacBindingV1): void {
+    const tree = this.generateIacTree(run, intent, binding);
+    if (run.iacTool !== "bicep") return;
+    const issues = bicepResourceGroupScopePattern.test(run.targetScope)
+      ? resolveNativeBicepResourceOwnership({
+          intent,
+          binding,
+          manifest: tree.logicalManifest,
+          targetScope: run.targetScope,
+        }).issues
+      : Object.entries(binding.resourceBindings)
+          .filter(([, entry]) => entry.implementation.startsWith("avm:") && entry.physicalResources === undefined)
+          .map(([id]) => ({
+            path: `/binding/resourceBindings/${id}`,
+            message: "Bicep module ownership is unresolved; AVM requires a bounded exact physical resource map",
+          }));
+    if (issues.length > 0)
+      throw new ApexError(
+        "APEX_VALIDATION",
+        `IaC binding is not accepted: ${issues
+          .slice(0, 8)
+          .map(({ path, message }) => `${path}: ${message}`)
+          .join("; ")}`,
+        EXIT_CODES.validation,
+      );
+  }
+
   async generateIac(
     taskId: string,
     options: GenerateIacOptions = {},
@@ -4388,21 +4768,7 @@ export class ApexService {
         EXIT_CODES.validation,
       );
     }
-    const tree =
-      run.iacTool === "bicep"
-        ? generateBicepTree(intent, binding, {
-            ...(options.existingResources === undefined ? {} : { existingResources: options.existingResources }),
-          })
-        : generateTerraformTree(intent, binding, {
-            ...(options.existingResources === undefined ? {} : { existingResources: options.existingResources }),
-            ...(options.azurermProviderConstraint === undefined
-              ? {}
-              : { azurermProviderConstraint: options.azurermProviderConstraint }),
-            ...(options.azapiProviderConstraint === undefined
-              ? {}
-              : { azapiProviderConstraint: options.azapiProviderConstraint }),
-            ...(options.lockFileContent === undefined ? {} : { lockFileContent: options.lockFileContent }),
-          });
+    const tree = this.generateIacTree(run, intent, binding, options);
     const files: StagedFile[] = [];
     const sourceRoot =
       previousHandoff?.treeHash === tree.treeHash
@@ -4899,24 +5265,7 @@ export class ApexService {
       throw new ApexError("APEX_STALE", "Requirements change state is stale", EXIT_CODES.stale);
     const transfers = new WriterTransferStore(this.projects.runDirectory(run.projectId, run.runId), this.clock);
     await this.assertCurrentWriterAuthority(run, transfers);
-    for (const [index, event] of events.entries()) {
-      if (!["deployment.started", "deployment.executed", "deployment.indeterminate"].includes(event.type)) continue;
-      const previewHash = (event.payload as { previewHash?: string }).previewHash;
-      if (
-        !events
-          .slice(index + 1)
-          .some(
-            (entry) =>
-              entry.type === "deployment.completed" &&
-              (entry.payload as { previewHash?: string }).previewHash === previewHash,
-          )
-      )
-        throw new ApexError(
-          "APEX_CONFLICT",
-          "Deployment is in-flight or indeterminate; reconcile before requirements revision",
-          EXIT_CODES.conflict,
-        );
-    }
+    this.assertNoInFlightDeployment(events);
     await this.acquireRunWriterLease(run);
     const candidateHash = await this.objects.putJson(candidate);
     const proposalHash = await this.objects.putJson(proposal);
@@ -4951,6 +5300,27 @@ export class ApexService {
       invalidatedNodes: proposal.invalidatedNodes,
       deploymentAuthorized: false as const,
     };
+  }
+
+  private assertNoInFlightDeployment(events: EventV1[]): void {
+    for (const [index, event] of events.entries()) {
+      if (!["deployment.started", "deployment.executed", "deployment.indeterminate"].includes(event.type)) continue;
+      const previewHash = (event.payload as { previewHash?: string }).previewHash;
+      if (
+        !events
+          .slice(index + 1)
+          .some(
+            (entry) =>
+              entry.type === "deployment.completed" &&
+              (entry.payload as { previewHash?: string }).previewHash === previewHash,
+          )
+      )
+        throw new ApexError(
+          "APEX_CONFLICT",
+          "Deployment is in-flight or indeterminate; reconcile before changing workflow inputs",
+          EXIT_CODES.conflict,
+        );
+    }
   }
 
   private pendingRequirementsRevision(events: EventV1[]) {
@@ -6856,13 +7226,214 @@ export class ApexService {
     }
   }
 
+  async labDelegation(): Promise<{
+    policyHash: string;
+    consentHash: string;
+    policy: LabDelegationPolicyV1;
+    consent: LabDelegationConsentV1;
+    revoked: boolean;
+  }> {
+    const run = await this.currentRun();
+    const events = await this.journal(run).replay();
+    return this.readLabDelegation(events);
+  }
+
+  private async readLabDelegation(events: Awaited<ReturnType<EventJournal["replay"]>>): Promise<{
+    policyHash: string;
+    consentHash: string;
+    policy: LabDelegationPolicyV1;
+    consent: LabDelegationConsentV1;
+    revoked: boolean;
+  }> {
+    const event = [...events].reverse().find(({ type }) => type === "lab.delegation-consented");
+    const payload = event?.payload as { policyHash?: string; consentHash?: string } | undefined;
+    if (payload?.policyHash === undefined || payload.consentHash === undefined)
+      throw new ApexError(
+        "APEX_AUTHORIZATION",
+        "No human lab delegation consent has been recorded",
+        EXIT_CODES.authorization,
+      );
+    const policy = await this.objects.getJson<LabDelegationPolicyV1>(payload.policyHash);
+    const consent = await this.objects.getJson<LabDelegationConsentV1>(payload.consentHash);
+    if (sha256Json(policy) !== payload.policyHash || sha256Json(consent) !== payload.consentHash)
+      throw new ApexError(
+        "APEX_AUTHORIZATION",
+        "Delegation receipt content does not match its hash",
+        EXIT_CODES.authorization,
+      );
+    return {
+      policyHash: payload.policyHash,
+      consentHash: payload.consentHash,
+      policy,
+      consent,
+      revoked: events.some(
+        ({ type, payload: value, sequence }) =>
+          type === "lab.delegation-revoked" &&
+          sequence > event!.sequence &&
+          (value as { policyHash?: string }).policyHash === payload.policyHash,
+      ),
+    };
+  }
+
+  async confirmLabDelegation(
+    policy: LabDelegationPolicyV1,
+    confirm: (policyHash: string) => Promise<{ actor: string }>,
+  ): Promise<Awaited<ReturnType<ApexService["labDelegation"]>>> {
+    await this.assertNoPendingReview("gateDecide");
+    this.assertValid("lab-delegation-policy", policy);
+    const run = await this.currentRun();
+    await this.assertCurrentWriterAuthority(
+      run,
+      new WriterTransferStore(this.projects.runDirectory(run.projectId, run.runId), this.clock),
+    );
+    const events = await this.journal(run).replay();
+    const requirementsHash = this.artifactHash(events, "requirements");
+    if (requirementsHash === undefined)
+      throw new ApexError(
+        "APEX_AUTHORIZATION",
+        "Accepted Requirements must exist before human policy confirmation",
+        EXIT_CODES.authorization,
+      );
+    const requirements = await this.objects.getJson<RequirementsV1>(requirementsHash);
+    const recipient = await this.currentRecipientIdentity(run);
+    delegationCheck(() => assertLabDelegationPolicy(policy, run, requirements, recipient, this.clock().toISOString()));
+    const policyHash = sha256Json(policy);
+    const { actor } = await this.waitOutsideWorkspaceLock(() => confirm(policyHash));
+    const consent: LabDelegationConsentV1 = {
+      schemaVersion: CONTRACT_VERSION,
+      policyHash,
+      actor,
+      mechanism: "terminal-policy-confirmation",
+      userOwnedScopeConfirmed: true,
+      syntheticNonSensitiveConfirmed: true,
+      futurePreviewReviewed: false,
+      consentedAt: this.clock().toISOString(),
+      expiresAt: policy.expiresAt,
+    };
+    this.assertValid("lab-delegation-consent", consent);
+    delegationCheck(() => assertLabDelegationPolicy(policy, run, requirements, recipient, consent.consentedAt));
+    await this.acquireRunWriterLease(run);
+    await this.objects.putJson(policy);
+    const consentHash = await this.objects.putJson(consent);
+    await this.mutateRun(
+      run,
+      run,
+      "lab.delegation-consented",
+      { policyHash, consentHash },
+      events.at(-1)?.hash ?? null,
+    );
+    return this.labDelegation();
+  }
+
+  async revokeLabDelegation(policyHash: string): Promise<{ revoked: string }> {
+    const current = await this.labDelegation();
+    if (current.policyHash !== policyHash || current.revoked)
+      throw new ApexError("APEX_AUTHORIZATION", "The requested delegation is not active", EXIT_CODES.authorization);
+    const run = await this.currentRun();
+    const events = await this.journal(run).replay();
+    await this.acquireRunWriterLease(run);
+    await this.mutateRun(run, run, "lab.delegation-revoked", { policyHash }, events.at(-1)?.hash ?? null);
+    return { revoked: policyHash };
+  }
+
+  private async delegatedContext(
+    run: RunConfigV1,
+    gate: 1 | 4,
+    options: DelegatedGateOptions,
+    events: Awaited<ReturnType<EventJournal["replay"]>>,
+    preview?: DeploymentPreviewV1,
+    approvalContextHash?: string,
+  ): Promise<LabDelegationContext> {
+    const transfers = new WriterTransferStore(this.projects.runDirectory(run.projectId, run.runId), this.clock);
+    await this.assertCurrentWriterAuthority(run, transfers);
+    const lease = await transfers.leaseStore().current();
+    const current = await this.readLabDelegation(events);
+    if (current.revoked || current.policyHash !== options.policyHash || current.consentHash !== options.consentHash)
+      throw new ApexError(
+        "APEX_AUTHORIZATION",
+        "Delegation consent is revoked or does not match the request",
+        EXIT_CODES.authorization,
+      );
+    const requirementsHash = this.artifactHash(events, "requirements");
+    if (requirementsHash === undefined)
+      throw new ApexError("APEX_AUTHORIZATION", "Current accepted Requirements are required", EXIT_CODES.authorization);
+    const requirements = await this.objects.getJson<RequirementsV1>(requirementsHash);
+    const providerEvent = [...events].reverse().find(({ type }) => type === "preview.created");
+    const providerName = (providerEvent?.payload as { provider?: string } | undefined)?.provider;
+    let scope: LabDelegationContext["scope"];
+    if (gate === 4) {
+      if (preview?.operation !== "apply")
+        throw new ApexError(
+          "APEX_AUTHORIZATION",
+          "Delegated destroy is unsupported; use its own preview and normal human approval",
+          EXIT_CODES.authorization,
+          { reason: "LAB_DELEGATION_DESTROY_UNSUPPORTED" },
+        );
+      if (options.previewHash !== preview.previewHash || options.approvalContextHash !== approvalContextHash)
+        throw new ApexError(
+          "APEX_STALE",
+          "Delegation must request the exact current preview and immutable context",
+          EXIT_CODES.stale,
+        );
+      await this.readApprovalContext(run, preview.previewHash, approvalContextHash);
+      const provider = providerName === "bicep" ? this.providers.bicep : undefined;
+      if (provider?.labApplyScope === undefined || provider.validationMode === "simulated")
+        throw new ApexError(
+          "APEX_AUTHORIZATION",
+          "Native azd scope observations are unavailable; fake previews and external ledgers cannot authorize delegated apply",
+          EXIT_CODES.authorization,
+          { reason: "LAB_DELEGATION_SCOPE_UNPROVEN" },
+        );
+      scope = await this.whileExternalProcessRuns(() => provider.labApplyScope!(preview.previewHash));
+      await this.objects.putJson(scope);
+    } else if (options.previewHash !== undefined || options.approvalContextHash !== undefined) {
+      throw new ApexError("APEX_USAGE", "Gate 1 has no deployment preview context", EXIT_CODES.usage);
+    }
+    return {
+      policy: current.policy,
+      consent: current.consent,
+      consentHash: options.consentHash,
+      activePolicyHash: current.policyHash,
+      activeConsentHash: current.consentHash,
+      run,
+      gate,
+      now: this.clock().toISOString(),
+      recipientIdentity: await this.currentRecipientIdentity(run),
+      requirements,
+      reviewBlockers: (gate === 1
+        ? ["requirements-review"]
+        : ["requirements-review", "architecture-review", "plan-review"]
+      ).flatMap((node) => this.reviewBlockers(events, node)),
+      dependencyRevision: this.dependencyRevision(run, events),
+      ...(lease === null ? {} : { authorityExpiresAt: lease.expiresAt }),
+      ...(preview === undefined ? {} : { preview }),
+      ...(approvalContextHash === undefined ? {} : { approvalContextHash }),
+      ...(scope === undefined ? {} : { scope }),
+    };
+  }
+
+  async decideDelegatedGate(gate: 1 | 4, options: DelegatedGateOptions): Promise<ApprovalEvidenceV1> {
+    if (gate !== 1 && gate !== 4)
+      throw new ApexError("APEX_USAGE", "Only Gate 1 and apply Gate 4 may be delegated", EXIT_CODES.usage);
+    return this.decideGateNumber(gate, "approved", "agent", { delegation: options });
+  }
+
   async decideGateNumber(
     gateNumber: number,
     decision: "approved" | "rejected",
     actor: string,
     options: GateDecisionOptions = {},
   ): Promise<ApprovalEvidenceV1> {
-    await this.assertNoPendingReview("gateDecide");
+    await this.assertNoPendingReview(options.delegation === undefined ? "gateDecide" : "gateDelegate");
+    if (options.delegation !== undefined && (decision !== "approved" || (gateNumber !== 1 && gateNumber !== 4)))
+      throw new ApexError(
+        "APEX_USAGE",
+        "Delegation is limited to approved Gate 1 or apply Gate 4 decisions",
+        EXIT_CODES.usage,
+      );
+    if (options.delegation !== undefined && options.recipientIdentity !== undefined)
+      throw new ApexError("APEX_USAGE", "Delegation cannot override its current execution recipient", EXIT_CODES.usage);
+    await this.reopenExpiredDelegatedGates();
     const run = await this.currentRun();
     if (isReadinessGate(run.purpose, gateNumber)) {
       throw new ApexError(
@@ -6946,11 +7517,25 @@ export class ApexService {
       decidedAt,
       ...(approvalExpiresAt === undefined ? {} : { expiresAt: approvalExpiresAt }),
     };
-    const approval: ApprovalEvidenceV1 = {
-      ...commonApproval,
-      mechanism: "tty",
-      recipientIdentity: approvalRecipientIdentity,
-    };
+    const delegation =
+      options.delegation === undefined
+        ? undefined
+        : await this.delegatedContext(
+            run,
+            gateNumber as 1 | 4,
+            options.delegation,
+            events,
+            preview,
+            approvalContextHash,
+          );
+    const approval: ApprovalEvidenceV1 =
+      delegation === undefined
+        ? {
+            ...commonApproval,
+            mechanism: "tty",
+            recipientIdentity: approvalRecipientIdentity,
+          }
+        : delegationCheck(() => evaluateLabDelegation(delegation));
     this.assertValid("approval", approval);
     const validatorIds =
       decision === "approved"
@@ -6966,7 +7551,9 @@ export class ApexService {
     const approvalHash = await this.objects.putJson(approval);
     const updated = {
       ...run,
-      gates: run.gates.map((item) => (item.gate === gateNumber ? decideGate(item, decision, decidedAt) : item)),
+      gates: run.gates.map((item) =>
+        item.gate === gateNumber ? decideGate(item, decision, approval.decidedAt) : item,
+      ),
     };
     await this.mutateRun(
       run,
@@ -6978,8 +7565,17 @@ export class ApexService {
         ...(previewHash === undefined ? {} : { previewHash }),
         ...(approvalContextHash === undefined ? {} : { approvalContextHash }),
         ...(validatorIds.length === 0 ? {} : { validatorIds }),
+        ...(approval.mechanism !== "lab-delegation"
+          ? {}
+          : {
+              mechanism: approval.mechanism,
+              policyHash: approval.policyHash,
+              consentHash: approval.consentHash,
+              expiresAt: approval.expiresAt!,
+              writerEpoch: approval.writerEpoch,
+            }),
       },
-      gateNumber === 4 ? (events.at(-1)?.hash ?? null) : undefined,
+      gateNumber === 4 || delegation !== undefined ? (events.at(-1)?.hash ?? null) : undefined,
       preview !== undefined && approvalContextHash !== undefined
         ? async (lockedRun) => {
             if (decision === "approved")
@@ -6991,11 +7587,29 @@ export class ApexService {
                 approvalRecipientIdentity,
                 lockedRun,
               );
+            if (delegation !== undefined)
+              delegationCheck(() =>
+                evaluateLabDelegation({ ...delegation, run: lockedRun, now: this.clock().toISOString() }),
+              );
             await this.assertApprovalContextReviewed(run, preview.previewHash, approvalContextHash);
             if (approval.expiresAt === undefined || Date.parse(approval.expiresAt) <= this.clock().getTime())
               throw new ApexError("APEX_STALE", "Approval authority expired before commit", EXIT_CODES.stale);
           }
-        : undefined,
+        : delegation === undefined
+          ? undefined
+          : async (lockedRun) => {
+              delegationCheck(() =>
+                evaluateLabDelegation({ ...delegation, run: lockedRun, now: this.clock().toISOString() }),
+              );
+              await this.validateGateValidators(
+                lockedRun,
+                gate,
+                events,
+                approval,
+                approvalRecipientIdentity,
+                lockedRun,
+              );
+            },
     );
     if (gateNumber === 4) await this.materializeOperationsApprovalPackage(run, approval, approvalHash);
     return approval;
@@ -7767,6 +8381,22 @@ export class ApexService {
         "Approval does not bind the immutable preview review context",
         EXIT_CODES.authorization,
       );
+    if (approval.mechanism === "lab-delegation") {
+      const context = await this.delegatedContext(
+        run,
+        4,
+        {
+          policyHash: approval.policyHash,
+          consentHash: approval.consentHash,
+          previewHash: preview.previewHash,
+          ...(approvalContextHash === undefined ? {} : { approvalContextHash }),
+        },
+        events,
+        preview,
+        approvalContextHash,
+      );
+      delegationCheck(() => verifyLabDelegationApproval(context, approval));
+    }
     const providerName = [...events].reverse().find((event) => event.type === "preview.created")?.payload as
       { provider?: unknown } | undefined;
     const provider =
@@ -8058,7 +8688,11 @@ export class ApexService {
     const inherited = promoted.gates.map((gate) => {
       const sourceGate = source.gates.find(({ gate: number }) => number === gate.gate)!;
       // Gate 1 binds the target, so a changed target needs a fresh human confirmation in the new run.
-      const inheritable = sameScope && gate.gate <= 3;
+      const sourceDecision = sourceEvents.findLast(
+        (event) => event.type === "gate.decided" && (event.payload as { gate?: number }).gate === gate.gate,
+      );
+      const delegated = (sourceDecision?.payload as { mechanism?: string } | undefined)?.mechanism === "lab-delegation";
+      const inheritable = sameScope && gate.gate <= 3 && !delegated;
       return inheritable && (sourceGate.state === "approved" || sourceGate.state === "inherited")
         ? inheritGate(sourceGate, source.runId, sourceGate.dependencyHash, this.clock().toISOString())
         : gate;
@@ -8932,7 +9566,9 @@ export class ApexService {
     taskId?: string;
     staleTaskId?: string;
   } {
-    const requested = [...events].reverse().find((event) => event.type === "architecture.decision-requested");
+    const requested = this.currentArchitectureInputEvents(events).findLast(
+      (event) => event.type === "architecture.decision-requested",
+    );
     if (requested === undefined) return {};
     const request = this.architectureDecisionRequest(requested, requested.ownerEpoch);
     const recorded = events.some(
@@ -8949,27 +9585,18 @@ export class ApexService {
 
   private architectureDecisionValues(
     events: Awaited<ReturnType<EventJournal["replay"]>>,
-    taskId: string,
   ): Record<string, InputValueV1> {
-    const result: Record<string, InputValueV1> = {};
-    for (const event of events) {
-      if (event.type !== "architecture.decision-recorded") continue;
-      const payload = event.payload as { decision?: { taskId?: unknown; id?: unknown }; answers?: unknown };
-      if (
-        payload.decision?.taskId !== taskId ||
-        typeof payload.decision.id !== "string" ||
-        !Array.isArray(payload.answers)
-      ) {
-        continue;
-      }
-      for (const answer of payload.answers) {
-        const value = answer as { questionId?: unknown; value?: unknown };
-        if (typeof value.questionId === "string" && Value.Check(InputValueV1Schema, value.value)) {
-          result[value.questionId] = value.value;
-        }
-      }
-    }
-    return result;
+    const recorded = this.recordedInputs(events).find(({ kind }) => kind === "architecture");
+    return Object.fromEntries((recorded?.answers ?? []).map(({ questionId, value }) => [questionId, value]));
+  }
+
+  private currentArchitectureInputEvents(events: EventV1[]): EventV1[] {
+    const invalidation = events.findLastIndex(
+      (event) =>
+        event.type === "workflow.invalidated" &&
+        (event.payload as { nodeIds?: string[] }).nodeIds?.includes("requirements"),
+    );
+    return events.slice(invalidation + 1);
   }
 
   private async issueArchitectureDecision(run: RunConfigV1, task: TaskEnvelopeV1): Promise<InputRequestV1> {
@@ -9007,21 +9634,25 @@ export class ApexService {
       ),
     );
     const catalog = REQUIREMENTS_INTAKE;
-    const latest = requests.at(-1);
-    if (latest !== undefined && !recordedRequestIds.has((latest.payload as { requestId: string }).requestId)) {
-      const intake = (latest.payload as { intake: { ordinal?: unknown; round?: unknown; total?: unknown } }).intake;
-      const ordinal = intake.ordinal;
-      const round = typeof ordinal === "number" && Number.isInteger(ordinal) ? catalog[ordinal - 1] : undefined;
-      if (round === undefined || intake.round !== round.round || intake.total !== catalog.length) {
-        throw new ApexError(
-          "APEX_CONFLICT",
-          "Requirements intake is incompatible; start a new run",
-          EXIT_CODES.conflict,
-        );
-      }
-      return round;
+    for (const round of catalog) {
+      const latest = requests.findLast(
+        (event) => (event.payload as { intake: { round: string } }).intake.round === round.round,
+      );
+      if (latest === undefined || !recordedRequestIds.has((latest.payload as { requestId: string }).requestId))
+        return round;
+      const original = this.inputRequest(latest, latest.ownerEpoch).questions;
+      const current = this.requirementsIntakeQuestions(round, events);
+      const shape = (questions: InputRequestV1["questions"]) =>
+        questions.map(({ id, options, multiSelect, valueType, optional }) => ({
+          id,
+          options: options ?? null,
+          multiSelect: multiSelect ?? false,
+          valueType: valueType ?? null,
+          optional: optional ?? false,
+        }));
+      if (sha256Json(shape(original)) !== sha256Json(shape(current))) return round;
     }
-    return catalog[recordedRequestIds.size];
+    return undefined;
   }
 
   private async issueRequirementsInput(run: RunConfigV1, round: RequirementsIntakeRound): Promise<InputRequestV1> {
@@ -9037,7 +9668,12 @@ export class ApexService {
           event.type === "requirements.input-recorded" &&
           (event.payload as { requestId?: unknown }).requestId === (latest.payload as { requestId: string }).requestId,
       );
-      if (!recorded && latest.hash === events.at(-1)?.hash && latest.ownerEpoch === run.ownerEpoch) {
+      if (
+        !recorded &&
+        latest.hash === events.at(-1)?.hash &&
+        latest.ownerEpoch === run.ownerEpoch &&
+        (latest.payload as { intake: { round: string } }).intake.round === round.round
+      ) {
         return this.inputRequest(latest, run.ownerEpoch);
       }
     }
@@ -9539,21 +10175,9 @@ export class ApexService {
     events: Awaited<ReturnType<EventJournal["replay"]>>,
   ): Record<string, InputValueV1> | null {
     const result: Record<string, InputValueV1> = {};
-    let recorded = false;
-    for (const event of events) {
-      if (event.type !== "requirements.input-recorded") continue;
-      const answers = (event.payload as { answers?: unknown }).answers;
-      if (!Array.isArray(answers)) continue;
-      recorded = true;
-      for (const answer of answers) {
-        const value = answer as { questionId?: unknown; value?: unknown };
-        if (typeof value.questionId !== "string" || !Value.Check(InputValueV1Schema, value.value)) {
-          throw new ApexError("APEX_INTERNAL", "Recorded requirements input is invalid", EXIT_CODES.internal);
-        }
-        result[value.questionId] = value.value as InputValueV1;
-      }
-    }
-    return recorded ? result : null;
+    const records = this.recordedInputs(events).filter(({ kind }) => kind === "requirements");
+    for (const record of records) for (const { questionId, value } of record.answers) result[questionId] = value;
+    return records.length > 0 ? result : null;
   }
 
   private outputTemplate(
@@ -10127,9 +10751,65 @@ export class ApexService {
     events: Awaited<ReturnType<EventJournal["replay"]>>,
   ): boolean {
     const gate = run.gates.find((candidate) => candidate.gate === gateNumber);
-    if (gate?.state === "approved" || gate?.state === "inherited") return true;
+    if (gate?.state === "approved" || gate?.state === "inherited") {
+      const decision = events.findLast(
+        (event) => event.type === "gate.decided" && (event.payload as { gate?: number }).gate === gateNumber,
+      );
+      const payload = decision?.payload as
+        | {
+            mechanism?: string;
+            policyHash?: string;
+            consentHash?: string;
+            expiresAt?: string;
+            writerEpoch?: number;
+          }
+        | undefined;
+      if (payload?.mechanism !== "lab-delegation") return true;
+      const consent = events.findLast(({ type }) => type === "lab.delegation-consented");
+      const active = consent?.payload as { policyHash?: string; consentHash?: string } | undefined;
+      return (
+        run.purpose === "lab" &&
+        gate.state === "approved" &&
+        payload.writerEpoch === run.ownerEpoch &&
+        payload.expiresAt !== undefined &&
+        Date.parse(payload.expiresAt) > this.clock().getTime() &&
+        active?.policyHash === payload.policyHash &&
+        active?.consentHash === payload.consentHash &&
+        !events.some(
+          (event) =>
+            event.type === "lab.delegation-revoked" &&
+            event.sequence > (consent?.sequence ?? 0) &&
+            (event.payload as { policyHash?: string }).policyHash === payload.policyHash,
+        )
+      );
+    }
     if (gate?.state !== "ready" || !isReadinessGate(run.purpose, gateNumber)) return false;
     return this.readinessProven(run, gate, events);
+  }
+
+  private async reopenExpiredDelegatedGates(): Promise<void> {
+    const run = await this.currentRun();
+    const events = await this.journal(run).replay();
+    const expired = run.gates.filter(
+      (gate) => gate.state === "approved" && !this.gateSatisfied(run, gate.gate, events),
+    );
+    if (expired.length === 0) return;
+    await this.acquireRunWriterLease(run);
+    for (const gate of expired) {
+      const current = await this.currentRun();
+      const updated = {
+        ...current,
+        gates: current.gates.map((item) =>
+          item.gate !== gate.gate
+            ? item
+            : openGate(
+                invalidateGate(item, item.dependencyHash, "Delegation expired, was revoked, or changed writer"),
+                item.dependencyHash,
+              ),
+        ),
+      };
+      await this.mutateRun(current, updated, "gate.opened", { gate: gate.gate, dependencyHash: gate.dependencyHash });
+    }
   }
 
   /**
@@ -10414,6 +11094,7 @@ export class ApexService {
           EXIT_CODES.validation,
         );
       }
+      this.assertPlanGeneratable(run, intent, binding);
     }
     if (descriptor.id.startsWith("codegen-")) {
       const manifest = byKind["logical-resource-manifest"] as LogicalResourceManifestV1;

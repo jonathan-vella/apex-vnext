@@ -210,6 +210,21 @@ test("rejects unknown managed agent tool names while accepting the central inven
   assert.ok(hasRule(retiredServerResult, "customization.mcp-tool"));
 });
 
+test("accepts read_agent on APEX only, never on hidden workers", () => {
+  assert.ok(
+    !hasRule(
+      mutate(() => {}),
+      "customization.unknown-tool",
+    ),
+  );
+  const worker = mutate((model) => {
+    model.customization.agents
+      .find(({ frontmatter }) => frontmatter.name === "APEX Validator")
+      .frontmatter.tools.push("read_agent");
+  });
+  assert.ok(hasRule(worker, "customization.worker-read-tool"));
+});
+
 test("rejects ask_user on an autonomous subagent", () => {
   const result = mutate((model) => {
     model.customization.agents

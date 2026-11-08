@@ -23,6 +23,8 @@ export interface ProcessRequest {
   readonly env?: NodeJS.ProcessEnv;
   readonly timeoutMs: number;
   readonly maxOutputBytes: number;
+  /** Skip secret redaction; only for compiler JSON consumed in memory and never persisted or displayed. */
+  readonly rawOutput?: boolean;
 }
 
 export interface ProcessResult {
@@ -124,7 +126,7 @@ export class ProcessRunner implements ProcessRunnerLike {
         const result: ProcessResult = {
           exitCode,
           signal,
-          stdout: redactProcessOutput(stdout.toString("utf8")),
+          stdout: request.rawOutput === true ? stdout.toString("utf8") : redactProcessOutput(stdout.toString("utf8")),
           stderr: redactProcessOutput(stderr.toString("utf8")),
           timedOut,
           outputTruncated,

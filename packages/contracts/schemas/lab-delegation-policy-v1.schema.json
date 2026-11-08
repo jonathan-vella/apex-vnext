@@ -1,0 +1,114 @@
+{
+  "$id": "https://schemas.apexops.dev/lab-delegation-policy-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "cloud": {
+      "const": "AzureCloud",
+      "type": "string"
+    },
+    "environment": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    },
+    "expiresAt": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "gates": {
+      "items": {
+        "anyOf": [
+          {
+            "const": 1,
+            "type": "number"
+          },
+          {
+            "const": 4,
+            "type": "number"
+          }
+        ]
+      },
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "operation": {
+      "const": "apply",
+      "type": "string"
+    },
+    "projectId": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    },
+    "purpose": {
+      "const": "lab",
+      "type": "string"
+    },
+    "recipientIdentity": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "requirementsHash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "resourceIds": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 256,
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "runId": {
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "subscriptionId": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "type": "string"
+    },
+    "targetScope": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "tenantId": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "type": "string"
+    },
+    "track": {
+      "const": "bicep",
+      "type": "string"
+    },
+    "writerEpoch": {
+      "minimum": 1,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "projectId",
+    "runId",
+    "purpose",
+    "environment",
+    "track",
+    "cloud",
+    "tenantId",
+    "subscriptionId",
+    "targetScope",
+    "requirementsHash",
+    "resourceIds",
+    "gates",
+    "operation",
+    "writerEpoch",
+    "recipientIdentity",
+    "expiresAt"
+  ],
+  "type": "object"
+}

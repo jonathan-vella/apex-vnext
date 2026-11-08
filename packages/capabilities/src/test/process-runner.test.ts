@@ -29,6 +29,25 @@ test("process output redaction handles structured secrets, connection strings, a
   assert.match(text, /Bearer \[REDACTED\]/);
 });
 
+test("process runner keeps compiler JSON unredacted only when rawOutput is requested", async () => {
+  const script = "console.log(JSON.stringify({ resources: { secret_vault: { type: 'x' } } }))";
+  const redacted = await runner.run({
+    executable: process.execPath,
+    args: ["-e", script],
+    timeoutMs: 1_000,
+    maxOutputBytes: 1_024,
+  });
+  assert.equal(JSON.parse(redacted.stdout).resources.secret_vault, "[REDACTED]");
+  const raw = await runner.run({
+    executable: process.execPath,
+    args: ["-e", script],
+    timeoutMs: 1_000,
+    maxOutputBytes: 1_024,
+    rawOutput: true,
+  });
+  assert.deepEqual(JSON.parse(raw.stdout).resources.secret_vault, { type: "x" });
+});
+
 test("process runner returns stable timeout and output-limit errors", async () => {
   await assert.rejects(
     runner.run({

@@ -10,6 +10,202 @@
           "type": "string"
         },
         "approvalContextHash": {
+          "not": {}
+        },
+        "consentHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "decidedAt": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$",
+          "type": "string"
+        },
+        "decision": {
+          "const": "approved",
+          "type": "string"
+        },
+        "dependencyHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "evaluator": {
+          "const": "kernel-lab-delegation-v1",
+          "type": "string"
+        },
+        "expiresAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "gate": {
+          "const": 1,
+          "type": "number"
+        },
+        "mechanism": {
+          "const": "lab-delegation",
+          "type": "string"
+        },
+        "policyHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "previewHash": {
+          "not": {}
+        },
+        "projectId": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "recipientIdentity": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "runId": {
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": "1.0.0",
+          "type": "string"
+        },
+        "scopeEvidenceHash": {
+          "not": {}
+        },
+        "writerEpoch": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "writerTransferClaimHash": {
+          "not": {}
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "projectId",
+        "runId",
+        "gate",
+        "decision",
+        "actor",
+        "dependencyHash",
+        "writerEpoch",
+        "decidedAt",
+        "expiresAt",
+        "mechanism",
+        "recipientIdentity",
+        "policyHash",
+        "consentHash",
+        "evaluator"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "actor": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "approvalContextHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "consentHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "decidedAt": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$",
+          "type": "string"
+        },
+        "decision": {
+          "const": "approved",
+          "type": "string"
+        },
+        "dependencyHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "evaluator": {
+          "const": "kernel-lab-delegation-v1",
+          "type": "string"
+        },
+        "expiresAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "gate": {
+          "const": 4,
+          "type": "number"
+        },
+        "mechanism": {
+          "const": "lab-delegation",
+          "type": "string"
+        },
+        "policyHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "previewHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "projectId": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "recipientIdentity": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "runId": {
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": "1.0.0",
+          "type": "string"
+        },
+        "scopeEvidenceHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "writerEpoch": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "writerTransferClaimHash": {
+          "not": {}
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "projectId",
+        "runId",
+        "gate",
+        "decision",
+        "actor",
+        "dependencyHash",
+        "previewHash",
+        "approvalContextHash",
+        "writerEpoch",
+        "decidedAt",
+        "expiresAt",
+        "mechanism",
+        "recipientIdentity",
+        "policyHash",
+        "consentHash",
+        "evaluator",
+        "scopeEvidenceHash"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "actor": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "approvalContextHash": {
           "pattern": "^[0-9a-f]{64}$",
           "type": "string"
         },

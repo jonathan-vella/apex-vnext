@@ -6,6 +6,7 @@ export * from "./deployment.js";
 export * from "./evidence.js";
 export * from "./governance-observation.js";
 export * from "./improvement.js";
+export * from "./lab-delegation.js";
 export * from "./native-validation.js";
 export * from "./onboarding.js";
 export * from "./pricing.js";
@@ -21,6 +22,7 @@ import {
   RequirementsChangeProposalV1Schema,
 } from "./artifacts.js";
 import { AzdBindingV1Schema } from "./azd-binding.js";
+import { LabDelegationPolicyV1Schema, LabDelegationConsentV1Schema, LabApplyScopeV1Schema } from "./lab-delegation.js";
 import {
   ArchetypeSourceProposalV1Schema,
   ArchetypeBatchConfigV1Schema,
@@ -67,6 +69,8 @@ import {
   EventV1Schema,
   InputRequestV1Schema,
   InputSubmissionV1Schema,
+  InputAmendmentV1Schema,
+  InputAmendmentProposalV1Schema,
   ProjectConfigV1Schema,
   RepeatGuardRecordsV1Schema,
   RunConfigV1Schema,
@@ -95,6 +99,9 @@ import {
 } from "./targets.js";
 
 export const contractSchemas = [
+  LabDelegationPolicyV1Schema,
+  LabDelegationConsentV1Schema,
+  LabApplyScopeV1Schema,
   GovernanceProvisionPlanV1Schema,
   RepositoryPublishConfigV1Schema,
   RepositoryPublishPlanV1Schema,
@@ -110,6 +117,8 @@ export const contractSchemas = [
   TaskEnvelopeV1Schema,
   InputRequestV1Schema,
   InputSubmissionV1Schema,
+  InputAmendmentV1Schema,
+  InputAmendmentProposalV1Schema,
   EventV1Schema,
   RepeatGuardRecordsV1Schema,
   RequirementsV1Schema,
@@ -178,6 +187,9 @@ const metadata = (maxBytes: number, sensitivity: ContractSensitivity = "internal
 });
 
 export const contractMetadata: Readonly<Record<string, ContractMetadata>> = {
+  "https://schemas.apexops.dev/lab-delegation-policy-v1.json": metadata(65_536, "confidential"),
+  "https://schemas.apexops.dev/lab-delegation-consent-v1.json": metadata(8_192, "confidential"),
+  "https://schemas.apexops.dev/lab-apply-scope-v1.json": metadata(65_536, "confidential"),
   "https://schemas.apexops.dev/governance-provision-plan-v1.json": metadata(65_536, "confidential"),
   "https://schemas.apexops.dev/repository-publish-config-v1.json": metadata(16_384, "confidential"),
   "https://schemas.apexops.dev/repository-publish-plan-v1.json": metadata(262_144, "confidential"),
@@ -195,6 +207,8 @@ export const contractMetadata: Readonly<Record<string, ContractMetadata>> = {
   "https://schemas.apexops.dev/task-envelope-v1.json": metadata(131_072, "confidential"),
   "https://schemas.apexops.dev/input-request-v1.json": metadata(65_536, "confidential"),
   "https://schemas.apexops.dev/input-submission-v1.json": metadata(65_536, "confidential"),
+  "https://schemas.apexops.dev/input-amendment-v1.json": metadata(262_144, "confidential"),
+  "https://schemas.apexops.dev/input-amendment-proposal-v1.json": metadata(1_048_576, "confidential"),
   "https://schemas.apexops.dev/event-v1.json": metadata(262_144, "confidential"),
   "https://schemas.apexops.dev/requirements-v1.json": metadata(524_288, "confidential"),
   "https://schemas.apexops.dev/requirements-amendment-v1.json": metadata(262_144, "confidential"),

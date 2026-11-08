@@ -105,29 +105,44 @@ timeouts or cancellations, route human decisions through `ask_user`, and explain
 
 ## Workflow Tools
 
-| Tool                   | Purpose                                                                                       |
-| ---------------------- | --------------------------------------------------------------------------------------------- |
-| `status`               | Read selected project and run status, or report a runtime version mismatch.                   |
-| `releaseWriter`        | Release this workspace's writer lease for the selected run.                                   |
-| `nextTask`             | Get the next input, review decision, task, or terminal status.                                |
-| `taskContext`          | Read context for the exact task ID returned by `nextTask`.                                    |
-| `readTaskInput`        | Read externalized active-task context in bounded chunks.                                      |
-| `recordInput`          | Submit answers for the exact pending requirements input request.                              |
-| `stageArtifact`        | Stage one or more typed outputs for a task.                                                   |
-| `stageFile`            | Stage a bounded file for a task, optionally with an expected SHA-256.                         |
-| `generateIac`          | Generate the selected task's Bicep or Terraform batch.                                        |
-| `validateTask`         | Validate staged or supplied task outputs without completion.                                  |
-| `completeTask`         | Atomically accept a complete typed output bundle.                                             |
-| `requirementsComplete` | Complete Requirements without constructing a generic bundle.                                  |
-| `architectureComplete` | Complete Architecture, cost, and decisions atomically.                                        |
-| `reviewComplete`       | Complete a review from rubber-duck's captured output; takes only the task ID.                 |
-| `reviewDecide`         | Revise, acknowledge obligations, or accept risk with project owner and 90-day default expiry. |
-| `planComplete`         | Complete a plan with an APEX-derived intent binding.                                          |
+| Tool                    | Purpose                                                                                       |
+| ----------------------- | --------------------------------------------------------------------------------------------- |
+| `status`                | Read selected project and run status, or report a runtime version mismatch.                   |
+| `releaseWriter`         | Release this workspace's writer lease for the selected run.                                   |
+| `nextTask`              | Get the next input, review decision, task, or terminal status.                                |
+| `taskContext`           | Read context for the exact task ID returned by `nextTask`.                                    |
+| `readTaskInput`         | Read externalized active-task context in bounded chunks.                                      |
+| `recordInput`           | Submit answers for the exact pending requirements input request.                              |
+| `inputHistory`          | Read effective recorded intake/Architecture answers and their correction base hashes.         |
+| `previewInputAmendment` | Preview a correction and dependent invalidation without changing state.                       |
+| `amendInput`            | Append the explicitly confirmed correction, invalidating dependent reviews and gates.         |
+| `stageArtifact`         | Stage one or more typed outputs for a task.                                                   |
+| `stageFile`             | Stage a bounded file for a task, optionally with an expected SHA-256.                         |
+| `generateIac`           | Generate the selected task's Bicep or Terraform batch.                                        |
+| `validateTask`          | Validate staged or supplied task outputs without completion.                                  |
+| `completeTask`          | Atomically accept a complete typed output bundle.                                             |
+| `requirementsComplete`  | Complete Requirements without constructing a generic bundle.                                  |
+| `architectureComplete`  | Complete Architecture, cost, and decisions atomically.                                        |
+| `reviewComplete`        | Complete a review from rubber-duck's captured output; takes only the task ID.                 |
+| `reviewDecide`          | Revise, acknowledge obligations, or accept risk with project owner and 90-day default expiry. |
+| `planComplete`          | Complete a plan with an APEX-derived intent binding.                                          |
 
 Handle `needs_input` before requesting task context. Only a `nextTask` result with `status=task` provides a valid task
 ID. New Requirements runs return three adaptive panels before the task. Handle `needs_review` through the returned
 finding actions and `reviewDecide`.
 The returned request ID, expected head, and owner epoch are required for `recordInput`.
+For an already recorded answer, use `inputHistory`, then `previewInputAmendment` with an `input-amendment-v1` and
+reason. Present its impact and obtain explicit confirmation before `amendInput` with the same amendment and reason,
+`expectedHash: proposalHash` and `confirm: true`. This preserves audit history and reopens dependent approvals;
+it never authorizes a gate or deployment. Corrected stages and reviews must be rerun; lab Gate 2/3 readiness is
+automatic, while human Gate 1 and Gate 4 decisions remain genuine. An amendment above 512 KiB is rejected. When the
+MCP preview would exceed the 64 KiB result budget, long answers are shown as their size and SHA-256 and
+`proposalHash` still binds the complete proposal; the CLI preview keeps every value. See
+[answer correction](cli.md#correcting-recorded-intake-answers).
+Do not delete a project to fix an answer. Autopilot and Allow All do not authorize amendment confirmation.
+For explicitly optional questions, omit the answer or submit a blank string or `none` to leave it unspecified.
+Blank required answers still fail validation; `none` for required questions is accepted only when the question supports
+that value. Empty optional answers are not persisted as preferences.
 `projectCreate` requires `riskOwner` (`partner` or `customer`). `reviewDecide` accept-risk decisions derive owner from
 that project value; omit `expiresAt` to use the 90-day default.
 `projectCreate` and `promote` accept an optional `purpose` (`lab`, the default, or `production`). A run's purpose cannot
@@ -148,6 +163,10 @@ The Requirements, Architecture and Plan reviews (`requirements-review`, `archite
 3. The managed `postToolUse` hook saves the prompt and rubber-duck's exact output (`toolResult.textResultForLlm`) as an
    HMAC-signed `review-capture-v1` record under `$APEX_REVIEW_HOME/captures/` (default `~/.apex/reviews/`). The key,
    `capture.key`, is created there with mode 0600 by whichever side runs first.
+   When Copilot CLI moves a sync call to the background, the `task` result is only an `Agent moved to background`
+   notice. The hook saves no capture for it; it writes a signed record under `pending/` with the agent ID, the session
+   and the prompt. The APEX agent then calls `read_agent` with `wait: true` for that agent ID, and the hook turns the
+   completed result into the same capture and removes the pending record. A result that is still running is ignored.
 4. `reviewComplete` takes only the task ID. The kernel accepts exactly one capture for the nonce, verifies its signature,
    hashes and rubber-duck origin, compares the prompt with the issued prompt (line endings and trailing whitespace
    aside), checks that the reviewed artifact is unchanged, and parses findings only from one fenced `apex-review` JSON
@@ -160,6 +179,8 @@ The Requirements, Architecture and Plan reviews (`requirements-review`, `archite
 The answer block is one JSON object: `findings` lists `{ "id"?, "severity", "title", "detail" }` with severity
 `critical`, `high`, `medium`, `low` or `info`, and IDs default to `F-1`, `F-2` and so on. The Architecture review also
 returns `criteria` with one entry per Well-Architected pillar (`criterionId`, `outcome`, `rationale`, `findingIds`).
+The top-level object accepts only those keys. Other fields inside a finding or a criteria entry, such as `impact` or
+`evidenceRefs`, are discarded; the kernel adds each finding's evidence references itself.
 
 A missing capture leaves the request open: run rubber-duck once more with the same prompt. A second capture for the same
 nonce, an edited or forged record, a different prompt, a nonce from another request, a changed artifact, an edited or

@@ -1,0 +1,86 @@
+{
+  "$id": "https://schemas.apexops.dev/lab-apply-scope-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "cloud": {
+      "const": "AzureCloud",
+      "type": "string"
+    },
+    "executor": {
+      "const": "azd",
+      "type": "string"
+    },
+    "extensionsAbsent": {
+      "const": true,
+      "type": "boolean"
+    },
+    "hooksAbsent": {
+      "const": true,
+      "type": "boolean"
+    },
+    "previewHash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "resourceStates": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "resourceId": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "const": "absent",
+                "type": "string"
+              },
+              {
+                "const": "present",
+                "type": "string"
+              }
+            ]
+          }
+        },
+        "required": [
+          "resourceId",
+          "state"
+        ],
+        "type": "object"
+      },
+      "maxItems": 256,
+      "type": "array"
+    },
+    "schemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "subscriptionId": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "type": "string"
+    },
+    "targetScope": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "tenantId": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "previewHash",
+    "cloud",
+    "tenantId",
+    "subscriptionId",
+    "targetScope",
+    "executor",
+    "hooksAbsent",
+    "extensionsAbsent",
+    "resourceStates"
+  ],
+  "type": "object"
+}
