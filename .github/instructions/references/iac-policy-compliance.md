@@ -5,10 +5,9 @@ Referenced by the IaC best-practices instruction files.
 
 ## Policy Compliance Mandate
 
-All IaC code generation cross-references `04-governance-constraints.md`
-and `04-governance-constraints.json` before writing templates. These
-artifacts contain discovered Azure Policy constraints for the target
-subscription.
+All IaC code generation cross-references `.apex/runs/<runId>/governance/constraints.json` (`governance-constraints-v1`)
+and `.apex/runs/<runId>/plan/policy-property-map.json` (`policy-property-map-v1`) before writing templates. These
+artifacts contain discovered Azure Policy constraints and property mappings for the target subscription.
 
 ## Dynamic Tag List
 
@@ -30,7 +29,7 @@ Required in generated code:       9 tags (governance wins on key names)
 
 ## Policy Compliance Checklist
 
-For every policy in `04-governance-constraints.json`:
+For every policy in `governance-constraints-v1` / `policy-property-map-v1`:
 
 ### Deny Policies
 
@@ -66,7 +65,7 @@ as the ARM property path.
 
 ### `azurePropertyPath` Translation
 
-For each Deny or Modify policy in `04-governance-constraints.json`,
+For each Deny or Modify policy in `governance-constraints-v1` / `policy-property-map-v1`,
 read the `azurePropertyPath` field and translate it to the corresponding
 `azurerm_*` resource argument:
 
@@ -107,13 +106,13 @@ read the `azurePropertyPath` field and translate it to the corresponding
 
 ## Policy Anti-Patterns
 
-| Anti-Pattern                                       | Correct Approach                                        |
-| -------------------------------------------------- | ------------------------------------------------------- |
-| Assume 4 tags are sufficient                       | Read `04-governance-constraints.md` for actual tag list |
-| Ignore `publicNetworkAccess` constraints           | Check network policies in governance constraints        |
-| Skip governance constraints reading                | Always read and enforce governance constraints          |
-| Hardcode security settings without checking policy | Cross-reference `04-governance-constraints.json`        |
-| Use `bicepPropertyPath` for Terraform translation  | Use `azurePropertyPath` for Terraform argument mapping  |
+| Anti-Pattern                                       | Correct Approach                                       |
+| -------------------------------------------------- | ------------------------------------------------------ |
+| Assume 4 tags are sufficient                       | Read `governance-constraints-v1` for actual tag list   |
+| Ignore `publicNetworkAccess` constraints           | Check network policies in governance constraints       |
+| Skip governance constraints reading                | Always read and enforce governance constraints         |
+| Hardcode security settings without checking policy | Cross-reference `policy-property-map-v1`               |
+| Use `bicepPropertyPath` for Terraform translation  | Use `azurePropertyPath` for Terraform argument mapping |
 
 ## Enforcement
 

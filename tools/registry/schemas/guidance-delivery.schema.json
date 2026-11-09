@@ -12,14 +12,21 @@
     "instructions",
     "maintainerSkills",
     "deferredCapabilities",
-    "provenanceOwner",
     "qualification"
   ],
   "properties": {
-    "$schema": { "type": "string" },
-    "schemaVersion": { "const": "1.0.0" },
-    "baselineCommit": { "$ref": "#/$defs/gitSha" },
-    "scope": { "$ref": "#/$defs/text" },
+    "$schema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "baselineCommit": {
+      "$ref": "#/$defs/gitSha"
+    },
+    "scope": {
+      "$ref": "#/$defs/text"
+    },
     "skills": {
       "type": "array",
       "minItems": 1,
@@ -28,18 +35,35 @@
         "additionalProperties": false,
         "required": ["id", "owner", "entrypoint", "files", "manifestOwner", "status", "capabilityQualification"],
         "properties": {
-          "id": { "type": "string", "pattern": "^apex-[a-z0-9-]+$" },
-          "owner": { "$ref": "#/$defs/text" },
-          "entrypoint": { "type": "string", "pattern": "^\\.github/skills/apex-[a-z0-9-]+/SKILL\\.md$" },
+          "id": {
+            "type": "string",
+            "pattern": "^apex-[a-z0-9-]+$"
+          },
+          "owner": {
+            "$ref": "#/$defs/text"
+          },
+          "entrypoint": {
+            "type": "string",
+            "pattern": "^\\.github/skills/apex-[a-z0-9-]+/SKILL\\.md$"
+          },
           "files": {
             "type": "array",
             "minItems": 1,
             "uniqueItems": true,
-            "items": { "type": "string", "pattern": "^\\.github/skills/apex-[a-z0-9-]+/" }
+            "items": {
+              "type": "string",
+              "pattern": "^\\.github/skills/apex-[a-z0-9-]+/"
+            }
           },
-          "manifestOwner": { "const": "plugin" },
-          "status": { "const": "current-source" },
-          "capabilityQualification": { "const": "not-established-by-this-registry" }
+          "manifestOwner": {
+            "const": "plugin"
+          },
+          "status": {
+            "const": "current-source"
+          },
+          "capabilityQualification": {
+            "const": "not-established-by-this-registry"
+          }
         }
       }
     },
@@ -51,9 +75,16 @@
         "additionalProperties": false,
         "required": ["path", "owner", "manifestOwner"],
         "properties": {
-          "path": { "type": "string", "pattern": "^\\.github/instructions/apex-[a-z0-9-]+\\.instructions\\.md$" },
-          "owner": { "const": "managed workspace" },
-          "manifestOwner": { "const": "workspace" }
+          "path": {
+            "type": "string",
+            "pattern": "^\\.github/instructions/apex-[a-z0-9-]+\\.instructions\\.md$"
+          },
+          "owner": {
+            "const": "managed workspace"
+          },
+          "manifestOwner": {
+            "const": "workspace"
+          }
         }
       }
     },
@@ -65,9 +96,17 @@
         "additionalProperties": false,
         "required": ["id", "entrypoint", "purpose"],
         "properties": {
-          "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]+$" },
-          "entrypoint": { "type": "string", "pattern": "^\\.github/skills/[a-z0-9-]+/SKILL\\.md$" },
-          "purpose": { "$ref": "#/$defs/text" }
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]+$"
+          },
+          "entrypoint": {
+            "type": "string",
+            "pattern": "^\\.github/skills/[a-z0-9-]+/SKILL\\.md$"
+          },
+          "purpose": {
+            "$ref": "#/$defs/text"
+          }
         }
       }
     },
@@ -90,40 +129,79 @@
           "scopeRule"
         ],
         "properties": {
-          "id": { "type": "string", "pattern": "^deferred:[a-z][a-z0-9-]+(?:/[^\\\\]+)?$" },
-          "ownerPackage": { "enum": ["packages/renderers", "packages/capabilities"] },
-          "managedSkill": { "type": "string", "pattern": "^apex-[a-z0-9-]+$" },
-          "status": { "const": "deferred" },
-          "reason": { "$ref": "#/$defs/text" },
+          "id": {
+            "type": "string",
+            "pattern": "^deferred:[a-z][a-z0-9-]+(?:/[^\\\\]+)?$"
+          },
+          "ownerPackage": {
+            "enum": ["packages/renderers", "packages/capabilities"]
+          },
+          "managedSkill": {
+            "type": "string",
+            "pattern": "^apex-[a-z0-9-]+$"
+          },
+          "status": {
+            "const": "deferred"
+          },
+          "reason": {
+            "$ref": "#/$defs/text"
+          },
           "scenarioIds": {
             "type": "array",
             "minItems": 1,
             "uniqueItems": true,
-            "items": { "$ref": "#/$defs/text" }
+            "items": {
+              "$ref": "#/$defs/text"
+            }
           },
-          "archiveEntry": { "type": "string", "pattern": "^\\.github/skills/[a-z0-9-]+/" },
-          "sourceSha256": { "$ref": "#/$defs/sha256" },
-          "replacementProof": { "$ref": "#/$defs/text" },
-          "rollbackGate": { "$ref": "#/$defs/text" },
-          "scopeRule": { "$ref": "#/$defs/text" }
+          "archiveEntry": {
+            "type": "string",
+            "pattern": "^\\.github/skills/[a-z0-9-]+/"
+          },
+          "sourceSha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "replacementProof": {
+            "$ref": "#/$defs/text"
+          },
+          "rollbackGate": {
+            "$ref": "#/$defs/text"
+          },
+          "scopeRule": {
+            "$ref": "#/$defs/text"
+          }
         }
       }
     },
-    "provenanceOwner": { "const": "tools/registry/skill-upstream-pins.v1.json" },
     "qualification": {
       "type": "object",
       "additionalProperties": false,
       "required": ["capability", "clients", "live"],
       "properties": {
-        "capability": { "const": "not-run" },
-        "clients": { "const": "not-run" },
-        "live": { "const": "not-run" }
+        "capability": {
+          "const": "not-run"
+        },
+        "clients": {
+          "const": "not-run"
+        },
+        "live": {
+          "const": "not-run"
+        }
       }
     }
   },
   "$defs": {
-    "text": { "type": "string", "minLength": 1 },
-    "gitSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
-    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+    "text": {
+      "type": "string",
+      "minLength": 1
+    },
+    "gitSha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
   }
 }

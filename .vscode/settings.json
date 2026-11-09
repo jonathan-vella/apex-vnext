@@ -39,10 +39,6 @@
     {
       "fileMatch": ["tools/registry/guidance-delivery.v1.json"],
       "url": "./tools/registry/schemas/guidance-delivery.schema.json"
-    },
-    {
-      "fileMatch": ["tools/registry/skill-upstream-pins.v1.json"],
-      "url": "./tools/registry/schemas/skill-upstream-pins.schema.json"
     }
   ],
   "editor.formatOnSave": true,

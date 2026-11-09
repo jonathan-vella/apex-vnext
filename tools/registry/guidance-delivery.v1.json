@@ -19,38 +19,11 @@
       "entrypoint": ".github/skills/apex-artifacts/SKILL.md",
       "files": [
         ".github/skills/apex-artifacts/SKILL.md",
-        ".github/skills/apex-artifacts/references/01-requirements-template.md",
-        ".github/skills/apex-artifacts/references/02-architecture-template.md",
-        ".github/skills/apex-artifacts/references/04-plan-template.md",
-        ".github/skills/apex-artifacts/references/05-code-template.md",
-        ".github/skills/apex-artifacts/references/06-deploy-template.md",
-        ".github/skills/apex-artifacts/references/07-docs-template.md",
-        ".github/skills/apex-artifacts/references/content-index.md",
         ".github/skills/apex-artifacts/references/cost-estimate-sections.md",
         ".github/skills/apex-artifacts/references/kernel-boundary.md",
         ".github/skills/apex-artifacts/references/presentation-conventions.md",
-        ".github/skills/apex-artifacts/references/reference-only-outlines.md",
         ".github/skills/apex-artifacts/references/revision-workflow.md",
-        ".github/skills/apex-artifacts/references/sku-manifest-details.md",
         ".github/skills/apex-artifacts/references/styling-standards.md",
-        ".github/skills/apex-artifacts/templates/01-requirements.template.md",
-        ".github/skills/apex-artifacts/templates/02-architecture-assessment.template.md",
-        ".github/skills/apex-artifacts/templates/03-des-cost-estimate.template.md",
-        ".github/skills/apex-artifacts/templates/04-governance-constraints.template.md",
-        ".github/skills/apex-artifacts/templates/04-implementation-plan.template.md",
-        ".github/skills/apex-artifacts/templates/04-preflight-check.template.md",
-        ".github/skills/apex-artifacts/templates/05-implementation-reference.template.md",
-        ".github/skills/apex-artifacts/templates/06-deployment-summary.template.md",
-        ".github/skills/apex-artifacts/templates/07-ab-cost-estimate.template.md",
-        ".github/skills/apex-artifacts/templates/07-backup-dr-plan.template.md",
-        ".github/skills/apex-artifacts/templates/07-compliance-matrix.template.md",
-        ".github/skills/apex-artifacts/templates/07-design-document.template.md",
-        ".github/skills/apex-artifacts/templates/07-documentation-index.template.md",
-        ".github/skills/apex-artifacts/templates/07-operations-runbook.template.md",
-        ".github/skills/apex-artifacts/templates/07-resource-inventory.template.md",
-        ".github/skills/apex-artifacts/templates/09-lessons-learned.template.md",
-        ".github/skills/apex-artifacts/templates/PROJECT-README.template.md",
-        ".github/skills/apex-artifacts/templates/README.md",
         ".github/skills/apex-artifacts/templates/architecture-assessment.md",
         ".github/skills/apex-artifacts/templates/cost-estimate.md",
         ".github/skills/apex-artifacts/templates/deployment-summary.md",
@@ -58,8 +31,7 @@
         ".github/skills/apex-artifacts/templates/implementation-plan.md",
         ".github/skills/apex-artifacts/templates/operations-runbook.md",
         ".github/skills/apex-artifacts/templates/requirements.md",
-        ".github/skills/apex-artifacts/templates/resource-inventory.md",
-        ".github/skills/apex-artifacts/templates/sku-manifest.template.md"
+        ".github/skills/apex-artifacts/templates/resource-inventory.md"
       ],
       "manifestOwner": "plugin",
       "status": "current-source",
@@ -115,7 +87,6 @@
         ".github/skills/apex-azure-cloud-migrate/references/services/functions/runtimes/python.md",
         ".github/skills/apex-azure-cloud-migrate/references/services/functions/runtimes/typescript.md",
         ".github/skills/apex-azure-cloud-migrate/references/staged-validation-handoff.md",
-        ".github/skills/apex-azure-cloud-migrate/references/upstream-coverage.md",
         ".github/skills/apex-azure-cloud-migrate/references/workflow-details.md",
         ".github/skills/apex-azure-cloud-migrate/references/workload-mapping.md"
       ],
@@ -237,8 +208,7 @@
         ".github/skills/apex-azure-deploy/references/sdk/azure-identity-java.md",
         ".github/skills/apex-azure-deploy/references/sdk/azure-identity-py.md",
         ".github/skills/apex-azure-deploy/references/sdk/azure-identity-ts.md",
-        ".github/skills/apex-azure-deploy/references/troubleshooting.md",
-        ".github/skills/apex-azure-deploy/references/upstream-coverage.md"
+        ".github/skills/apex-azure-deploy/references/troubleshooting.md"
       ],
       "manifestOwner": "plugin",
       "status": "current-source",
@@ -305,8 +275,7 @@
         ".github/skills/apex-azure-diagnostics/references/script-examples/run-ig.ps1.md",
         ".github/skills/apex-azure-diagnostics/references/script-examples/run-ig.sh.md",
         ".github/skills/apex-azure-diagnostics/references/script-examples/test-messaging-connectivity.ps1.md",
-        ".github/skills/apex-azure-diagnostics/references/script-examples/test-messaging-connectivity.sh.md",
-        ".github/skills/apex-azure-diagnostics/references/upstream-coverage.md"
+        ".github/skills/apex-azure-diagnostics/references/script-examples/test-messaging-connectivity.sh.md"
       ],
       "manifestOwner": "plugin",
       "status": "current-source",
@@ -338,7 +307,6 @@
         ".github/skills/apex-azure-kubernetes/references/azure-aks-vpa.md",
         ".github/skills/apex-azure-kubernetes/references/cli-reference.md",
         ".github/skills/apex-azure-kubernetes/references/safeguards.md",
-        ".github/skills/apex-azure-kubernetes/references/upstream-coverage.md",
         ".github/skills/apex-azure-kubernetes/references/workload-identity.md"
       ],
       "manifestOwner": "plugin",
@@ -356,8 +324,7 @@
         ".github/skills/apex-azure-kusto/references/fallback-strategy.md",
         ".github/skills/apex-azure-kusto/references/kql-evidence-interpretation.md",
         ".github/skills/apex-azure-kusto/references/operational-checklist.md",
-        ".github/skills/apex-azure-kusto/references/query-patterns.md",
-        ".github/skills/apex-azure-kusto/references/upstream-coverage.md"
+        ".github/skills/apex-azure-kusto/references/query-patterns.md"
       ],
       "manifestOwner": "plugin",
       "status": "current-source",
@@ -618,7 +585,6 @@
         ".github/skills/apex-azure-reliability/references/services/app-service/reliability.md",
         ".github/skills/apex-azure-reliability/references/services/functions/reliability.md",
         ".github/skills/apex-azure-reliability/references/storage-redundancy-checks.md",
-        ".github/skills/apex-azure-reliability/references/upstream-coverage.md",
         ".github/skills/apex-azure-reliability/references/zone-redundancy-checks.md"
       ],
       "manifestOwner": "plugin",
@@ -663,8 +629,7 @@
         ".github/skills/apex-azure-upgrade/references/global-rules.md",
         ".github/skills/apex-azure-upgrade/references/services/functions/assessment.md",
         ".github/skills/apex-azure-upgrade/references/services/functions/consumption-to-flex.md",
-        ".github/skills/apex-azure-upgrade/references/services/redis/redis-to-amr.md",
-        ".github/skills/apex-azure-upgrade/references/upstream-coverage.md"
+        ".github/skills/apex-azure-upgrade/references/services/redis/redis-to-amr.md"
       ],
       "manifestOwner": "plugin",
       "status": "current-source",
@@ -757,8 +722,7 @@
         ".github/skills/apex-mermaid/SKILL.md",
         ".github/skills/apex-mermaid/references/styling.md",
         ".github/skills/apex-mermaid/references/syntax-cheatsheet.md",
-        ".github/skills/apex-mermaid/references/syntax.md",
-        ".github/skills/apex-mermaid/references/upstream-coverage.md"
+        ".github/skills/apex-mermaid/references/syntax.md"
       ],
       "manifestOwner": "plugin",
       "status": "current-source",
@@ -821,7 +785,6 @@
         ".github/skills/apex-python-diagrams/references/sequence-auth-flows.md",
         ".github/skills/apex-python-diagrams/references/timeline-gantt-diagrams.md",
         ".github/skills/apex-python-diagrams/references/ui-wireframe-diagrams.md",
-        ".github/skills/apex-python-diagrams/references/upstream-coverage.md",
         ".github/skills/apex-python-diagrams/references/waf-cost-charts.md"
       ],
       "manifestOwner": "plugin",
@@ -3756,7 +3719,6 @@
       "scopeRule": "Preserve the declared obligation; do not expand current PRD scope or mark implementation/client/live qualification complete."
     }
   ],
-  "provenanceOwner": "tools/registry/skill-upstream-pins.v1.json",
   "qualification": {
     "capability": "not-run",
     "clients": "not-run",

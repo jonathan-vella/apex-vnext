@@ -7,10 +7,9 @@ constraints, Bicep or Terraform, validation evidence and a deployment preview. Y
 A deterministic runtime, not the model, owns the state, the gates and the evidence.
 
 > [!WARNING]
-> **Preview software.** The current release is `0.11.0-next.5`, published under the `next` tag. It targets
+> **Preview software.** The current release is `0.11.0-next.6`, published in the `apex-plugins` marketplace. It targets
 > **non-production** use: labs, demos and learning. Production deployment is blocked by design until its own approval
-> and execution model ships. Live qualification of the supported clients is still pending. See
-> [Project status](#project-status).
+> and execution model ships. See [Project status](#project-status).
 
 ## What You Get
 
@@ -109,10 +108,10 @@ governance collection uses. Deployments to Azure always go through an approved p
 
 | Area                           | State                                                                                          |
 | ------------------------------ | ---------------------------------------------------------------------------------------------- |
-| Runtime, CLI and agent plugin  | Preview `0.11.0-next.5`, published to npm (`next`) and the `apex-plugins` marketplace           |
+| Runtime, CLI and agent plugin  | Preview `0.11.0-next.6`, published in the `apex-plugins` marketplace (`apex@apex-plugins`)     |
 | Lab approval flow              | Implemented: one intent confirmation, kernel readiness checkpoints, final preview approval     |
-| Bicep and Terraform tracks     | Implemented: Bicep runs through the `azd` executor (`CP-26`, awaiting `CP-30` live qualification); Terraform uses native CLI |
-| Supported-client qualification | Pending. Live runs in the three clients are still to be recorded                                |
+| Bicep and Terraform tracks     | Implemented: Bicep runs through the `azd` executor (`CP-26`, `CP-30` qualified); Terraform uses native CLI |
+| Supported-client qualification | Qualified across WSL2 Copilot CLI (full Bicep E2E) and Windows 11 Copilot app/VS Code (`CP-37`)|
 | Production deployments         | **Not available.** Planned as an opt-in, CI-owned run with verified human approval and setup help |
 
 The scope, decisions and plan live in the [PRD](docs/vnext/PRD.md), the [roadmap](docs/vnext/ROADMAP.md),

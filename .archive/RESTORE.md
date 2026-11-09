@@ -14,6 +14,16 @@ Status: **verified**. See [CATALOG.json](CATALOG.json) for entries, source ident
 - Determinism: two independent builds were byte-identical; numeric owner/group are zero, timestamps use the
   baseline commit's committer time, regular-file modes are preserved, and gzip uses `-n`.
 
+### Second cleanup archive (`4c838a25ff03e9414cdf561267df38b9c367bf27`)
+
+- Bundle: `apex-vnext-only-cleanup-4c838a25ff03e9414cdf561267df38b9c367bf27.tar.gz` (catalog:
+  [CATALOG-vnext-only-cleanup.json](CATALOG-vnext-only-cleanup.json)).
+- SHA-256: `1776583cf56897248bbc1990643f912b4c44d0aed0a7ca4d19690dfe4b81e289`.
+- Baseline: `4c838a25ff03e9414cdf561267df38b9c367bf27`.
+- Originals: 86 tracked legacy v1 and pre-`DECISION-040` files (upstream coverage ledgers, `01-*`..`09-*` and
+  `sku-manifest` templates, legacy instruction precedence matrix, npm/debug prompts and guides, `apex-insights` Bicep,
+  and pre-`DECISION-040` optimization-gate / lifecycle scripts and registries).
+
 The explicit user-approved optimization-test amendments add four tracked originals to the earlier 620-file selection
 (one validator test, then the audit, context-receipt and client-preflight tests), because the checked-in optimization
 campaign is now draft/pending and those tests use synthetic authorized fixtures.

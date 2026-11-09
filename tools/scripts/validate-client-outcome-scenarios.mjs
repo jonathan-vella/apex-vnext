@@ -7,7 +7,6 @@ import { parseStrictJson } from "./_lib/strict-json.mjs";
 
 const CORPUS_PATH = "tools/registry/client-outcome-scenarios.v1.json";
 const TOOLCHAIN_PATH = "config/toolchain.v1.json";
-const CONTEXT_RECEIPT_PATH = "tools/registry/client-context-baseline-receipt.json";
 const EXPECTED_IDS = Array.from({ length: 10 }, (_, index) => `CLIENT-${String(index + 1).padStart(3, "0")}`);
 const ALLOWED_PATHS = new Set([
   "/candidate",
@@ -56,7 +55,7 @@ function validStringSet(values, pattern) {
   );
 }
 
-export function validateClientOutcomeScenarios(corpus, toolchain, receipt, receiptHash) {
+export function validateClientOutcomeScenarios(corpus, toolchain) {
   const errors = [];
   if (corpus?.schemaVersion !== "1.0.0") errors.push("schemaVersion must be 1.0.0");
   if (!Array.isArray(corpus?.scenarios)) return [...errors, "scenarios must be an array"];
@@ -122,20 +121,12 @@ export function validateClientOutcomeScenarios(corpus, toolchain, receipt, recei
   ) {
     errors.push("live client qualification policy must require rolling observed candidate bindings");
   }
-  const receiptVscode = receipt?.clients?.find(({ id }) => id === "github-copilot-vscode");
-  const receiptCli = receipt?.clients?.find(({ id }) => id === "github-copilot-cli");
   if (
     vscode?.selectionStatus !== "selected-qualification-required" ||
     vscode?.historicalFixtureVersion !== expectedVscodeVersion ||
-    vscode?.historicalFixtureCopilotChatVersion !== expectedExtensionVersion ||
-    vscode?.selectionEvidence?.receipt !== CONTEXT_RECEIPT_PATH ||
-    vscode?.selectionEvidence?.sha256 !== receiptHash ||
-    receipt?.coverageComplete !== true ||
-    receiptVscode?.version !== expectedVscodeVersion ||
-    receiptVscode?.extensionVersion !== expectedExtensionVersion ||
-    receiptCli?.version !== cli?.historicalFixtureVersion
+    vscode?.historicalFixtureCopilotChatVersion !== expectedExtensionVersion
   ) {
-    errors.push("historical client fixtures must match the complete bound context receipt");
+    errors.push("historical client fixtures must match canonical toolchain selection metadata");
   }
   return errors;
 }
@@ -143,9 +134,7 @@ export function validateClientOutcomeScenarios(corpus, toolchain, receipt, recei
 function main() {
   const corpus = parseStrictJson(fs.readFileSync(CORPUS_PATH, "utf8"));
   const toolchain = parseStrictJson(fs.readFileSync(TOOLCHAIN_PATH, "utf8"));
-  const receipt = parseStrictJson(fs.readFileSync(CONTEXT_RECEIPT_PATH, "utf8"));
-  const receiptHash = canonicalContextReceiptDigest(receipt);
-  const errors = validateClientOutcomeScenarios(corpus, toolchain, receipt, receiptHash);
+  const errors = validateClientOutcomeScenarios(corpus, toolchain);
   if (errors.length > 0) {
     errors.forEach((error) => console.error(`❌ ${CORPUS_PATH}: ${error}`));
     return 1;

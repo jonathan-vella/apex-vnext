@@ -111,11 +111,10 @@ test("catalog review category coverage follows the schema", () => {
 });
 import domainSkillFs from "node:fs";
 
-test("approved domain additions are plugin-only, pinned and covered by declared boundary scenarios", () => {
+test("approved domain additions are plugin-only and covered by declared boundary scenarios", () => {
   const read = (relative) => JSON.parse(domainSkillFs.readFileSync(new URL(relative, import.meta.url), "utf8"));
   const manifest = read("../../customizations/manifest.json");
   const registry = read("../registry/guidance-delivery.v1.json");
-  const pins = read("../registry/skill-upstream-pins.v1.json");
   const corpus = read("../registry/skill-catalog-review-scenarios.v1.json");
   for (const suffix of ["azure-kubernetes", "azure-reliability", "azure-upgrade", "python-diagrams"]) {
     const id = `apex-${suffix}`;
@@ -127,11 +126,8 @@ test("approved domain additions are plugin-only, pinned and covered by declared 
       registry.skills.find((skill) => skill.id === id)?.capabilityQualification,
       "not-established-by-this-registry",
     );
-    const pin = pins.entries.filter((entry) => entry.skill === id);
-    assert.equal(pin.length, 1, id);
-    assert.equal(pin[0].upstreamCommit, "c209d8bb765681aa21dce5d3cd2a3b080dad8d5e");
     assert.match(source, /user-invocable: false/u);
-    assert.match(source, /upstream-coverage\.md/u);
+    assert.doesNotMatch(source, /upstream-coverage\.md/u);
     const prefix = suffix.replace(/^azure-/u, "");
     for (const [ending, category] of [
       ["discovery", "discovery-positive"],

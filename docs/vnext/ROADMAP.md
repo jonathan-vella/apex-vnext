@@ -22,7 +22,7 @@ CP-32 (#495) is complete through merged [#496](https://github.com/jonathan-vella
 commit `4ccd5d80`, with post-merge hosted checks passing. Immutable Gate 4 context
 [#466](https://github.com/jonathan-vella/apex-vnext/issues/466) merged through #497 at `cd6a3a79`, also with passing
 hosted checks. The current bounded source slice completes the approved new-domain content in CP-18 #384 and
-CP-21 #401's [best-practice dispositions](SKILL-BEST-PRACTICES.md). None of these source checks replaces CP-20 client
+CP-21 #401's [skill catalog review](SKILL-CATALOG-REVIEW.generated.md). None of these source checks replaces CP-20 client
 qualification, CP-30 deployment qualification, or release approval.
 
 The 2026-10-10 target update is
@@ -81,8 +81,7 @@ optimization first batch or its deferred telemetry recommendation:
 - Verify synthetic ingestion and local regressions first; retain real VS Code/CLI custom-agent session coverage as a
   separate pending qualification item. No desktop-app export claim.
 
-See [current checkpoint](PROJECT.md#development-diagnostics-checkpoint) and
-[operator commands](../how-to/debug-local.md#command-driven-session-assessment).
+See [current checkpoint](PROJECT.md#development-diagnostics-checkpoint).
 
 ## CLI-Only Projection
 

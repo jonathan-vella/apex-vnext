@@ -22,8 +22,7 @@ npm run validate:agents                  # Agent + prompt frontmatter, model ali
 npm run validate:iac-security-baseline   # TLS/HTTPS/Entra-only/no-public-blob baseline
 npm run lint:safe-shell                  # No interactive shell prompts in committed snippets
 
-# Full list (≈30 scripts) → npm run | grep -E "^  (lint|validate|test):" or
-# https://apexops.pro/reference/validation-reference/
+# Full list → npm run | grep -E "^  (lint|validate|test):" or docs/reference/qualification.md
 
 # Pre-commit/pre-push hooks (installed via lefthook on `npm run prepare`)
 git push                                 # Triggers diff-based-push-check.sh automatically
@@ -95,4 +94,4 @@ For deeper guidance, agents read these on demand:
 - Azure defaults for active tasks: `customizations/.github/skills/apex-azure-defaults/SKILL.md`
 - vNext product contracts: `packages/contracts/schemas/`
 - Managed customization manifest: `customizations/manifest.json`
-- Full validation reference: <https://apexops.pro/reference/validation-reference/>
+- Qualification reference: `docs/reference/qualification.md`

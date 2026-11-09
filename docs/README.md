@@ -8,8 +8,8 @@ GitHub Copilot app on native Windows 11, or in GitHub Copilot CLI on Linux or WS
 owns state, gates and evidence; clients guide people through it.
 
 The [PRD](vnext/PRD.md) defines the target contract. Guides describe implemented commands and mark planned extensions
-explicitly; the [checkpoint](vnext/PROJECT.md) identifies remaining work. APEX ships as the `apex` Agent Plugin plus
-`apex init` onboarding; no plugin release is published yet.
+explicitly; the [checkpoint](vnext/PROJECT.md) identifies remaining work. APEX ships as the `apex@apex-plugins` Agent
+Plugin bundling both the MCP server (`mcp/apex.mjs`) and CLI (`cli/apex.mjs`).
 
 ## Start By Goal
 
@@ -44,8 +44,8 @@ explicitly; the [checkpoint](vnext/PROJECT.md) identifies remaining work. APEX s
 - [Maintain requirements intake](how-to/maintain-requirements-intake.md)
 - [Operate a project](how-to/operate-project.md)
 - [Qualify a candidate](how-to/qualify-candidate.md)
+- [Qualify live clients](how-to/qualify-live-clients.md)
 - [Contribute to APEX vNext](how-to/contribute.md)
-- [Historical development agent logging](how-to/debug-local.md)
 
 ## Explanation
 

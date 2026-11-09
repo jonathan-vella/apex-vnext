@@ -12,39 +12,28 @@ Fixes #
 
 <!-- Mark the appropriate option with an "x" -->
 
-- [ ] 🆕 New prompt guide section
-- [ ] 🏗️ New infrastructure module (Bicep/Terraform)
-- [ ] 🤖 Managed agent definition update (customizations/.github/agents/)
-- [ ] 📝 Documentation update
+- [ ] 🏗️ Infrastructure / capability update (`packages/capabilities/`, `infra/`)
+- [ ] 🤖 Managed agent or skill update (`customizations/.github/`)
+- [ ] 📝 Documentation update (`docs/`, `README.md`)
 - [ ] 🐛 Bug fix
 - [ ] 🔧 Refactoring (no functional changes)
-- [ ] ⚙️ Configuration/workflow change
-- [ ] ARM MCP client or pricing contract change
+- [ ] ⚙️ Kernel, contract, CLI, or workflow change (`packages/`, `config/`, `.github/workflows/`)
 
-## Token / latency impact (Plan 01 Phase 5)
+## Context Budget Impact
 
 <!--
-Does this PR change input-token budget or per-turn latency for any
-agent or subagent? Default answer is NO — only opt in when you've
-changed agent bodies, skills, instructions, model assignments, or
-review-loop behaviour.
+Does this PR change the always-loaded context budget enforced by `npm run validate:context-budget`
+(`config/context-budget.v1.json`)? Default answer is NO.
 -->
 
-This change affects input-token budget / per-call latency:
+This change affects the static context budget (`mcpToolsList`, `apexAgent`, `skillFrontmatter`, `managedInstructions`):
 
-- [ ] YES (provide a magnitude estimate below)
+- [ ] YES (provide `npm run validate:context-budget` numbers below)
 - [ ] NO
-
-If YES, expected impact:
-
-<!-- e.g. "~30 K input tokens saved per Step 1 (askQuestions batching)" -->
 
 ## Workflow Used
 
-<!-- Which agent workflow was used to create these changes? -->
-
-- [ ] Multi-step workflow: `@requirements` → `architect` → `iac-planner` → `bicep-code`
-- [ ] Direct implementation (simple change)
+- [ ] Direct implementation
 - [ ] Copilot Coding Agent (autonomous)
 - [ ] Manual implementation
 
@@ -54,7 +43,9 @@ If YES, expected impact:
 
 **Files added:**
 
-- **Files modified:**
+-
+
+**Files modified:**
 
 -
 
@@ -109,9 +100,7 @@ If YES, expected impact:
 ### Documentation
 
 - [ ] README updated with any new features
-- [ ] DEMO-SCRIPT.md included (for scenarios)
-- [ ] Effective prompts documented
-- [ ] Architecture diagram included (Python diagrams-as-code)
+- [ ] Architecture diagram or reference docs updated (when applicable)
 - [ ] Cost estimate provided (for significant infrastructure)
 
 ### Validation

@@ -42,9 +42,6 @@ const hash = (character) => character.repeat(64);
 const canonicalToolchain = parseStrictJson(
   readFileSync(new URL("../../config/toolchain.v1.json", import.meta.url), "utf8"),
 );
-const contextReceiptBytes = readFileSync(new URL("../registry/client-context-baseline-receipt.json", import.meta.url));
-const contextReceipt = parseStrictJson(contextReceiptBytes.toString("utf8"));
-const contextReceiptHash = createHash("sha256").update(canonicalJson(contextReceipt)).digest("hex");
 
 function merge(base, overrides) {
   if (overrides === null || typeof overrides !== "object" || Array.isArray(overrides)) return overrides;
@@ -206,39 +203,29 @@ test("the corpus defines exact scenario-specific proof and valid equality paths"
   }
 });
 
-test("historical client fixtures remain bound to the complete context receipt", () => {
-  assert.equal(canonicalContextReceiptDigest(contextReceipt), contextReceiptHash);
+test("historical client fixtures remain bound to canonical toolchain policy", () => {
+  const sampleReceipt = { schemaVersion: "1.0.0", coverageComplete: true };
+  assert.equal(
+    canonicalContextReceiptDigest(sampleReceipt),
+    createHash("sha256").update(canonicalJson(sampleReceipt)).digest("hex"),
+  );
   assert.throws(() => canonicalContextReceiptDigest({ value: undefined }), /CONTEXT_RECEIPT_NON_JSON_VALUE/);
   assert.throws(() => canonicalContextReceiptDigest({ value: Number.NaN }), /CONTEXT_RECEIPT_NON_JSON_VALUE/);
-  assert.deepEqual(
-    validateClientOutcomeScenarios(
-      CLIENT_OUTCOME_SCENARIO_CORPUS,
-      canonicalToolchain,
-      contextReceipt,
-      contextReceiptHash,
-    ),
-    [],
-  );
+  assert.deepEqual(validateClientOutcomeScenarios(CLIENT_OUTCOME_SCENARIO_CORPUS, canonicalToolchain), []);
   for (const toolchain of [
     merge(canonicalToolchain, { core: { vscode: { historicalFixtureVersion: "1.129.0" } } }),
     merge(canonicalToolchain, { core: { vscode: { historicalFixtureCopilotChatVersion: "0.57.0" } } }),
-    merge(canonicalToolchain, { core: { vscode: { selectionEvidence: { sha256: hash("f") } } } }),
   ]) {
     assert.ok(
-      validateClientOutcomeScenarios(
-        CLIENT_OUTCOME_SCENARIO_CORPUS,
-        toolchain,
-        contextReceipt,
-        contextReceiptHash,
-      ).includes("historical client fixtures must match the complete bound context receipt"),
+      validateClientOutcomeScenarios(CLIENT_OUTCOME_SCENARIO_CORPUS, toolchain).includes(
+        "fixtureClients must match canonical toolchain fixture and pinned values",
+      ),
     );
   }
   assert.ok(
     validateClientOutcomeScenarios(
       CLIENT_OUTCOME_SCENARIO_CORPUS,
       merge(canonicalToolchain, { clientQualificationPolicy: { autoUpdateBetweenCandidates: false } }),
-      contextReceipt,
-      contextReceiptHash,
     ).includes("live client qualification policy must require rolling observed candidate bindings"),
   );
 });

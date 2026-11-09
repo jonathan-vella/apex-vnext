@@ -34,7 +34,7 @@ executable gate alignment must be completed before affected scenarios; do not by
 
 Candidates including the CP-18/CP-21 domain additions must record the exact managed guidance/plugin hashes and inspect
 Kubernetes, reliability, upgrade and diagram discovery, near misses and blocked-operation behavior. The
-[best-practice review](SKILL-BEST-PRACTICES.md) and catalog scenario fixtures are deterministic source declarations,
+[skill catalog review](SKILL-CATALOG-REVIEW.generated.md) and catalog scenario fixtures are deterministic source declarations,
 not live-model evaluations. Observe that the existing APEX agent remains foreground, loads only relevant references,
 and does not execute upstream Python, cluster changes, unsupported upgrades or unregistered renderers.
 
@@ -441,10 +441,9 @@ verify. The aggregate cannot grant release authority; it becomes one input to th
 
 ## VS Code Installation Lifecycle
 
-The [VS Code installation lifecycle matrix](../../tools/registry/vscode-installation-lifecycle.v1.json) defines the
+The [installation guide](../how-to/manage-installation.md) defines the
 bootstrap, reload, update, rollback, uninstall, and reinstall scenarios for the VS Code Copilot harness, which runs
-the CLI projection. Its deterministic evidence is committed; live scenarios remain `not-run` until executed in a clean
-supported profile. Slice 8 retired the profile bootstrap agent scenario with the VS Code Local projection.
+the CLI projection. Slice 8 retired the profile bootstrap agent scenario with the VS Code Local projection.
 
 ## Azure MCP Server 3 Qualification (Human Authorization Pending)
 

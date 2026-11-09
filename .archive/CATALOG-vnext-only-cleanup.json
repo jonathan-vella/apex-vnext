@@ -1,0 +1,525 @@
+{
+  "schemaVersion": "1.0.0",
+  "archivePath": ".archive/apex-vnext-only-cleanup-4c838a25ff03e9414cdf561267df38b9c367bf27.tar.gz",
+  "archiveSha256": "1776583cf56897248bbc1990643f912b4c44d0aed0a7ca4d19690dfe4b81e289",
+  "baselineCommit": "4c838a25ff03e9414cdf561267df38b9c367bf27",
+  "protectedOmissions": [],
+  "entries": [
+    {
+      "path": ".github/instructions/references/precedence-matrix.md",
+      "bytes": 3924,
+      "sha256": "8263b1ce83f147da9827e05dafd818797fcd39d0f9a17b692ac01e924629c3b0",
+      "mode": "0644"
+    },
+    {
+      "path": ".github/prompts/apex-debug-log-export.prompt.md",
+      "bytes": 18724,
+      "sha256": "3161af251c09f6f62dd43196cbe40a6d774aae0ee7b4e4d7ff652d172ee195fc",
+      "mode": "0644"
+    },
+    {
+      "path": ".github/prompts/apex-npm-artifacts-setup.prompt.md",
+      "bytes": 15214,
+      "sha256": "084e652304588594a14417a679fbc54053ee1024950ddc8c5c34b1dde80d793e",
+      "mode": "0644"
+    },
+    {
+      "path": "customizations/.github/skills/apex-artifacts/references/01-requirements-template.md",
+      "bytes": 1300,
+      "sha256": "0cf6eade4bce9714b00bc36f4ce56a1b3f81278e9ab8d341c8c30fe7aed92b46",
+      "mode": "0644"
+    },
+    {
+      "path": "customizations/.github/skills/apex-artifacts/references/02-architecture-template.md",
+      "bytes": 1241,
+      "sha256": "566710f4f38730f4ac39473a7713273ecda861462b76b208017473acd778c193",
+      "mode": "0644"
+    },
+    {
+      "path": "customizations/.github/skills/apex-artifacts/references/04-plan-template.md",
+      "bytes": 2124,
+      "sha256": "02147c8beada43f0adf68dae753d7069f939358a146b14d6212f2cd6cd67c59c",
+      "mode": "0644"
+    },
+    {
+      "path": "customizations/.github/skills/apex-artifacts/references/05-code-template.md",
+      "bytes": 812,
+      "sha256": "8dee124c016e143ef913c607f4c41e01b053141e341ab3b2b200abe3429a3bcb",
+      "mode": "0644"
+    },
+    {
+      "path": "customizations/.github/skills/apex-artifacts/references/06-deploy-template.md",
+      "bytes": 809,
+      "sha256": "3b8889d0e8012429c703f493872ba99ccc9336fbcc8922e05583a2731a396204",
+      "mode": "0644"
+    },
+    {
+      "path": "customizations/.github/skills/apex-artifacts/references/07-docs-template.md",
+      "bytes": 3738,
+      "sha256": "0fa02d3261d9044db170aa9442aae1230f6798f6df4c0815d84df61ca799ef0e",
+      "mode": "0644"
+    },
+    {
+      "path": "customizations/.github/skills/apex-artifacts/references/content-index.md",
+      "bytes": 3944,
+      "sha256": "97b565ad2834a9a8070678eba9d659ac425db1bfe112ffd20e7023c562e4d554",
+      "mode": "0644"
+    },
+    {
+      "path": "customizations/.github/skills/apex-artifacts/references/reference-only-outlines.md",
+      "bytes": 3053,
+      "sha256": "05a0da485933d38297df918821699a61e7c37bac0f1a1f0d0357c0c931e95ff5",
+      "mode": "0644"
+    },
+    {
+      "path": "customizations/.github/skills/apex-artifacts/references/sku-manifest-details.md",
+      "bytes": 4492,
+      "sha256": "4032f43bd5e37842f2dcde5396d47a1e3bf1785e62be0573912f38a0f136d87c",
+      "mode": "0644"
+    },
+    {
+      "path": "customizations/.github/skills/apex-artifacts/templates/01-requirements.template.md",
+      "bytes": 16775,
+      "sha256": "d1200de0d5710fb1d00aa0e8ea736d489100c7f64d42c9ac1d625aef37563577",
+      "mode": "0644"
+    },
+    {
+      "path": "customizations/.github/skills/apex-artifacts/templates/02-architecture-assessment.template.md",
+      "bytes": 12622,
+      "sha256": "d2110c802dfaed070a710aafa45823edb6baaa7d0b0dbaa32f9ab7dfc231ce40",
+      "mode": "0644"
+    },
+    {
+      "path": "customizations/.github/skills/apex-artifacts/templates/03-des-cost-estimate.template.md",
+      "bytes": 11188,
+      "sha256": "8d877cb108c1fd3d17715aa9fdc94c60a7e26ee25a1ec06d3c51449793964de0",
+      "mode": "0644"
+    },
+    {
+      "path": "customizations/.github/skills/apex-artifacts/templates/04-governance-constraints.template.md",
+      "bytes": 13130,
+      "sha256": "4f6b0f7ff58882cbc484e955f8b38aa5d91992aa89eda900d9d764005e8a1e51",
+      "mode": "0644"
+    },
+    {
+      "path": "customizations/.github/skills/apex-artifacts/templates/04-implementation-plan.template.md",
+      "bytes": 12314,
+      "sha256": "a33daeda183f730c661c0497d3aebe544ef1a175d9e9c9ea82b91b1ebc766d09",
+      "mode": "0644"
+    },
+    {
+      "path": "customizations/.github/skills/apex-artifacts/templates/04-preflight-check.template.md",
+      "bytes": 5731,
+      "sha256": "2d2c1dc714d07578c66034f2aac0d7a41f3adcc9e28462e9377ad309971bad30",
+      "mode": "0644"
+    },
+    {
+      "path": "customizations/.github/skills/apex-artifacts/templates/05-implementation-reference.template.md",
+      "bytes": 5307,
+      "sha256": "a3838603cce80660a223941108c50df561a45a15025a8ed99fa6f60e92dc129f",
+      "mode": "0644"
+    },
+    {
+      "path": "customizations/.github/skills/apex-artifacts/templates/06-deployment-summary.template.md",
+      "bytes": 5863,
+      "sha256": "34449c2c41589c187287d2b93801303c71e06d806e969d0d8c7de819443bced2",
+      "mode": "0644"
+    },
+    {
+      "path": "customizations/.github/skills/apex-artifacts/templates/07-ab-cost-estimate.template.md",
+      "bytes": 11091,
+      "sha256": "34eeb16d8a0dd30cab22eb7bb74dec17a380862c2b28130fe860a0e6119dd572",
+      "mode": "0644"
+    },
+    {
+      "path": "customizations/.github/skills/apex-artifacts/templates/07-backup-dr-plan.template.md",
+      "bytes": 7425,
+      "sha256": "9060d29b5f19dcdd42c29700e76f4136024b498a7f7fecdccba6c7deab3a0605",
+      "mode": "0644"
+    },
+    {
+      "path": "customizations/.github/skills/apex-artifacts/templates/07-compliance-matrix.template.md",
+      "bytes": 5852,
+      "sha256": "030cc452be8237b22a2293380d55efc09d725ea028b6a54e7d9052dc9e457928",
+      "mode": "0644"
+    },
+    {
+      "path": "customizations/.github/skills/apex-artifacts/templates/07-design-document.template.md",
+      "bytes": 9915,
+      "sha256": "fbba02060fc45f0767a54ef9c2a421e4dd1627326d610a99d38cd78d63d6498f",
+      "mode": "0644"
+    },
+    {
+      "path": "customizations/.github/skills/apex-artifacts/templates/07-documentation-index.template.md",
+      "bytes": 6237,
+      "sha256": "f6143d7a0b5c8bdad99e27fd76f26c18bea368d536b3b6fc5368a9a3376896ee",
+      "mode": "0644"
+    },
+    {
+      "path": "customizations/.github/skills/apex-artifacts/templates/07-operations-runbook.template.md",
+      "bytes": 6400,
+      "sha256": "1f7807ca8b945f2fc7c8a37b1229147985598286e4c11cf3c48110157142fa2b",
+      "mode": "0644"
+    },
+    {
+      "path": "customizations/.github/skills/apex-artifacts/templates/07-resource-inventory.template.md",
+      "bytes": 4859,
+      "sha256": "8c8745ee4c1c72896e413004fcefe1138b3c03398bbd772b44e3e47ed6c52a00",
+      "mode": "0644"
+    },
+    {
+      "path": "customizations/.github/skills/apex-artifacts/templates/09-lessons-learned.template.md",
+      "bytes": 3106,
+      "sha256": "856c73372f2206168e6d6336d54efa078618feb2ddfd22b5039f65696a25e9b9",
+      "mode": "0644"
+    },
+    {
+      "path": "customizations/.github/skills/apex-artifacts/templates/PROJECT-README.template.md",
+      "bytes": 10639,
+      "sha256": "4a78ddc83475a3bb2002435de7e882cced381a6b6b302ecbd31952d76a175e69",
+      "mode": "0644"
+    },
+    {
+      "path": "customizations/.github/skills/apex-artifacts/templates/README.md",
+      "bytes": 4230,
+      "sha256": "7d4e97ec4f005820ee85eed7606f836f937a4790f8c6ad23e33ad9469aeaa3fa",
+      "mode": "0644"
+    },
+    {
+      "path": "customizations/.github/skills/apex-artifacts/templates/sku-manifest.template.md",
+      "bytes": 6998,
+      "sha256": "7feb204494f88d068448cca4d6f608ea867270876433fd34ad379db527680194",
+      "mode": "0644"
+    },
+    {
+      "path": "customizations/.github/skills/apex-azure-cloud-migrate/references/upstream-coverage.md",
+      "bytes": 11256,
+      "sha256": "a27efec291e5527d749a1afa61c6a8f27bab69a25de81837f11327729a796e58",
+      "mode": "0644"
+    },
+    {
+      "path": "customizations/.github/skills/apex-azure-deploy/references/upstream-coverage.md",
+      "bytes": 12524,
+      "sha256": "4c67f64b9772966bf0254bd136db052d944c42469ebe67360e604924ac7d59cc",
+      "mode": "0644"
+    },
+    {
+      "path": "customizations/.github/skills/apex-azure-diagnostics/references/upstream-coverage.md",
+      "bytes": 18762,
+      "sha256": "892c7e222b61afed0d9a2fbae8b4a91687b5b81b567740e8f7bbe0cb39295358",
+      "mode": "0644"
+    },
+    {
+      "path": "customizations/.github/skills/apex-azure-kubernetes/references/upstream-coverage.md",
+      "bytes": 3984,
+      "sha256": "096fb0edd1874368222c2b2007b2ff4c6548b5a73f07c376433b8852a4244229",
+      "mode": "0644"
+    },
+    {
+      "path": "customizations/.github/skills/apex-azure-kusto/references/upstream-coverage.md",
+      "bytes": 1934,
+      "sha256": "150bad0f4f850b408b67c9bbe14da855c4f6e8a27dfb9dc344324c5f8dfc488a",
+      "mode": "0644"
+    },
+    {
+      "path": "customizations/.github/skills/apex-azure-reliability/references/upstream-coverage.md",
+      "bytes": 3856,
+      "sha256": "c8f5fdd4ef9641b5ad0c842551b3daddbf2356fe084f3a63d4f0a0cc61ffd759",
+      "mode": "0644"
+    },
+    {
+      "path": "customizations/.github/skills/apex-azure-upgrade/references/upstream-coverage.md",
+      "bytes": 3830,
+      "sha256": "9cfd46d8276328eb6982eb5b85d204f28d143e79941936a2751d7b67b6169ce9",
+      "mode": "0644"
+    },
+    {
+      "path": "customizations/.github/skills/apex-mermaid/references/upstream-coverage.md",
+      "bytes": 1562,
+      "sha256": "2391129186112fc7236f2fcaff76968bde1f0f630f82f85e4c9a9b41296eb1d9",
+      "mode": "0644"
+    },
+    {
+      "path": "customizations/.github/skills/apex-python-diagrams/references/upstream-coverage.md",
+      "bytes": 3462,
+      "sha256": "36886ae3fa70cf9958dc6ec3cda03d9354a13e183f54ca2dc02c14d5d7fc62f3",
+      "mode": "0644"
+    },
+    {
+      "path": "docs/how-to/complete-optimization-gate.md",
+      "bytes": 2873,
+      "sha256": "6021a5e0f9306b20e4e04f3b93f1c9a1828b1a4653b5aff82700640705e51b6f",
+      "mode": "0644"
+    },
+    {
+      "path": "docs/how-to/debug-local.md",
+      "bytes": 2116,
+      "sha256": "3bfe170f55d5f62826c25e199dfb7732205a26c4a425a4289897cc1fa6cdf9ee",
+      "mode": "0644"
+    },
+    {
+      "path": "docs/how-to/publish-npm.md",
+      "bytes": 5103,
+      "sha256": "9abf13f86b25396d14267ba215f3701f167658412f5011ec818f2d2a49db9f78",
+      "mode": "0644"
+    },
+    {
+      "path": "docs/vnext/SKILL-BEST-PRACTICES.md",
+      "bytes": 30280,
+      "sha256": "809daa12b2f9d4366fdf46896e827da1fe24074c3c042bcb9bd98fdc737d1533",
+      "mode": "0644"
+    },
+    {
+      "path": "infra/bicep/apex-insights/credential.bicep",
+      "bytes": 717,
+      "sha256": "0663255a503f3434dcd7aac2d43ebf47392b9382333337d4578fedf0dff0288b",
+      "mode": "0644"
+    },
+    {
+      "path": "infra/bicep/apex-insights/main.bicep",
+      "bytes": 2032,
+      "sha256": "aba2c3cc1ba4d4ab91d4bdfdda12defba1c62a7cd23096ec525f5fa07db56cf2",
+      "mode": "0644"
+    },
+    {
+      "path": "infra/bicep/apex-insights/main.json",
+      "bytes": 470721,
+      "sha256": "4d9be9bb5d64598b29338a9c26a2c5d9c6c4eaa53858a548405a13145c6e1edc",
+      "mode": "0644"
+    },
+    {
+      "path": "infra/bicep/apex-insights/resources.bicep",
+      "bytes": 3940,
+      "sha256": "06d7237f96ae66235f75d4875c69d17a7898bc40780693d808ab1a4f58bbde3e",
+      "mode": "0644"
+    },
+    {
+      "path": "tools/debug/deployment.example.json",
+      "bytes": 392,
+      "sha256": "4898f770a4ddedaee8f5a0f9264ae640e0c4627ff30dec3b75c4716796e23664",
+      "mode": "0644"
+    },
+    {
+      "path": "tools/registry/client-context-baseline-receipt.json",
+      "bytes": 2428,
+      "sha256": "1752aaf69ca715ec5774fc59aae10e69e5c1612576d2a2bd9da2953516fa6fcf",
+      "mode": "0644"
+    },
+    {
+      "path": "tools/registry/client-context-matrix.json",
+      "bytes": 1509,
+      "sha256": "b4409c1678e04d873080cb3180a55f786287ae24c0f6ccb14dd03dd238b60fc7",
+      "mode": "0644"
+    },
+    {
+      "path": "tools/registry/optimization-gate.v1.json",
+      "bytes": 5707,
+      "sha256": "a59842c948e49a94c628935dd1ee4235219c4a4ff9341257ae03998d5a29f5dd",
+      "mode": "0644"
+    },
+    {
+      "path": "tools/registry/schemas/client-context-matrix.schema.json",
+      "bytes": 2255,
+      "sha256": "7cecf2af3fdb4fd4f6726b9cf993411b8bd5026565f302a33eeb1a0b310b2679",
+      "mode": "0644"
+    },
+    {
+      "path": "tools/registry/schemas/client-context-sample.schema.json",
+      "bytes": 3123,
+      "sha256": "47b1448dd3e75f796d75fb8fad3de7ebeeb55531e4f1bf60fafc4e66a38b6b78",
+      "mode": "0644"
+    },
+    {
+      "path": "tools/registry/schemas/optimization-audit-receipt.schema.json",
+      "bytes": 1981,
+      "sha256": "778f01676586f0ae50333cfb5db484ad0075a318f35d304bf1476f4d6e7643e9",
+      "mode": "0644"
+    },
+    {
+      "path": "tools/registry/schemas/optimization-baseline-receipt.schema.json",
+      "bytes": 1715,
+      "sha256": "da252c27d24ca24411c6ee1fc31d93baa5d9e343ada514d37145def19123b764",
+      "mode": "0644"
+    },
+    {
+      "path": "tools/registry/schemas/optimization-client-preflight.schema.json",
+      "bytes": 3249,
+      "sha256": "a43b324a089d544f457cacefb284e927f52b779531b0917fb8be6d7d0792a329",
+      "mode": "0644"
+    },
+    {
+      "path": "tools/registry/schemas/optimization-context-receipt.schema.json",
+      "bytes": 1650,
+      "sha256": "169116326047aed0f1230e8e19176053e9aff95c12bb82b6cd1bb2a85effc708",
+      "mode": "0644"
+    },
+    {
+      "path": "tools/registry/schemas/optimization-gate.schema.json",
+      "bytes": 6372,
+      "sha256": "e87daa22e1d3c1edca67d1657963955f4456cd432a3003ed1285a9bcd14c92ce",
+      "mode": "0644"
+    },
+    {
+      "path": "tools/registry/schemas/skill-upstream-pins.schema.json",
+      "bytes": 2000,
+      "sha256": "fa7279b25d530310d5ed2d981616f56c0235c3353b188d2460e6f3e3cc2c4893",
+      "mode": "0644"
+    },
+    {
+      "path": "tools/registry/schemas/vscode-installation-lifecycle.schema.json",
+      "bytes": 1905,
+      "sha256": "394f5ba36a3d58cae854dfd17442e68b5051bdde254e0d69ad97ae2d2390190e",
+      "mode": "0644"
+    },
+    {
+      "path": "tools/registry/skill-upstream-pins.v1.json",
+      "bytes": 349590,
+      "sha256": "d00ced5c129ba7c97b85045f29624b7edc6852113e33b173016804d736a38802",
+      "mode": "0644"
+    },
+    {
+      "path": "tools/registry/vscode-installation-lifecycle.v1.json",
+      "bytes": 1559,
+      "sha256": "6327b3d3b570caea5d9f43a36fbcaead97da2b12f49abc37d46a22dd863ad5fd",
+      "mode": "0644"
+    },
+    {
+      "path": "tools/scripts/aggregate-client-context-samples.mjs",
+      "bytes": 10545,
+      "sha256": "c3390e8fe9f1b4cf1795c5f37601bb6b87c9b9553c1962558e833742b9fed1d8",
+      "mode": "0644"
+    },
+    {
+      "path": "tools/scripts/build-optimization-context-receipt.mjs",
+      "bytes": 4374,
+      "sha256": "cecc53100b17b37302e81a6fddaba02b045ec53205bbed51e070288742747f8b",
+      "mode": "0644"
+    },
+    {
+      "path": "tools/scripts/capture-optimization-audit.mjs",
+      "bytes": 4534,
+      "sha256": "adf7fd8e31f07bceade809bade1e154467307d1038d2e4f167dab9aadeaf2a7a",
+      "mode": "0644"
+    },
+    {
+      "path": "tools/scripts/capture-optimization-baseline.mjs",
+      "bytes": 3904,
+      "sha256": "98701b112990be317a25683ad690b7178a6ef7dff1eb1aa9a48d99dc019b5298",
+      "mode": "0644"
+    },
+    {
+      "path": "tools/scripts/debug-session.mjs",
+      "bytes": 8959,
+      "sha256": "1079dece351bf9ca55343164b6fa785efdfde23a1773d6c080fa0dabbe117d43",
+      "mode": "0644"
+    },
+    {
+      "path": "tools/scripts/deploy-debug-insights.mjs",
+      "bytes": 12387,
+      "sha256": "ccfc2f5abf37aa803db5fc6a9669c2ed368d6c1a4b386f9cbce07cc66b5e5440",
+      "mode": "0644"
+    },
+    {
+      "path": "tools/scripts/diff-context-baseline.sh",
+      "bytes": 7162,
+      "sha256": "24c63f453e6a4dc75af3bfdb32f32b6698b4a9257bfc8b2494ce040fba807d2c",
+      "mode": "0755"
+    },
+    {
+      "path": "tools/scripts/normalize-client-context-sample.mjs",
+      "bytes": 11598,
+      "sha256": "a986d68f0e92f82cd99d0961fa0ae12af11ff3b7333f8bfc6422da820f7115e7",
+      "mode": "0644"
+    },
+    {
+      "path": "tools/scripts/preflight-optimization-client-measurement.mjs",
+      "bytes": 9798,
+      "sha256": "8e7faba593f3e7c15ce64b958ab59dfe10e02b4157333e55b0e037d074b59912",
+      "mode": "0644"
+    },
+    {
+      "path": "tools/scripts/profile-copilot-cli-otel.mjs",
+      "bytes": 6210,
+      "sha256": "bdc306f29cfd92df5d183f8387b220c1d4931f7661b5e1a977831756bc31455a",
+      "mode": "0644"
+    },
+    {
+      "path": "tools/scripts/profile-vscode-otel.mjs",
+      "bytes": 5518,
+      "sha256": "973a76d1a19cc730e5cfe323ac436d9894a72df452948c6eabbc6219acea7050",
+      "mode": "0644"
+    },
+    {
+      "path": "tools/scripts/snapshot-agent-context.sh",
+      "bytes": 3261,
+      "sha256": "c295a5e695c47430224f3dae0e0dc6cb4d55af8ddf935ddb5c5970e8b4349e43",
+      "mode": "0755"
+    },
+    {
+      "path": "tools/scripts/validate-optimization-gate.mjs",
+      "bytes": 3840,
+      "sha256": "b6a7f88f6ebd14fbe965aa77bd18ded6e5ea6416de37888d5d6a277a5d6495f2",
+      "mode": "0644"
+    },
+    {
+      "path": "tools/scripts/validate-vscode-installation-lifecycle.mjs",
+      "bytes": 2289,
+      "sha256": "6a8e8c1fe6c2587d042dd5addd222c8cb3b7a0dd74be91d99427bf4c4db5a8b0",
+      "mode": "0644"
+    },
+    {
+      "path": "tools/tests/build-optimization-context-receipt.test.mjs",
+      "bytes": 3535,
+      "sha256": "910ce56033b2099146762bb35d6f00568c529cdc47e055fde7b4ecc20c455024",
+      "mode": "0644"
+    },
+    {
+      "path": "tools/tests/capture-optimization-audit.test.mjs",
+      "bytes": 3691,
+      "sha256": "ce9b3a023ebc80310b33648a20fe909f8ff1b4ea747ab9c9ef2e7cc0e726d37e",
+      "mode": "0644"
+    },
+    {
+      "path": "tools/tests/capture-optimization-baseline.test.mjs",
+      "bytes": 2339,
+      "sha256": "fd18efd5f2b976f4ea00b76de833369ab3030e34dc93cf94125459af820efb46",
+      "mode": "0644"
+    },
+    {
+      "path": "tools/tests/debug-session.test.mjs",
+      "bytes": 10205,
+      "sha256": "fbdc32d6e00d114ee158a43e21448d61a9cbcf0673d8244d72d1d72263e1577a",
+      "mode": "0644"
+    },
+    {
+      "path": "tools/tests/normalize-client-context-sample.test.mjs",
+      "bytes": 28712,
+      "sha256": "7466a5a4fdf5656fc1f7b624a9579ba858ae9ed09757a38d06dc468ca146a6cf",
+      "mode": "0644"
+    },
+    {
+      "path": "tools/tests/preflight-optimization-client-measurement.test.mjs",
+      "bytes": 8093,
+      "sha256": "a561c0350fb10182de5cffbcd2204cc33ba8a64170c85315431c7219ba400273",
+      "mode": "0644"
+    },
+    {
+      "path": "tools/tests/security-exceptions.test.mjs",
+      "bytes": 3440,
+      "sha256": "2c9c7032dbed6aee31033fc28e9aca4a2de653753e252dde2026f76605f01a23",
+      "mode": "0644"
+    },
+    {
+      "path": "tools/tests/validate-optimization-gate.test.mjs",
+      "bytes": 5274,
+      "sha256": "083299f6f3cc332b2253b72184f66d6e68d3efd7d660edbab1e8efac3fbd0130",
+      "mode": "0644"
+    },
+    {
+      "path": "tools/tests/validate-vscode-installation-lifecycle.test.mjs",
+      "bytes": 1294,
+      "sha256": "0c50f4dbdf1731efeefe4d2492f728a8ce0552000dc16896652c17f51ff47836",
+      "mode": "0644"
+    }
+  ]
+}
