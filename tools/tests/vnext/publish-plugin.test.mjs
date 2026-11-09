@@ -107,6 +107,8 @@ async function fixture(context, { marketplacePlugins = [], seedMarketplace = tru
     git,
     gitHead: git(root, "rev-parse", "HEAD"),
     npm: undefined,
+    node: undefined,
+    nodeCalls: [],
     gh: [],
     build: { sidecar: undefined, touch: undefined },
   };
@@ -116,6 +118,12 @@ async function fixture(context, { marketplacePlugins = [], seedMarketplace = tru
       if (args[0] === "-C" && args[2] === "remote" && args[3] === "get-url")
         return { status: 0, stdout: `${remotes.get(args[1])}\n`, stderr: "" };
       const result = spawnSync("git", args, { cwd, encoding: "utf8", env });
+      return { status: result.status ?? 1, stdout: result.stdout, stderr: result.stderr };
+    }
+    if (command === process.execPath) {
+      state.nodeCalls.push(args);
+      if (state.node !== undefined) return state.node(args);
+      const result = spawnSync(process.execPath, args, { cwd, encoding: "utf8", env });
       return { status: result.status ?? 1, stdout: result.stdout, stderr: result.stderr };
     }
     if (command === "npm") {
@@ -513,4 +521,67 @@ test("--apply opens a pull request from a release branch with the exact built tr
   assert.match(args[11], /### \[1\.2\.0-next\.3\] - Unreleased\n\n- First release\./u);
   assert.match(args[11], /\(replaces 1\.2\.0-next\.2\)/u);
   assert.ok(!state.gh.flat().includes("merge"), "the script never merges");
+});
+
+test("--apply refreshes marketplace SBOM files and aborts before push when generation fails", async (context) => {
+  const state = await fixture(context, {
+    marketplacePlugins: [{ name: "apex", source: "./plugins/apex", version: "1.2.0-next.2" }],
+  });
+  await state.commitSource("package-lock.json", '{"name":"apex-vnext","lockfileVersion":3}\n');
+  await writeText(
+    join(state.marketplaceDir, "tools/generate-sbom.mjs"),
+    [
+      'import { writeFileSync } from "node:fs";',
+      'import { join } from "node:path";',
+      "const args = process.argv.slice(2);",
+      'const root = args[args.indexOf("--root") + 1];',
+      'if (args.includes("--from-lockfile")) {',
+      '  writeFileSync(join(root, "tools/sbom-bundled-deps.json"), "{\\"deps\\":[]}\\n");',
+      "} else {",
+      '  writeFileSync(join(root, ".github/plugin/sbom.cdx.json"), "{\\"bomFormat\\":\\"CycloneDX\\"}\\n");',
+      '  writeFileSync(join(root, "README.md"), "# apex-plugins\\nupdated\\n");',
+      "}",
+      "",
+    ].join("\n"),
+  );
+  state.git(state.marketplaceDir, "add", "--all");
+  state.git(state.marketplaceDir, "commit", "--quiet", "-m", "add sbom generator");
+  state.git(state.marketplaceDir, "push", "--quiet", "origin", "main");
+
+  const sbomScript = join(state.marketplaceDir, "tools/generate-sbom.mjs");
+  const lockfilePath = join(state.root, "package-lock.json");
+  const { plan } = await state.publish({ apply: true });
+  assert.deepEqual(state.nodeCalls, [
+    [sbomScript, "--root", state.marketplaceDir, "--from-lockfile", lockfilePath],
+    [sbomScript, "--root", state.marketplaceDir],
+  ]);
+  assert.deepEqual(
+    state.git(state.marketplaceDir, "diff", "--name-only", "origin/main", "HEAD").split("\n").sort(),
+    [
+      MARKETPLACE_PATH,
+      PROVENANCE_PATH,
+      ".github/plugin/sbom.cdx.json",
+      "README.md",
+      "tools/sbom-bundled-deps.json",
+      ...plan.tree.files.map((file) => `plugins/apex/${file}`),
+    ].sort(),
+  );
+
+  const failing = await fixture(context, {
+    marketplacePlugins: [{ name: "apex", source: "./plugins/apex", version: "1.2.0-next.2" }],
+  });
+  await failing.commitSource("package-lock.json", '{"name":"apex-vnext","lockfileVersion":3}\n');
+  await writeText(join(failing.marketplaceDir, "tools/generate-sbom.mjs"), "process.exit(1);\n");
+  failing.git(failing.marketplaceDir, "add", "--all");
+  failing.git(failing.marketplaceDir, "commit", "--quiet", "-m", "add failing sbom generator");
+  failing.git(failing.marketplaceDir, "push", "--quiet", "origin", "main");
+  failing.node = () => ({ status: 1, stdout: "", stderr: "sbom generation failed" });
+
+  await assert.rejects(failing.publish({ apply: true }), /sbom generation failed/u);
+  assert.deepEqual(failing.gh, [], "gh must not run when SBOM generation fails");
+  assert.equal(
+    failing.git(failing.marketplaceDir, "ls-remote", "--heads", "origin", `release/apex-${version}`),
+    "",
+    "release branch must not be pushed when SBOM generation fails",
+  );
 });
