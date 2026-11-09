@@ -129,7 +129,10 @@ function resourcesFromJson(json: string, track: IacTool): readonly Resource[] {
       parentSymbols: readonly string[] | null = [],
     ): void => {
       const entries = Array.isArray(value)
-        ? value.map((entry) => [undefined, entry] as const)
+        ? value.map(
+            (entry, index) =>
+              [parentSymbols !== null && parentSymbols.length > 0 ? String(index) : undefined, entry] as const,
+          )
         : object(value) !== undefined
           ? Object.entries(value as Record<string, unknown>)
           : undefined;
@@ -665,16 +668,44 @@ export function validateBicepStorageBaseline(request: {
   });
   if (parity.outcome !== "pass") return result(parity.outcome, "resource-parity");
   const parsed: unknown = JSON.parse(request.json);
-  const hasCredential = (value: unknown): boolean => {
-    if (typeof value === "string") return SECRET_VALUE_PATTERN.test(value);
-    if (Array.isArray(value)) return value.some(hasCredential);
-    return (
-      object(value) !== undefined &&
-      Object.entries(value as Record<string, unknown>).some(
-        ([key, child]) =>
-          (SECRET_FIELD_PATTERN.test(key) && typeof child === "string" && child.length > 0) || hasCredential(child),
-      )
-    );
+  const isArmExpression = (value: string): boolean =>
+    value.startsWith("[") && !value.startsWith("[[") && value.endsWith("]");
+  const hasSecretValue = (value: string, insideModuleTemplate: boolean): boolean => {
+    const normalized =
+      insideModuleTemplate && isArmExpression(value) ? value.replace(/AccountKey=\{\d+\}/giu, "") : value;
+    return SECRET_VALUE_PATTERN.test(normalized);
+  };
+  const isSafeModuleFieldExpression = (value: string): boolean =>
+    isArmExpression(value) &&
+    !hasSecretValue(value, true) &&
+    !/\bconcat\s*\(/iu.test(value) &&
+    /^\[(?:parameters|tryGet|if|subscriptionResourceId|resourceId|reference)\(/u.test(value);
+  const hasCredential = (value: unknown, insideModuleTemplate = false, inDeploymentProperties = false): boolean => {
+    if (typeof value === "string") {
+      return hasSecretValue(value, insideModuleTemplate);
+    }
+    if (Array.isArray(value)) {
+      return value.some((item) => hasCredential(item, insideModuleTemplate));
+    }
+    const record = object(value);
+    if (record === undefined) return false;
+    const isDeployment = text(record.type)?.toLowerCase() === "microsoft.resources/deployments";
+    return Object.entries(record).some(([key, child]) => {
+      const nextInDeploymentProperties = isDeployment && key === "properties";
+      const nextInsideTemplate = insideModuleTemplate || (inDeploymentProperties && key === "template");
+      if (SECRET_FIELD_PATTERN.test(key)) {
+        const paramValue = !insideModuleTemplate ? object(child)?.value : undefined;
+        const candidate = typeof child === "string" ? child : typeof paramValue === "string" ? paramValue : undefined;
+        if (
+          candidate !== undefined &&
+          candidate.length > 0 &&
+          !(insideModuleTemplate && isSafeModuleFieldExpression(candidate))
+        ) {
+          return true;
+        }
+      }
+      return hasCredential(child, nextInsideTemplate, nextInDeploymentProperties);
+    });
   };
   if (hasCredential(parsed)) return result("fail", "credential-content");
   const onlyKeys = (value: unknown, keys: readonly string[]): boolean =>
