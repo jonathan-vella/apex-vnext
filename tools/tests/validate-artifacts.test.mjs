@@ -165,12 +165,20 @@ test("missing and invalid manifest/source fail explicitly", () => {
   }
 });
 
-test("rejects symlink templates and parent directories", () => {
+test("rejects symlink templates and parent directories", (context) => {
   const directory = fixture();
   try {
     const filename = path.join(directory, "customizations", assetPath);
     rmSync(filename);
-    symlinkSync(path.join(root, "customizations", assetPath), filename);
+    try {
+      symlinkSync(path.join(root, "customizations", assetPath), filename);
+    } catch (error) {
+      if (process.platform === "win32" && error?.code === "EPERM") {
+        context.skip("symlink privilege unavailable on Windows");
+        return;
+      }
+      throw error;
+    }
     assert.throws(() => collectArtifactSourceInputs(directory), /must not use symlinks/u);
     rmSync(path.join(directory, "customizations"), { recursive: true });
     symlinkSync(path.join(root, "customizations"), path.join(directory, "customizations"));

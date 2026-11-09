@@ -12,8 +12,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0-next.6] — Preview
+
+This release resets the preview launch scope (`DECISION-040`, #535, #536), ships a single self-contained marketplace
+plugin artifact bundling both `mcp/apex.mjs` and `cli/apex.mjs` with `.apex/bin/apex.mjs` workspace launchers and
+`scripts/onboard.{ps1,sh}`, cuts the MCP `tools/list` wire payload under a static context budget (`27,505 / 28,000`
+bytes), and qualifies general Bicep and MCR AVM module live execution through `azd` (`#533`, `#386`, `#455`).
+
 ### Changed
 
+- Ship a single marketplace plugin artifact (`apex@apex-plugins`) bundling both `mcp/apex.mjs` and `cli/apex.mjs` plus
+  `scripts/onboard.ps1` and `scripts/onboard.sh` (`DECISION-040`, `CP-35`, #531). Workspace initialization writes a
+  thin `.apex/bin/apex.mjs` launcher without running `npm install @apexops/cli`, and `doctor` treats a
+  workspace-disabled duplicate marketplace entry (`enabledPlugins: {"apex@apex-plugins": false}`) as healthy (#507).
+- Stop serializing `outputSchema` onto the MCP `tools/list` wire payload while keeping server-side `outputSchema`
+  validation, unregister 10 CLI-only MCP tools (`31` role-scoped tools retained), and enforce static context budgets in
+  CI (`CP-34`, `CP-36`, #530, #532).
+- Unlock general Bicep and MCR AVM module validation (`CP-33`, #529, #536): remove the rigid 9-resource storage-only
+  lock, support `Microsoft.Resources/deployments` module parity and nested array sub-deployments, omit unused top-level
+  `param` declarations in `generateBicepTree`, and pass `--api-version 2021-05-01-preview` when reading
+  `Microsoft.Insights/diagnosticSettings` during destroy preview on Azure CLI 2.91+.
 - Client local sandboxing is no longer a launch requirement or qualification input; sandboxed sessions are deferred
   until after launch. Doctor's host check no longer says the sandbox is assumed on.
 - A policy `deny` in a `DoNotEnforce` assignment is now informational instead of a blocker, in the ALZ reference

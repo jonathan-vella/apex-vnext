@@ -10,8 +10,25 @@ When you prepare a release, rename `## [Unreleased]` to the new version.
 
 ## [Unreleased]
 
+## [0.11.0-next.6] - 2026-11-09
+
+This release resets the preview launch scope (`DECISION-040`, #535, #536), ships a single self-contained marketplace
+plugin artifact bundling both `mcp/apex.mjs` and `cli/apex.mjs` with `.apex/bin/apex.mjs` workspace launchers and
+`scripts/onboard.{ps1,sh}`, cuts the MCP `tools/list` wire payload under a static context budget (`27,505 / 28,000`
+bytes), and qualifies general Bicep and MCR AVM module live execution through `azd` (`#533`, `#386`, `#455`).
+
 ### Changed
 
+- Bundle `cli/apex.mjs` and `scripts/onboard.{ps1,sh}` directly in the plugin (`CP-35`, #531) and generate
+  `.apex/bin/apex.mjs` during workspace initialization without running `npm install @apexops/cli`. Treat duplicate
+  marketplace entries disabled in `.github/copilot/settings.local.json` as healthy in `doctor` (#507).
+- Stop serializing `outputSchema` onto the MCP `tools/list` wire payload while keeping server-side output validation,
+  unregister 10 CLI-only MCP tools (`31` role-scoped tools retained), and enforce static context budgets (`CP-34`,
+  `CP-36`, #530, #532).
+- Unlock general Bicep and MCR AVM module validation (`CP-33`, #529, #536): remove the 9-resource storage-only lock,
+  support `Microsoft.Resources/deployments` modules and nested array sub-deployments, omit unused top-level `param`
+  declarations in `generateBicepTree`, and pass `--api-version 2021-05-01-preview` when reading
+  `Microsoft.Insights/diagnosticSettings` during destroy preview on Azure CLI 2.91+.
 - Add exact Azure MCP Server `3.0.0` as the general read-only `apex-azure` provider with verified foreground grants
   and guarded namespace commands. Retire the separate ARM CostManagement server; actual billing, forecasts, budgets,
   alerts and commitment records are unsupported. Pricing uses `pricing_get` with explicit cap/provenance guidance.

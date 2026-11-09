@@ -9,12 +9,12 @@
  * (version, source commit, tree hash, files). It changes nothing outside the gitignored build output.
  *
  * --apply refuses unless every check passes: clean tree, HEAD on origin/main (or HEAD equal to an explicit
- * --release-commit that is on origin), a plugin/CHANGELOG.md section for the version, the same @apexops/cli version on
- * npm built from unchanged CLI inputs, a clean marketplace clone, a version newer than the marketplace's, an unused
- * release branch and a build whose tree hash matches its .sha256 sidecar. It then creates `release/apex-<version>` from
- * the marketplace's origin/main, replaces `plugins/apex/` with the built tree, updates marketplace.json and
- * provenance.json, pushes only that branch and opens a pull request with `gh`. It never merges, never pushes to main
- * and never creates tags. The pin is the source commit SHA; tags are release labels only.
+ * --release-commit that is on origin), a plugin/CHANGELOG.md section for the version, a clean marketplace clone, a
+ * version newer than the marketplace's, an unused release branch and a build whose tree hash matches its .sha256
+ * sidecar. It then creates `release/apex-<version>` from the marketplace's origin/main, replaces `plugins/apex/` with
+ * the built tree, updates marketplace.json and provenance.json (plus SBOM/README when tools/generate-sbom.mjs is
+ * present), pushes only that branch and opens a pull request with `gh`. It never merges, never pushes to main and never
+ * creates tags. The pin is the source commit SHA; tags are release labels only.
  */
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -217,6 +217,7 @@ export async function planRelease({
 
   await evaluate(checks, "source-commit", () => {
     plan.source.commit = git(root, ["rev-parse", "HEAD"]);
+    plan.npm.gitHead = plan.source.commit;
     const slug = repositorySlug(git(root, ["remote", "get-url", "origin"]));
     if (slug !== SOURCE_REPOSITORY)
       throw new Error(`origin is ${slug ?? "not a GitHub remote"}, not ${SOURCE_REPOSITORY}`);
@@ -244,34 +245,6 @@ export async function planRelease({
     plan.changelog = changelogSection(text, version);
     if (plan.changelog === null) throw new Error(`${CHANGELOG_PATH} has no non-empty "## [${version}]" section`);
     return `${CHANGELOG_PATH} has a section for ${version}`;
-  });
-
-  await evaluate(checks, "npm-release", () => {
-    const result = call("npm", ["view", `${CLI_PACKAGE}@${version}`, "version", "gitHead", "--json"], root);
-    let published;
-    try {
-      published = result.stdout.trim() === "" ? null : JSON.parse(result.stdout);
-    } catch {
-      published = null;
-    }
-    if (result.status !== 0 && published?.error?.code !== "E404")
-      throw new Error(`npm view ${CLI_PACKAGE}@${version} failed: ${(result.stderr || result.stdout).trim()}`);
-    if (published?.version !== version)
-      throw new Error(`${CLI_PACKAGE}@${version} is not on npm; publish the CLI first (docs/how-to/publish-npm.md)`);
-    plan.npm.gitHead = published.gitHead ?? null;
-    if (!plan.npm.gitHead || !FULL_SHA.test(plan.npm.gitHead))
-      throw new Error(`${CLI_PACKAGE}@${version} on npm records no gitHead commit`);
-    if (gitStatus(root, ["cat-file", "-e", `${plan.npm.gitHead}^{commit}`]) !== 0)
-      throw new Error(`npm gitHead ${plan.npm.gitHead} is not in this clone; fetch origin`);
-    const changed = git(root, ["diff", "--name-only", plan.npm.gitHead, "HEAD", "--", ...CLI_PACKAGE_INPUTS]);
-    if (changed) {
-      const files = changed.split("\n");
-      throw new Error(
-        `${files.length} CLI input file(s) changed since npm ${version} (gitHead ${plan.npm.gitHead.slice(0, 12)}), ` +
-          `e.g. ${files.slice(0, 3).join(", ")}; release a new CLI version first`,
-      );
-    }
-    return `${CLI_PACKAGE}@${version} is on npm from ${plan.npm.gitHead.slice(0, 12)} with unchanged CLI inputs`;
   });
 
   let marketplaceReady = false;
@@ -365,8 +338,7 @@ export function pullRequestBody(plan) {
     `- Source commit (pin): [${repository}@${commit}](https://github.com/${repository}/commit/${commit})`,
     `- Plugin tree SHA-256: \`${plan.tree.sha256}\` (${plan.tree.files.length} files in \`plugins/${PLUGIN_NAME}/\`, ` +
       `${TREE_ALGORITHM})`,
-    `- Bundled CLI: [\`${CLI_PACKAGE}@${plan.npm.version}\`](https://www.npmjs.com/package/${CLI_PACKAGE}/v/` +
-      `${plan.npm.version}), npm gitHead \`${plan.npm.gitHead}\``,
+    `- Bundled CLI: \`${CLI_PACKAGE}@${plan.npm.version}\` (\`cli/apex.mjs\` + \`mcp/apex.mjs\`, gitHead \`${plan.npm.gitHead}\`)`,
     "",
     "## Changelog",
     "",
@@ -383,7 +355,7 @@ export function pullRequestBody(plan) {
 }
 
 /** Prepares the release branch in the marketplace clone, pushes only that branch and opens a pull request. */
-export async function applyRelease(plan, { run = defaultRun } = {}) {
+export async function applyRelease(plan, { root = repositoryRoot, run = defaultRun } = {}) {
   if (!plan.ready) throw new Error("Refusing to publish: not every check passed");
   const { git, must } = runner(run);
   const { directory, branch, base } = plan.marketplace;
@@ -407,7 +379,25 @@ export async function applyRelease(plan, { run = defaultRun } = {}) {
   );
   await writeFile(provenancePath, `${JSON.stringify(provenance, null, 2)}\n`);
 
-  git(directory, ["add", "--force", "--all", "--", `plugins/${PLUGIN_NAME}`, MARKETPLACE_PATH, PROVENANCE_PATH]);
+  const extraStaged = [];
+  const sbomScript = join(directory, "tools/generate-sbom.mjs");
+  const lockfilePath = join(root, "package-lock.json");
+  if (existsSync(sbomScript) && existsSync(lockfilePath)) {
+    must(process.execPath, [sbomScript, "--root", directory, "--from-lockfile", lockfilePath]);
+    must(process.execPath, [sbomScript, "--root", directory]);
+    extraStaged.push("tools/sbom-bundled-deps.json", ".github/plugin/sbom.cdx.json", "README.md");
+  }
+
+  git(directory, [
+    "add",
+    "--force",
+    "--all",
+    "--",
+    `plugins/${PLUGIN_NAME}`,
+    MARKETPLACE_PATH,
+    PROVENANCE_PATH,
+    ...extraStaged,
+  ]);
   const staged = git(directory, ["ls-files", "-z", "--", `plugins/${PLUGIN_NAME}`])
     .split("\0")
     .filter(Boolean)
@@ -466,7 +456,7 @@ export function formatPlan(plan, { apply = false, listFiles = false } = {}) {
     "",
     `  plugin          ${plan.plugin.name} ${plan.plugin.version} (version from ${plan.plugin.versionFrom})`,
     `  source commit   ${plan.source.repository}@${plan.source.commit ?? "unknown"}`,
-    `  bundled CLI     ${plan.npm.package}@${plan.npm.version} (npm gitHead ${plan.npm.gitHead ?? "unknown"})`,
+    `  bundled CLI     ${plan.npm.package}@${plan.npm.version} (gitHead ${plan.npm.gitHead ?? "unknown"})`,
     `  marketplace     ${plan.marketplace.repository} ${plan.marketplace.base}: ${
       plan.marketplace.current ? `${plan.plugin.name} ${plan.marketplace.current}` : "no published version"
     }`,

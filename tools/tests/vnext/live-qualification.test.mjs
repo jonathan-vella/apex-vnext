@@ -76,8 +76,8 @@ const releaseManifest = {
   packages: [
     {
       package: "@apexops/cli",
-      version: "0.11.0-next.5",
-      file: "apex-cli-0.11.0-next.5.tgz",
+      version: "0.11.0-next.6",
+      file: "apex-cli-0.11.0-next.6.tgz",
       sha256: hash,
       bytes: 1,
       dependencies: {},
@@ -105,7 +105,7 @@ function fixture() {
     actor: "maintainer",
     environment: "sandbox",
     targetScope: "subscription/example",
-    toolVersions: { apex: "0.11.0-next.5" },
+    toolVersions: { apex: "0.11.0-next.6" },
   });
   return { evidenceManifest, qualification, actual: { candidate, evidenceManifestHash: hash } };
 }

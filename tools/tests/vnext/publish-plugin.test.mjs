@@ -308,7 +308,6 @@ test("dry run builds, passes every check and changes nothing", async (context) =
       "clean-tree",
       "source-commit",
       "changelog",
-      "npm-release",
       "marketplace",
       "version",
       "release-branch",
@@ -386,28 +385,6 @@ test("--apply refuses a version without a changelog section", async (context) =>
   const state = await fixture(context);
   await state.commitSource("plugin/CHANGELOG.md", changelog("1.2.0-next.2"));
   await assertRefused(state, "changelog", /plugin\/CHANGELOG\.md has no non-empty "## \[1\.2\.0-next\.3\]" section/u);
-});
-
-test("--apply refuses a CLI version that is not on npm", async (context) => {
-  const state = await fixture(context);
-  state.npm = {
-    status: 1,
-    stdout: JSON.stringify({ error: { code: "E404", summary: "No match found" } }),
-    stderr: "npm error 404",
-  };
-  await assertRefused(state, "npm-release", /@apexops\/cli@1\.2\.0-next\.3 is not on npm; publish the CLI first/u);
-  state.npm = { status: 1, stdout: "", stderr: "network unreachable" };
-  await assertRefused(state, "npm-release", /npm view @apexops\/cli@1\.2\.0-next\.3 failed: network unreachable/u);
-});
-
-test("--apply refuses when CLI inputs changed since the npm release", async (context) => {
-  const state = await fixture(context);
-  await state.commitSource("packages/cli/src/index.ts", "export const changed = true;\n");
-  await assertRefused(
-    state,
-    "npm-release",
-    /1 CLI input file\(s\) changed since npm 1\.2\.0-next\.3.*packages\/cli\/src/u,
-  );
 });
 
 test("--apply refuses a version that is not newer than the marketplace", async (context) => {
