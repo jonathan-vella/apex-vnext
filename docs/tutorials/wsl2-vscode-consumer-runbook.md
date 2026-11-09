@@ -11,10 +11,10 @@ the [Windows 11 first run](windows-11-first-run.md). Use one host per workspace:
 client and Copilot CLI in WSL2. Docker, a devcontainer and the APEX source repository are not required.
 
 > [!IMPORTANT]
-> The plugin and CLI ship preview `0.11.0-next.5`; live qualification is still pending.
+> The plugin and bundled CLI ship preview `0.11.0-next.6` (`apex@apex-plugins`).
 > These steps describe the published flow. For source changes, use a
 > [local candidate](../how-to/manage-installation.md#install-a-local-candidate) and the
-> [human-run qualification kit](../how-to/qualify-live-clients.md); do not mix same-version source and registry bytes.
+> [human-run qualification kit](../how-to/qualify-live-clients.md).
 
 ## Prepare Ubuntu
 
@@ -43,13 +43,12 @@ A workspace that `apex init` set up also asks Copilot CLI to install the plugin,
 ## Create The Workspace
 
 Create one consumer repository in Ubuntu. This repository can hold multiple APEX workloads; choose a name for the
-consumer or business entity, not the first workload. Bootstrap the APEX CLI at the plugin's version and create a Git
-repository boundary:
+consumer or business entity, not the first workload. Run the bundled onboarding script from the installed plugin:
 
 ```bash
 mkdir -p ~/src/contoso-platform
 cd ~/src/contoso-platform
-npx --yes @apexops/cli@PLUGIN_VERSION bootstrap \
+sh ~/.copilot/installed-plugins/apex-plugins/apex/scripts/onboard.sh \
   --project payments \
   --risk-owner partner \
   --target local \
@@ -57,7 +56,7 @@ npx --yes @apexops/cli@PLUGIN_VERSION bootstrap \
   --yes
 ```
 
-The command installs the exact APEX CLI as a workspace dependency, creates `.apex` state, and writes the thin
+The command writes the thin `.apex/bin/apex.mjs` launcher, creates `.apex` state, and writes the thin
 workspace projection with `.github/copilot/settings.json`, which enables the `apex` plugin. Do not edit `.apex`
 directly.
 
@@ -89,7 +88,7 @@ project in a consumer workspace.
 The equivalent deterministic CLI fallback is:
 
 ```bash
-npx apex project create \
+node .apex/bin/apex.mjs project create \
   --project data-platform \
   --risk-owner partner \
   --name "Data platform" \
@@ -98,14 +97,13 @@ npx apex project create \
   --iac terraform \
   --json
 
-npx apex project list --json
-npx apex project use --project payments --json
+node .apex/bin/apex.mjs project list --json
+node .apex/bin/apex.mjs project use --project payments --json
 ```
 
 APEX stores workload state and artifacts by project and run under `.apex/projects/<project>/runs/<run>/`.
 Code generation is staged in a run-bound `.apex/work/<run>/<task>/code/` directory, and accepted artifacts are
-content-bound to that run. The current preview does not materialize the legacy `agent-output/<workload>/`,
-`infra/bicep/<workload>/`, or `infra/terraform/<workload>/` directory convention automatically.
+content-bound to that run.
 
 ## Start APEX
 
@@ -116,18 +114,18 @@ stage review packages are described in [Run the workflow](../how-to/run-workflow
 execution-state contract.
 
 In the workspace terminal, run `copilot --agent apex` and provide the initial workload requirements. Ask APEX what is
-next at any point; it reads kernel state, continues in the same APEX agent and delegates only to its hidden workers.
+next at any point; it reads kernel state, continues in the same APEX agent and delegates only its hidden workers.
 The agents read the kernel-owned workspace state; they do not grant deployment approval or configure cloud resources on
 their own.
 
 Verify the workspace before continuing:
 
 ```bash
-npx apex version --json
-npx apex setup --json
-npx apex doctor --json
-npx apex status --json
-npx apex task next --json
+node .apex/bin/apex.mjs version --json
+node .apex/bin/apex.mjs setup --json
+node .apex/bin/apex.mjs doctor --json
+node .apex/bin/apex.mjs status --json
+node .apex/bin/apex.mjs task next --json
 ```
 
 ## Add Azure Tooling When Needed

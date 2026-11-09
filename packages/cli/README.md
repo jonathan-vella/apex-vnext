@@ -32,8 +32,8 @@ npx apex update
 ## Documentation
 
 - [APEX vNext repository](https://github.com/jonathan-vella/apex-vnext)
-- [CLI reference](https://apexops.pro/reference/cli/)
-- [First run tutorial](https://apexops.pro/tutorials/first-run/)
+- [CLI reference](../../docs/reference/cli.md)
+- [First run tutorial](../../docs/tutorials/first-run.md)
 
 ## License
 

@@ -21,7 +21,7 @@ authoritative.
 ## Documentation
 
 - [APEX vNext repository](https://github.com/jonathan-vella/apex-vnext)
-- [Workflow and gates](https://apexops.pro/explanation/workflow-and-gates/)
+- [Workflow and gates](../../docs/explanation/workflow-and-gates.md)
 
 ## License
 

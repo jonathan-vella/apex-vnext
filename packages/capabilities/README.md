@@ -19,7 +19,7 @@ import { generateBicepTree, generateTerraformTree } from "@apexops/capabilities"
 ## Documentation
 
 - [APEX vNext repository](https://github.com/jonathan-vella/apex-vnext)
-- [IaC tracks](https://apexops.pro/reference/iac-tracks/)
+- [IaC tracks](../../docs/reference/iac-tracks.md)
 
 ## License
 

@@ -6,13 +6,13 @@ Referenced by the IaC best-practices instruction files.
 > **Canonical contract owner**:
 > [`customizations/.github/skills/apex-azure-defaults/references/decision-boundaries.md`](../../../customizations/.github/skills/apex-azure-defaults/references/decision-boundaries.md).
 > The tables below are an extract for IaC-author convenience; on
-> conflict the azure-defaults reference and the discovered
-> `04-governance-constraints.json` `cost_monitoring.*` block win
+> conflict the azure-defaults reference and the accepted
+> `governance-constraints-v1` / `workload-decision-manifest-v1` contracts win
 > (governance > defaults > this extract).
 
 ## Azure Budget — scope-aware
 
-Scope is selected by Planner-set `cost_monitoring_scope ∈ {rg, sub, mg}`
+Scope is selected by the accepted plan (`cost_monitoring_scope ∈ {rg, sub, mg}`)
 (see `cost-alerts-baseline.md` → "Scope-aware Resource Matrix").
 
 | Scope | Bicep resource                               | Terraform resource                            |
@@ -21,7 +21,7 @@ Scope is selected by Planner-set `cost_monitoring_scope ∈ {rg, sub, mg}`
 | `sub` | `Microsoft.Consumption/budgets` (sub-scoped) | `azurerm_consumption_budget_subscription`     |
 | `mg`  | `Microsoft.Consumption/budgets` (MG-scoped)  | `azurerm_consumption_budget_management_group` |
 
-- Amount: aligned to cost estimate from Step 2 (`03-des-cost-estimate.md`).
+- Amount: aligned to the accepted cost estimate (`cost-estimate-v1`).
 - Time grain: Monthly.
 - Budget amount is a parameter (never hardcoded).
 - **AVM-first** — Planner queries the AVM Consumption Budget pattern
@@ -127,11 +127,9 @@ the InsightAlert is subscription-scoped.
 
 ## Governance Precedence
 
-`04-governance-constraints.json` `cost_monitoring.*` (any of
-`thresholds`, `required_scope`, `required_action_group_id`,
-`min_emails`, `deferred_allowed`) always overrides this extract and
-the azure-defaults reference. Planner records the merged contract in
-the implementation plan; Challenger D-6 asserts the merge is faithful.
+Accepted `governance-constraints-v1` and `workload-decision-manifest-v1` cost-monitoring settings (`thresholds`,
+`required_scope`, `required_action_group_id`, `min_emails`, `deferred_allowed`) always override this extract and the
+`apex-azure-defaults` reference. Planning records the merged contract in `implementation-intent-v1`.
 
 ## Opt-out (`cost_monitoring_mode`)
 

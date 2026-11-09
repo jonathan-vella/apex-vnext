@@ -12,10 +12,10 @@ adaptation experience is [planned work](../explanation/workflow-and-gates.md#pla
 init flag.
 
 > [!IMPORTANT]
-> The plugin and CLI ship preview `0.11.0-next.5`; live qualification is still pending.
+> The plugin and bundled CLI ship preview `0.11.0-next.6` (`apex@apex-plugins`).
 > These steps describe the published flow. For source changes, use a
 > [local candidate](../how-to/manage-installation.md#install-a-local-candidate) and the
-> [human-run qualification kit](../how-to/qualify-live-clients.md); do not mix same-version source and registry bytes.
+> [human-run qualification kit](../how-to/qualify-live-clients.md).
 
 ## Before You Start
 
@@ -23,22 +23,21 @@ Complete the native Windows steps in [Prepare Windows 11](../how-to/prepare-wind
 
 - VS Code 1.140 or later, or the GitHub Copilot app, signed in with a Copilot-enabled account;
 - Git, Node.js 24.21.0 (LTS) or later, Copilot CLI, Azure CLI and Bicep or Terraform;
-- the `apex` plugin installed once through the Copilot CLI store.
+- the `apex@apex-plugins` plugin installed once through the Copilot CLI store.
 
 ## Create A Workspace
 
-In PowerShell, install the APEX CLI at the plugin's version and create one consumer repository. The repository can hold
-multiple workloads; its folder name identifies the consumer, not a single workload:
+In PowerShell, create a consumer repository and run the bundled onboarding script from the installed plugin. The
+repository can hold multiple workloads; its folder name identifies the consumer, not a single workload:
 
 ```powershell
-npm install --global @apexops/cli@PLUGIN_VERSION
-apex version --json
 New-Item -ItemType Directory -Force C:\src\contoso-platform | Out-Null
 Set-Location C:\src\contoso-platform
-apex bootstrap --project payments --risk-owner partner --target local --create-repo --yes
+& "$HOME\.copilot\installed-plugins\apex-plugins\apex\scripts\onboard.ps1" --project payments --risk-owner partner --target local --create-repo --yes
+node .apex\bin\apex.mjs version --json
 ```
 
-Bootstrap installs the same CLI version as a workspace dependency and writes the thin workspace projection:
+Onboarding writes the thin `.apex/bin/apex.mjs` launcher and the workspace projection:
 `.github/copilot/settings.json`, which enables the `apex` plugin, plus the instructions, the governance workflow and
 `.apex/`. Do not edit `.apex` directly.
 
@@ -46,7 +45,7 @@ To set the project details yourself, initialize the workspace directly. This exa
 replace `--iac bicep` with `--iac terraform`:
 
 ```powershell
-npx apex init --project payments --risk-owner partner --name "Payments platform" `
+node .apex\bin\apex.mjs init --project payments --risk-owner partner --name "Payments platform" `
   --environment dev --target local --iac bicep --json
 ```
 
@@ -68,10 +67,10 @@ hidden workers.
 In the workspace, run:
 
 ```powershell
-npx apex setup --json
-npx apex doctor --json
-npx apex status --json
-npx apex task next --json
+node .apex\bin\apex.mjs setup --json
+node .apex\bin\apex.mjs doctor --json
+node .apex\bin\apex.mjs status --json
+node .apex\bin\apex.mjs task next --json
 ```
 
 The initialization command installs one client projection and creates the first project and run.

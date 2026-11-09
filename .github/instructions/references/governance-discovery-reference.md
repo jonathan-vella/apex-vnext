@@ -101,28 +101,20 @@ Discovered from Azure Policy assignment "JV-Inherit Multiple Tags" (effect: modi
   tech-contact
 ```
 
-## Governance Constraints File Format
+## Governance Constraints Contract
 
-### JSON Schema (`04-governance-constraints.json`)
+### JSON Schema (`governance-constraints-v1` / `policy-property-map-v1`)
 
-- Root: envelope object with `discovery_status` and `policies` fields (NOT a bare array)
-- **`discovery_status`**: `"COMPLETE"`, `"PARTIAL"`, or `"FAILED"` — validated by Step 4 at startup
-- **`policies`**: array of policy objects
-- Required fields per policy: `displayName`, `policyDefinitionId`, `effect`, `scope`
-- For `Deny` policies, add machine-actionable fields:
-  - `bicepPropertyPath` (e.g., `"storageAccounts::properties.publicNetworkAccess"`)
-  - `azurePropertyPath` (e.g., `"storageAccount.properties.publicNetworkAccess"`)
-  - `requiredValue` (e.g., `"Disabled"`)
-  - `affectedResourceTypes` (e.g., `["Microsoft.Storage/storageAccounts"]`)
-- For tag-enforcement policies (Deny/Modify targeting tags, not resource properties):
-  - `bicepPropertyPath`: `"resourceGroups::tags"`
-  - `azurePropertyPath`: `"resourceGroup.tags"`
-  - `requiredTags`: array of exact tag key names
-  - `pathSemantics`: `"tag-policy-non-property"`
-- These fields enable programmatic compliance verification by Code Generators
-  and review subagents across both Bicep and Terraform
+- Governed by `packages/contracts/schemas/governance-constraints-v1.schema.json` and
+  `packages/contracts/schemas/policy-property-map-v1.schema.json`.
+- Stored under `.apex/runs/<runId>/governance/constraints.json` and `.apex/runs/<runId>/plan/policy-property-map.json`.
+- Required fields per policy finding: `assignmentId`, `definitionId`, `displayName`, `effect`, `scope`, and
+  `enforcementMode`.
+- For `deny`, `modify`, and `deployIfNotExists` policies, `policy-property-map-v1` records `policyAssignmentId`,
+  `effect`, `logicalResourceId`, `propertyPath`, `expectedValue`, and `disposition` (`planned`, `remediated-by-platform`,
+  `not-applicable`, or `exempted`).
 
-### Discovery Source Section (MANDATORY in `04-governance-constraints.md`)
+### Discovery Source Summary (`governance-constraints.md` rendered view)
 
 ```markdown
 ## Discovery Source

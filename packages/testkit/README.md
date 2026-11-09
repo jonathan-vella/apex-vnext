@@ -18,7 +18,7 @@ import { requirementsFixture, runFixture } from "@apexops/testkit";
 ## Documentation
 
 - [APEX vNext repository](https://github.com/jonathan-vella/apex-vnext)
-- [Qualification guide](https://apexops.pro/how-to/qualify-candidate/)
+- [Qualification guide](../../docs/how-to/qualify-candidate.md)
 
 ## License
 

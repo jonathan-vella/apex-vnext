@@ -66,15 +66,6 @@ test("cost guidance uses guarded Azure MCP only and preserves partial results fo
   assert.match(costGuardrails, /Do not fall back to Azure CLI, REST, Resource Graph CLI,\s+azqr/u);
   assert.match(costGuardrails, /For mixed requests, return supported recommendations/u);
   assert.match(costGuardrails, /Historical actual spend or AKS cost allocation/u);
-  for (const template of ["03-des-cost-estimate", "07-ab-cost-estimate"]) {
-    const estimate = readFileSync(
-      join(root, `customizations/.github/skills/apex-artifacts/templates/${template}.template.md`),
-      "utf8",
-    );
-    assert.match(estimate, /Estimated Monthly Total/u);
-    assert.match(estimate, /\[📊 Top 5 Estimated Cost Drivers\]\(#-top-5-estimated-cost-drivers\)/u);
-    assert.doesNotMatch(estimate, /as-built actuals|Commitment\s+discounts do not apply/u);
-  }
 });
 
 function example(schema) {

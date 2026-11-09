@@ -467,9 +467,8 @@ typed answers without relying on chat history.
   an identical repeat with the original result, and convergent tools that change state outside the run reach the same
   outcome. Every MCP tool takes an explicit workspace path.
 
-Managed domain guidance includes AKS design, reliability, lifecycle assessment and supported Python-backed diagrams,
-with exact upstream lineage and per-file adaptations/exclusions. The
-[CP-18/CP-21 review](SKILL-BEST-PRACTICES.md) records best-practice dispositions and checkable metadata/navigation
+Managed domain guidance includes AKS design, reliability, lifecycle assessment and supported Python-backed diagrams.
+The [skill catalog review](SKILL-CATALOG-REVIEW.generated.md) records checkable metadata and navigation
 constraints. These skills grant no cluster/migration/recovery/script executor or new renderer. Their deterministic
 discovery declarations do not replace supported-client behavioral acceptance in CP-20.
 
@@ -628,8 +627,6 @@ Acceptance:
 5. Historical ingestion, reader correctness, and client behavior are separate proof obligations. Synthetic telemetry
    validates the pipeline only. Real VS Code/CLI routing and custom-agent handoffs require exact-client evidence;
    desktop-app capture and unattended model-driven assessment remain unqualified until tested and authorized.
-
-Implementation and operational instructions: [development logging](../how-to/debug-local.md).
 
 ### REQ-DOCS-001: Documentation And Lifecycle
 

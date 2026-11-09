@@ -21,7 +21,7 @@ import { EventJournal, WorkflowEngine } from "@apexops/kernel";
 ## Documentation
 
 - [APEX vNext repository](https://github.com/jonathan-vella/apex-vnext)
-- [Runtime architecture](https://apexops.pro/explanation/runtime-architecture/)
+- [Runtime architecture](../../docs/explanation/runtime-architecture.md)
 
 ## License
 

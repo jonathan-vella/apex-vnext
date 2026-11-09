@@ -4,12 +4,9 @@ Agent instructions specific to the `infra/terraform/` subtree.
 
 ## SKU Source of Truth
 
-Read `agent-output/{project}/sku-manifest.json` first. Never re-derive
-creative SKUs (App Service plan, VM, SQL, Cosmos, AKS pool, Redis, APIM,
-App Gateway, Storage replication) from `04-implementation-plan.md`
-prose. Each Terraform resource maps to a
-`services[].iac_logical_names.terraform` entry; per-environment overrides
-come from `services[].environment_overrides.{env}`. See
+Read `.apex/runs/<runId>/architecture/decisions.json` (`workload-decision-manifest-v1`) and
+`.apex/runs/<runId>/plan/binding.json` (`iac-binding-v1`) first. Never re-derive creative SKUs (App Service plan, VM,
+SQL, Cosmos, AKS pool, Redis, APIM, App Gateway, Storage replication) from summary prose. See
 [workload decision SSOT](../../docs/reference/sources-of-truth.md).
 
 ## Build Commands
@@ -66,5 +63,6 @@ infra/terraform/{project}/
 
 ## Governance
 
-Before generating configurations, always check `agent-output/{project}/04-governance-constraints.md`
-for subscription-level Azure Policy requirements that may impose additional rules.
+Before generating configurations, always check `.apex/runs/<runId>/governance/constraints.json`
+(`governance-constraints-v1`) and `.apex/runs/<runId>/plan/policy-property-map.json` (`policy-property-map-v1`) for
+subscription-level Azure Policy requirements that impose additional rules.

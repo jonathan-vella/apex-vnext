@@ -32,8 +32,8 @@ tampering, including risk renewal before approval and deployment. No live client
 or publication is implied.
 
 The current content slice addresses the four remaining CP-18 #384 domains (Kubernetes, reliability, upgrade and Python
-diagrams) and CP-21 #401's best-practice/core-workflow review. The agreed upstream pin and
-[guideline dispositions](SKILL-BEST-PRACTICES.md) preserve existing kernel, renderer and tool boundaries.
+diagrams) and CP-21 #401's best-practice/core-workflow review. The
+[generated skill catalog review](SKILL-CATALOG-REVIEW.generated.md) preserves existing kernel, renderer and tool boundaries.
 Source/packaging checks and maintainer review are required before integration; actual model/client discovery,
 behavior and visual outcomes remain with CP-20 #386 on a separately frozen candidate.
 
@@ -490,8 +490,7 @@ Azure records. Existing service-principal credentials remain untouched; Key Vaul
 This does not qualify real client routing, custom-agent handoffs, desktop-app export, or unattended assessment. The
 next client proof is one real registered session per supported client, with tool/subagent activity and attributable
 evidence. No manual findings report should be required when the registered sources contain the necessary data. See
-[acceptance](PRD.md#req-dev-diagnostics-001-opt-in-development-evidence) and
-[setup and limitations](../how-to/debug-local.md#command-driven-session-assessment).
+[acceptance](PRD.md#req-dev-diagnostics-001-opt-in-development-evidence).
 
 ## Resume Protocol
 

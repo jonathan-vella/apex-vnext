@@ -3,7 +3,6 @@
 
 <!-- ref:avm-pitfalls-v1 -->
 
-> Ported from `jonathan-vella/apex@c209d8bb765681aa21dce5d3cd2a3b080dad8d5e`.
 > Read the [vNext authority and command boundary](../references/kernel-boundary.md) before using this reference.
 > Examples are design material for accepted task inputs, not permission to write, execute or advance state.
 > Runtime defaults, effective policy tags, security invariants and exact AVM locks override sample values.
@@ -390,7 +389,7 @@ module registry 'br/public:avm/res/container-registry/registry:0.12.1' = {
 
 Alternate fixes: upgrade to **Premium**, or replace the AVM wrapper with a
 minimal raw `Microsoft.ContainerRegistry/registries` resource (document the
-AVM exception per [AGENTS.md](https://github.com/jonathan-vella/apex/blob/c209d8bb765681aa21dce5d3cd2a3b080dad8d5e/infra/bicep/AGENTS.md)).
+AVM exception per [AGENTS.md](../../apex-azure-defaults/SKILL.md)).
 
 ### Generic detection rule
 
@@ -502,7 +501,7 @@ KQL body for:
 | `_LogOperation` | Workspace meta (`Operation`, `Category`, `Detail`)          | Allowed columns only — see Microsoft docs  |
 
 The deploy-side preflight is captured in
-[`deploy-validation-checklist.md` § KQL alert queries](https://github.com/jonathan-vella/apex/blob/c209d8bb765681aa21dce5d3cd2a3b080dad8d5e/.github/skills/apex-iac-common/references/deploy-validation-checklist.md#kql-alert-queries-reference-valid-columns).
+[`deploy-validation-checklist.md` § KQL alert queries](../../apex-azure-validate/references/infraops-preflight.md).
 
 ---
 
@@ -558,7 +557,7 @@ The deploy preflight (07b Phase 1.5) MUST call `az ad ... show` for
 every param flagged as `entra-object-id` in
 `04-environment-manifest.json` and fail-closed on empty / non-GUID
 responses. See
-[`deploy-validation-checklist.md` § Entra principal object IDs](https://github.com/jonathan-vella/apex/blob/c209d8bb765681aa21dce5d3cd2a3b080dad8d5e/.github/skills/apex-iac-common/references/deploy-validation-checklist.md#entra-principal-object-ids-are-real).
+[`deploy-validation-checklist.md` § Entra principal object IDs](../../apex-azure-validate/references/infraops-preflight.md).
 
 ---
 

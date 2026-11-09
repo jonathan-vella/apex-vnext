@@ -31,9 +31,14 @@ proof that behavior is unused.
 
 ## Repository Instructions
 
-The files in `.github/instructions/references/` are supporting references, not a second set of executable workflow rules.
-Security/policy, cost, governance, agent structure, review, Markdown formatting and precedence references remain because
-active guidance or validation consumes them. Managed scoped instructions live under `customizations/.github/instructions/`.
+The files in `.github/instructions/references/` are supporting references, not a second set of executable workflow rules:
+[iac-policy-compliance.md](../instructions/references/iac-policy-compliance.md),
+[iac-security-baseline.md](../instructions/references/iac-security-baseline.md),
+[iac-cost-monitoring.md](../instructions/references/iac-cost-monitoring.md),
+[governance-discovery-reference.md](../instructions/references/governance-discovery-reference.md),
+[code-review-checklists.md](../instructions/references/code-review-checklists.md) and
+[markdown-formatting-guide.md](../instructions/references/markdown-formatting-guide.md).
+Managed scoped instructions live under `customizations/.github/instructions/`.
 
 Use [AGENTS.md](../../AGENTS.md) for validation scope. Small prose edits need focused Markdown/link checks, skill edits
 need metadata/reference checks, and shared runtime or packaging changes need their owning tests and integration proof.

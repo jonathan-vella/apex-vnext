@@ -416,9 +416,6 @@ Copilot CLI warns that direct installs are deprecated. Remove the direct install
 before you install a marketplace release, so that only one copy is installed. The
 [first local run](../tutorials/first-run.md) describes the build and the install smoke test.
 
-For an approved registry release, follow [Publish npm Packages](publish-npm.md) before using the published bootstrap
-route.
-
 ## Manage Capability Packs
 
 ```bash

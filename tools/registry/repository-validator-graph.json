@@ -339,36 +339,6 @@
       }
     },
     {
-      "id": "profile-copilot-cli-otel",
-      "script": "profile:copilot-cli-otel",
-      "profile": "node-validation",
-      "aliases": [],
-      "retirement": {
-        "status": "active",
-        "replacementIds": []
-      }
-    },
-    {
-      "id": "profile-vscode-otel",
-      "script": "profile:vscode-otel",
-      "profile": "node-validation",
-      "aliases": [],
-      "retirement": {
-        "status": "active",
-        "replacementIds": []
-      }
-    },
-    {
-      "id": "test-client-context-samples",
-      "script": "test:client-context-samples",
-      "profile": "node-test",
-      "aliases": [],
-      "retirement": {
-        "status": "active",
-        "replacementIds": []
-      }
-    },
-    {
       "id": "test-client-outcomes",
       "script": "test:client-outcomes",
       "profile": "node-test",
@@ -739,86 +709,6 @@
       }
     },
     {
-      "id": "validate-optimization-gate",
-      "script": "validate:optimization-gate",
-      "profile": "node-validation",
-      "aliases": [],
-      "retirement": {
-        "status": "active",
-        "replacementIds": []
-      }
-    },
-    {
-      "id": "test-optimization-gate",
-      "script": "test:optimization-gate",
-      "profile": "node-test",
-      "aliases": [],
-      "retirement": {
-        "status": "active",
-        "replacementIds": []
-      }
-    },
-    {
-      "id": "test-optimization-baseline",
-      "script": "test:optimization-baseline",
-      "profile": "node-test",
-      "aliases": [],
-      "retirement": {
-        "status": "active",
-        "replacementIds": []
-      }
-    },
-    {
-      "id": "test-optimization-audit",
-      "script": "test:optimization-audit",
-      "profile": "node-test",
-      "aliases": [],
-      "retirement": {
-        "status": "active",
-        "replacementIds": []
-      }
-    },
-    {
-      "id": "test-optimization-context-receipt",
-      "script": "test:optimization-context-receipt",
-      "profile": "node-test",
-      "aliases": [],
-      "retirement": {
-        "status": "active",
-        "replacementIds": []
-      }
-    },
-    {
-      "id": "test-optimization-client-measurement",
-      "script": "test:optimization-client-measurement",
-      "profile": "node-test",
-      "aliases": [],
-      "retirement": {
-        "status": "active",
-        "replacementIds": []
-      }
-    },
-    {
-      "id": "validate-vscode-installation-lifecycle",
-      "script": "validate:vscode-installation-lifecycle",
-      "profile": "node-validation",
-      "aliases": [],
-      "retirement": {
-        "status": "active",
-        "replacementIds": []
-      }
-    },
-    {
-      "id": "test-vscode-installation-lifecycle",
-      "script": "test:vscode-installation-lifecycle",
-      "profile": "node-test",
-      "aliases": [],
-      "retirement": {
-        "status": "active",
-        "replacementIds": []
-      }
-    },
-    {
       "id": "validate-terminology",
       "script": "validate:terminology",
       "profile": "node-validation",
@@ -911,8 +801,6 @@
         "test:skills",
         "validate:guidance-delivery",
         "validate:instruction-catalog-review",
-        "validate:optimization-gate",
-        "validate:vscode-installation-lifecycle",
         "validate:skill-catalog-review",
         "test:skill-catalog-review",
         "lint:version-sync",
@@ -944,13 +832,6 @@
         "test:github-workflows",
         "test:registry-validator-reporter",
         "test:guidance-delivery",
-        "test:optimization-gate",
-        "test:optimization-baseline",
-        "test:optimization-audit",
-        "test:optimization-context-receipt",
-        "test:optimization-client-measurement",
-        "test:vscode-installation-lifecycle",
-        "test:client-context-samples",
         "validate:client-outcomes",
         "test:client-outcomes:prepared",
         "validate:pricing-parity:prepared",

@@ -21,7 +21,7 @@ files under `schemas/`. It is intended for APEX runtime packages and integration
 ## Documentation
 
 - [APEX vNext repository](https://github.com/jonathan-vella/apex-vnext)
-- [Contract configuration reference](https://apexops.pro/reference/configuration/)
+- [Contract configuration reference](../../docs/reference/configuration.md)
 
 ## License
 
