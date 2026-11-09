@@ -2,11 +2,11 @@
 
 # Version Information
 
-**Current Version:** 0.11.0-next.5 (preview)
+**Current Version:** 0.11.0-next.6 (preview)
 
-**Status:** Preview - non-production npm distribution published under the `next` dist-tag
+**Status:** Preview - non-production marketplace plugin distribution (`apex@apex-plugins`)
 
-**Last Content Update:** 2026-10-19
+**Last Content Update:** 2026-11-09
 
 **Build:** standalone-vnext
 
