@@ -186,7 +186,11 @@ describe("bounded policy property validation", () => {
     delete noIdentity.storage!.identity;
     assert.notEqual(check({ resources: noIdentity }).outcome, "pass");
     for (const section of ["outputs", "variables", "parameters", "functions"]) {
-      assert.equal(check({ resources, [section]: { unchecked: "value" } }).outcome, "unsupported");
+      assert.equal(
+        check({ resources, [section]: { allowed: { type: "string", defaultValue: "ok" } } }).outcome,
+        "pass",
+      );
+      assert.equal(check({ resources, [section]: "not-an-object" }).outcome, "unsupported");
     }
     for (const property of ["isLocalUserEnabled", "isSftpEnabled", "unknownControl"]) {
       const changed = structuredClone(resources);
@@ -196,16 +200,91 @@ describe("bounded policy property validation", () => {
     const unreviewedService = structuredClone(resources);
     unreviewedService.blobServices!.properties = { cors: { corsRules: [{ allowedOrigins: ["*"] }] } };
     assert.equal(check({ resources: unreviewedService }).outcome, "unsupported");
-    const unsupportedManifest = structuredClone(manifest);
-    unsupportedManifest.resources.push(entry("foreign", "Microsoft.KeyVault/vaults", []));
+    const multiResourceManifest = structuredClone(manifest);
+    multiResourceManifest.resources.push(entry("vault", "Microsoft.KeyVault/vaults", []));
+    const multiResourceBinding = structuredClone(binding);
+    multiResourceBinding.resourceBindings.vault = {
+      implementation: "native:Microsoft.KeyVault/vaults@2023-07-01",
+      version: "2023-07-01",
+      parameters: { name: "kv-demo" },
+    };
     assert.equal(
       validateBicepStorageBaseline({
         sourceHash: hash,
-        manifest: unsupportedManifest,
-        binding,
-        json: JSON.stringify({ resources: { ...resources, foreign: { type: "Microsoft.KeyVault/vaults" } } }),
-      }).reason,
-      "unsupported-resource",
+        manifest: multiResourceManifest,
+        binding: multiResourceBinding,
+        json: JSON.stringify({
+          parameters: { vaultName: { type: "string" } },
+          resources: { ...resources, vault: { type: "Microsoft.KeyVault/vaults", name: "kv-demo" } },
+        }),
+      }).outcome,
+      "pass",
+    );
+    const avmManifest: LogicalResourceManifestV1 = {
+      schemaVersion: "1.0.0",
+      projectId: "demo",
+      runId: "run",
+      track: "bicep",
+      resources: [
+        {
+          logicalId: "app-host",
+          type: "Microsoft.Web/sites",
+          implementationAddress: "avm:br/public:avm/res/web/site@0.15.0",
+          executionAddress: "app_host",
+          implementationKind: "module",
+          ownership: "managed",
+          dependsOn: [],
+          generatedDependencies: [],
+          sourcePath: "infra/main.bicep",
+        },
+      ],
+    };
+    const avmBinding: IacBindingV1 = {
+      schemaVersion: "1.0.0",
+      projectId: "demo",
+      runId: "run",
+      track: "bicep",
+      intentHash: hash,
+      resourceBindings: {
+        "app-host": {
+          implementation: "avm:br/public:avm/res/web/site@0.15.0",
+          version: "0.15.0",
+          parameters: { name: "app-demo", location: "swedencentral" },
+          physicalResources: [
+            {
+              resourceId:
+                "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg/providers/Microsoft.Web/sites/app-demo",
+              type: "Microsoft.Web/sites",
+              ownership: "managed",
+              role: "primary",
+            },
+          ],
+        },
+      },
+    };
+    assert.equal(
+      validateBicepStorageBaseline({
+        sourceHash: hash,
+        manifest: avmManifest,
+        binding: avmBinding,
+        json: JSON.stringify({
+          parameters: { name: { type: "string" } },
+          resources: {
+            app_host: {
+              type: "Microsoft.Resources/deployments",
+              name: "app-host-deployment",
+              properties: {
+                template: {
+                  resources: {
+                    innerSite: { type: "Microsoft.Web/sites", name: "app-demo", condition: true },
+                  },
+                },
+              },
+            },
+          },
+        }),
+      }).outcome,
+      "pass",
     );
     assert.equal(
       check({ resources, outputs: { private: { type: "string", value: "AccountKey=must-not-leak" } } }).reason,

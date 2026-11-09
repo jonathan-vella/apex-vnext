@@ -8,20 +8,13 @@ This file is generated from [packages/cli/src/mcp.ts](../../packages/cli/src/mcp
 
 - `amendInput`
 - `architectureComplete`
-- `capabilityList`
-- `capabilityStatus`
 - `completeTask`
 - `diagnose`
-- `doctor`
-- `doctorChecks`
 - `gateDecide`
 - `gateDelegate`
 - `generateIac`
 - `governanceImport`
 - `governanceSelect`
-- `improvementObservations`
-- `improvementObserve`
-- `improvementProposals`
 - `inputHistory`
 - `inventory`
 - `nextTask`
@@ -32,7 +25,6 @@ This file is generated from [packages/cli/src/mcp.ts](../../packages/cli/src/mcp
 - `projectDelete`
 - `projectList`
 - `projectUse`
-- `promote`
 - `readTaskInput`
 - `reconcile`
 - `recordInput`
@@ -41,10 +33,8 @@ This file is generated from [packages/cli/src/mcp.ts](../../packages/cli/src/mcp
 - `requirementsComplete`
 - `reviewComplete`
 - `reviewDecide`
-- `stageArtifact`
 - `stageFile`
 - `status`
-- `submitEvidence`
 - `taskContext`
 - `validateTask`
 

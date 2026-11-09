@@ -38,7 +38,8 @@ inventory, diagnosis, reconciliation or quality work.
 6. Use `apex/preview` only to read the current preview and explain recorded semantic changes, target, expiry,
    destructive actions, unevaluated items and uncertainty. Gate 4 is the final approval for a lab: summarize the
    architecture, cost estimate and accepted risks so it is informed, and require review of the exact preview, target,
-   expiry and approval recipient through the trusted terminal ceremony; never approve Gate 4 through chat. Each apply
+   expiry and approval recipient through the trusted terminal ceremony (`node .apex/bin/apex.mjs gate decide --gate 4 ...`);
+   never approve Gate 4 through chat or print `${PLUGIN_ROOT}` in user shells. Each apply
    and each destroy has its own preview and approval; a changed preview or intent needs a new one.
    On source candidates containing immutable context binding (#466), preserve the returned `approvalContextHash`
    and full source/risk references. Changed or renewed risk terms require a fresh preview; never repair review

@@ -19,14 +19,11 @@ import {
   amendmentOptions,
   timestamp,
   selection,
-  run,
   task,
   request,
   staged,
   completion,
   inventory,
-  observation,
-  proposal,
   status,
   doctorReport,
   approval,
@@ -92,8 +89,6 @@ const validVariants: Array<[ToolName, Record<string, unknown>]> = [
       ],
     },
   ],
-  ["stageArtifact", { artifacts: [staged] }],
-  ["stageArtifact", { artifacts: [] }],
   ["validateTask", { valid: true, taskId: "task-1", staged }],
   ["validateTask", { valid: true, taskId: "task-1", staged: [staged] }],
   ["gateDecide", { ...approval, mechanism: "inherited", recipientIdentity: "tester", expiresAt: timestamp }],
@@ -154,18 +149,6 @@ const validVariants: Array<[ToolName, Record<string, unknown>]> = [
       },
     },
   ],
-  [
-    "submitEvidence",
-    {
-      status: "quarantined",
-      kind: "test",
-      bytes: 2,
-      retention: "optional",
-      quarantinePath: "/workspace/quarantine.bin",
-      redacted: false,
-      reasons: ["high-risk-content"],
-    },
-  ],
 ];
 
 const invalidVariants: Array<[ToolName, Record<string, unknown>]> = [
@@ -180,8 +163,6 @@ const invalidVariants: Array<[ToolName, Record<string, unknown>]> = [
   ],
   ["nextTask", { status: "task", task: { ...task, inputRefs: [hash, hash] } }],
   ["nextTask", { status: "task", task: { ...task, unexpected: true } }],
-  ["stageArtifact", { ...staged, artifacts: [staged] }],
-  ["stageArtifact", { artifacts: [{ ...staged, hash: "invalid" }] }],
   ["validateTask", { valid: true, taskId: "task-1", staged: [{}] }],
   ["taskContext", { ...fixtures.taskContext, recordedInput: { services: ["web", "web"] } }],
   [
@@ -211,11 +192,7 @@ const invalidVariants: Array<[ToolName, Record<string, unknown>]> = [
   ],
   ["completeTask", { ...completion, outputHashes: { unsupported: hash } }],
   ["inventory", { ...inventory, resources: [{ ...inventory.resources[0], resourceId: 1 }] }],
-  ["promote", { ...run, gates: [] }],
   ["gateDecide", { ...approval, mechanism: "automatic" }],
-  ["improvementObserve", { observation: { ...observation, evidenceRefs: [hash, hash] }, deduplicated: false }],
-  ["improvementProposals", { proposals: [{ ...proposal, inert: false }] }],
-  ["submitEvidence", { ...fixtures.submitEvidence, quarantinePath: "/workspace/quarantine.bin" }],
   ["readTaskInput", { ...fixtures.readTaskInput, nextOffset: -1 }],
   ["readTaskInput", { ...fixtures.readTaskInput, outputTemplate: {} }],
 ];
@@ -247,7 +224,8 @@ test("output schema coverage matches every registered MCP tool", async () => {
     assert.equal(tools.length, Object.keys(MCP_OUTPUT_SCHEMAS).length);
     assert.deepEqual(Object.keys(MCP_OUTPUT_SCHEMAS).sort(), tools.map(({ name }) => name).sort());
     for (const tool of tools) {
-      assert.equal(tool.outputSchema?.type, "object", tool.name);
+      assert.equal(tool.outputSchema, undefined, tool.name);
+      assert.ok(MCP_OUTPUT_SCHEMAS[tool.name as ToolName] instanceof z.ZodObject, tool.name);
       assert.equal(tool.inputSchema.type, "object", tool.name);
       assert.equal(tool.inputSchema.additionalProperties, false, tool.name);
       assert.ok(tool.inputSchema.properties?.workspace, tool.name);
@@ -258,7 +236,7 @@ test("output schema coverage matches every registered MCP tool", async () => {
       assert.equal(tool.annotations?.destructiveHint, !readOnly, tool.name);
       assert.equal(
         tool.annotations?.openWorldHint,
-        ["reconcile", "inventory", "diagnose", "doctor", "doctorChecks"].includes(tool.name),
+        ["reconcile", "inventory", "diagnose"].includes(tool.name),
         tool.name,
       );
       assert.doesNotMatch(tool.name, /apply|deploy|execute/i);
@@ -271,7 +249,7 @@ test("output schema coverage matches every registered MCP tool", async () => {
     for (const gate of [1, 2, 3])
       assert.equal(validateGate({ workspace: "/workspace", gate, decision: "approved", confirm: true }), true);
     assert.equal(validateGate({ workspace: "/workspace", gate: 4, decision: "approved", confirm: true }), false);
-    for (const name of ["stageArtifact", "validateTask"]) {
+    for (const name of ["validateTask"]) {
       const validate = new Ajv({ strict: false }).compile(tools.find((tool) => tool.name === name)!.inputSchema);
       assert.equal(validate({ workspace: "/workspace", taskId: "task-1", kind: "requirements" }), false);
       assert.equal(
@@ -317,13 +295,6 @@ test("actual MCP handlers wrap service fixtures and sanitize failures for every 
   };
   const decisions = [{ findingId: "finding-1", action: "revise" }];
   const binding = { schemaVersion: "1.0.0", ...selection, track: "bicep", resourceBindings: {} };
-  const observationInput = {
-    source: observation.source,
-    category: observation.category,
-    severity: observation.severity,
-    statement: observation.statement,
-    evidenceRefs: observation.evidenceRefs,
-  };
   type ServiceMethod = {
     [Method in keyof ApexService]: ApexService[Method] extends (...args: never[]) => unknown ? Method : never;
   }[keyof ApexService];
@@ -341,8 +312,6 @@ test("actual MCP handlers wrap service fixtures and sanitize failures for every 
     },
     status: { method: "status", input: {}, args: [] },
     releaseWriter: { method: "releaseWriter", input: {}, args: [] },
-    capabilityList: { method: "capabilityList", input: {}, args: [] },
-    capabilityStatus: { method: "capabilityStatus", input: { pack: "test" }, args: ["test"] },
     nextTask: { method: "nextTask", input: {}, args: [] },
     taskContext: { method: "taskContext", input: { taskId }, args: [taskId] },
     readTaskInput: { method: "readTaskInput", input: { taskId }, args: [taskId, undefined, undefined, undefined] },
@@ -364,7 +333,6 @@ test("actual MCP handlers wrap service fixtures and sanitize failures for every 
       args: [1, { policyHash: hash, consentHash: hash }],
     },
     reviewDecide: { method: "decideReview", input: { reviewHash: hash, decisions }, args: [hash, decisions] },
-    stageArtifact: { method: "stageArtifact", input: { taskId, ...output }, args: [taskId, output] },
     stageFile: {
       method: "stageFile",
       input: { taskId, path: "main.bicep", content: "{}" },
@@ -389,22 +357,7 @@ test("actual MCP handlers wrap service fixtures and sanitize failures for every 
     reconcile: { method: "reconcile", input: {}, args: [] },
     inventory: { method: "inventory", input: {}, args: [] },
     diagnose: { method: "diagnose", input: {}, args: [] },
-    improvementObserve: { method: "improvementObserve", input: observationInput, args: [observationInput] },
-    improvementObservations: { method: "improvementObservations", input: {}, args: [] },
-    improvementProposals: { method: "improvementProposals", input: {}, args: [] },
     render: { method: "render", input: { kind: "status" }, args: ["status"] },
-    promote: {
-      method: "promote",
-      input: { environment: "prod", target: "local", purpose: "lab" },
-      args: ["prod", "local", "lab"],
-    },
-    doctor: { method: "doctor", input: {}, args: [undefined, undefined] },
-    doctorChecks: { method: "doctor", input: {}, args: [] },
-    submitEvidence: {
-      method: "acceptEvidence",
-      input: { taskId, kind: "test", value: {} },
-      args: [{ kind: "test", contentType: "application/json", value: {}, required: false }],
-    },
   };
   const service = new ApexService(await tempRoot());
   await mkdir(join(service.root, ".apex"));
@@ -419,20 +372,11 @@ test("actual MCP handlers wrap service fixtures and sanitize failures for every 
       if (failure?.method === method) throw failure.error;
       const value = responses[name];
       switch (name) {
-        case "capabilityList":
-          return value.packs;
         case "projectList":
           return value.projects;
-        case "improvementObservations":
-          return value.observations;
-        case "improvementProposals":
-          return value.proposals;
         case "preview":
         case "render":
           return value.markdown;
-        case "doctor":
-        case "doctorChecks":
-          return doctorReport;
         case "diagnose":
           return { status, doctor: doctorReport };
         default:
@@ -449,8 +393,9 @@ test("actual MCP handlers wrap service fixtures and sanitize failures for every 
     ajv.addFormat("date-time", (value: string) => Number.isFinite(Date.parse(value)));
     const validators = new Map(
       tools.map((tool) => {
-        assert.ok(tool.outputSchema, tool.name);
-        return [tool.name, ajv.compile(tool.outputSchema as Record<string, unknown>)];
+        assert.equal(tool.outputSchema, undefined, tool.name);
+        const schema = z.toJSONSchema(MCP_OUTPUT_SCHEMAS[tool.name as ToolName], { target: "draft-7" });
+        return [tool.name, ajv.compile(schema as Record<string, unknown>)];
       }),
     );
     const invoked = new Set<string>();
@@ -471,10 +416,7 @@ test("actual MCP handlers wrap service fixtures and sanitize failures for every 
       assert.deepEqual(MCP_OUTPUT_SCHEMAS[name].parse(response.structuredContent), expected, name);
       assert.deepEqual(
         calls,
-        [
-          ...(name === "submitEvidence" ? [{ method: "taskContext", args: [taskId] }] : []),
-          ...args.map((args) => ({ method: cases[name].method, args })),
-        ],
+        args.map((args) => ({ method: cases[name].method, args })),
         name,
       );
     };
@@ -487,20 +429,12 @@ test("actual MCP handlers wrap service fixtures and sanitize failures for every 
       assert.equal(response.isError, true, tool.name);
     }
     for (const [name, value] of validVariants) {
-      if (name === "stageArtifact") continue;
       responses[name] = value;
       await check(name, value);
       responses[name] = fixtures[name];
     }
     const secondOutput = { kind: "architecture", value: {} };
     const outputs = [output, secondOutput];
-    await check("stageArtifact", { artifacts: [staged] }, { taskId, outputs: [output] });
-    await check(
-      "stageArtifact",
-      { artifacts: [staged, staged] },
-      { taskId, outputs },
-      outputs.map((value) => [taskId, value]),
-    );
     responses.validateTask = { valid: true, taskId, staged };
     await check("validateTask", responses.validateTask, { taskId, ...output }, [[taskId, output]]);
     await check(
@@ -540,14 +474,7 @@ test("actual MCP handlers wrap service fixtures and sanitize failures for every 
         assert.equal(JSON.stringify(response).includes(secret), false, name);
         assert.equal(validators.get(name)!(response.structuredContent), true, name);
         assert.deepEqual(MCP_OUTPUT_SCHEMAS[name].parse(response.structuredContent), expected, name);
-        assert.deepEqual(
-          calls,
-          [
-            ...(name === "submitEvidence" ? [{ method: "taskContext", args: [taskId] }] : []),
-            { method: cases[name].method, args: cases[name].args },
-          ],
-          name,
-        );
+        assert.deepEqual(calls, [{ method: cases[name].method, args: cases[name].args }], name);
       }
       assert.deepEqual([...invoked].sort(), names);
     }
@@ -643,9 +570,8 @@ test("schemas accept real offline service results through requirements completio
   const check = (name: ToolName, value: unknown) => assert.deepEqual(MCP_OUTPUT_SCHEMAS[name].parse(value), value);
   check("status", await service.status());
   check("nextTask", await service.nextTask());
-  check("capabilityList", { packs: await service.capabilityList() });
   check("projectList", { projects: await service.listProjects() });
-  check("doctor", summarizeDoctorReport(await service.doctor()));
+  check("diagnose", { status: await service.status(), doctor: summarizeDoctorReport(await service.doctor()) });
   const next = await nextTaskAfterInput(service);
   check("nextTask", next);
   assert.equal(next.status, "task");
@@ -653,7 +579,6 @@ test("schemas accept real offline service results through requirements completio
   check("taskContext", await service.taskContext(taskId));
   check("readTaskInput", await service.readTaskInput(taskId));
   const output = { kind: "requirements" as const, value: requirements() };
-  check("stageArtifact", await service.stageArtifact(taskId, output));
   check("validateTask", await service.validateTask(taskId));
   check("validateTask", await service.validateTask(taskId, output));
   check("validateTask", await service.validateTask(taskId, [output]));

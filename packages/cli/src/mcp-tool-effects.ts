@@ -22,17 +22,12 @@ export const MCP_TOOL_EFFECTS = {
   projectList: "read-only",
   inputHistory: "read-only",
   previewInputAmendment: "read-only",
-  doctorChecks: "read",
-  capabilityList: "read",
-  capabilityStatus: "read",
   taskContext: "read",
   readTaskInput: "read",
   preview: "read",
   inventory: "read",
   diagnose: "read",
   render: "read",
-  improvementObservations: "read",
-  improvementProposals: "read",
   releaseWriter: "repeat-guarded",
   nextTask: "repeat-guarded",
   recordInput: "repeat-guarded",
@@ -45,7 +40,6 @@ export const MCP_TOOL_EFFECTS = {
   gateDecide: "repeat-guarded",
   gateDelegate: "repeat-guarded",
   reviewDecide: "repeat-guarded",
-  stageArtifact: "repeat-guarded",
   stageFile: "repeat-guarded",
   generateIac: "repeat-guarded",
   validateTask: "repeat-guarded",
@@ -55,10 +49,6 @@ export const MCP_TOOL_EFFECTS = {
   reviewComplete: "repeat-guarded",
   planComplete: "repeat-guarded",
   reconcile: "repeat-guarded",
-  promote: "repeat-guarded",
-  submitEvidence: "repeat-guarded",
-  improvementObserve: "convergent",
-  doctor: "convergent",
 } as const satisfies Record<McpToolName, McpToolEffect>;
 
 /** Tools that change state: the `repeat-guarded` and `convergent` effect classes. */
@@ -89,7 +79,6 @@ export const MCP_TOOL_REVIEW_GUARDS = {
   gateDecide: "approve",
   gateDelegate: "approve",
   reviewDecide: "approve",
-  stageArtifact: null,
   stageFile: null,
   generateIac: null,
   validateTask: null,
@@ -99,13 +88,17 @@ export const MCP_TOOL_REVIEW_GUARDS = {
   reviewComplete: null,
   planComplete: null,
   reconcile: null,
-  promote: "publish",
-  submitEvidence: "publish",
-  improvementObserve: null,
-  doctor: null,
 } as const satisfies Record<McpStateChangingTool, ReviewGuard | null>;
 
 /** Tools the pending-review guard refuses. */
 export type ReviewGuardedTool = {
   [Name in McpStateChangingTool]: (typeof MCP_TOOL_REVIEW_GUARDS)[Name] extends ReviewGuard ? Name : never;
 }[McpStateChangingTool];
+
+/** Service-level review guards including CLI-only publish operations. */
+export const SERVICE_REVIEW_GUARDS = {
+  ...MCP_TOOL_REVIEW_GUARDS,
+  promote: "publish",
+  submitEvidence: "publish",
+} as const;
+export type ServiceReviewGuardedOperation = ReviewGuardedTool | "promote" | "submitEvidence";

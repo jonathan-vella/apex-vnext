@@ -619,6 +619,26 @@
       }
     },
     {
+      "id": "validate-context-budget",
+      "script": "validate:context-budget",
+      "profile": "node-validation",
+      "aliases": [],
+      "retirement": {
+        "status": "active",
+        "replacementIds": []
+      }
+    },
+    {
+      "id": "test-context-budget",
+      "script": "test:context-budget",
+      "profile": "node-test",
+      "aliases": [],
+      "retirement": {
+        "status": "active",
+        "replacementIds": []
+      }
+    },
+    {
       "id": "validate-no-hardcoded-counts",
       "script": "validate:no-hardcoded-counts",
       "profile": "node-validation",
@@ -939,6 +959,8 @@
         "test:azure-mcp",
         "validate:diagram-semantics",
         "test:diagram-semantics",
+        "validate:context-budget",
+        "test:context-budget",
         "test:retired-automation",
         "lint:safe-shell",
         "test:avm-source-pins"

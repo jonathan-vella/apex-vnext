@@ -1040,10 +1040,9 @@ async function dispatch(
   }
 }
 
-async function main(): Promise<void> {
-  const json = process.argv.includes("--json");
-  const verbose = process.argv.includes("--verbose");
-  const args = process.argv.slice(2);
+export async function main(args: string[] = process.argv.slice(2)): Promise<void> {
+  const json = args.includes("--json");
+  const verbose = args.includes("--verbose");
   try {
     const result = await execute(args);
     if (result !== undefined)

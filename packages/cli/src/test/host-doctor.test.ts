@@ -159,6 +159,18 @@ test("doctor reads the Copilot CLI plugin store without trusting malformed or am
   const duplicate = await value({ plugin: [entry, { ...entry, marketplace: undefined }] });
   assert.equal(duplicate.ok, false);
   assert.match(duplicate.value, /^2 apex plugins installed/u);
+  const workspaceDisabledDuplicate = await doctorOn(
+    "windows",
+    { plugin: [entry, { ...entry, marketplace: undefined }] },
+    true,
+  );
+  await writeFile(
+    join(workspaceDisabledDuplicate.root, ".github", "copilot", "settings.local.json"),
+    JSON.stringify({ enabledPlugins: { "apex@apex-plugins": false } }),
+  );
+  const resolvedDuplicate = check(await workspaceDisabledDuplicate.service.doctor(), "copilot-plugin");
+  assert.equal(resolvedDuplicate.ok, true);
+  assert.match(resolvedDuplicate.value, /^apex@direct /u);
   const disabled = await value({ plugin: { ...entry, enabled: false } });
   assert.deepEqual([disabled.ok, disabled.value], [false, `apex@apex-plugins ${APEX_VERSION} disabled`]);
   const stale = await value({ plugin: { ...entry, version: "0.0.1" } });

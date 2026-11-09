@@ -42,9 +42,10 @@ npm run test:plugin
 
 The build writes `dist/apex-plugin/` and its tree hash to `dist/apex-plugin.sha256`. The package holds `plugin.json`,
 `mcp.json`, `skills/`, the APEX agent and hidden workers under `com.github.copilot/agents/`, the managed hooks under
-`com.github.copilot/hooks/`, `assets/`, `native/`, and `mcp/apex.mjs`: one esbuild bundle of the MCP server and its
-npm dependencies, about 3 MB. Clients start it with `node ${PLUGIN_ROOT}/mcp/apex.mjs`; it reads `assets/` next to
-`mcp/` and needs no `node_modules`, `npm` or network.
+`com.github.copilot/hooks/`, `assets/`, `native/`, `scripts/onboard.{ps1,sh}`, `cli/apex.mjs`, and `mcp/apex.mjs`: one
+esbuild bundle of the MCP/CLI runtime and its npm dependencies, about 3 MB. Clients start the MCP server with
+`node ${PLUGIN_ROOT}/mcp/apex.mjs`, and workspace initialization writes `.apex/bin/apex.mjs` to invoke `cli/apex.mjs`;
+both read `assets/` next to `mcp/` and need no `node_modules`, `npm` or network.
 
 `native/resvg-js/` holds the prebuilt `@resvg/resvg-js` binaries that render PNG diagrams, about 8.5 MB: `linux-x64`
 (glibc, for the Copilot CLI on Linux and WSL2) and `win32-x64` (VS Code and the Copilot app on Windows), with their

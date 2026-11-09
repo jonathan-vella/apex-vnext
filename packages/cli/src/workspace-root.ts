@@ -58,10 +58,11 @@ function ignoreMissingPath(error: unknown): undefined {
 
 // A session may start below the workspace root; stop at the repository boundary so an unrelated parent is never used.
 export async function mcpWorkspaceRoot(start: string): Promise<string> {
-  for (let directory = resolve(start); ; directory = dirname(directory)) {
+  const initial = resolve(start);
+  for (let directory = initial; ; directory = dirname(directory)) {
     const apex = await lstat(join(directory, ".apex")).catch(ignoreMissingPath);
-    if (apex?.isDirectory() === true) return directory;
     const repository = await lstat(join(directory, ".git")).catch(ignoreMissingPath);
+    if (apex?.isDirectory() === true && (directory === initial || repository !== undefined)) return directory;
     if (repository !== undefined || dirname(directory) === directory) return start;
   }
 }

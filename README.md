@@ -71,8 +71,10 @@ Other combinations are not qualified; see [client support](docs/reference/client
 
 ## Quick Start
 
-APEX has two parts: the `apex` Agent Plugin, which carries the agent, skills and MCP server, and the `@apexops/cli`
-npm package, which sets up and checks your workspace. Install both at the same version.
+APEX ships as a single Agent Plugin (`apex@apex-plugins`) that bundles the agent, skills, hooks, MCP server
+(`mcp/apex.mjs`), and CLI (`cli/apex.mjs`). Workspace initialization writes a thin `.apex/bin/apex.mjs` launcher for
+terminal ceremonies (`preview`, `gate decide`, `deploy`, `doctor`) without installing `node_modules` into your
+repository.
 
 1. **Prepare the host.** On Windows, follow [Prepare Windows 11](docs/how-to/prepare-windows-11.md). You need
    Node.js 24.21.0 or newer and Git.
@@ -83,10 +85,12 @@ npm package, which sets up and checks your workspace. Install both at the same v
    copilot plugin install apex@apex-plugins
    ```
 
-3. **Set up a workspace.** In an empty project directory, use the version shown by `copilot plugin list`:
+3. **Set up a workspace.** Open a clean Git repository and start **APEX** in your client (creating a project
+   automatically initializes `.apex/` and `.apex/bin/apex.mjs`), or run the bundled onboarding script from the
+   installed plugin:
 
    ```bash
-   npx --yes @apexops/cli@PLUGIN_VERSION bootstrap --create-repo --yes
+   sh ~/.copilot/installed-plugins/apex-plugins/apex/scripts/onboard.sh --create-repo --yes
    ```
 
 4. **Start APEX** in your client and describe the workload you want. The agent asks for the rest and tells you what it

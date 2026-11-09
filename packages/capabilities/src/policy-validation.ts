@@ -543,26 +543,35 @@ export function validateBicepResourceParity(request: {
     expected.some(
       (resource) =>
         resource.ownership !== "managed" ||
-        resource.implementationKind !== "resource" ||
+        (resource.implementationKind !== "resource" && resource.implementationKind !== "module") ||
         !/^[A-Za-z_][A-Za-z0-9_]*$/.test(resource.executionAddress ?? "") ||
         resource.dependsOn.some((id) => !byId.has(id)) ||
         JSON.stringify([...resource.dependsOn].sort()) !== JSON.stringify([...resource.generatedDependencies].sort()),
     )
   )
     return result("unsupported", "unsupported-resource");
-  let observed: readonly Resource[];
+  let allObserved: readonly Resource[];
   try {
-    observed = resourcesFromJson(request.json, "bicep");
+    allObserved = resourcesFromJson(request.json, "bicep");
   } catch {
     return result("unsupported", "invalid-source");
   }
+  const moduleSymbols = new Set(
+    expected
+      .filter((resource) => resource.implementationKind === "module")
+      .map((resource) => resource.executionAddress!),
+  );
+  const nestedObserved = allObserved.filter((resource) => resource.codeSymbol?.includes("::"));
+  if (nestedObserved.some((resource) => !moduleSymbols.has(resource.codeSymbol!.split("::")[0]!)))
+    return result("unsupported", "unsupported-resource");
+  const observed = allObserved.filter((resource) => !resource.codeSymbol?.includes("::"));
   if (
     observed.some(
       (resource) =>
         resource.unsupported ||
         resource.codeSymbol === undefined ||
-        resource.codeSymbol.includes("::") ||
-        resource.resourceType?.toLowerCase() === "microsoft.resources/deployments" ||
+        (resource.resourceType?.toLowerCase() === "microsoft.resources/deployments" &&
+          !moduleSymbols.has(resource.codeSymbol)) ||
         Object.hasOwn(resource.value, "condition"),
     )
   )
@@ -576,10 +585,15 @@ export function validateBicepResourceParity(request: {
     return result("fail", "coverage-mismatch");
   for (const resource of expected) {
     const compiled = observed.find(({ codeSymbol }) => codeSymbol === resource.executionAddress)!;
-    if (compiled.resourceType?.toLowerCase() !== resource.type.toLowerCase()) return result("fail", "type-mismatch");
+    const expectedType =
+      resource.implementationKind === "module" ? "microsoft.resources/deployments" : resource.type.toLowerCase();
+    if (compiled.resourceType?.toLowerCase() !== expectedType) return result("fail", "type-mismatch");
     const selected = request.binding?.resourceBindings[resource.logicalId];
     const scopeId = selected?.scopeLogicalId;
-    if (Object.hasOwn(compiled.value, "scope") || scopeId !== undefined) {
+    if (resource.implementationKind === "module") {
+      if (Object.hasOwn(compiled.value, "scope") || scopeId !== undefined)
+        return result("unsupported", "unsupported-resource");
+    } else if (Object.hasOwn(compiled.value, "scope") || scopeId !== undefined) {
       const target = scopeId === undefined ? undefined : byId.get(scopeId);
       const targetBinding = scopeId === undefined ? undefined : request.binding?.resourceBindings[scopeId];
       const targetCompiled =
@@ -650,24 +664,6 @@ export function validateBicepStorageBaseline(request: {
     reason,
   });
   if (parity.outcome !== "pass") return result(parity.outcome, "resource-parity");
-  const resources = resourcesFromJson(request.json, "bicep");
-  const accounts = resources.filter(
-    ({ resourceType }) => resourceType?.toLowerCase() === "microsoft.storage/storageaccounts",
-  );
-  const allowed = new Set([
-    "microsoft.storage/storageaccounts",
-    "microsoft.insights/diagnosticsettings",
-    ...["blobservices", "fileservices", "queueservices", "tableservices"].map(
-      (service) => `microsoft.storage/storageaccounts/${service}`,
-    ),
-  ]);
-  if (
-    accounts.length === 0 ||
-    new Set(accounts.map(({ value }) => value.name)).size !== accounts.length ||
-    resources.length !== accounts.length * 9 ||
-    resources.some(({ resourceType }) => !allowed.has(resourceType?.toLowerCase() ?? ""))
-  )
-    return result("unsupported", "unsupported-resource");
   const parsed: unknown = JSON.parse(request.json);
   const hasCredential = (value: unknown): boolean => {
     if (typeof value === "string") return SECRET_VALUE_PATTERN.test(value);
@@ -694,13 +690,22 @@ export function validateBicepStorageBaseline(request: {
       "parameters",
       "variables",
       "outputs",
+      "definitions",
+      "functions",
     ]) ||
-    ["parameters", "variables", "outputs"].some(
-      (key) =>
-        Object.hasOwn(template, key) &&
-        (!onlyKeys(template[key], []) || Object.keys(template[key] as object).length !== 0),
-    )
+    ["parameters", "variables", "outputs", "definitions"].some(
+      (key) => Object.hasOwn(template, key) && object(template[key]) === undefined,
+    ) ||
+    (Object.hasOwn(template, "functions") &&
+      !Array.isArray(template.functions) &&
+      object(template.functions) === undefined)
   )
+    return result("unsupported", "unsupported-resource");
+  const resources = resourcesFromJson(request.json, "bicep").filter((resource) => !resource.codeSymbol?.includes("::"));
+  const accounts = resources.filter(
+    ({ resourceType }) => resourceType?.toLowerCase() === "microsoft.storage/storageaccounts",
+  );
+  if (accounts.length > 0 && new Set(accounts.map(({ value }) => value.name)).size !== accounts.length)
     return result("unsupported", "unsupported-resource");
   for (const resource of resources) {
     if (
@@ -716,6 +721,11 @@ export function validateBicepStorageBaseline(request: {
         "properties",
         "dependsOn",
         "scope",
+        "plan",
+        "zones",
+        "extendedLocation",
+        "comments",
+        "metadata",
       ])
     )
       return result("unsupported", "unsupported-resource");
@@ -723,7 +733,7 @@ export function validateBicepStorageBaseline(request: {
       if (!onlyKeys(resource.value.properties, ["workspaceId", "logs", "metrics", "logAnalyticsDestinationType"]))
         return result("unsupported", "unsupported-resource");
     } else if (
-      resource.resourceType?.toLowerCase() !== "microsoft.storage/storageaccounts" &&
+      resource.resourceType?.toLowerCase().startsWith("microsoft.storage/storageaccounts/") &&
       resource.value.properties !== undefined &&
       !onlyKeys(resource.value.properties, [])
     )
@@ -784,23 +794,30 @@ export function validateBicepStorageBaseline(request: {
     const settings = request.manifest.resources.filter(({ logicalId }) =>
       services.some((service) => request.binding.resourceBindings[logicalId]?.scopeLogicalId === service.logicalId),
     );
-    const workspaceIds = settings.map(({ logicalId }) =>
-      own(request.binding.resourceBindings[logicalId]?.parameters.properties, "workspaceId"),
-    );
-    if (settings.length !== 4 || workspaceIds.some((id) => typeof id !== "string") || new Set(workspaceIds).size !== 1)
-      return result("unsupported", "diagnostic-routing");
-    let routing: ReturnType<typeof validateBicepStorageDiagnostics>;
-    try {
-      routing = validateBicepStorageDiagnostics({
-        sourceHash: request.sourceHash,
-        binding: { codeSymbol: account.codeSymbol! },
-        workspaceResourceId: workspaceIds[0] as string,
-        json: request.json,
-      });
-    } catch {
-      return result("unsupported", "diagnostic-routing");
+    if (services.length > 0 || settings.length > 0) {
+      const workspaceIds = settings.map(({ logicalId }) =>
+        own(request.binding.resourceBindings[logicalId]?.parameters.properties, "workspaceId"),
+      );
+      if (
+        services.length !== 4 ||
+        settings.length !== 4 ||
+        workspaceIds.some((id) => typeof id !== "string") ||
+        new Set(workspaceIds).size !== 1
+      )
+        return result("unsupported", "diagnostic-routing");
+      let routing: ReturnType<typeof validateBicepStorageDiagnostics>;
+      try {
+        routing = validateBicepStorageDiagnostics({
+          sourceHash: request.sourceHash,
+          binding: { codeSymbol: account.codeSymbol! },
+          workspaceResourceId: workspaceIds[0] as string,
+          json: request.json,
+        });
+      } catch {
+        return result("unsupported", "diagnostic-routing");
+      }
+      if (routing.outcome !== "pass") return result(routing.outcome, "diagnostic-routing");
     }
-    if (routing.outcome !== "pass") return result(routing.outcome, "diagnostic-routing");
   }
   return result("pass", "matched");
 }

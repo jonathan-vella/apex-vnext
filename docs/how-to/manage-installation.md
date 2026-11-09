@@ -2,13 +2,16 @@
 
 > [Current Version](../../VERSION.md) | Install, update and reset APEX on each supported host and manage workspace files.
 
-APEX has two parts on each machine:
+APEX ships as one install artifact on each machine:
 
-- the `apex` plugin, which carries the APEX agent, its hidden workers, skills, managed hooks and MCP servers;
-- the `@apexops/cli` npm package, whose `apex` command writes, updates and checks the workspace files.
+- the `apex` Agent Plugin (`apex@apex-plugins`), which carries the APEX agent, its hidden workers, skills, managed
+  hooks, MCP server (`mcp/apex.mjs`), bundled CLI (`cli/apex.mjs`), and onboarding scripts (`scripts/onboard.ps1`,
+  `scripts/onboard.sh`).
 
-Each plugin release bundles the `@apexops/cli` version published to npm with the same version number. Keep the
-workspace CLI at the version of the installed plugin.
+Initializing a workspace (`init`, `bootstrap`, or creating the first project with `projectCreate` in a clean Git
+repository) writes `.apex/bin/apex.mjs`, which delegates to the installed plugin's bundled CLI without requiring a
+separate `npm install @apexops/cli` in the consumer repository. `@apexops/cli` remains published on npm at the same
+version for standalone CI and developer tooling.
 
 > [!IMPORTANT]
 > **Release status.** Preview `0.11.0-next.5` is the current release on npm (`next` tag, all six `@apexops/*`

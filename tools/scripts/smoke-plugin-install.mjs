@@ -28,7 +28,6 @@ import { isDeepStrictEqual } from "node:util";
 import { hashTree } from "./build-plugin.mjs";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const repositoryCli = join(repositoryRoot, "packages/cli/dist/cli.js");
 const protocolVersion = "2026-07-28";
 const installTimeoutMs = 300_000;
 const responseTimeoutMs = 60_000;
@@ -237,7 +236,7 @@ async function smoke({ pluginDirectory, copilot, cliVersion: expectedCliVersion,
         `Installed tree hash ${installed.sha256} != build ${sidecar}; missing ${JSON.stringify(missing)}, extra ${JSON.stringify(extra)}`,
       );
     }
-    const missingPaths = [...requiredPaths, manifest.server.target].filter(
+    const missingPaths = [...requiredPaths, manifest.server.target, manifest.cli.target].filter(
       (path) => !existsSync(join(pluginRoot, path)),
     );
     if (missingPaths.length > 0) throw new Error(`Installed plugin is missing ${missingPaths.join(", ")}`);
@@ -245,13 +244,20 @@ async function smoke({ pluginDirectory, copilot, cliVersion: expectedCliVersion,
     const skills = await countFiles(join(pluginRoot, manifest.skills.targetRoot), (name) => name === "SKILL.md");
     if (agents === 0 || skills === 0) throw new Error(`Installed plugin has ${agents} agents and ${skills} skills`);
 
-    // The workspace is prepared with the repository CLI; only the installed server is under test.
-    const fixtureEnv = { PATH: process.env.PATH, ...homeEnvironment(home) };
+    // Initialize the workspace with the installed plugin's bundled CLI and verify the .apex/bin/apex.mjs launcher.
+    const fixtureEnv = { PATH: process.env.PATH, ...homeEnvironment(home), COPILOT_HOME: copilotHome };
     run("git", ["init", "--quiet", workspace], { cwd: sandbox, env: fixtureEnv });
+    const installedCli = join(pluginRoot, manifest.cli.target);
     const apex = (args) =>
-      JSON.parse(run(process.execPath, [repositoryCli, ...args, "--json"], { cwd: workspace, env: fixtureEnv }));
+      JSON.parse(run(process.execPath, [installedCli, ...args, "--json"], { cwd: workspace, env: fixtureEnv }));
     if (apex(["init", "--project", "plugin-smoke", "--risk-owner", "partner", "--target", "local"]).ok !== true)
       throw new Error("apex init failed in the smoke workspace");
+    const workspaceLauncher = join(workspace, ".apex", "bin", "apex.mjs");
+    if (!existsSync(workspaceLauncher)) throw new Error("Workspace launcher .apex/bin/apex.mjs was not written");
+    const launcherStatus = JSON.parse(
+      run(process.execPath, [workspaceLauncher, "status", "--json"], { cwd: workspace, env: fixtureEnv }),
+    );
+    if (launcherStatus.ok !== true) throw new Error(".apex/bin/apex.mjs status failed");
 
     const mcp = JSON.parse(await readFile(join(pluginRoot, "mcp.json"), "utf8"));
     const launch = serverLaunch(mcp, manifest.mcp.server, pluginRoot);

@@ -33,6 +33,8 @@ export interface HostCheckInputs {
   minimums: { vscode?: string | undefined; copilotCli?: string | undefined };
   plugin: { name: string; marketplace: string };
   apexVersion: string;
+  /** Qualified plugin identifiers (`<name>@<marketplace>` or `<name>`) disabled in workspace settings (#507). */
+  workspaceDisabledPlugins?: ReadonlySet<string> | undefined;
   executableExists: (executable: string) => Promise<boolean>;
   /** First stable `major.minor.patch` the executable reports for `args`, or undefined when it cannot be read. */
   toolVersion: (executable: string, args: readonly string[]) => Promise<string | undefined>;
@@ -248,13 +250,29 @@ async function copilotPluginCheck(kind: HostKind, inputs: HostCheckInputs): Prom
           remedy: `${kind === "windows" ? "Close every VS Code window, then run" : "Run"} copilot plugin marketplace add jonathan-vella/apex-plugins and copilot plugin install ${qualified}`,
         };
   }
-  if (entries.length > 1)
-    return {
-      id: "copilot-plugin",
-      ok: false,
-      value: `${entries.length} ${name} plugins installed in ${home}`,
-      remedy: `Uninstall the extra copies so that only ${qualified} remains (copilot plugin list shows them)`,
-    };
+  if (entries.length > 1) {
+    const activeEntries = entries.filter((candidate) => {
+      const candidateSource =
+        typeof candidate.marketplace === "string" && candidate.marketplace.length > 0
+          ? candidate.marketplace
+          : "direct";
+      const candidateQualified = candidateSource === "direct" ? name : `${name}@${candidateSource}`;
+      return (
+        candidate.enabled !== false &&
+        !inputs.workspaceDisabledPlugins?.has(candidateQualified) &&
+        !inputs.workspaceDisabledPlugins?.has(`${name}@${candidateSource}`)
+      );
+    });
+    if (activeEntries.length !== 1) {
+      return {
+        id: "copilot-plugin",
+        ok: false,
+        value: `${entries.length} ${name} plugins installed in ${home}`,
+        remedy: `Uninstall the extra copies so that only ${qualified} remains (copilot plugin list shows them)`,
+      };
+    }
+    entries.splice(0, entries.length, activeEntries[0]!);
+  }
   const entry = entries[0]!;
   const version = typeof entry.version === "string" ? entry.version : "unknown";
   const source = typeof entry.marketplace === "string" && entry.marketplace.length > 0 ? entry.marketplace : "direct";

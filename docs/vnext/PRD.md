@@ -88,20 +88,24 @@ this flow; the scenarios are not yet run.
 
 ### REQ-DIST-001: Distribution And Installation
 
-APEX ships as one Agent Plugins 1.0 plugin under DECISION-033, published from a separate vNext marketplace repository.
-Installs and release provenance pin an immutable commit SHA; tags are release labels only. The plugin carries the
-skills, the APEX agent and hidden workers, hooks, and an MCP server that runs the bundled `@apexops/cli` runtime with
-`node` from the plugin folder as one esbuild bundle (DECISION-034); starting it must not need a registry download.
-`@apexops/cli` stays on npm for the terminal at the same exact version the plugin bundles. Clients install the plugin
-through one channel, the Copilot CLI store, which VS Code reads; installing through more than one channel is
-unsupported.
+APEX ships as one Agent Plugins 1.0 plugin under DECISION-033 and
+[DECISION-040](DECISIONS.md#decision-040-launch-scope-reset-single-plugin-artifact-static-context-budget-and-tiered-client-acceptance),
+published from a separate vNext marketplace repository. Installs and release provenance pin an immutable commit SHA;
+tags are release labels only. The plugin carries the skills, the APEX agent and hidden workers, hooks, onboarding
+scripts (`scripts/onboard.ps1`, `scripts/onboard.sh`), an MCP server (`mcp/apex.mjs`), and a bundled CLI entry
+(`cli/apex.mjs`) that run the bundled `@apexops/cli` runtime with `node` from the plugin folder as one esbuild bundle
+(DECISION-034); starting either entry must not need an npm registry download or a separate workspace `node_modules`
+install. `@apexops/cli` stays on npm for standalone terminal and CI use at the same exact version the plugin bundles.
+Consumers install the plugin through one channel, the Copilot CLI store (`apex@apex-plugins`), which VS Code and the
+GitHub Copilot app read; local-path plugin installation is retained for pre-publish candidate testing.
 
-`apex init` and bootstrap write a thin workspace projection: `.github/copilot/settings.json` with `enabledPlugins` and
-`extraKnownMarketplaces`, instructions with `applyTo` globs, the governance workflow and scripts, and `.apex/`. Init,
-update, rollback, and uninstall detect local edits, preserve unrelated files and project state, and keep plugin and
-runtime versions exact. Plugin-owned files are neither copied into the workspace nor checked as workspace files.
-Retiring the copied agents and skills follows the DECISION-015 gates. Avoid competing updaters or a hosted service
-unless separately approved. Final package and client qualification follows any distribution change.
+`init`, `bootstrap`, and auto-initialization on `projectCreate` in a clean Git repository write a thin workspace
+projection: `.github/copilot/settings.json` with `enabledPlugins` and `extraKnownMarketplaces`, instructions with
+`applyTo` globs, the governance workflow and scripts, and `.apex/` including the `.apex/bin/apex.mjs` workspace CLI
+launcher. Init, update, rollback, and uninstall detect local edits, preserve unrelated files and project state, and
+keep plugin and runtime versions exact. Plugin-owned files are neither copied into the workspace nor checked as
+workspace files. Retiring the copied agents and skills follows the DECISION-015 gates. Avoid competing updaters or a
+hosted service unless separately approved. Final package and client qualification follows any distribution change.
 
 ### REQ-ONBOARDING-001: First-Time Install And Repository Bootstrap
 
@@ -562,22 +566,29 @@ receipt. Separately authorized maintenance remains bounded by its manifest and h
 
 ### REQ-MCP-001: Predictable Tool Contracts
 
-The CLI MCP adapter exposes kernel-authorized operations, not a second workflow engine. Under DECISION-034 it uses the
-MCP TypeScript SDK v2 (`@modelcontextprotocol/server`) with a low-level `Server` served by `serveStdio` and targets
-protocol `2026-07-28`, which all supported Copilot clients negotiate. This requirement governs APEX's own server only.
+The CLI MCP adapter exposes kernel-authorized operations, not a second workflow engine. Under DECISION-034 and
+[DECISION-040](DECISIONS.md#decision-040-launch-scope-reset-single-plugin-artifact-static-context-budget-and-tiered-client-acceptance)
+it uses the MCP TypeScript SDK v2 (`@modelcontextprotocol/server`) with a low-level `Server` served by `serveStdio`
+and targets protocol `2026-07-28`, which all supported Copilot clients negotiate. The server registers only the 31
+role-scoped workflow tools assigned to `APEX`, `APEX CodeGen`, and `APEX Validator`; CLI-only maintenance operations
+remain on `ApexService` and the terminal CLI. To keep always-loaded session context within `config/context-budget.v1.json`,
+`outputSchema` is omitted from the `tools/list` wire payload while `MCP_OUTPUT_SCHEMAS` validates every tool response
+server-side via `outputSchema.safeParse`. This requirement governs APEX's own server only.
 The official Azure MCP Server integration
 ([DECISION-038](DECISIONS.md#decision-038-introduce-azure-mcp-server-3-as-a-managed-azure-tool-provider),
 [CP-31](https://github.com/jonathan-vella/apex-vnext/issues/489)) is a separate external tool provider and dependency
 axis; it does not change this SDK, protocol version, or kernel authority, and its own tool contracts and grants are
 tracked by that decision, not by this requirement's acceptance below. Acceptance:
 
-1. Every successful tool result validates through the supported SDK. Preserve existing object responses; wrap Markdown
-   and lists in named objects. Retain serialized text alongside structured results for compatible clients.
+1. Every successful tool result validates through the supported SDK and server-side `MCP_OUTPUT_SCHEMAS`. Preserve
+   existing object responses; wrap Markdown and lists in named objects. Retain serialized text alongside structured
+   results for compatible clients.
 2. Execution failures return `isError: true` and a stable, sanitized APEX code/message. Unexpected diagnostics,
    stacks, raw provider errors and unreviewed details must not reach the model. Test stale, validation and internal
    failures.
-3. Publish output schemas, starting with intake, task context and bounded reads, reusing canonical contracts. Reject
-   unexpected arguments and ambiguous staging forms before mutation. Test every registered tool's response shape.
+3. Maintain server-side output schemas (`MCP_OUTPUT_SCHEMAS`) reusing canonical contracts while omitting `outputSchema`
+   from the `tools/list` wire payload (`<= 28,000` bytes). Reject unexpected arguments and ambiguous staging forms
+   before mutation. Test every registered tool's response shape.
 4. Describe side effects truthfully and supply behavior annotations without treating them as authorization. Do not
    mark task issuance or terminal bookkeeping as read-only or retry-safe; kernel repeat suppression is bounded by run
    state and time, so it does not make them idempotent. Prefer a genuinely read-only status path.
