@@ -84,6 +84,7 @@ const CONFIG_SHAPES = {
     "optionalCapabilityPackRuntimes",
     "approvedExceptions",
   ],
+  "context-budget.v1.json": ["schemaVersion", "budgets"],
 };
 const FORBIDDEN_TOOL = /(^|\/)(shell|terminal|filesystem|fs|edit|write|git|azure|az|bicep|terraform)(\/|$)/i;
 // DECISION-033: the supported VS Code Copilot harness requires VS Code 1.140.

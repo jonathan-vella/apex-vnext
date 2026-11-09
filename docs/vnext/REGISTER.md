@@ -109,12 +109,15 @@ and the repository archives.
 
 - **Owner:** Release engineering and client experience
 - **Impact:** A plugin update could launch the wrong MCP runtime, select the wrong workspace or alter an active run.
-- **Mitigation:** DECISION-033 selects one Agent Plugin with the bundled runtime, pinned to a commit SHA and installed
-  through one channel; `apex init` writes only the thin projection. Preserve state and avoid competing updaters.
-- **State:** Open; plugin package and thin `apex init` projection implemented (`0.11.0-next.5`); supported-client
-  lifecycle qualification pending
-- **Closure proof:** The plugin lifecycle (install, update, rollback, uninstall) passes in all three supported clients
-  on their hosts without disturbing an active run.
+- **Mitigation:** DECISION-033 and
+  [DECISION-040](DECISIONS.md#decision-040-launch-scope-reset-single-plugin-artifact-static-context-budget-and-tiered-client-acceptance)
+  select one Agent Plugin bundling both `mcp/apex.mjs` and `cli/apex.mjs`, pinned to a commit SHA and installed through
+  one channel; workspace initialization writes only the thin projection and `.apex/bin/apex.mjs` launcher without a
+  separate consumer `npm install @apexops/cli`. Preserve state and avoid competing updaters.
+- **State:** Open; single-artifact plugin package, `.apex/bin/apex.mjs` launcher, and `#507` duplicate-plugin check
+  implemented; tiered supported-client qualification pending (`CP-37`)
+- **Closure proof:** The plugin lifecycle (install, update, rollback, uninstall) passes tiered launch qualification
+  without disturbing an active run.
 
 ## RISK-010: Revised Plans Can Outrun Executable Controls
 

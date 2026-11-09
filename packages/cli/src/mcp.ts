@@ -64,10 +64,7 @@ const pagePaths: Partial<Record<keyof typeof MCP_OUTPUT_SCHEMAS, readonly string
   inputHistory: ["inputs"],
   preview: ["markdown"],
   inventory: ["resources"],
-  improvementObservations: ["observations"],
-  improvementProposals: ["proposals"],
   render: ["markdown"],
-  doctorChecks: ["checks"],
 };
 
 type CursorPayload = {
@@ -195,7 +192,7 @@ export function mcpToolPolicy(): { server: "apex"; tools: string[]; readOnly: st
     readOnly: [...MCP_READ_ONLY_TOOLS].sort(),
   };
 }
-const externalTools = new Set(["reconcile", "inventory", "diagnose", "doctor", "doctorChecks"]);
+const externalTools = new Set(["reconcile", "inventory", "diagnose"]);
 
 function assertBoundedInput(value: unknown): void {
   const stack = [{ value, depth: 0 }];
@@ -839,7 +836,6 @@ export function createMcpServerFactory(
       name,
       ...(config.description === undefined ? {} : { description: config.description }),
       inputSchema: inputJson as Tool["inputSchema"],
-      outputSchema: z.toJSONSchema(outputSchema, { target: "draft-7" }) as NonNullable<Tool["outputSchema"]>,
       annotations,
     };
     toolDefinitions.push(definition);
@@ -852,14 +848,6 @@ export function createMcpServerFactory(
     "releaseWriter",
     { description: "Release this workspace's writer lease for the selected run." },
     async () => result(await service.releaseWriter()),
-  );
-  registerTool("capabilityList", { description: "Read capability pack availability" }, async () =>
-    result({ packs: await service.capabilityList() }),
-  );
-  registerTool(
-    "capabilityStatus",
-    { description: "Read one capability pack status", inputSchema: { pack: z.string() } },
-    async ({ pack }) => result(await service.capabilityStatus(pack)),
   );
   registerTool(
     "nextTask",
@@ -920,7 +908,7 @@ export function createMcpServerFactory(
     "previewInputAmendment",
     {
       description:
-        "Preview an append-only correction to recorded answers, including dependent review/gate invalidation and re-approval. Does not apply it. Long text answers are shown as size and SHA-256 when the preview would exceed the result budget; proposalHash still binds the complete proposal.",
+        "Preview an append-only correction to recorded answers, including dependent review/gate invalidation and re-approval. Does not apply it. Long text answers show size and SHA-256 when over budget; proposalHash binds the full proposal.",
       inputSchema: { amendment: inputAmendment, reason: z.string().min(1).max(2048) },
     },
     async ({ amendment, reason }) =>
@@ -930,7 +918,7 @@ export function createMcpServerFactory(
     "amendInput",
     {
       description:
-        "Apply only after the user explicitly confirms the exact preview and impact. Preserves original audit history; does not approve any gate or authorize deployment.",
+        "Apply only after the user confirms the exact preview and impact. Preserves audit history; does not approve any gate or authorize deployment.",
       inputSchema: {
         amendment: inputAmendment,
         reason: z.string().min(1).max(2048),
@@ -944,7 +932,7 @@ export function createMcpServerFactory(
     "governanceImport",
     {
       description:
-        "Import governance for the active discovery task: either a reviewed local subscription baseline by path (never its contents) or reference: true for the shipped ALZ Corp reference baseline.",
+        "Import governance for the active discovery task: a reviewed local subscription baseline path or reference: true for the shipped ALZ Corp reference baseline.",
       inputSchema: { path: z.string().min(1).optional(), reference: z.literal(true).optional() },
     },
     async ({ path, reference }) => {
@@ -959,7 +947,7 @@ export function createMcpServerFactory(
     "governanceSelect",
     {
       description:
-        "Prepare or recall the target governance snapshot reuse/refresh question; only a local path is accepted. Does not import or collect Azure policy.",
+        "Prepare or recall the target governance snapshot reuse/refresh question for a local baseline path. Does not import or collect Azure policy.",
       inputSchema: { path: z.string().min(1), reopen: z.boolean().optional() },
     },
     async ({ path, reopen }) =>
@@ -969,7 +957,7 @@ export function createMcpServerFactory(
     "projectCreate",
     {
       description:
-        "Create and select a new project with its initial environment run. targetScope is the user's explicit choice: local, or a full /subscriptions/<id>/resourceGroups/<name> path. purpose is lab (default) or production; production is unavailable until CP-28/CP-29 ship and is rejected.",
+        "Create and select a new project and initial run. targetScope is local or /subscriptions/<id>/resourceGroups/<name>. purpose is lab (default) or production (rejected until CP-28/CP-29).",
       inputSchema: projectCreateInput,
     },
     async (input) => result(await service.createProject(input as Parameters<typeof service.createProject>[0])),
@@ -1000,7 +988,7 @@ export function createMcpServerFactory(
     "gateDecide",
     {
       description:
-        "Record the explicitly confirmed human Gate 1 intent confirmation (purpose, target and requirements) using the local OS username as actor. In a lab run Gates 2 and 3 are kernel-recorded readiness checkpoints, not human decisions, and are refused here with reason GATE_READINESS_AUTOMATIC: resolve the reported review or validation blocker instead. Gate 4, the final preview approval, remains CLI-only.",
+        "Record confirmed human Gate 1 intent (purpose, target, requirements). In lab runs Gates 2 and 3 are automatic readiness checkpoints (refused with GATE_READINESS_AUTOMATIC). Gate 4 is CLI-only.",
       inputSchema: gateDecisionInput,
     },
     async ({ gate, decision }) => result(await service.decideInteractiveGate(gate, decision)),
@@ -1009,7 +997,7 @@ export function createMcpServerFactory(
     "gateDelegate",
     {
       description:
-        "Evaluate Gate 1 or exact apply Gate 4 under an existing human-confirmed lab delegation policy. Records agent, consent and kernel provenance, never a human TTY approval. Supply the recorded policy/consent hashes and, for Gate 4, the exact current preview/context hashes. Native AzureCloud Bicep only; no updates, deletes, replacements, unknowns, material no-ops, production or delegated destroy. Missing facts or expired/revoked consent fail closed. Consent registration remains interactive CLI-only.",
+        "Evaluate Gate 1 or exact apply Gate 4 under an existing human-confirmed lab delegation policy using recorded policy/consent hashes and, for Gate 4, exact preview/context hashes. Native AzureCloud Bicep create-only; expired or revoked consent fails closed.",
       inputSchema: delegatedGateInput,
     },
     async ({ gate, policyHash, consentHash, previewHash, approvalContextHash }) =>
@@ -1041,28 +1029,6 @@ export function createMcpServerFactory(
           })),
         ),
       ),
-  );
-  registerTool(
-    "stageArtifact",
-    {
-      description:
-        "Stage one typed artifact or an outputs[] bundle for the exact active task; staging does not complete the task.",
-      inputSchema: stagingInput(false),
-    },
-    async ({ taskId, kind, value, summary, outputs }, extra) => {
-      if (outputs !== undefined) {
-        const artifacts = [];
-        for (const output of normalizeOutputs(outputs)) {
-          if (extra.signal.aborted) throw new ApexError("APEX_CONFLICT", "Cancelled", EXIT_CODES.conflict);
-          artifacts.push(await service.stageArtifact(taskId, output));
-        }
-        return result({ artifacts });
-      }
-      if (kind === undefined) throw new Error("stageArtifact requires kind/value or outputs[]");
-      return result(
-        await service.stageArtifact(taskId, { kind, value, ...(summary === undefined ? {} : { summary }) }),
-      );
-    },
   );
   registerTool(
     "stageFile",
@@ -1109,7 +1075,7 @@ export function createMcpServerFactory(
     "validateTask",
     {
       description:
-        "With only taskId for an IaC validation task, execute native checks and return runtime-owned outputs and execution metadata. valid:false and blockedValidatorIds mean required checks remain unexecuted; do not complete. Supplied artifacts are only checked/staged. Task completion and approval are separate.",
+        "With only taskId for an IaC validation task, execute native checks and return runtime-owned outputs and execution metadata; valid:false or blockedValidatorIds means checks remain unexecuted. Supplied artifacts are checked and staged.",
       inputSchema: stagingInput(true),
     },
     async ({ taskId, kind, value, summary, outputs }, extra) => {
@@ -1157,7 +1123,7 @@ export function createMcpServerFactory(
     "architectureComplete",
     {
       description:
-        "Complete Architecture atomically; APEX derives identity, artifact hashes, top-level requirementTraceability, and cost/SKU bindings. Each SKU and SLO decision lists its component requirementIds. policyMappings maps each governanceFindings entry from task context to a component; APEX marks findings whose resource types match no component resourceTypes not-applicable. A rejection lists every problem across all four inputs.",
+        "Complete Architecture atomically; APEX derives identity, hashes, requirementTraceability, and cost/SKU bindings. Each SKU and SLO decision lists component requirementIds; policyMappings maps governanceFindings to components.",
       inputSchema: {
         taskId: z.string(),
         architecture: z.unknown(),
@@ -1181,7 +1147,7 @@ export function createMcpServerFactory(
     "reviewComplete",
     {
       description:
-        "Complete the active review task from rubber-duck's captured output after running rubber-duck in sync mode with the exact reviewRequest.prompt from taskContext. Takes no findings: APEX derives them only from the verified capture. A missing, edited, replayed or mismatched capture fails closed and the review counts as not done.",
+        "Complete the active review task from rubber-duck's captured output after running rubber-duck in sync mode with reviewRequest.prompt from taskContext. Missing or tampered captures fail closed.",
       inputSchema: { taskId: z.string() },
     },
     async ({ taskId }) => result(await service.completeReview(taskId)),
@@ -1230,57 +1196,6 @@ export function createMcpServerFactory(
     },
   );
   registerTool(
-    "improvementObserve",
-    {
-      description: "Submit one bounded redacted observation for the selected run",
-      inputSchema: {
-        taskId: z.string().optional(),
-        observedAt: z.string().datetime().optional(),
-        source: z.enum([
-          "task-completion",
-          "deterministic-test",
-          "validation-failure",
-          "capability-execution",
-          "cache-check",
-          "explicit-correction",
-        ]),
-        category: z.enum([
-          "correctness",
-          "security",
-          "reliability",
-          "performance",
-          "usability",
-          "documentation",
-          "capability-gap",
-        ]),
-        severity: z.enum(["critical", "high", "medium", "low", "info"]),
-        statement: z.string().min(1).max(1024),
-        evidenceRefs: z
-          .array(z.string().regex(/^[0-9a-f]{64}$/))
-          .min(1)
-          .max(32),
-      },
-    },
-    async ({ taskId, observedAt, ...input }) =>
-      result(
-        await service.improvementObserve({
-          ...input,
-          ...(taskId === undefined ? {} : { taskId }),
-          ...(observedAt === undefined ? {} : { observedAt }),
-        }),
-      ),
-  );
-  registerTool(
-    "improvementObservations",
-    { description: "Read bounded observations", inputSchema: { cursor: cursorInput } },
-    async () => result({ observations: await service.improvementObservations() }),
-  );
-  registerTool(
-    "improvementProposals",
-    { description: "Read inert improvement proposals", inputSchema: { cursor: cursorInput } },
-    async () => result({ proposals: await service.improvementProposals() }),
-  );
-  registerTool(
     "render",
     {
       description:
@@ -1302,55 +1217,6 @@ export function createMcpServerFactory(
       },
     },
     async ({ kind }) => result({ markdown: await service.render(kind) }),
-  );
-  registerTool(
-    "promote",
-    {
-      description:
-        "Promote the selected run to a target environment through kernel checks; does not approve or execute deployment. The run's purpose is kept; a different purpose needs a new project.",
-      inputSchema: { environment: z.string(), target: z.string(), purpose: z.enum(["lab", "production"]).optional() },
-    },
-    async ({ environment, target, purpose }) => result(await service.promote(environment, target, purpose)),
-  );
-  registerTool(
-    "doctor",
-    {
-      description:
-        "Inspect local APEX installation health; request repairs with fix and explicit confirmation with yes. Returns counts, remedies, and a bounded check list with failing checks first; when truncated, read every check with doctorChecks.",
-      inputSchema: { fix: z.boolean().optional(), yes: z.boolean().optional() },
-    },
-    async ({ fix, yes }) => result(summarizeDoctorReport(await service.doctor(fix, yes))),
-  );
-  registerTool(
-    "doctorChecks",
-    {
-      description:
-        "Read every local APEX installation health check without repairing; failedOnly limits the list to failing checks.",
-      inputSchema: { failedOnly: z.boolean().optional(), cursor: cursorInput },
-    },
-    async ({ failedOnly }) => {
-      const { checks } = await service.doctor();
-      return result({ checks: failedOnly === true ? checks.filter(({ ok }) => !ok) : checks });
-    },
-  );
-  registerTool(
-    "submitEvidence",
-    {
-      description:
-        "Submit JSON evidence bound to the exact active task after validating its context; does not complete the task.",
-      inputSchema: {
-        taskId: z.string(),
-        kind: z.string(),
-        value: z.record(z.string(), z.json()),
-        required: z.boolean().optional(),
-      },
-    },
-    async ({ taskId, kind, value, required }) => {
-      await service.taskContext(taskId);
-      return result(
-        await service.acceptEvidence({ kind, contentType: "application/json", value, required: required ?? false }),
-      );
-    },
   );
   // Unknown tool names keep the v1-era externally visible shape (an isError tool result, not a JSON-RPC error), now
   // as the standard APEX error envelope so clients parse one error contract.

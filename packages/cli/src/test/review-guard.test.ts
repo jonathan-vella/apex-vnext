@@ -86,18 +86,16 @@ const invocations: Record<
       (service) => service.resolveReview({ reviewHash: hash } as never),
     ],
   },
-  promote: {
-    mcp: () => ({ environment: "prod", target: "local" }),
-    service: [(service) => service.promote("prod", "local")],
-  },
-  submitEvidence: {
-    // The adapter reads the task context first, so the call names the pending review task to reach the service.
-    mcp: (taskId) => ({ taskId, kind: "test", value: {} }),
-    service: [
-      (service) =>
-        service.acceptEvidence({ kind: "test", contentType: "application/json", value: {}, required: false }),
-    ],
-  },
+};
+
+const serviceOnlyInvocations: Record<
+  "promote" | "submitEvidence",
+  Array<(service: ApexService) => Promise<unknown>>
+> = {
+  promote: [(service) => service.promote("prod", "local")],
+  submitEvidence: [
+    (service) => service.acceptEvidence({ kind: "test", contentType: "application/json", value: {}, required: false }),
+  ],
 };
 
 async function pendingReview(clock?: () => Date) {
@@ -127,8 +125,12 @@ function mcpCode(response: Awaited<ReturnType<Client["callTool"]>>): string {
 }
 
 async function assertBlocked(service: ApexService, taskId: string): Promise<void> {
-  for (const tool of guardedTools)
-    for (const invoke of invocations[tool].service)
+  const allServiceInvocations = [
+    ...guardedTools.map((tool) => [tool, invocations[tool].service] as const),
+    ...Object.entries(serviceOnlyInvocations),
+  ];
+  for (const [tool, list] of allServiceInvocations)
+    for (const invoke of list)
       await assert.rejects(
         invoke(service),
         (error: unknown) => {
@@ -149,21 +151,24 @@ async function assertBlocked(service: ApexService, taskId: string): Promise<void
 }
 
 async function assertNotBlocked(service: ApexService): Promise<void> {
-  for (const tool of guardedTools)
-    for (const invoke of invocations[tool].service)
-      assert.notEqual(await outcome(invoke(service)), "APEX_REVIEW_PENDING", tool);
+  const allServiceInvocations = [
+    ...guardedTools.map((tool) => [tool, invocations[tool].service] as const),
+    ...Object.entries(serviceOnlyInvocations),
+  ];
+  for (const [tool, list] of allServiceInvocations)
+    for (const invoke of list) assert.notEqual(await outcome(invoke(service)), "APEX_REVIEW_PENDING", tool);
 }
 
 test("the pending-review guard extends the MCP effect classification", () => {
   const stateChanging = Object.entries(MCP_TOOL_EFFECTS)
-    .filter(([, effect]) => effect === "repeat-guarded" || effect === "convergent")
+    .filter(([, effect]) => (effect as string) === "repeat-guarded" || (effect as string) === "convergent")
     .map(([name]) => name)
     .sort();
   assert.deepEqual(Object.keys(MCP_TOOL_REVIEW_GUARDS).sort(), stateChanging, "every state-changing tool decides");
   assert.deepEqual(Object.keys(invocations).sort(), [...guardedTools].sort(), "every guarded tool has a case");
-  for (const tool of ["projectDelete", "gateDecide", "reviewDecide", "promote", "submitEvidence"])
+  for (const tool of ["projectDelete", "gateDecide", "reviewDecide"])
     assert.ok(guardedTools.includes(tool as ReviewGuardedTool), tool);
-  for (const tool of ["nextTask", "reviewComplete", "stageArtifact"])
+  for (const tool of ["nextTask", "reviewComplete", "stageFile"])
     assert.equal(MCP_TOOL_REVIEW_GUARDS[tool as McpStateChangingTool], null, tool);
 });
 

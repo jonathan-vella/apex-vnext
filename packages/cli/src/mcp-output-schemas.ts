@@ -1,8 +1,6 @@
 import {
   ApprovalEvidenceV1Schema,
   EvidenceManifestV1Schema,
-  ImprovementObservationV1Schema,
-  ImprovementProposalV1Schema,
   InputRequestV1Schema,
   RecordedInputV1Schema,
   InputAmendmentProposalV1Schema,
@@ -96,17 +94,6 @@ function contract(schema: TObject | TUnion<TObject[]>, options: { pageable?: boo
 }
 
 const selection = object({ projectId: NonEmptyStringSchema, runId: NonEmptyStringSchema });
-const capability = object({
-  id: Type.String(),
-  state: Type.Union(
-    ["installed", "unavailable", "blocked", "invalid", "not-installed"].map((value) => Type.Literal(value)),
-  ),
-  version: Type.Optional(Type.String()),
-  installedVersion: Type.Optional(Type.String()),
-  requiredWorkflows: strings,
-  reason: Type.Optional(Type.String()),
-  action: Type.String(),
-});
 const status = object({
   run: RunConfigV1Schema,
   head: Type.Union([Sha256Schema, Type.Null()]),
@@ -193,13 +180,6 @@ const stagedFile = object({
   idempotent: Type.Boolean(),
 });
 const completion = object({ outputHashes: artifactHashes, summary: Type.String() });
-const evidenceProperties = {
-  kind: Type.String(),
-  bytes: count,
-  retention: Type.Union(["immutable", "project", "optional"].map((value) => Type.Literal(value))),
-  redacted: Type.Boolean(),
-  reasons: strings,
-};
 
 export const MCP_OUTPUT_SCHEMAS = {
   status: contract(
@@ -231,8 +211,6 @@ export const MCP_OUTPUT_SCHEMAS = {
       runId: NonEmptyStringSchema,
     }),
   ),
-  capabilityList: contract(object({ packs: Type.Array(capability) })),
-  capabilityStatus: contract(capability),
   nextTask: contract(
     Type.Union([
       object({ status: Type.Literal("needs_input"), request: InputRequestV1Schema }),
@@ -324,7 +302,6 @@ export const MCP_OUTPUT_SCHEMAS = {
   reviewDecide: contract(
     object({ status: Type.Union([Type.Literal("revision_requested"), Type.Literal("resolved")]) }),
   ),
-  stageArtifact: contract(Type.Union([stagedArtifact, object({ artifacts: Type.Array(stagedArtifact) })])),
   stageFile: contract(stagedFile),
   generateIac: contract(
     object({ files: Type.Array(stagedFile), outputHashes: artifactHashes, treeHash: Sha256Schema }),
@@ -363,19 +340,5 @@ export const MCP_OUTPUT_SCHEMAS = {
   inventory: contract(ResourceInventoryV1Schema, { pageable: true }),
   reconcile: contract(ResourceInventoryV1Schema),
   diagnose: contract(object({ status, doctor })),
-  improvementObserve: contract(object({ observation: ImprovementObservationV1Schema, deduplicated: Type.Boolean() })),
-  improvementObservations: contract(object({ observations: Type.Array(ImprovementObservationV1Schema) }), {
-    pageable: true,
-  }),
-  improvementProposals: contract(object({ proposals: Type.Array(ImprovementProposalV1Schema) }), { pageable: true }),
   render: contract(object({ markdown: Type.String() }), { pageable: true }),
-  promote: contract(RunConfigV1Schema),
-  doctor: contract(doctor),
-  doctorChecks: contract(object({ checks: Type.Array(doctorCheck) }), { pageable: true }),
-  submitEvidence: contract(
-    Type.Union([
-      object({ ...evidenceProperties, status: Type.Literal("accepted"), hash: Sha256Schema }),
-      object({ ...evidenceProperties, status: Type.Literal("quarantined"), quarantinePath: NonEmptyStringSchema }),
-    ]),
-  ),
 } satisfies Record<string, z.ZodObject>;

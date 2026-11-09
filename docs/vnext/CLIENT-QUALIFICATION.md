@@ -18,11 +18,17 @@ after #454) and their exploratory results remain historical; the current candida
 evidence without restoring retired root guidance.
 
 Each client runs on its supported host without Docker or a devcontainer; client local sandboxing is deferred until after
-launch and is not part of qualification. Required
-outcomes follow the [PRD](PRD.md), including both environment profiles, COE reuse and conversational changes. Basic
-interaction checks accompany feature delivery; final installation qualification uses the APEX plugin. No token
-baseline is required now. Existing executable gate alignment must be completed before affected scenarios; do not
-bypass it.
+launch and is not part of qualification. Under
+[DECISION-040](DECISIONS.md#decision-040-launch-scope-reset-single-plugin-artifact-static-context-budget-and-tiered-client-acceptance)
+and [PARITY-CHECKLIST.md](PARITY-CHECKLIST.md), preview launch uses tiered client qualification:
+GitHub Copilot CLI on WSL2 Ubuntu runs the complete end-to-end workflow (plugin install, Requirements through Gate 4,
+and Bicep deploy), while the GitHub Copilot app and VS Code Copilot harness on Windows 11 run smoke verification
+(plugin discovery from the shared store, `APEX` agent selection, `apex/status` MCP connectivity, and first intake
+prompt). The full four-client multi-stage matrix and per-commit hash re-freezing are deferred to post-launch.
+Required outcomes follow the [PRD](PRD.md), including both environment profiles, COE reuse and conversational changes.
+Basic interaction checks accompany feature delivery; final installation qualification uses the APEX plugin.
+Always-loaded context is bounded by `config/context-budget.v1.json` (`npm run validate:context-budget`). Existing
+executable gate alignment must be completed before affected scenarios; do not bypass it.
 
 ## Candidate Binding
 

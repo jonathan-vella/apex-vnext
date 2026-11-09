@@ -65,6 +65,8 @@ const forbiddenBundleText = "@modelcontextprotocol/sdk";
 const fixedTargets = {
   plugin: "plugin.json",
   mcp: "mcp.json",
+  cli: "cli/apex.mjs",
+  scripts: "scripts",
   skills: "skills",
   agents: "com.github.copilot/agents",
   hooks: "com.github.copilot/hooks",
@@ -73,6 +75,8 @@ const manifestShape = {
   plugin: ["source", "target", "versionFrom"],
   mcp: ["source", "target", "server"],
   server: ["entry", "target", "nodeTarget"],
+  cli: ["entry", "target"],
+  scripts: ["sourceRoot", "targetRoot", "entries"],
   agents: ["sourceRoot", "targetRoot"],
   skills: ["sourceRoot", "targetRoot"],
   hooks: ["sourceRoot", "targetRoot", "entries", "toolPolicy"],
@@ -175,6 +179,8 @@ function validateNativeSection(manifest) {
     manifest.plugin.target,
     manifest.mcp.target,
     manifest.server.target,
+    manifest.cli.target,
+    manifest.scripts.targetRoot,
     manifest.agents.targetRoot,
     manifest.skills.targetRoot,
     manifest.hooks.targetRoot,
@@ -209,6 +215,10 @@ function validatePackageManifest(manifest) {
     ["mcp.source", manifest.mcp.source],
     ["server.entry", manifest.server.entry],
     ["server.target", manifest.server.target],
+    ["cli.entry", manifest.cli.entry],
+    ["cli.target", manifest.cli.target],
+    ["scripts.sourceRoot", manifest.scripts.sourceRoot],
+    ["scripts.targetRoot", manifest.scripts.targetRoot],
     ["agents.sourceRoot", manifest.agents.sourceRoot],
     ["skills.sourceRoot", manifest.skills.sourceRoot],
     ["hooks.sourceRoot", manifest.hooks.sourceRoot],
@@ -217,6 +227,9 @@ function validatePackageManifest(manifest) {
     ["native.targetRoot", manifest.native.targetRoot],
   ]) {
     if (!safeRelativePath(path)) throw new Error(`Plugin package manifest ${label} must be a safe relative path`);
+  }
+  if (!Array.isArray(manifest.scripts.entries) || !manifest.scripts.entries.every(safeRelativePath)) {
+    throw new Error("Plugin scripts entries must be safe relative paths");
   }
   for (const [section, target] of Object.entries(fixedTargets)) {
     const actual = manifest[section].target ?? manifest[section].targetRoot;
@@ -1065,6 +1078,18 @@ async function build(
 
   const nativeTable = await packageNativeBinaries(manifest, outputDirectory);
   const bundle = await bundleServer(manifest, outputDirectory, nativeTable);
+  await writeOutputFile(
+    outputDirectory,
+    manifest.cli.target,
+    await readSourceFile(join(repositoryRoot, manifest.cli.entry)),
+  );
+  for (const entry of [...manifest.scripts.entries].sort(bytewise)) {
+    await writeOutputFile(
+      outputDirectory,
+      `${manifest.scripts.targetRoot}/${entry}`,
+      await readSourceFile(join(repositoryRoot, manifest.scripts.sourceRoot, entry)),
+    );
+  }
   for (const [name, content] of await renderPluginAgents(manifest.agents.sourceRoot)) {
     await writeOutputFile(outputDirectory, `${manifest.agents.targetRoot}/${name}`, Buffer.from(content, "utf8"));
   }

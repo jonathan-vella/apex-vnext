@@ -1,12 +1,22 @@
 # APEX vNext Checkpoint
 
-- **Updated:** 2026-10-20
+- **Updated:** 2026-10-24
 - **Repository:** `jonathan-vella/apex-vnext`
 - **Integration branch:** `main`
 - **Product status:** Pre-release
 - **Release candidate:** None selected
 
 ## Current State
+
+On 2026-10-24 the maintainer accepted
+[DECISION-040](DECISIONS.md#decision-040-launch-scope-reset-single-plugin-artifact-static-context-budget-and-tiered-client-acceptance)
+and [PARITY-CHECKLIST.md](PARITY-CHECKLIST.md) (`CP-33` through `CP-38`) to reset the preview launch scope:
+general Bicep and AVM module validation without the rigid 9-resource storage-only lock (`CP-33`), MCP `tools/list` wire
+payload reduction (`27,505` bytes across 31 role-scoped tools with server-side `MCP_OUTPUT_SCHEMAS` validation,
+`CP-34`), a single plugin install artifact bundling `cli/apex.mjs` plus onboarding scripts (`scripts/onboard.{ps1,sh}`)
+and the `.apex/bin/apex.mjs` workspace CLI launcher (`CP-35`, `#507`), a static context-budget validator in CI
+(`67,855 / 70,500` bytes total across always-loaded surfaces, `CP-36`), tiered client acceptance (`CP-37`), and
+deferral of production CI/setup, sandboxing, and Terraform live deployment to post-launch (`CP-38`).
 
 CP-32 audit remediation merged in [#496](https://github.com/jonathan-vella/apex-vnext/pull/496) at
 `4ccd5d80043e19067e1e0c83a8023c53cdef00e6`; tracking issue #495 is closed. The repaired PR head and the exact

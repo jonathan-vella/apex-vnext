@@ -109,8 +109,21 @@ test("plugin layout, manifests, agents, skills and bundle are valid", async (con
   const { outputDirectory, files, bundle } = await buildInto(context, "layout");
   const manifest = await readManifest();
   const topLevel = [...new Set(files.map((path) => path.split("/", 1)[0]))].sort();
-  assert.deepEqual(topLevel, ["assets", "com.github.copilot", "mcp", "mcp.json", "native", "plugin.json", "skills"]);
+  assert.deepEqual(topLevel, [
+    "assets",
+    "cli",
+    "com.github.copilot",
+    "mcp",
+    "mcp.json",
+    "native",
+    "plugin.json",
+    "scripts",
+    "skills",
+  ]);
   assert.ok(files.every((path) => !path.split("/").includes("node_modules")));
+  assert.ok(files.includes("cli/apex.mjs"), "packaged plugin ships cli/apex.mjs");
+  assert.ok(files.includes("scripts/onboard.ps1"), "packaged plugin ships scripts/onboard.ps1");
+  assert.ok(files.includes("scripts/onboard.sh"), "packaged plugin ships scripts/onboard.sh");
 
   const plugin = await readJson(join(outputDirectory, "plugin.json"));
   validatePluginJson(plugin);
@@ -738,10 +751,35 @@ async function offlinePlugin(context, outputDirectory, projectId = "plugin-test"
   await mkdir(workspace, { recursive: true });
   const git = spawnSync("git", ["init", "--quiet", workspace], { encoding: "utf8" });
   assert.equal(git.status, 0, git.stderr);
-  const init = cli(workspace, ["init", "--project", projectId, "--risk-owner", "partner", "--target", "local"]);
-  assert.equal(init.ok, true);
   const guard = join(sandbox, "guard.mjs");
   await writeFile(guard, guardHook);
+  const pluginCli = spawnSync(
+    process.execPath,
+    [
+      "--import",
+      pathToFileURL(guard).href,
+      join(pluginRoot, "cli/apex.mjs"),
+      "init",
+      "--project",
+      projectId,
+      "--risk-owner",
+      "partner",
+      "--target",
+      "local",
+      "--json",
+    ],
+    { cwd: workspace, encoding: "utf8" },
+  );
+  assert.equal(pluginCli.status, 0, pluginCli.stderr);
+  const init = JSON.parse(pluginCli.stdout);
+  assert.equal(init.ok, true);
+  const launcherRun = spawnSync(
+    process.execPath,
+    ["--import", pathToFileURL(guard).href, join(workspace, ".apex/bin/apex.mjs"), "status", "--json"],
+    { cwd: workspace, encoding: "utf8" },
+  );
+  assert.equal(launcherRun.status, 0, launcherRun.stderr);
+  assert.equal(JSON.parse(launcherRun.stdout).ok, true);
   return { pluginRoot, pluginData, workspace, guard, sandbox, projectId, runId: init.result.runId };
 }
 

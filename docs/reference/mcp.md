@@ -116,7 +116,6 @@ timeouts or cancellations, route human decisions through `ask_user`, and explain
 | `inputHistory`          | Read effective recorded intake/Architecture answers and their correction base hashes.         |
 | `previewInputAmendment` | Preview a correction and dependent invalidation without changing state.                       |
 | `amendInput`            | Append the explicitly confirmed correction, invalidating dependent reviews and gates.         |
-| `stageArtifact`         | Stage one or more typed outputs for a task.                                                   |
 | `stageFile`             | Stage a bounded file for a task, optionally with an expected SHA-256.                         |
 | `generateIac`           | Generate the selected task's Bicep or Terraform batch.                                        |
 | `validateTask`          | Validate staged or supplied task outputs without completion.                                  |
@@ -245,38 +244,35 @@ What this guarantees and what it does not:
 
 ## Read And Operations Tools
 
-| Tool               | Purpose                                                                      |
-| ------------------ | ---------------------------------------------------------------------------- |
-| `capabilityList`   | Read capability-pack availability.                                           |
-| `capabilityStatus` | Read one pack's state.                                                       |
-| `preview`          | Read the current operator-created preview; it does not create one.           |
-| `reconcile`        | Reconcile selected-run state.                                                |
-| `inventory`        | Read the accepted resource inventory.                                        |
-| `diagnose`         | Produce bounded diagnostic state.                                            |
-| `render`           | Render status, requirements, preview, approval, or inventory Markdown.       |
-| `promote`          | Create a linked environment run.                                             |
-| `doctor`           | Check or repair local managed state; returns a bounded summary.              |
-| `doctorChecks`     | Read every doctor check without repairing; `failedOnly` lists failures only. |
-| `submitEvidence`   | Submit bounded JSON evidence for an active task.                             |
+| Tool        | Purpose                                                                |
+| ----------- | ---------------------------------------------------------------------- |
+| `preview`   | Read the current operator-created preview; it does not create one.     |
+| `reconcile` | Reconcile selected-run state.                                          |
+| `inventory` | Read the accepted resource inventory.                                  |
+| `diagnose`  | Produce bounded diagnostic state.                                      |
+| `render`    | Render status, requirements, preview, approval, or inventory Markdown. |
 
-`doctor` (with or without `fix`/`yes`) and the `doctor` field of `diagnose` return a bounded summary rather than one
+The `doctor` field of `diagnose` returns a bounded summary rather than one
 check per managed file, which would exceed the result cap in an initialized workspace. The summary carries `healthy`,
 `nextAction`, deduplicated `remedies`, `counts` (`total`, `passed`, `failed`), and up to 32 `checks`: failing checks
 first, then passing checks other than per-file `managed:` hashes. `omitted` counts the passed and failed checks left out
-of the list, and `truncated` is `true` whenever any check is omitted. Call `doctorChecks` (paged on `checks`) for the
-complete list. A repair result is never paged. `apex doctor` and `apex doctor --json` still print the full report.
+of the list, and `truncated` is `true` whenever any check is omitted. `node .apex/bin/apex.mjs doctor` and
+`node .apex/bin/apex.mjs doctor --json` print the full report from the terminal.
 
-## Improvement Tools
-
-`improvementObserve`, `improvementObservations`, and `improvementProposals` record and read bounded improvement data.
-Proposals are inert: they do not mutate instructions, policy, or runtime behavior automatically.
+Operator and maintenance operations that are not assigned to any managed agent role (`capability list`,
+`capability status`, `doctor`, `evidence accept`, `project promote`, `quality observe`/`observations`/`proposals`,
+`task stage`) remain available on `ApexService` and the terminal CLI rather than being registered on the MCP wire
+surface.
 
 ## Response Contracts
 
 APEX pins the v2 TypeScript server SDK `@modelcontextprotocol/server` 2.3.1 exactly and targets MCP protocol
 `2026-07-28`. The server is a low-level SDK `Server` with explicit `tools/list` and `tools/call` handlers, so the
-advertised tool names, descriptions, input/output schemas and annotations come from APEX's own tool table rather
-than SDK schema conversion. `apex mcp serve` uses the SDK `serveStdio` entry with `legacy: 'serve'`: it answers
+advertised tool names, descriptions, input schemas and annotations come from APEX's own tool table rather
+than SDK schema conversion. Output schemas remain in `MCP_OUTPUT_SCHEMAS` and are validated server-side via
+`outputSchema.safeParse(response.structuredContent)` on every call, while `outputSchema` is omitted from the
+`tools/list` wire payload to keep always-loaded session context compact. `apex mcp serve` uses the SDK `serveStdio`
+entry with `legacy: 'serve'`: it answers
 `server/discover` with `supportedVersions: ["2026-07-28"]` and the server instructions, and still serves a 2025-era
 `initialize` handshake (for example `2025-11-25`), including a client that sends `server/discover` first and then
 falls back to `initialize` on the same connection after a discovery timeout. Each connection gets a fresh, cheap
@@ -286,18 +282,13 @@ when stdin closes and closes cleanly on `SIGINT` or `SIGTERM`; stdio stdout is p
 Successful responses include an object in `structuredContent` and the same JSON serialized in a text content block.
 Existing object results are unchanged. Non-object service results use these envelopes:
 
-| Tool                           | Structured result        |
-| ------------------------------ | ------------------------ |
-| `render`                       | `{ "markdown": "..." }`  |
-| `preview`                      | `{ "markdown": "..." }`  |
-| `capabilityList`               | `{ "packs": [] }`        |
-| `improvementObservations`      | `{ "observations": [] }` |
-| `improvementProposals`         | `{ "proposals": [] }`    |
-| `stageArtifact` with `outputs` | `{ "artifacts": [] }`    |
+| Tool      | Structured result       |
+| --------- | ----------------------- |
+| `render`  | `{ "markdown": "..." }` |
+| `preview` | `{ "markdown": "..." }` |
 
-Single-artifact staging still returns its existing artifact object. Bundle staging is not an atomic completion;
-use `completeTask` for atomic output acceptance. Every tool advertises output schemas derived from the canonical
-contracts and explicit adapter envelopes. Success and structured error branches are validated, including by SDK clients.
+Every registered tool validates its response against `MCP_OUTPUT_SCHEMAS` derived from the canonical
+contracts and explicit adapter envelopes. Success and structured error branches are validated server-side on every call.
 See [REQ-MCP-001](../vnext/PRD.md#req-mcp-001-predictable-tool-contracts) for acceptance.
 
 Handler failures return `isError: true` with
@@ -328,17 +319,14 @@ oversized non-pageable result fails instead of being silently truncated. Every c
 | `cursor` sent to a tool that is not paging-capable                                  | `APEX_VALIDATION`       | Remove `cursor`; only the tools below accept it.                        |
 | Non-pageable result, or a single item/page, exceeds 64 KiB                          | `APEX_RESULT_TOO_LARGE` | Request a smaller bounded result or use a paging-capable read tool.     |
 
-| Tool                      | Paged field    |
-| ------------------------- | -------------- |
-| `taskContext`             | `inputs`       |
-| `readTaskInput`           | `content`      |
-| `projectList`             | `projects`     |
-| `preview`                 | `markdown`     |
-| `inventory`               | `resources`    |
-| `improvementObservations` | `observations` |
-| `improvementProposals`    | `proposals`    |
-| `render`                  | `markdown`     |
-| `doctorChecks`            | `checks`       |
+| Tool            | Paged field |
+| --------------- | ----------- |
+| `taskContext`   | `inputs`    |
+| `readTaskInput` | `content`   |
+| `projectList`   | `projects`  |
+| `preview`       | `markdown`  |
+| `inventory`     | `resources` |
+| `render`        | `markdown`  |
 
 ## Runtime Binding
 
@@ -406,21 +394,15 @@ Session models can issue the same tool call twice. Every tool has an effect clas
 [`packages/cli/src/mcp.ts`](../../packages/cli/src/mcp.ts), and a test fails when a state-changing tool lacks a
 duplicate-call case:
 
-| Class            | Tools                          | Repeat behavior                                          |
-| ---------------- | ------------------------------ | -------------------------------------------------------- |
-| `read-only`      | `status`, `projectList`        | Never writes.                                            |
-| `read`           | The read tools listed below    | Always executes; may only finish a committed recovery.   |
-| `repeat-guarded` | Every other tool               | The kernel repeat guard below decides.                   |
-| `convergent`     | `doctor`, `improvementObserve` | Always executes; a repeat converges on the same outcome. |
+| Class            | Tools                       | Repeat behavior                                        |
+| ---------------- | --------------------------- | ------------------------------------------------------ |
+| `read-only`      | `status`, `projectList`     | Never writes.                                          |
+| `read`           | The read tools listed below | Always executes; may only finish a committed recovery. |
+| `repeat-guarded` | Every other tool            | The kernel repeat guard below decides.                 |
 
-The `read` tools are `doctorChecks`, `capabilityList`, `capabilityStatus`, `taskContext`, `readTaskInput`, `preview`,
-`inventory`, `diagnose`, `render`, `improvementObservations` and `improvementProposals`.
+The `read` tools are `taskContext`, `readTaskInput`, `preview`, `inventory`, `diagnose`, `render` and `inputHistory`.
 
-`doctor` repairs workspace installation files outside the run, so a run-scoped record could hide a newly broken file.
-It is not deduplicated; a repair that reproduces the current customization lock keeps the existing rollback chain.
-`improvementObserve` writes the content-addressed improvement store outside the run, which `quality delete-observation`
-and `quality prune` can change without changing the run. It is not deduplicated either: a repeat returns the stored
-observation with `deduplicated: true`, or records it again if it was deleted in between.
+CLI maintenance operations (`doctor` and `quality observe`) execute outside MCP and converge on the same outcome when repeated.
 
 For a `repeat-guarded` tool, the kernel identifies a call by the tool name, the canonical worktree (real path,
 case-folded on Windows) and the validated arguments as canonical JSON with sorted keys and undefined members dropped.

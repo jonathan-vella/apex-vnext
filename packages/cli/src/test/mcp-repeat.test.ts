@@ -92,7 +92,6 @@ const duplicateCases: Record<GuardedTool, ToolCase> = {
     method: "decideReview",
     input: { reviewHash: hash, decisions: [{ findingId: "f", action: "revise" }] },
   },
-  stageArtifact: { method: "stageArtifact", input: { taskId: "task-1", kind: "requirements", value: { a: 1 } } },
   stageFile: { method: "stageFile", input: { taskId: "task-1", path: "main.bicep", content: "{}" } },
   generateIac: { method: "generateIac", input: { taskId: "task-1" } },
   validateTask: { method: "validateTask", input: { taskId: "task-1" } },
@@ -116,8 +115,6 @@ const duplicateCases: Record<GuardedTool, ToolCase> = {
     },
   },
   reconcile: { method: "reconcile", input: {} },
-  promote: { method: "promote", input: { environment: "prod", target: "local" } },
-  submitEvidence: { method: "acceptEvidence", input: { taskId: "task-1", kind: "test", value: {} } },
 };
 
 const readCases: Partial<Record<ToolName, ToolCase>> = {
@@ -128,17 +125,12 @@ const readCases: Partial<Record<ToolName, ToolCase>> = {
   },
   status: { method: "workspaceStatus", input: {} },
   projectList: { method: "listProjects", input: {} },
-  doctorChecks: { method: "doctor", input: {} },
-  capabilityList: { method: "capabilityList", input: {} },
-  capabilityStatus: { method: "capabilityStatus", input: { pack: "test" } },
   taskContext: { method: "taskContext", input: { taskId: "task-1" } },
   readTaskInput: { method: "readTaskInput", input: { taskId: "task-1" } },
   preview: { method: "currentPreview", input: {} },
   inventory: { method: "inventory", input: {} },
   diagnose: { method: "diagnose", input: {} },
   render: { method: "render", input: { kind: "status" } },
-  improvementObservations: { method: "improvementObservations", input: {} },
-  improvementProposals: { method: "improvementProposals", input: {} },
 };
 
 function serviceValue(name: ToolName): unknown {
@@ -149,14 +141,8 @@ function serviceValue(name: ToolName): unknown {
       return { status: "task", task: { ...task, expiresAt: new Date(Date.now() + 3_600_000).toISOString() } };
     case "status":
       return value;
-    case "capabilityList":
-      return value.packs;
     case "projectList":
       return value.projects;
-    case "improvementObservations":
-      return value.observations;
-    case "improvementProposals":
-      return value.proposals;
     case "preview":
     case "render":
       return value.markdown;
@@ -200,8 +186,8 @@ test("every state-changing MCP tool is classified and has a duplicate-call case"
   const listedGuarded = names.filter((name) => MCP_TOOL_EFFECTS[name as ToolName] === "repeat-guarded");
   assert.deepEqual(Object.keys(duplicateCases).sort(), listedGuarded);
   assert.deepEqual(
-    names.filter((name) => MCP_TOOL_EFFECTS[name as ToolName] === "convergent"),
-    ["doctor", "improvementObserve"],
+    names.filter((name) => MCP_TOOL_EFFECTS[name as ToolName] === ("convergent" as string)),
+    [],
   );
   assert.deepEqual(
     Object.keys(readCases).sort(),
@@ -356,31 +342,31 @@ test("staged work is bound by content: an edit during or after a call makes the 
   const { client } = await connect(context, service, "repeat-staged-content");
   const call = () =>
     client.callTool({
-      name: "stageArtifact",
+      name: "validateTask",
       arguments: { workspace: service.root, taskId, kind: "requirements", value: requirements() },
     });
   // The call's own write is bound by content, so its identical repeat is answered.
   const first = await call();
-  assertSuccess(first, "stageArtifact");
-  assertSameResult(await call(), first, "stageArtifact");
+  assertSuccess(first, "validateTask");
+  assertSameResult(await call(), first, "validateTask");
   assert.equal(invocations, 1);
 
   // An edit after the call makes the identical call a new request.
   await sameSizeEdit();
-  assertSuccess(await call(), "stageArtifact");
+  assertSuccess(await call(), "validateTask");
   assert.equal(invocations, 2);
-  assertSuccess(await call(), "stageArtifact");
+  assertSuccess(await call(), "validateTask");
   assert.equal(invocations, 2);
 
   // An edit while the call runs keeps its result from being stored, so the repeat executes against current content.
   await sameSizeEdit();
   editWhileRunning = true;
-  assertSuccess(await call(), "stageArtifact");
+  assertSuccess(await call(), "validateTask");
   editWhileRunning = false;
   assert.equal(invocations, 3);
-  assertSuccess(await call(), "stageArtifact");
+  assertSuccess(await call(), "validateTask");
   assert.equal(invocations, 4);
-  assertSuccess(await call(), "stageArtifact");
+  assertSuccess(await call(), "validateTask");
   assert.equal(invocations, 4);
   assert.equal((await readRepeatEvents(runDirectory)).length, 3);
 });
@@ -403,44 +389,33 @@ test("read tools are never answered from a stored result", async (context) => {
   assert.deepEqual(await readRepeatEvents(runDirectory), []);
 });
 
-test("a repeated improvementObserve converges and recreates an observation deleted in between", async (context) => {
+test("a repeated improvementObserve converges and recreates an observation deleted in between", async () => {
   const { service, runDirectory } = await initializedWorkspace();
-  const { client } = await connect(context, service, "repeat-observe");
   const call = () =>
-    client.callTool({
-      name: "improvementObserve",
-      arguments: {
-        workspace: service.root,
-        source: "deterministic-test",
-        category: "correctness",
-        severity: "low",
-        statement: "Repeat safety",
-        evidenceRefs: [hash],
-      },
+    service.improvementObserve({
+      source: "deterministic-test",
+      category: "correctness",
+      severity: "low",
+      statement: "Repeat safety",
+      evidenceRefs: [hash],
     });
-  type Observed = { observation: { observationId: string; observedAt: string }; deduplicated: boolean };
-  const first = await call();
-  assertSuccess(first, "improvementObserve");
-  const created = first.structuredContent as Observed;
+  const created = await call();
   assert.equal(created.deduplicated, false);
   const again = await call();
-  assertSuccess(again, "improvementObserve");
-  assert.deepEqual((again.structuredContent as Observed).observation, created.observation);
-  assert.equal((again.structuredContent as Observed).deduplicated, true);
+  assert.deepEqual(again.observation, created.observation);
+  assert.equal(again.deduplicated, true);
   assert.equal((await service.improvementObservations()).length, 1);
   await service.improvementDeleteObservation(created.observation.observationId);
   assert.deepEqual(await service.improvementObservations(), []);
   const recreated = await call();
-  assertSuccess(recreated, "improvementObserve");
-  assert.equal((recreated.structuredContent as Observed).deduplicated, false);
-  assert.equal((recreated.structuredContent as Observed).observation.observationId, created.observation.observationId);
+  assert.equal(recreated.deduplicated, false);
+  assert.equal(recreated.observation.observationId, created.observation.observationId);
   assert.equal((await service.improvementObservations()).length, 1);
   assert.deepEqual(await readRepeatEvents(runDirectory), []);
 });
 
-test("repeated doctor repair converges without an extra effect", async (context) => {
+test("repeated doctor repair converges without an extra effect", async () => {
   const { service, runDirectory, journal } = await initializedWorkspace();
-  const { client } = await connect(context, service, "repeat-doctor");
   const snapshot = async () => {
     const files = new Map<string, string>();
     const walk = async (directory: string) => {
@@ -461,15 +436,12 @@ test("repeated doctor repair converges without an extra effect", async (context)
     return files;
   };
   await writeFile(join(service.root, ".apex", "runtime", "defaults.v1.json"), "{}\n");
-  const repair = () =>
-    client.callTool({ name: "doctor", arguments: { workspace: service.root, fix: true, yes: true } });
-  const first = await repair();
-  assertSuccess(first, "doctor");
+  const first = await service.doctor(true, true);
   assert.notEqual(await readFile(join(service.root, ".apex", "runtime", "defaults.v1.json"), "utf8"), "{}\n");
   const afterFirst = await snapshot();
   const events = (await journal.replay()).length;
-  const second = await repair();
-  assert.deepEqual(second.content, first.content);
+  const second = await service.doctor(true, true);
+  assert.deepEqual(second, first);
   assert.deepEqual(await snapshot(), afterFirst);
   assert.equal((await journal.replay()).length, events);
   assert.deepEqual(await readRepeatEvents(runDirectory), []);
@@ -718,8 +690,6 @@ test("MCP reads are served while a CLI command waits for a long provider operati
     ["status", {}],
     ["render", { kind: "status" }],
     ["diagnose", {}],
-    ["doctorChecks", {}],
-    ["capabilityList", {}],
   ] as const) {
     assertSuccess(await call(name, input), name);
   }

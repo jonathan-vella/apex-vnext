@@ -37,8 +37,6 @@
   "verifiedSelectors": [
     "apex/status",
     "apex/releaseWriter",
-    "apex/capabilityList",
-    "apex/capabilityStatus",
     "apex/nextTask",
     "apex/taskContext",
     "apex/readTaskInput",
@@ -52,7 +50,6 @@
     "apex/projectDelete",
     "apex/gateDecide",
     "apex/gateDelegate",
-    "apex/stageArtifact",
     "apex/stageFile",
     "apex/generateIac",
     "apex/validateTask",
@@ -68,20 +65,11 @@
     "apex/reconcile",
     "apex/inventory",
     "apex/diagnose",
-    "apex/improvementObserve",
-    "apex/improvementObservations",
-    "apex/improvementProposals",
-    "apex/render",
-    "apex/promote",
-    "apex/doctor",
-    "apex/doctorChecks",
-    "apex/submitEvidence"
+    "apex/render"
   ],
   "operationIds": [
     "status",
     "releaseWriter",
-    "capabilityList",
-    "capabilityStatus",
     "nextTask",
     "taskContext",
     "readTaskInput",
@@ -95,7 +83,6 @@
     "projectDelete",
     "gateDecide",
     "gateDelegate",
-    "stageArtifact",
     "stageFile",
     "generateIac",
     "validateTask",
@@ -111,14 +98,7 @@
     "reconcile",
     "inventory",
     "diagnose",
-    "improvementObserve",
-    "improvementObservations",
-    "improvementProposals",
-    "render",
-    "promote",
-    "doctor",
-    "doctorChecks",
-    "submitEvidence"
+    "render"
   ],
   "evidence": {
     "agentReadToolProbe": "CLI 1.0.88 session 787aebd7: agent frontmatter view, glob and rg were granted; grep and shell(bicep:*) were ignored",

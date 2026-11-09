@@ -24,17 +24,12 @@ const toolArguments: Record<ToolName, Record<string, unknown>> = {
   amendInput: { amendment: inputAmendment, ...amendmentOptions },
   status: {},
   projectList: {},
-  doctorChecks: {},
-  capabilityList: {},
-  capabilityStatus: { pack: "test" },
   taskContext: { taskId: "task-1" },
   readTaskInput: { taskId: "task-1" },
   preview: {},
   inventory: {},
   diagnose: {},
   render: { kind: "status" },
-  improvementObservations: {},
-  improvementProposals: {},
   releaseWriter: {},
   nextTask: {},
   recordInput: {
@@ -59,7 +54,6 @@ const toolArguments: Record<ToolName, Record<string, unknown>> = {
   gateDecide: { gate: 1, decision: "approved", confirm: true },
   gateDelegate: { gate: 1, policyHash: hash, consentHash: hash },
   reviewDecide: { reviewHash: hash, decisions: [{ findingId: "f", action: "revise" }] },
-  stageArtifact: { taskId: "task-1", kind: "requirements", value: { a: 1 } },
   stageFile: { taskId: "task-1", path: "main.bicep", content: "{}" },
   generateIac: { taskId: "task-1" },
   validateTask: { taskId: "task-1" },
@@ -80,16 +74,6 @@ const toolArguments: Record<ToolName, Record<string, unknown>> = {
     environmentInputs: {},
   },
   reconcile: {},
-  promote: { environment: "prod", target: "local" },
-  submitEvidence: { taskId: "task-1", kind: "test", value: {} },
-  improvementObserve: {
-    source: "explicit-correction",
-    category: "usability",
-    severity: "low",
-    statement: "Observation",
-    evidenceRefs: [hash],
-  },
-  doctor: {},
 };
 
 const older = "0.0.1";

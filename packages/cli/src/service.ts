@@ -246,6 +246,7 @@ import { constants, realpathSync } from "node:fs";
 import { cp, lstat, mkdir, open, readFile, readdir, realpath, rm, stat } from "node:fs/promises";
 import { userInfo } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   pluginOwnsPath,
   readBundledFile,
@@ -258,7 +259,7 @@ import { dependencyRevision as calculateDependencyRevision } from "./dependency-
 import { assertDeploymentPurposeUsable, DEFAULT_DEPLOYMENT_PURPOSE } from "./purpose.js";
 import { currentHostEnvironment, firstReleaseVersion, hostDoctorChecks, type HostEnvironment } from "./host-profile.js";
 import { ApexError, EXIT_CODES, governanceBaselineApexError, retiredProjectionError } from "./errors.js";
-import { MCP_TOOL_REVIEW_GUARDS, type ReviewGuardedTool } from "./mcp-tool-effects.js";
+import { SERVICE_REVIEW_GUARDS, type ServiceReviewGuardedOperation } from "./mcp-tool-effects.js";
 import { MCP_MAX_SERIALIZED_RESULT_BYTES, mcpResultEnvelopeBytes } from "./mcp-limits.js";
 import { APEX_VERSION, meetsMinimumVersion, MINIMUM_NODE_VERSION } from "./version.js";
 import { bundledToolchainMinimums, type BundledToolchainMinimums } from "./toolchain-pin.js";
@@ -296,6 +297,91 @@ const WORKSPACE_STATE_FILES = [
 ] as const;
 // Repeat records hold serialized tool results for this machine only; they stay out of Git like other local state.
 const APEX_GITIGNORE = `/cache/\n/local/\n/work/\n/runtime/capability-packs/\n${REPEAT_GUARD_FILE}\n`;
+
+declare const __APEX_PLUGIN_BUNDLE__: boolean | undefined;
+
+const WORKSPACE_CLI_LAUNCHER = `#!/usr/bin/env node
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
+const workspaceRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+
+function readJsonOptional(filePath, stripComments = false) {
+  if (!existsSync(filePath)) return undefined;
+  try {
+    const raw = readFileSync(filePath, "utf8");
+    return JSON.parse(stripComments ? raw.replace(/^\\s*\\/\\/.*$/gmu, "") : raw);
+  } catch {
+    return undefined;
+  }
+}
+
+function resolveCliModule() {
+  for (const envRoot of [process.env.APEX_PLUGIN_ROOT, process.env.PLUGIN_ROOT]) {
+    if (typeof envRoot === "string" && envRoot.trim().length > 0) {
+      const candidate = join(envRoot.trim(), "cli", "apex.mjs");
+      if (existsSync(candidate)) return candidate;
+    }
+  }
+  const localHint = readJsonOptional(join(workspaceRoot, ".apex", "local", "plugin-root.json"));
+  if (typeof localHint?.pluginRoot === "string") {
+    const hinted = join(localHint.pluginRoot, "cli", "apex.mjs");
+    if (existsSync(hinted)) return hinted;
+  }
+  const lock = readJsonOptional(join(workspaceRoot, ".apex", "apex.lock.json"));
+  const expectedVersion = typeof lock?.cliVersion === "string" ? lock.cliVersion : undefined;
+  const copilotHome = process.env.COPILOT_HOME?.trim() || join(homedir(), ".copilot");
+  const config = readJsonOptional(join(copilotHome, "config.json"), true);
+  if (Array.isArray(config?.installedPlugins)) {
+    const matching = config.installedPlugins.filter(
+      (entry) => entry && entry.name === "apex" && entry.enabled !== false && typeof entry.cache_path === "string",
+    );
+    const ordered =
+      expectedVersion === undefined
+        ? matching
+        : [
+            ...matching.filter((entry) => entry.version === expectedVersion),
+            ...matching.filter((entry) => entry.version !== expectedVersion),
+          ];
+    for (const entry of ordered) {
+      const candidate = join(entry.cache_path, "cli", "apex.mjs");
+      if (existsSync(candidate)) return candidate;
+    }
+  }
+  const installedRoot = join(copilotHome, "installed-plugins");
+  for (const candidate of [
+    join(installedRoot, "apex-plugins", "apex", "cli", "apex.mjs"),
+    join(installedRoot, "_direct", "apex", "cli", "apex.mjs"),
+  ]) {
+    if (existsSync(candidate)) return candidate;
+  }
+  const directRoot = join(installedRoot, "_direct");
+  if (existsSync(directRoot)) {
+    for (const entry of readdirSync(directRoot, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const candidate = join(directRoot, entry.name, "cli", "apex.mjs");
+      if (existsSync(candidate)) return candidate;
+    }
+  }
+  const nodeModulesCli = join(workspaceRoot, "node_modules", "@apexops", "cli", "dist", "cli.js");
+  if (existsSync(nodeModulesCli)) return nodeModulesCli;
+  return undefined;
+}
+
+const resolved = resolveCliModule();
+if (resolved === undefined) {
+  process.stderr.write(
+    "APEX_NOT_FOUND: Unable to locate the installed APEX plugin CLI runtime; run copilot plugin install apex@apex-plugins\\n",
+  );
+  process.exit(3);
+}
+const mod = await import(pathToFileURL(resolved).href);
+if (typeof mod.main === "function") {
+  await mod.main(process.argv.slice(2));
+}
+`;
 
 function repeatGuardError(error: unknown): unknown {
   if (error instanceof RepeatGuardBusyError)
@@ -1078,6 +1164,7 @@ export class ApexService {
     await mkdir(join(this.root, ".apex"), { recursive: true });
     try {
       await this.ensureLocalGitBoundary();
+      await this.ensureWorkspaceLauncher();
       const assets = await resolveBundledAssets();
       const clientId = input.clientId ?? "github-copilot-cli";
       const selection: CustomizationSelection = {
@@ -1691,7 +1778,8 @@ export class ApexService {
     });
     const packagePath = join(this.root, "node_modules", "@apexops", "cli", "package.json");
     const runtime = await inspect(packagePath);
-    let exactRuntime = false;
+    const launcher = runtime === undefined ? await inspect(join(this.root, ".apex", "bin", "apex.mjs")) : undefined;
+    let exactRuntime = launcher !== undefined && launcher.isFile();
     if (runtime !== undefined && runtime.isFile() && runtime.size <= 65_536) {
       try {
         const descriptor = JSON.parse(await readFile(packagePath, "utf8")) as { version?: unknown } | null;
@@ -1702,9 +1790,9 @@ export class ApexService {
     }
     checks.push({
       id: "workspace-runtime",
-      status: runtime === undefined ? "pending" : exactRuntime ? "ready" : "blocked",
+      status: runtime === undefined && !exactRuntime ? "pending" : exactRuntime ? "ready" : "blocked",
       reason:
-        runtime === undefined
+        runtime === undefined && !exactRuntime
           ? "Exact workspace APEX runtime must be installed after confirmation."
           : exactRuntime
             ? "Workspace package declares the exact runtime version; package integrity is not assessed."
@@ -1952,23 +2040,32 @@ export class ApexService {
   }): Promise<{ projectId: ProjectId; runId: RunId }> {
     const purpose = input.purpose ?? DEFAULT_DEPLOYMENT_PURPOSE;
     assertDeploymentPurposeUsable(purpose);
+    if (input.riskOwner !== "partner" && input.riskOwner !== "customer") {
+      throw new ApexError("APEX_VALIDATION", "Project risk owner must be partner or customer", EXIT_CODES.validation);
+    }
     let runtimeLock: unknown;
     try {
       runtimeLock = JSON.parse(await readFile(join(this.root, ".apex", "apex.lock.json"), "utf8")) as unknown;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-        throw new ApexError(
-          "APEX_NOT_FOUND",
-          "Initialize the workspace with apex init before creating a project",
-          EXIT_CODES.notFound,
-        );
+        if (
+          (await this.pathExistsLstat(join(this.root, ".git"))) &&
+          !(await this.pathExistsLstat(join(this.root, ".apex")))
+        ) {
+          await this.initializeWorkspace({});
+          runtimeLock = JSON.parse(await readFile(join(this.root, ".apex", "apex.lock.json"), "utf8")) as unknown;
+        } else {
+          throw new ApexError(
+            "APEX_NOT_FOUND",
+            "Initialize the workspace with apex init before creating a project",
+            EXIT_CODES.notFound,
+          );
+        }
+      } else {
+        throw error;
       }
-      throw error;
     }
     const runtimeLockHash = sha256Json(runtimeLock);
-    if (input.riskOwner !== "partner" && input.riskOwner !== "customer") {
-      throw new ApexError("APEX_VALIDATION", "Project risk owner must be partner or customer", EXIT_CODES.validation);
-    }
     await this.projects.initializeProject({
       projectId: input.projectId,
       displayName: input.displayName ?? input.projectId,
@@ -1990,6 +2087,7 @@ export class ApexService {
     const selection = (await this.workspaceHasNoProjects()) ? undefined : await this.selection();
     if (selection !== undefined) await this.acquireRunWriterLease(await this.run(selection, { readOnly: true }));
     await this.ensureLocalGitBoundary();
+    await this.ensureWorkspaceLauncher();
     const assets = await resolveBundledAssets();
     const previousRuntimeLock = JSON.parse(
       await readFile(join(this.root, ".apex", "apex.lock.json"), "utf8"),
@@ -5707,7 +5805,7 @@ export class ApexService {
    * DECISION-031 amendment (2026-10-08): while a review waits for its capture, refuse operations that approve, delete
    * or publish (MCP_TOOL_REVIEW_GUARDS), so an inherited rubber-duck cannot use them even when hooks fail open.
    */
-  async assertNoPendingReview(operation: ReviewGuardedTool): Promise<void> {
+  async assertNoPendingReview(operation: ServiceReviewGuardedOperation): Promise<void> {
     let pending: { projectId: string; runId: string; taskId: string; workspace?: string } | undefined = (
       await this.pendingReviews()
     )[0];
@@ -5720,7 +5818,7 @@ export class ApexService {
     if (pending === undefined) return;
     throw new ApexError(
       "APEX_REVIEW_PENDING",
-      `${operation} (${MCP_TOOL_REVIEW_GUARDS[operation]}) is blocked while a rubber-duck review waits for its ` +
+      `${operation} (${SERVICE_REVIEW_GUARDS[operation]}) is blocked while a rubber-duck review waits for its ` +
         `capture in ${pending.workspace === undefined ? "" : `workspace ${pending.workspace}, `}project ` +
         `${pending.projectId}, run ${pending.runId} (task ${pending.taskId}). Finish the review ` +
         `with reviewComplete, or stop any running rubber-duck and cancel it from a terminal: apex project use ` +
@@ -8793,6 +8891,7 @@ export class ApexService {
     const apexExists = await this.exists(join(this.root, ".apex"));
     if (fix && yes && apexExists) {
       await this.ensureLocalGitBoundary(true);
+      await this.ensureWorkspaceLauncher();
       const assets = await resolveBundledAssets();
       const selection = await this.customizationSelection();
       if (selection.sourceMode === "custom-source") {
@@ -12572,11 +12671,29 @@ export class ApexService {
     } catch {
       plugin = { name: "apex", marketplace: "apex-plugins" };
     }
+    const workspaceDisabledPlugins = new Set<string>();
+    for (const rel of [".github/copilot/settings.json", ".github/copilot/settings.local.json"]) {
+      const settingsPath = join(this.root, rel);
+      try {
+        await this.assertSafeDestination(this.root, settingsPath);
+        if (!(await this.pathExistsLstat(settingsPath))) continue;
+        const parsed = JSON.parse(await readFile(settingsPath, "utf8")) as {
+          enabledPlugins?: Record<string, unknown>;
+        } | null;
+        for (const [key, value] of Object.entries(parsed?.enabledPlugins ?? {})) {
+          if (value === false) workspaceDisabledPlugins.add(key);
+          else if (value === true) workspaceDisabledPlugins.delete(key);
+        }
+      } catch {
+        // Ignore unreadable or missing local workspace override during host checks.
+      }
+    }
     return hostDoctorChecks({
       host: this.host,
       minimums: await this.bundledToolchainMinimums(),
       plugin,
       apexVersion: APEX_VERSION,
+      workspaceDisabledPlugins,
       executableExists: this.executableChecker,
       toolVersion: (executable, args) => this.hostToolVersion(executable, args),
     });
@@ -12706,6 +12823,28 @@ export class ApexService {
     await atomicWriteBytes(path, Buffer.from(APEX_GITIGNORE));
   }
 
+  private async ensureWorkspaceLauncher(): Promise<boolean> {
+    const apexRoot = join(this.root, ".apex");
+    const binRoot = join(apexRoot, "bin");
+    const launcherPath = join(binRoot, "apex.mjs");
+    await this.assertSafeDestination(this.root, launcherPath);
+    const existing = await this.readOptional(launcherPath);
+    const changed = existing?.toString("utf8") !== WORKSPACE_CLI_LAUNCHER;
+    if (changed) {
+      await mkdir(binRoot, { recursive: true });
+      await atomicWriteBytes(launcherPath, Buffer.from(WORKSPACE_CLI_LAUNCHER));
+    }
+    if (typeof __APEX_PLUGIN_BUNDLE__ !== "undefined") {
+      const pluginRoot = dirname(dirname(fileURLToPath(import.meta.url)));
+      const localRoot = join(apexRoot, "local");
+      const hintPath = join(localRoot, "plugin-root.json");
+      await this.assertSafeDestination(apexRoot, hintPath);
+      await mkdir(localRoot, { recursive: true });
+      await atomicWriteJson(hintPath, { pluginRoot });
+    }
+    return changed;
+  }
+
   private async ensureWorkspaceRuntime(): Promise<boolean> {
     const packagePath = join(this.root, "node_modules", "@apexops", "cli", "package.json");
     try {
@@ -12722,30 +12861,8 @@ export class ApexService {
       if (error instanceof ApexError) throw error;
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     }
-    try {
-      await this.processRunner.run({
-        executable: "npm",
-        args: [
-          "install",
-          "--save-dev",
-          "--save-exact",
-          "--ignore-scripts",
-          "--no-audit",
-          "--no-fund",
-          `@apexops/cli@${APEX_VERSION}`,
-        ],
-        cwd: this.root,
-        timeoutMs: 120_000,
-        maxOutputBytes: 1_048_576,
-      });
-    } catch (error) {
-      throw new ApexError(
-        "APEX_INTERNAL",
-        `Unable to install @apexops/cli@${APEX_VERSION} in the workspace`,
-        EXIT_CODES.internal,
-        undefined,
-        { cause: error },
-      );
+    if (await this.pathExistsLstat(join(this.root, ".apex", "bin", "apex.mjs"))) {
+      return false;
     }
     return true;
   }

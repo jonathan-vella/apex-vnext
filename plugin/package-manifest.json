@@ -16,6 +16,15 @@
     "target": "mcp/apex.mjs",
     "nodeTarget": "node24"
   },
+  "cli": {
+    "entry": "plugin/cli/apex.mjs",
+    "target": "cli/apex.mjs"
+  },
+  "scripts": {
+    "sourceRoot": "plugin/scripts",
+    "targetRoot": "scripts",
+    "entries": ["onboard.ps1", "onboard.sh"]
+  },
   "agents": {
     "sourceRoot": "customizations/.github/agents",
     "targetRoot": "com.github.copilot/agents"

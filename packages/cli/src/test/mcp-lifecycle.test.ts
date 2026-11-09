@@ -9,11 +9,18 @@ import type { TestContext } from "node:test";
 import { setImmediate as nextTurn } from "node:timers/promises";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
+import { z } from "zod";
 import { isJSONRPCResultResponse, type Client } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import { execute, mcpWorkspaceRoot, resolveMcpWorkspace } from "../cli.js";
 import { MCP_DOCTOR_CHECK_LIMIT, MCP_OUTPUT_SCHEMAS } from "../mcp-output-schemas.js";
-import { MCP_MAX_SERIALIZED_RESULT_BYTES, MCP_SERVER_INSTRUCTIONS, serveMcp, type McpServiceResolver } from "../mcp.js";
+import {
+  MCP_MAX_SERIALIZED_RESULT_BYTES,
+  MCP_SERVER_INSTRUCTIONS,
+  serveMcp,
+  summarizeDoctorReport,
+  type McpServiceResolver,
+} from "../mcp.js";
 import { ApexError, EXIT_CODES } from "../errors.js";
 import { GovernanceBaselineError } from "@apexops/capabilities";
 import { withRepeatGuardLock } from "@apexops/kernel";
@@ -246,7 +253,7 @@ test("paging cursors fail closed when tampered, stale, or bound elsewhere", asyn
   const workspaceB = await tempRoot();
   const service = Object.assign(new ApexService(workspaceA), {
     listProjects: async () => projects(),
-    improvementObservations: async () => [],
+    inputHistory: async () => ({ inputs: [] }),
   });
   const { client, close } = await connectMcp(
     {
@@ -278,7 +285,7 @@ test("paging cursors fail closed when tampered, stale, or bound elsewhere", asyn
   );
   assertError(
     await client.callTool({
-      name: "improvementObservations",
+      name: "inputHistory",
       arguments: { workspace: workspaceA, cursor: first.nextCursor },
     }),
     "APEX_CURSOR_INVALID",
@@ -352,39 +359,23 @@ async function initializedDoctorWorkspace(context: TestContext) {
   const service = new ApexService(root, options);
   const { client, close } = await connectMcp(service, { name: "doctor-size-test" });
   context.after(close);
-  const call = async (name: "doctor" | "doctorChecks" | "diagnose", args: Record<string, unknown> = {}) => {
-    const response = await client.callTool({ name, arguments: { workspace: root, ...args } });
-    const structured = assertSuccess(name, response) as Record<string, unknown>;
-    assert.ok(resultEnvelopeBytes(structured) <= MCP_MAX_SERIALIZED_RESULT_BYTES, name);
-    return structured;
+  const callDiagnose = async () => {
+    const response = await client.callTool({ name: "diagnose", arguments: { workspace: root } });
+    const structured = assertSuccess("diagnose", response) as Record<string, unknown>;
+    assert.ok(resultEnvelopeBytes(structured) <= MCP_MAX_SERIALIZED_RESULT_BYTES, "diagnose");
+    return structured as { doctor: DoctorSummary };
   };
-  const allChecks = async (failedOnly?: boolean) => {
-    const checks: DoctorSummary["checks"] = [];
-    let cursor: string | undefined;
-    let pages = 0;
-    do {
-      const page = (await call("doctorChecks", {
-        ...(failedOnly === undefined ? {} : { failedOnly }),
-        ...(cursor === undefined ? {} : { cursor }),
-      })) as { checks: DoctorSummary["checks"]; nextCursor?: string };
-      checks.push(...page.checks);
-      cursor = page.nextCursor;
-      pages += 1;
-    } while (cursor !== undefined);
-    return { checks, pages };
-  };
-  return { root, service, call, allChecks };
+  return { root, service, callDiagnose };
 }
 
-test("doctor over MCP stays within the result cap in a fully initialized workspace", async (context) => {
-  const { service, call, allChecks } = await initializedDoctorWorkspace(context);
+test("doctor summary stays within the result cap in a fully initialized workspace", async (context) => {
+  const { service, callDiagnose } = await initializedDoctorWorkspace(context);
   const report = await service.doctor();
-  // The complete report is the CLI contract. The thin projection keeps it under the cap, but it still has more managed
-  // checks than the MCP summary carries, so the summary truncates and doctorChecks pages the rest.
   const managed = report.checks.filter(({ id }) => id.startsWith("managed:"));
   assert.ok(managed.length > MCP_DOCTOR_CHECK_LIMIT);
 
-  const summary = (await call("doctor")) as DoctorSummary;
+  const summary = summarizeDoctorReport(report) as DoctorSummary;
+  assert.ok(resultEnvelopeBytes(summary) <= MCP_MAX_SERIALIZED_RESULT_BYTES);
   assert.equal(summary.healthy, report.healthy);
   assert.deepEqual(summary.remedies, [...new Set(report.remedies)]);
   assert.deepEqual(summary.counts, {
@@ -403,21 +394,16 @@ test("doctor over MCP stays within the result cap in a fully initialized workspa
     ].map(({ id }) => id),
   );
 
-  const diagnose = (await call("diagnose")) as { doctor: DoctorSummary };
+  const diagnose = await callDiagnose();
   assert.deepEqual(diagnose.doctor.counts, summary.counts);
 
-  // The thin projection's full list fits one doctorChecks page; cursor paging is covered by the paging tests.
-  const full = await allChecks();
-  assert.equal(full.pages, 1);
-  assert.deepEqual(full.checks, report.checks);
-
-  const repaired = (await call("doctor", { fix: true, yes: true })) as DoctorSummary & { nextCursor?: string };
+  const repaired = summarizeDoctorReport(await service.doctor(true, true)) as DoctorSummary & { nextCursor?: string };
   assert.equal(repaired.nextCursor, undefined);
   assert.equal(repaired.counts.total, report.checks.length);
 });
 
-test("doctor over MCP lists problems first and counts truncated failures explicitly", async (context) => {
-  const { root, service, call, allChecks } = await initializedDoctorWorkspace(context);
+test("doctor summary lists problems first and counts truncated failures explicitly", async (context) => {
+  const { root, service } = await initializedDoctorWorkspace(context);
   const lock = JSON.parse(await readFile(join(root, ".apex", "customizations.lock.json"), "utf8")) as {
     files: Array<{ path: string }>;
     runtime: Array<{ path: string }>;
@@ -433,7 +419,7 @@ test("doctor over MCP lists problems first and counts truncated failures explici
   const failed = report.checks.filter(({ ok }) => !ok);
   assert.ok(failed.length > MCP_DOCTOR_CHECK_LIMIT);
 
-  const summary = (await call("doctor")) as DoctorSummary;
+  const summary = summarizeDoctorReport(report) as DoctorSummary;
   assert.equal(summary.healthy, false);
   assert.equal(summary.truncated, true);
   assert.equal(summary.counts.failed, failed.length);
@@ -447,20 +433,17 @@ test("doctor over MCP lists problems first and counts truncated failures explici
   assert.equal(summary.omitted.passed, summary.counts.passed);
   assert.ok(summary.remedies.includes("Run doctor --fix --yes to reinstall bundled managed files"));
 
-  const failing = await allChecks(true);
-  assert.deepEqual(failing.checks, failed);
-
-  const preview = (await call("doctor", { fix: true })) as DoctorSummary;
+  const preview = summarizeDoctorReport(await service.doctor(true)) as DoctorSummary;
   assert.equal(preview.counts.failed, failed.length);
   assert.ok(preview.remedies.every((remedy) => remedy.startsWith("Preview: ")));
 
-  const repaired = (await call("doctor", { fix: true, yes: true })) as DoctorSummary;
+  const repaired = summarizeDoctorReport(await service.doctor(true, true)) as DoctorSummary;
   assert.equal(
     repaired.checks.some(({ id }) => broken.some(({ path }) => id === `managed:${path}`)),
     false,
   );
   assert.deepEqual(
-    (await allChecks(true)).checks.filter(({ id }) => id.startsWith("managed:")),
+    (await service.doctor()).checks.filter(({ ok, id }) => !ok && id.startsWith("managed:")),
     [],
   );
 });
@@ -499,18 +482,7 @@ test("paging cursors do not survive an MCP server restart", async (context) => {
 });
 
 test("only bounded read tools accept cursors and mutations are never paged", async (context) => {
-  const pageable = [
-    "doctorChecks",
-    "improvementObservations",
-    "improvementProposals",
-    "inputHistory",
-    "inventory",
-    "preview",
-    "projectList",
-    "readTaskInput",
-    "render",
-    "taskContext",
-  ];
+  const pageable = ["inputHistory", "inventory", "preview", "projectList", "readTaskInput", "render", "taskContext"];
   let created = 0;
   const session = await connect(context, {
     createProject: async () => {
@@ -533,8 +505,13 @@ test("only bounded read tools accept cursors and mutations are never paged", asy
       .sort(),
     pageable,
   );
-  for (const tool of tools)
-    assert.equal(hasProperty(tool.outputSchema, "nextCursor"), pageable.includes(tool.name), tool.name);
+  for (const tool of tools) {
+    assert.equal(tool.outputSchema, undefined, tool.name);
+    const outputJson = z.toJSONSchema(MCP_OUTPUT_SCHEMAS[tool.name as keyof typeof MCP_OUTPUT_SCHEMAS], {
+      target: "draft-7",
+    });
+    assert.equal(hasProperty(outputJson, "nextCursor"), pageable.includes(tool.name), tool.name);
+  }
   const rejected = await session.call("projectCreate", { projectId: "demo", displayName: "Demo", cursor: "abc.def" });
   assert.equal(rejected.isError, true);
   const rejectedError = (rejected.structuredContent as { error: { code: string; message: string } }).error;
@@ -808,14 +785,15 @@ test("concurrent staging bundles run sequentially without interleaving", { timeo
   const entered = deferred();
   const order: string[] = [];
   const session = await connect(context, {
-    stageArtifact: async (taskId, output) => {
+    validateTask: async (taskId, output) => {
+      assert.ok(output && !Array.isArray(output));
       order.push(`${taskId}:${output.kind}:start`);
       if (taskId === "first" && output.kind === "requirements") {
         entered.resolve();
         await release.promise;
       }
       order.push(`${taskId}:${output.kind}:commit`);
-      return staged(taskId, output);
+      return { valid: true, taskId, staged: staged(taskId, output) };
     },
   });
   const release = session.block();
@@ -823,13 +801,13 @@ test("concurrent staging bundles run sequentially without interleaving", { timeo
     { kind: "requirements", value: {} },
     { kind: "architecture", value: {} },
   ];
-  const first = session.call("stageArtifact", { taskId: "first", outputs });
+  const first = session.call("validateTask", { taskId: "first", outputs });
   await entered.promise;
-  const second = session.call("stageArtifact", { taskId: "second", outputs });
+  const second = session.call("validateTask", { taskId: "second", outputs });
   await session.flush();
   assert.deepEqual(order, ["first:requirements:start"]);
   release.resolve();
-  for (const response of await Promise.all([first, second])) assertSuccess("stageArtifact", response);
+  for (const response of await Promise.all([first, second])) assertSuccess("validateTask", response);
   assert.deepEqual(order, [
     "first:requirements:start",
     "first:requirements:commit",
@@ -849,15 +827,16 @@ test(
     const persisted: string[] = [];
     const attempts: string[] = [];
     const session = await connect(context, {
-      stageArtifact: async (taskId, output) => {
+      validateTask: async (taskId, output) => {
+        assert.ok(output && !Array.isArray(output));
         attempts.push(output.kind);
         if (output.kind === "architecture") throw new Error("private path /workspace/secret-artifact.json");
         persisted.push(output.kind);
-        return staged(taskId, output);
+        return { valid: true, taskId, staged: staged(taskId, output) };
       },
       listProjects: async () => [],
     });
-    const response = await session.call("stageArtifact", {
+    const response = await session.call("validateTask", {
       taskId: "task-1",
       outputs: [
         { kind: "requirements", value: {} },
@@ -878,14 +857,14 @@ test(
   async (context) => {
     let calls = 0;
     const session = await connect(context, {
-      stageArtifact: async (taskId, output) => {
+      validateTask: async (taskId, output) => {
         calls += 1;
-        return staged(taskId, output);
+        return { valid: true, taskId, staged: staged(taskId, output as Parameters<ApexService["stageArtifact"]>[1]) };
       },
       listProjects: async () => [],
     });
     const value = "\u00e9".repeat(2 * 1024 * 1024);
-    const response = await session.call("stageArtifact", { taskId: "task-1", kind: "requirements", value });
+    const response = await session.call("validateTask", { taskId: "task-1", kind: "requirements", value });
     assertError(
       response,
       "APEX_VALIDATION",
@@ -901,7 +880,7 @@ test("service validation reasons reach the agent while other errors stay generic
     status: async () => {
       throw new ApexError("APEX_VALIDATION", "REQ-002 needs a SKU decision", EXIT_CODES.validation);
     },
-    capabilityList: async () => {
+    nextTask: async () => {
       throw new ApexError("APEX_VALIDATION", "architecture validation failed", EXIT_CODES.validation, [
         { path: "/components/0/requirementIds", message: "Expected required property" },
         { path: "/components/0/requirementIds", message: "Expected array" },
@@ -913,7 +892,7 @@ test("service validation reasons reach the agent while other errors stay generic
   });
   assertError(await session.call("status"), "APEX_VALIDATION", "REQ-002 needs a SKU decision");
   assertError(
-    await session.call("capabilityList"),
+    await session.call("nextTask"),
     "APEX_VALIDATION",
     "architecture validation failed: /components/0/requirementIds Expected required property",
   );
@@ -1040,16 +1019,16 @@ test("oversized malformed arguments hit the size guard before schema parsing", {
 test("deeply nested unknown artifact values are rejected before staging", { timeout: 10_000 }, async (context) => {
   let calls = 0;
   const session = await connect(context, {
-    stageArtifact: async (taskId, output) => {
+    validateTask: async (taskId, output) => {
       calls += 1;
-      return staged(taskId, output);
+      return { valid: true, taskId, staged: staged(taskId, output as Parameters<ApexService["stageArtifact"]>[1]) };
     },
     listProjects: async () => [],
   });
   let value: unknown = {};
   for (let depth = 0; depth < 256; depth += 1) value = { nested: value };
-  const response = await session.call("stageArtifact", { taskId: "task-1", kind: "requirements", value });
-  assert.equal(calls, 0, "the depth guard must run before stageArtifact");
+  const response = await session.call("validateTask", { taskId: "task-1", kind: "requirements", value });
+  assert.equal(calls, 0, "the depth guard must run before validateTask");
   assertError(
     response,
     "APEX_VALIDATION",
@@ -1213,7 +1192,7 @@ test(
     assert.equal(client.getServerVersion()?.name, "apex");
     const { tools } = await client.listTools();
     assert.equal(tools.length, Object.keys(MCP_OUTPUT_SCHEMAS).length);
-    assert.ok(tools.every((tool) => tool.outputSchema?.type === "object"));
+    assert.ok(tools.every((tool) => tool.outputSchema === undefined));
     const response = await client.callTool({ name: "status", arguments: { workspace: root } });
     assert.deepEqual(assertSuccess("status", response), expected);
     await client.close();
@@ -1399,14 +1378,13 @@ describe("real stdio CLI with a mutation in flight at stdin end", () => {
 test("invalid staging forms are rejected before staging", { timeout: 10_000 }, async (context) => {
   let calls = 0;
   const { client, workspace } = await connect(context, {
-    stageArtifact: async () => {
+    validateTask: async () => {
       calls += 1;
-      throw new Error("stageArtifact must not run");
+      throw new Error("validateTask must not run");
     },
   });
   const output = { kind: "requirements", value: {} };
   const invalid: Record<string, unknown>[] = [
-    {},
     { outputs: [] },
     { ...output, outputs: [output] },
     { summary: "mixed", outputs: [output] },
@@ -1420,7 +1398,7 @@ test("invalid staging forms are rejected before staging", { timeout: 10_000 }, a
   ];
   for (const args of invalid) {
     const response = await client.callTool({
-      name: "stageArtifact",
+      name: "validateTask",
       arguments: { workspace, taskId: "task-1", ...args },
     });
     assert.equal(response.isError, true, JSON.stringify(args));
@@ -1567,7 +1545,7 @@ test("MCP workspace resolution shares APEX state across git worktrees and enforc
   assert.ok(issued.task?.taskId);
   assertError(
     await client.callTool({
-      name: "stageArtifact",
+      name: "validateTask",
       arguments: {
         workspace: main,
         taskId: issued.task.taskId,

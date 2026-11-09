@@ -2,8 +2,14 @@
 
 > Human-run CP-20 kit. Preparation is not a client pass, cloud authorization, or release approval.
 
-Use this kit with the [scenario matrix](../vnext/CLIENT-QUALIFICATION.md). Run four separate host/client cases:
-native Windows VS Code **Copilot** harness, native Windows Copilot app, Linux Copilot CLI, and WSL2 Copilot CLI.
+Use this kit with the [scenario matrix](../vnext/CLIENT-QUALIFICATION.md) and
+[parity checklist](../vnext/PARITY-CHECKLIST.md). Under
+[DECISION-040](../vnext/DECISIONS.md#decision-040-launch-scope-reset-single-plugin-artifact-static-context-budget-and-tiered-client-acceptance),
+preview launch uses tiered client verification: run one full end-to-end qualification (plugin install, Requirements
+through Gate 4, and Bicep deploy) in WSL2 Copilot CLI, and run smoke verification (plugin discovery, `APEX` agent
+selection, `apex/status` MCP connectivity, and first intake prompt) in the native Windows Copilot app and native
+Windows VS Code **Copilot** harness. The full four-client multi-stage matrix and per-commit hash re-freezing are
+deferred post-launch.
 Do not use VS Code Local, VS Code over WSL, native-Windows CLI sessions, Docker, or a devcontainer. Windows Copilot CLI
 may manage the plugin store only. Keep one host per workspace; do not move runs between Windows and WSL2.
 

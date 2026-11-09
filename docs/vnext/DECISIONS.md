@@ -524,3 +524,43 @@ DECISION-038 record or its qualification evidence.
   must retire the endpoint together. Local/package qualification does not update installed plugins or existing
   consumers, and does not establish supported-client, authenticated Azure, live, release, or issue #386 acceptance.
   Such work requires separate authorization.
+
+## DECISION-040: Launch Scope Reset, Single Plugin Artifact, Static Context Budget, And Tiered Client Acceptance
+
+Maintainer decision on 2026-10-24 (`CP-33` through `CP-38`). This resets the preview launch scope so `apex-vnext`
+meets the six-stage functional floor of `jonathan-vella/apex` ([PARITY-CHECKLIST.md](PARITY-CHECKLIST.md)) with
+substantially lower always-loaded input context, a single consumer installation artifact, general Bicep validation,
+and tiered client qualification.
+
+- **General Bicep validation (`CP-33`).** Remove the rigid 9-resource storage-only lock (`resources.length !==
+accounts.length * 9`, storage-only type filter, `accounts.length === 0`, and empty `parameters`/`variables`/`outputs`
+  restriction) from `validateBicepStorageBaseline`, and support both `resource` and `module`
+  (`Microsoft.Resources/deployments`) manifest entries in `validateBicepResourceParity`. Keep recursive credential
+  scanning across compiled ARM templates, storage-account hardening when storage resources are present,
+  `business:policy-property-map` evaluation, and native `bicep build`/`bicep lint`. Terraform remains supported for
+  design, generation, and validation at launch; live Terraform apply/destroy qualification is deferred post-launch
+  (`#517`).
+- **MCP wire budget and static context gate (`CP-34`, `CP-36`).** Keep 1:1 tool names, annotations, repeat guards,
+  review-capture hooks, and server-side `MCP_OUTPUT_SCHEMAS` (`outputSchema.safeParse`) response validation, but omit
+  `outputSchema` from the `tools/list` wire payload and unregister the 10 unreferenced CLI-only maintenance tools
+  (`capabilityList`, `capabilityStatus`, `stageArtifact`, `improvementObserve`, `improvementObservations`,
+  `improvementProposals`, `promote`, `doctor`, `doctorChecks`, `submitEvidence`) from MCP while retaining them on
+  `ApexService` and the CLI. Enforce deterministic UTF-8 byte caps in CI via `config/context-budget.v1.json` and
+  `npm run validate:context-budget` (`tools/list <= 28,000`, `apex.agent.md <= 12,500`, skill frontmatter `<= 17,000`,
+  managed instructions `<= 13,000`).
+- **Single install artifact and workspace launcher (`CP-35`, `#507`).** Ship `cli/apex.mjs` and onboarding scripts
+  (`scripts/onboard.ps1`, `scripts/onboard.sh`) inside `dist/apex-plugin/` alongside `mcp/apex.mjs`. Workspace
+  initialization (`init`, `bootstrap`, and auto-initialization on `projectCreate` in a clean Git repository) writes
+  `.apex/bin/apex.mjs`, which resolves the installed plugin's bundled CLI without running `npm install @apexops/cli`
+  in consumer workspaces. Gate 4 and operator terminal guidance use `node .apex/bin/apex.mjs ...` (never
+  `${PLUGIN_ROOT}` in user shells). Doctor treats a workspace-disabled duplicate marketplace plugin entry
+  (`.github/copilot/settings.local.json` `enabledPlugins: {"apex@apex-plugins": false}`) as healthy when a single
+  plugin entry remains active (`#507`).
+- **Tiered client qualification and post-launch deferrals (`CP-37`, `CP-38`).** Preview launch requires one full
+  end-to-end run (plugin install, Requirements through Gate 4, and Bicep deploy) in GitHub Copilot CLI on WSL2 plus
+  smoke verification (plugin discovery, `APEX` agent selection, `apex/status`, and first intake prompt) in the
+  Windows GitHub Copilot app and Windows VS Code Copilot harness. Local-path plugin installation remains supported for
+  pre-publish candidate testing; the `apex-plugins` marketplace is the sole consumer release channel. Production CI
+  (`CP-28`/`#457`), production setup (`CP-29`/`#458`), `azd` extensions (`#443`), guided installer polish (`#480`,
+  `#515`, `#476`), local sandboxing, per-commit hash re-freezing, and the full four-client matrix are deferred to
+  post-launch.
