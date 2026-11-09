@@ -55,6 +55,32 @@ test("Bicep validation and Azure read adapters generate safe argv arrays", () =>
     "--output",
     "json",
   ]);
+  assert.deepEqual(
+    azure.resourceById("/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/st").args,
+    [
+      "resource",
+      "show",
+      "--ids",
+      "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/st",
+      "--output",
+      "json",
+    ],
+  );
+  assert.deepEqual(
+    azure.resourceById(
+      "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/st/blobServices/default/providers/Microsoft.Insights/diagnosticSettings/diag",
+    ).args,
+    [
+      "resource",
+      "show",
+      "--ids",
+      "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/st/blobServices/default/providers/Microsoft.Insights/diagnosticSettings/diag",
+      "--api-version",
+      "2021-05-01-preview",
+      "--output",
+      "json",
+    ],
+  );
   assert.deepEqual(azure.account().args, ["account", "show", "--output", "json"]);
 });
 

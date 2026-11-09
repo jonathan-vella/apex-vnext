@@ -274,9 +274,26 @@ describe("bounded policy property validation", () => {
               type: "Microsoft.Resources/deployments",
               name: "app-host-deployment",
               properties: {
+                parameters: {
+                  name: { value: "app-demo" },
+                },
                 template: {
+                  variables: {
+                    enableRbacAuthorization: "[parameters('enableRbacAuthorization')]",
+                  },
                   resources: {
                     innerSite: { type: "Microsoft.Web/sites", name: "app-demo", condition: true },
+                    avmTelemetry: {
+                      type: "Microsoft.Resources/deployments",
+                      name: "pid-telemetry",
+                      properties: {
+                        template: {
+                          resources: [
+                            { type: "Microsoft.Resources/deployments", name: "inner-telemetry", properties: {} },
+                          ],
+                        },
+                      },
+                    },
                   },
                 },
               },
@@ -285,6 +302,32 @@ describe("bounded policy property validation", () => {
         }),
       }).outcome,
       "pass",
+    );
+    assert.equal(
+      validateBicepStorageBaseline({
+        sourceHash: hash,
+        manifest: avmManifest,
+        binding: avmBinding,
+        json: JSON.stringify({
+          resources: {
+            app_host: {
+              type: "Microsoft.Resources/deployments",
+              name: "app-host-deployment",
+              properties: {
+                parameters: {
+                  adminPassword: { value: "Hunter2!" },
+                },
+                template: {
+                  resources: {
+                    innerSite: { type: "Microsoft.Web/sites", name: "app-demo" },
+                  },
+                },
+              },
+            },
+          },
+        }),
+      }).reason,
+      "credential-content",
     );
     assert.equal(
       check({ resources, outputs: { private: { type: "string", value: "AccountKey=must-not-leak" } } }).reason,

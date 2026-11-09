@@ -120,7 +120,13 @@ export class AzureCliReadAdapter {
 
   /** One resource by its exact ID, including child and extension resources that a group listing omits. */
   resourceById(resourceId: string): CommandPlan {
-    return { executable: "az", args: ["resource", "show", "--ids", resourceId, "--output", "json"] };
+    const apiVersionArgs = /\/providers\/microsoft\.insights\/diagnosticsettings\/[^/]+$/iu.test(resourceId)
+      ? ["--api-version", "2021-05-01-preview"]
+      : [];
+    return {
+      executable: "az",
+      args: ["resource", "show", "--ids", resourceId, ...apiVersionArgs, "--output", "json"],
+    };
   }
 
   /** The signed-in Azure CLI account: cloud name, tenant and default subscription. */

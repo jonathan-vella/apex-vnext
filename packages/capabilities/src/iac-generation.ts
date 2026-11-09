@@ -374,7 +374,6 @@ export function generateBicepTree(
     if (!logicalIds.has(logicalId))
       throw new TypeError(`Existing resource '${logicalId}' is not present in the intent`);
   }
-  const parameterNames = new Set<string>();
   const blocks = contexts.map((context) => {
     if (context.parsed.kind === "native") {
       const parameters = requiredGenericParameters(context);
@@ -409,7 +408,6 @@ export function generateBicepTree(
       .sort(([left], [right]) => left.localeCompare(right))
       .map(([name, value]) => {
         assertIdentifier(name, "Bicep parameter name");
-        parameterNames.add(name);
         return `    ${name}: ${renderBicepValue(value, 4)}`;
       });
     const dependencies =
@@ -421,14 +419,8 @@ export function generateBicepTree(
             .join("\n")}\n  ]`;
     return `module ${context.declaration} '${moduleReference}:${context.parsed.version}' = {\n  name: ${bicepString(`${context.resource.id}-deployment`)}\n  params: {\n${renderedParameters.join("\n")}\n  }${dependencies}\n}`;
   });
-  const descriptions = [...parameterNames]
-    .sort()
-    .map((name) => `@description(${bicepString(`Deployment value for ${name}`)})\nparam ${name} string`)
-    .join("\n\n");
   const content =
-    ["targetScope = 'resourceGroup'", descriptions, blocks.join("\n\n")]
-      .filter((part) => part.length > 0)
-      .join("\n\n") + "\n";
+    ["targetScope = 'resourceGroup'", blocks.join("\n\n")].filter((part) => part.length > 0).join("\n\n") + "\n";
   // The generated tree is an azd project: azd, the only Bicep executor, compiles `infra/main.bicep` itself. It declares
   // no hooks, extensions, layers or services.
   return virtualTree(

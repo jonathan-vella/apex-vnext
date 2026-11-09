@@ -265,11 +265,10 @@ test("AVM generators preserve exact pins, harden storage, and only include suppl
   });
   const bicep = generateBicepTree(sourceIntent, bicepBinding);
   assertExecutionAddresses(bicep, bicepBinding);
-  assert.match(
-    bicep.files.find(({ path }) => path === "infra/main.bicep")!.content,
-    /br\/public:avm\/res\/storage\/storage-account:0\.31\.0/,
-  );
-  assert.match(bicep.files.find(({ path }) => path === "infra/main.bicep")!.content, /allowBlobPublicAccess: false/);
+  const mainBicep = bicep.files.find(({ path }) => path === "infra/main.bicep")!.content;
+  assert.match(mainBicep, /br\/public:avm\/res\/storage\/storage-account:0\.31\.0/);
+  assert.match(mainBicep, /allowBlobPublicAccess: false/);
+  assert.doesNotMatch(mainBicep, /^param /m);
 
   const lock = "provider lock bytes\n";
   const terraformBinding = binding(
