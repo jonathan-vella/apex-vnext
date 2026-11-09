@@ -190,9 +190,32 @@ export function renderArchitectureMermaid(architecture: ArchitectureV1): string 
     lines.push("  end");
   }
   const members = new Map<TierId, string[]>();
+  for (const component of components) {
+    const tierId = architectureTierOf(component.resourceTypes);
+    const list = members.get(tierId) ?? [];
+    list.push(nodeIds.get(component.id)!);
+    members.set(tierId, list);
+  }
+  const tierById = new Map<TierId, Tier>(TIERS.map((tier) => [tier.id, tier]));
+  const subnetGroups = new Map<string, typeof components>();
+  for (const component of components) {
+    const subnet = component.subnet?.trim();
+    if (!subnet) continue;
+    const list = subnetGroups.get(subnet) ?? [];
+    list.push(component);
+    subnetGroups.set(subnet, list);
+  }
+  const crossTierSubnets = new Set<string>();
+  for (const [subnetName, group] of subnetGroups.entries()) {
+    const tiersInSubnet = new Set(group.map(({ resourceTypes }) => architectureTierOf(resourceTypes)));
+    if (tiersInSubnet.size > 1) crossTierSubnets.add(subnetName);
+  }
   const subnetIds: string[] = [];
   for (const tier of TIERS) {
-    const inTier = components.filter(({ resourceTypes }) => architectureTierOf(resourceTypes) === tier.id);
+    const inTier = components.filter(
+      ({ resourceTypes, subnet }) =>
+        architectureTierOf(resourceTypes) === tier.id && !crossTierSubnets.has(subnet?.trim() ?? ""),
+    );
     if (inTier.length === 0) continue;
     lines.push(`  subgraph lane_${tier.id}["${label(tier.title)}"]`, "    direction LR");
     const bySubnet = new Map<string, typeof inTier>();
@@ -222,42 +245,60 @@ export function renderArchitectureMermaid(architecture: ArchitectureV1): string 
       lines.push(`    ${nodeIds.get(component.id)!}${shape(tier.id, nodeText(tier, component.service, component.id))}`);
     }
     lines.push("  end");
-    members.set(
-      tier.id,
-      inTier.map(({ id }) => nodeIds.get(id)!),
-    );
+  }
+  for (const subnetName of [...crossTierSubnets].sort(compare)) {
+    const group = subnetGroups.get(subnetName)!;
+    const subnetNodeId = allocateId("subnet_shared", subnetName);
+    subnetIds.push(subnetNodeId);
+    lines.push(`  subgraph ${subnetNodeId}["Boundary: ${label(subnetName)}"]`, "    direction LR");
+    for (const component of group) {
+      const tierId = architectureTierOf(component.resourceTypes);
+      const tier = tierById.get(tierId)!;
+      lines.push(`    ${nodeIds.get(component.id)!}${shape(tierId, nodeText(tier, component.service, component.id))}`);
+    }
+    lines.push("  end");
   }
   const formatEdge = (fromNode: string, toNode: string, edgeText: string | undefined): string =>
     edgeText !== undefined && edgeText.trim() !== ""
       ? `  ${fromNode} -->|"${label(edgeText)}"| ${toNode}`
       : `  ${fromNode} --> ${toNode}`;
-  const actorEdges = actors.flatMap((actor) =>
-    [...new Set(actor.targetIds)]
-      .filter((targetId) => nodeIds.has(targetId))
-      .sort(compare)
-      .map((targetId) =>
-        formatEdge(
-          actorIds.get(actor.id)!,
-          nodeIds.get(targetId)!,
-          flowLabels.get(`${actor.id}->${targetId}`) ?? actor.edgeLabel,
-        ),
-      ),
-  );
-  const edges = components
-    .flatMap((component) =>
-      [...new Set(component.dependsOn)]
-        .filter((dependency) => nodeIds.has(dependency) && dependency !== component.id)
-        .sort(compare)
-        .map((dependency) =>
-          formatEdge(
-            nodeIds.get(component.id)!!,
-            nodeIds.get(dependency)!,
-            flowLabels.get(`${component.id}->${dependency}`),
-          ),
-        ),
+  const resolveEndpoint = (id: string): string | undefined => nodeIds.get(id) ?? actorIds.get(id);
+  const edgePairs = new Map<string, readonly [string, string, string]>();
+  for (const actor of actors) {
+    const fromNode = actorIds.get(actor.id)!;
+    for (const targetId of [...new Set(actor.targetIds)].sort(compare)) {
+      const toNode = nodeIds.get(targetId);
+      if (toNode === undefined || fromNode === toNode) continue;
+      edgePairs.set(`${fromNode}->${toNode}`, [fromNode, toNode, `${actor.id}->${targetId}`]);
+    }
+  }
+  for (const component of components) {
+    const fromNode = nodeIds.get(component.id)!;
+    for (const dependency of [...new Set(component.dependsOn)].sort(compare)) {
+      const toNode = nodeIds.get(dependency);
+      if (toNode === undefined || fromNode === toNode) continue;
+      edgePairs.set(`${fromNode}->${toNode}`, [fromNode, toNode, `${component.id}->${dependency}`]);
+    }
+  }
+  for (const flow of architecture.flows ?? []) {
+    const fromNode = resolveEndpoint(flow.from);
+    const toNode = nodeIds.get(flow.to);
+    if (fromNode === undefined || toNode === undefined || fromNode === toNode) continue;
+    const key = `${fromNode}->${toNode}`;
+    if (!edgePairs.has(key)) edgePairs.set(key, [fromNode, toNode, `${flow.from}->${flow.to}`]);
+  }
+  const actorLabelFallback = new Map<string, string>();
+  for (const actor of actors) {
+    if (actor.edgeLabel !== undefined && actor.edgeLabel.trim() !== "") {
+      for (const targetId of actor.targetIds) actorLabelFallback.set(`${actor.id}->${targetId}`, actor.edgeLabel);
+    }
+  }
+  const allEdges = [...edgePairs.values()]
+    .map(([fromNode, toNode, lookupKey]) =>
+      formatEdge(fromNode, toNode, flowLabels.get(lookupKey) ?? actorLabelFallback.get(lookupKey)),
     )
     .sort(compare);
-  lines.push(...actorEdges, ...edges);
+  lines.push(...allEdges);
   lines.push(
     `  subgraph legend["Legend"]`,
     "    direction LR",
@@ -273,10 +314,13 @@ export function renderArchitectureMermaid(architecture: ArchitectureV1): string 
   for (const tier of TIERS) {
     const ids = members.get(tier.id);
     if (ids === undefined) continue;
-    lines.push(`  class ${ids.join(",")} tier_${tier.id}`, `  class lane_${tier.id} lane_${tier.id}`);
+    lines.push(`  class ${ids.join(",")} tier_${tier.id}`);
+    if (lines.some((line) => line.startsWith(`  subgraph lane_${tier.id}[`))) {
+      lines.push(`  class lane_${tier.id} lane_${tier.id}`);
+    }
   }
   if (subnetIds.length > 0) lines.push(`  class ${subnetIds.join(",")} subnet_box`);
   lines.push("  class legend,legend_key legend_box");
-  if (actorEdges.length + edges.length > 0) lines.push(`  linkStyle default stroke:#6b7f94,stroke-width:1.5px`);
+  if (allEdges.length > 0) lines.push(`  linkStyle default stroke:#6b7f94,stroke-width:1.5px`);
   return `${lines.join("\n")}\n`;
 }

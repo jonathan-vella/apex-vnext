@@ -162,6 +162,7 @@ test("architecture Mermaid renders optional actors, subnet boundaries, labelled 
   const text = renderArchitectureMermaid({
     ...architecture,
     actors: [{ id: "users", label: "External Users", targetIds: ["api"], edgeLabel: "HTTPS" }],
+    flows: [{ from: "api", to: "pe", label: "VNet integration" }],
     components: [
       {
         id: "api",
@@ -172,6 +173,15 @@ test("architecture Mermaid renders optional actors, subnet boundaries, labelled 
         dependsOn: ["data"],
         subnet: "snet-app",
         edgeLabels: { data: "Private endpoint" },
+      },
+      {
+        id: "pe",
+        service: "Private Endpoint",
+        resourceTypes: ["Microsoft.Network/privateEndpoints"],
+        purpose: "Private access",
+        requirementIds: ["REQ-1"],
+        dependsOn: [],
+        subnet: "snet-app",
       },
       {
         id: "data",
@@ -186,10 +196,12 @@ test("architecture Mermaid renders optional actors, subnet boundaries, labelled 
   });
   assert.match(text, /subgraph lane_actors\["Actors #amp; callers"\]/u);
   assert.match(text, /actor_users\(\["👤 <b>External Users<\/b><br\/><i>users<\/i>"\]\)/u);
-  assert.match(text, /subgraph subnet_application_snet_app\["Boundary: snet-app"\]/u);
+  assert.match(text, /subgraph subnet_shared_snet_app\["Boundary: snet-app"\]/u);
+  assert.equal((text.match(/\["Boundary: snet-app"\]/gu) ?? []).length, 1);
   assert.match(text, /subgraph subnet_data_snet_pe\["Boundary: snet-pe"\]/u);
   assert.match(text, /actor_users -->\|"HTTPS"\| n_api/u);
   assert.match(text, /n_api -->\|"Private endpoint"\| n_data/u);
+  assert.match(text, /n_api -->\|"VNet integration"\| n_pe/u);
   assert.match(text, /subgraph legend\["Legend"\]/u);
 });
 
