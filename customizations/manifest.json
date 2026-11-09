@@ -1,5 +1,5 @@
 {
-  "version": "0.11.0-next.6",
+  "version": "0.11.0-next.7",
   "bundle": {
     "id": "apex-managed-workspace",
     "authority": "npm:@apexops/cli",
@@ -126,6 +126,7 @@
       ".github/skills/apex-azure-storage/references/service-auth-and-sdk-boundary.md",
       ".github/skills/apex-azure-storage/references/storage-cli-commands.md",
       ".github/skills/apex-bicep-patterns/SKILL.md",
+      ".github/skills/apex-bicep-patterns/references/app-service-entra-private-registry-pattern.md",
       ".github/skills/apex-bicep-patterns/references/avm-and-codegen-acceptance.md",
       ".github/skills/apex-bicep-patterns/references/avm-pitfalls.md",
       ".github/skills/apex-bicep-patterns/references/bicepparam-pattern.md",

@@ -1031,6 +1031,7 @@ test("greenfield service intake skips retained services and uses selectable reco
         "point-in-time-restore",
         "immutable-backups",
         "cross-region-disaster-recovery",
+        "none",
       ],
       multiSelect: true,
     },
@@ -1077,6 +1078,7 @@ test("requirements intake provides selectable Azure service and security recomme
         "api-management",
         "azure-monitor",
         "application-insights",
+        "none",
       ],
       multiSelect: true,
       recommendation: {

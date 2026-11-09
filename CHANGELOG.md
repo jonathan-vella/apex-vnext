@@ -12,6 +12,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0-next.7] — Preview
+
+This release cleans the repository and shipped plugin to vNext-only (#539), syncs upstream Azure Bicep, retail-pricing,
+and diagram pattern guidance from `jonathan-vella/apex`, and completes the remaining UX polish items in #500.
+
+### Changed
+
+- Archive 86 legacy v1 and pre-`DECISION-040` files into `.archive/` and remove legacy `jonathan-vella/apex`,
+  `01-*`..`09-*` markdown templates, and `sku-manifest` references from shipped skills, reducing the plugin bundle from
+  `1,245` to `1,172` files (#539).
+- Sync upstream Azure skill guidance: add `app-service-entra-private-registry-pattern.md` and Storage point-in-time
+  restore (`restorePolicyDays < deleteRetentionPolicyDays`) to `apex-bicep-patterns`, add `Foundry Models`,
+  `Azure Front Door Service` (`Zone 1`), Standard SSD, Bastion, and Monitor alert meter selection rules to
+  `apex-azure-defaults/references/retail-pricing.md`, and add end-to-end overview pattern guidance to
+  `apex-python-diagrams`.
+- Complete UX polish (#500): add optional `actors`, component `subnet` boundaries, labelled `flows`/`edgeLabels`, and a
+  `Legend` subgraph to `ArchitectureV1` and `renderArchitectureMermaid`; format UUID-sourced `runId` values as
+  human-readable `<environment>-<YYYYMMDD>-<shortId>` folder slugs; and add explicit exclusive `none` options to the
+  `service-preferences`, `availability-recovery`, and `operations` multi-select intake questions.
+
 ## [0.11.0-next.6] — Preview
 
 This release resets the preview launch scope (`DECISION-040`, #535, #536), ships a single self-contained marketplace

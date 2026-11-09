@@ -145,12 +145,21 @@ export function validateInputAnswers(questions: QuestionV1[], submitted: InputAn
     if (explicitNone !== undefined && typeof value === "string" && /^none$/iu.test(value.trim())) {
       return { questionId: question.id, value: explicitNone };
     }
-    if (selected.some((item) => item.trim().length === 0 || /^(?:none|n\/a)$/iu.test(item.trim()))) {
+    if (
+      selected.some(
+        (item) =>
+          item.trim().length === 0 ||
+          (/^(?:none|n\/a)$/iu.test(item.trim()) && !(question.options ?? []).includes(item.trim())),
+      )
+    ) {
       throw new Error(`Answer must be explicitly provided or deferred: ${question.id}`);
     }
     if (question.options !== undefined) {
       if (selected.some((item) => !question.options!.includes(item))) {
         throw new Error(`Answer is not a declared option: ${question.id}`);
+      }
+      if (selected.includes("none") && selected.length > 1) {
+        throw new Error(`Answer cannot combine none with other options: ${question.id}`);
       }
     }
     return {

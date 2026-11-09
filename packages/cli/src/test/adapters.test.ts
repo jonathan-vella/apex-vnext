@@ -28,7 +28,7 @@ test("CLI emits a stable JSON envelope", async () => {
   assert.equal(code, 0);
   assert.deepEqual(JSON.parse(stdout), {
     ok: true,
-    result: { version: "0.11.0-next.6", bundleVersion: "0.11.0-next.6", configVersion: "1.0.0" },
+    result: { version: "0.11.0-next.7", bundleVersion: "0.11.0-next.7", configVersion: "1.0.0" },
   });
 });
 
@@ -877,7 +877,7 @@ test("bootstrap reuses an exact local runtime and rejects a conflicting version"
   const root = await tempRoot();
   await mkdir(join(root, ".git"));
   await mkdir(join(root, "node_modules", "@apexops", "cli"), { recursive: true });
-  await writeFile(join(root, "node_modules", "@apexops", "cli", "package.json"), '{"version":"0.11.0-next.6"}\n');
+  await writeFile(join(root, "node_modules", "@apexops", "cli", "package.json"), '{"version":"0.11.0-next.7"}\n');
   const service = new ApexService(root, {
     processRunner: {
       run: async () => {
@@ -1575,8 +1575,8 @@ test("CLI accepts the azd Bicep provider config", async () => {
     },
   });
   assert.deepEqual(await execute(["version", "--provider-config", path], root), {
-    version: "0.11.0-next.6",
-    bundleVersion: "0.11.0-next.6",
+    version: "0.11.0-next.7",
+    bundleVersion: "0.11.0-next.7",
     configVersion: "1.0.0",
   });
 });
@@ -1613,7 +1613,7 @@ test("CLI rejects a stale Terraform lock hash", async () => {
 
   await writeJson(path, { terraform });
   const configured = await execute(["version", "--provider-config", path], root);
-  assert.deepEqual(configured, { version: "0.11.0-next.6", bundleVersion: "0.11.0-next.6", configVersion: "1.0.0" });
+  assert.deepEqual(configured, { version: "0.11.0-next.7", bundleVersion: "0.11.0-next.7", configVersion: "1.0.0" });
 });
 
 test("CLI capability commands report retained packs and require confirmation for mutation", async () => {
