@@ -329,6 +329,62 @@ describe("bounded policy property validation", () => {
       }).reason,
       "credential-content",
     );
+    for (const template of [
+      {
+        resources: {
+          innerSite: {
+            type: "Microsoft.Web/sites",
+            name: "app-demo",
+            properties: { connection: "[concat('AccountKey=must-not-leak', '')]" },
+          },
+        },
+      },
+      {
+        resources: {
+          innerSite: {
+            type: "Microsoft.Web/sites",
+            name: "app-demo",
+            properties: { connection: "[[AccountKey=must-not-leak]" },
+          },
+        },
+      },
+      {
+        resources: {
+          innerSite: {
+            type: "Microsoft.Web/sites",
+            name: "app-demo",
+            properties: { adminPassword: "[concat('Hunter2!', '')]" },
+          },
+        },
+      },
+      {
+        resources: {
+          innerSite: {
+            type: "Microsoft.Web/sites",
+            name: "app-demo",
+            properties: { adminPassword: "[[Hunter2!]" },
+          },
+        },
+      },
+    ]) {
+      assert.equal(
+        validateBicepStorageBaseline({
+          sourceHash: hash,
+          manifest: avmManifest,
+          binding: avmBinding,
+          json: JSON.stringify({
+            resources: {
+              app_host: {
+                type: "Microsoft.Resources/deployments",
+                name: "app-host-deployment",
+                properties: { template },
+              },
+            },
+          }),
+        }).reason,
+        "credential-content",
+      );
+    }
     assert.equal(
       check({ resources, outputs: { private: { type: "string", value: "AccountKey=must-not-leak" } } }).reason,
       "credential-content",

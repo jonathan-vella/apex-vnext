@@ -668,10 +668,21 @@ export function validateBicepStorageBaseline(request: {
   });
   if (parity.outcome !== "pass") return result(parity.outcome, "resource-parity");
   const parsed: unknown = JSON.parse(request.json);
-  const isArmExpression = (value: string): boolean => value.startsWith("[") && value.endsWith("]");
+  const isArmExpression = (value: string): boolean =>
+    value.startsWith("[") && !value.startsWith("[[") && value.endsWith("]");
+  const hasSecretValue = (value: string, insideModuleTemplate: boolean): boolean => {
+    const normalized =
+      insideModuleTemplate && isArmExpression(value) ? value.replace(/AccountKey=\{\d+\}/giu, "") : value;
+    return SECRET_VALUE_PATTERN.test(normalized);
+  };
+  const isSafeModuleFieldExpression = (value: string): boolean =>
+    isArmExpression(value) &&
+    !hasSecretValue(value, true) &&
+    !/\bconcat\s*\(/iu.test(value) &&
+    /^\[(?:parameters|tryGet|if|subscriptionResourceId|resourceId|reference)\(/u.test(value);
   const hasCredential = (value: unknown, insideModuleTemplate = false, inDeploymentProperties = false): boolean => {
     if (typeof value === "string") {
-      return !(insideModuleTemplate && isArmExpression(value)) && SECRET_VALUE_PATTERN.test(value);
+      return hasSecretValue(value, insideModuleTemplate);
     }
     if (Array.isArray(value)) {
       return value.some((item) => hasCredential(item, insideModuleTemplate));
@@ -683,9 +694,13 @@ export function validateBicepStorageBaseline(request: {
       const nextInDeploymentProperties = isDeployment && key === "properties";
       const nextInsideTemplate = insideModuleTemplate || (inDeploymentProperties && key === "template");
       if (SECRET_FIELD_PATTERN.test(key)) {
-        const paramValue = object(child)?.value;
+        const paramValue = !insideModuleTemplate ? object(child)?.value : undefined;
         const candidate = typeof child === "string" ? child : typeof paramValue === "string" ? paramValue : undefined;
-        if (candidate !== undefined && candidate.length > 0 && !(insideModuleTemplate && isArmExpression(candidate))) {
+        if (
+          candidate !== undefined &&
+          candidate.length > 0 &&
+          !(insideModuleTemplate && isSafeModuleFieldExpression(candidate))
+        ) {
           return true;
         }
       }
