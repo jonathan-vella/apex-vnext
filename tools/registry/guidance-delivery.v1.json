@@ -669,6 +669,7 @@
       "entrypoint": ".github/skills/apex-bicep-patterns/SKILL.md",
       "files": [
         ".github/skills/apex-bicep-patterns/SKILL.md",
+        ".github/skills/apex-bicep-patterns/references/app-service-entra-private-registry-pattern.md",
         ".github/skills/apex-bicep-patterns/references/avm-and-codegen-acceptance.md",
         ".github/skills/apex-bicep-patterns/references/avm-pitfalls.md",
         ".github/skills/apex-bicep-patterns/references/bicepparam-pattern.md",

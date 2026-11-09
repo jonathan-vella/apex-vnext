@@ -134,20 +134,43 @@ function shape(tier: TierId, text: string): string {
  */
 export function renderArchitectureMermaid(architecture: ArchitectureV1): string {
   const components = [...architecture.components].sort((left, right) => compare(left.id, right.id));
-  const used = new Set<string>();
+  const actors = [...(architecture.actors ?? [])].sort((left, right) => compare(left.id, right.id));
+  const used = new Set<string>(["legend", "legend_key", "lane_actors"]);
   const nodeIds = new Map<string, string>();
-  for (const { id } of components) {
-    const base = `n_${id.replace(/[^A-Za-z0-9_]/gu, "_")}`;
+  const allocateId = (prefix: string, rawId: string): string => {
+    const base = `${prefix}_${rawId.replace(/[^A-Za-z0-9_]/gu, "_")}`;
     let candidate = base;
     for (let suffix = 2; used.has(candidate); suffix += 1) candidate = `${base}_${suffix}`;
     used.add(candidate);
-    nodeIds.set(id, candidate);
+    return candidate;
+  };
+  for (const { id } of components) {
+    nodeIds.set(id, allocateId("n", id));
+  }
+  const actorIds = new Map<string, string>();
+  for (const { id } of actors) {
+    actorIds.set(id, allocateId("actor", id));
+  }
+  const flowLabels = new Map<string, string>();
+  for (const flow of architecture.flows ?? []) {
+    if (flow.label.trim() !== "") flowLabels.set(`${flow.from}->${flow.to}`, flow.label);
+  }
+  for (const component of components) {
+    for (const [targetId, edgeText] of Object.entries(component.edgeLabels ?? {})) {
+      if (edgeText.trim() !== "" && !flowLabels.has(`${component.id}->${targetId}`)) {
+        flowLabels.set(`${component.id}->${targetId}`, edgeText);
+      }
+    }
   }
   const lines: string[] = [
     `%% ${label(architecture.title)}`,
     "flowchart TB",
     `  accTitle: ${plain(architecture.title)}`,
     `  accDescr: ${plain(`Architecture diagram with ${components.length} components grouped by Azure resource family. ${architecture.summary}`)}`,
+    "  classDef actor_node fill:#f3f2f1,stroke:#323130,color:#172033,stroke-width:1.5px",
+    "  classDef lane_actors fill:#faf9f8,stroke:#605e5c,color:#323130,stroke-width:1px",
+    "  classDef subnet_box fill:#ffffff,stroke:#605e5c,color:#323130,stroke-width:1px,stroke-dasharray: 4 3",
+    "  classDef legend_box fill:#faf9f8,stroke:#8a8886,color:#323130,stroke-width:1px",
   ];
   for (const tier of TIERS) {
     lines.push(
@@ -155,12 +178,47 @@ export function renderArchitectureMermaid(architecture: ArchitectureV1): string 
       `  classDef lane_${tier.id} fill:${tier.fill},stroke:${tier.stroke},color:${tier.stroke},stroke-width:1px`,
     );
   }
+  if (actors.length > 0) {
+    lines.push(`  subgraph lane_actors["Actors #amp; callers"]`, "    direction LR");
+    for (const actor of actors) {
+      const [first = "", ...rest] = wrap(actor.label, 26).map(label);
+      const text = [`👤 <b>${first}</b>`, ...rest.map((line) => `<b>${line}</b>`), `<i>${label(actor.id)}</i>`].join(
+        "<br/>",
+      );
+      lines.push(`    ${actorIds.get(actor.id)!}(["${text}"])`);
+    }
+    lines.push("  end");
+  }
   const members = new Map<TierId, string[]>();
+  const subnetIds: string[] = [];
   for (const tier of TIERS) {
     const inTier = components.filter(({ resourceTypes }) => architectureTierOf(resourceTypes) === tier.id);
     if (inTier.length === 0) continue;
     lines.push(`  subgraph lane_${tier.id}["${label(tier.title)}"]`, "    direction LR");
+    const bySubnet = new Map<string, typeof inTier>();
+    const ungrouped: typeof inTier = [];
     for (const component of inTier) {
+      const subnet = component.subnet?.trim();
+      if (subnet) {
+        const list = bySubnet.get(subnet) ?? [];
+        list.push(component);
+        bySubnet.set(subnet, list);
+      } else {
+        ungrouped.push(component);
+      }
+    }
+    for (const [subnetName, group] of [...bySubnet.entries()].sort(([a], [b]) => compare(a, b))) {
+      const subnetNodeId = allocateId(`subnet_${tier.id}`, subnetName);
+      subnetIds.push(subnetNodeId);
+      lines.push(`    subgraph ${subnetNodeId}["Boundary: ${label(subnetName)}"]`, "      direction LR");
+      for (const component of group) {
+        lines.push(
+          `      ${nodeIds.get(component.id)!}${shape(tier.id, nodeText(tier, component.service, component.id))}`,
+        );
+      }
+      lines.push("    end");
+    }
+    for (const component of ungrouped) {
       lines.push(`    ${nodeIds.get(component.id)!}${shape(tier.id, nodeText(tier, component.service, component.id))}`);
     }
     lines.push("  end");
@@ -169,20 +227,56 @@ export function renderArchitectureMermaid(architecture: ArchitectureV1): string 
       inTier.map(({ id }) => nodeIds.get(id)!),
     );
   }
+  const formatEdge = (fromNode: string, toNode: string, edgeText: string | undefined): string =>
+    edgeText !== undefined && edgeText.trim() !== ""
+      ? `  ${fromNode} -->|"${label(edgeText)}"| ${toNode}`
+      : `  ${fromNode} --> ${toNode}`;
+  const actorEdges = actors.flatMap((actor) =>
+    [...new Set(actor.targetIds)]
+      .filter((targetId) => nodeIds.has(targetId))
+      .sort(compare)
+      .map((targetId) =>
+        formatEdge(
+          actorIds.get(actor.id)!,
+          nodeIds.get(targetId)!,
+          flowLabels.get(`${actor.id}->${targetId}`) ?? actor.edgeLabel,
+        ),
+      ),
+  );
   const edges = components
     .flatMap((component) =>
       [...new Set(component.dependsOn)]
         .filter((dependency) => nodeIds.has(dependency) && dependency !== component.id)
         .sort(compare)
-        .map((dependency) => `  ${nodeIds.get(component.id)!} --> ${nodeIds.get(dependency)!}`),
+        .map((dependency) =>
+          formatEdge(
+            nodeIds.get(component.id)!!,
+            nodeIds.get(dependency)!,
+            flowLabels.get(`${component.id}->${dependency}`),
+          ),
+        ),
     )
     .sort(compare);
-  lines.push(...edges);
+  lines.push(...actorEdges, ...edges);
+  lines.push(
+    `  subgraph legend["Legend"]`,
+    "    direction LR",
+    `    legend_key["([Ingress / Actor]) • [Compute / Network] • [(Data)] • {{Security}}"]`,
+    "  end",
+  );
+  if (actors.length > 0) {
+    lines.push(
+      `  class ${actors.map(({ id }) => actorIds.get(id)!).join(",")} actor_node`,
+      "  class lane_actors lane_actors",
+    );
+  }
   for (const tier of TIERS) {
     const ids = members.get(tier.id);
     if (ids === undefined) continue;
     lines.push(`  class ${ids.join(",")} tier_${tier.id}`, `  class lane_${tier.id} lane_${tier.id}`);
   }
-  if (edges.length > 0) lines.push(`  linkStyle default stroke:#6b7f94,stroke-width:1.5px`);
+  if (subnetIds.length > 0) lines.push(`  class ${subnetIds.join(",")} subnet_box`);
+  lines.push("  class legend,legend_key legend_box");
+  if (actorEdges.length + edges.length > 0) lines.push(`  linkStyle default stroke:#6b7f94,stroke-width:1.5px`);
   return `${lines.join("\n")}\n`;
 }

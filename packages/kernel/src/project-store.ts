@@ -60,7 +60,13 @@ export class ProjectStore {
 
   async createRun(projectId: ProjectId, input: CreateRunInput): Promise<RunConfigV1> {
     const project = await this.getProject(projectId);
-    const runId = this.idSource() as RunId;
+    const rawId = this.idSource();
+    const dateSlug = this.clock().toISOString().slice(0, 10).replaceAll("-", "");
+    const runId = (
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(rawId)
+        ? `${input.environment}-${dateSlug}-${rawId.slice(0, 8).toLowerCase()}`
+        : rawId
+    ) as RunId;
     const run: RunConfigV1 = {
       schemaVersion: CONTRACT_VERSION,
       projectId,

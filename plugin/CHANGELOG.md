@@ -10,6 +10,24 @@ When you prepare a release, rename `## [Unreleased]` to the new version.
 
 ## [Unreleased]
 
+## [0.11.0-next.7] - 2026-11-09
+
+This release ships the vNext-only plugin cleanup (#539), syncs upstream Azure Bicep, retail-pricing, and diagram
+pattern guidance, and completes the remaining UX polish items in #500.
+
+### Changed
+
+- Remove 73 legacy v1 skill templates and `upstream-coverage.md` files from the shipped plugin (`1,245` → `1,172`
+  files) and rewrite all shipped skill links to local relative paths (#539).
+- Add `app-service-entra-private-registry-pattern.md` and Storage point-in-time restore gotchas to
+  `apex-bicep-patterns`, expand `apex-azure-defaults/references/retail-pricing.md` with `Foundry Models`,
+  `Azure Front Door Service` (`Zone 1`), Standard SSD, Bastion, and Monitor alert meter selection rules, and add
+  end-to-end overview pattern guidance to `apex-python-diagrams`.
+- Complete UX polish (#500): support optional `actors`, component `subnet` boundaries, labelled `flows`/`edgeLabels`,
+  and a `Legend` subgraph in `ArchitectureV1` and `renderArchitectureMermaid`; generate human-readable
+  `<environment>-<YYYYMMDD>-<shortId>` run folder names; and add explicit exclusive `none` options to
+  `service-preferences`, `availability-recovery`, and `operations` multi-select intake questions.
+
 ## [0.11.0-next.6] - 2026-11-09
 
 This release resets the preview launch scope (`DECISION-040`, #535, #536), ships a single self-contained marketplace

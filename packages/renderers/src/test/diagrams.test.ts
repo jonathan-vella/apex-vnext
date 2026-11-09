@@ -153,8 +153,44 @@ test("architecture Mermaid keeps full labels, unique node ids, and only valid de
   assert.match(text, /n_app_x\[/u);
   assert.match(text, /n_app_x_2\[/u);
   assert.match(text, /subgraph lane_other\["Other"\]/u);
+  assert.match(text, /subgraph legend\["Legend"\]/u);
   const arrows = text.split("\n").filter((line) => line.includes("-->"));
   assert.deepEqual(arrows, ["  n_front_door --> n_app_x", "  n_front_door --> n_app_x_2"]);
+});
+
+test("architecture Mermaid renders optional actors, subnet boundaries, labelled flows, and legend", () => {
+  const text = renderArchitectureMermaid({
+    ...architecture,
+    actors: [{ id: "users", label: "External Users", targetIds: ["api"], edgeLabel: "HTTPS" }],
+    components: [
+      {
+        id: "api",
+        service: "App Service",
+        resourceTypes: ["Microsoft.Web/sites"],
+        purpose: "Serve requests",
+        requirementIds: ["REQ-1"],
+        dependsOn: ["data"],
+        subnet: "snet-app",
+        edgeLabels: { data: "Private endpoint" },
+      },
+      {
+        id: "data",
+        service: "Azure SQL",
+        resourceTypes: ["Microsoft.Sql/servers"],
+        purpose: "Store data",
+        requirementIds: ["REQ-1"],
+        dependsOn: [],
+        subnet: "snet-pe",
+      },
+    ],
+  });
+  assert.match(text, /subgraph lane_actors\["Actors #amp; callers"\]/u);
+  assert.match(text, /actor_users\(\["👤 <b>External Users<\/b><br\/><i>users<\/i>"\]\)/u);
+  assert.match(text, /subgraph subnet_application_snet_app\["Boundary: snet-app"\]/u);
+  assert.match(text, /subgraph subnet_data_snet_pe\["Boundary: snet-pe"\]/u);
+  assert.match(text, /actor_users -->\|"HTTPS"\| n_api/u);
+  assert.match(text, /n_api -->\|"Private endpoint"\| n_data/u);
+  assert.match(text, /subgraph legend\["Legend"\]/u);
 });
 
 test("WAF and cost diagrams preserve qualitative and partial pricing semantics", () => {

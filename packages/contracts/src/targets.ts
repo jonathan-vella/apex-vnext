@@ -154,10 +154,39 @@ export const ArchitectureV1Schema = Type.Object(
           purpose: NonEmptyStringSchema,
           requirementIds: Type.Array(NonEmptyStringSchema, { uniqueItems: true }),
           dependsOn: Type.Array(NonEmptyStringSchema, { uniqueItems: true }),
+          subnet: Type.Optional(NonEmptyStringSchema),
+          edgeLabels: Type.Optional(Type.Record(NonEmptyStringSchema, NonEmptyStringSchema)),
         },
         { additionalProperties: false },
       ),
       { minItems: 1 },
+    ),
+    actors: Type.Optional(
+      Type.Array(
+        Type.Object(
+          {
+            id: NonEmptyStringSchema,
+            label: NonEmptyStringSchema,
+            targetIds: Type.Array(NonEmptyStringSchema, { minItems: 1, uniqueItems: true }),
+            edgeLabel: Type.Optional(NonEmptyStringSchema),
+          },
+          { additionalProperties: false },
+        ),
+        { maxItems: 16 },
+      ),
+    ),
+    flows: Type.Optional(
+      Type.Array(
+        Type.Object(
+          {
+            from: NonEmptyStringSchema,
+            to: NonEmptyStringSchema,
+            label: NonEmptyStringSchema,
+          },
+          { additionalProperties: false },
+        ),
+        { maxItems: 128 },
+      ),
     ),
     decisions: Type.Array(NonEmptyStringSchema),
     decisionRecords: Type.Optional(

@@ -54,6 +54,13 @@ test("project store creates deterministic project and run layouts with four clos
     runtimeLockHash: hash,
   });
   assert.equal(production.purpose, "production");
+  const readable = await new ProjectStore(root, clock, () => "d290f1ee-6c54-4b01-90e6-d701748f0851").createRun("demo", {
+    environment: "dev",
+    purpose: "lab",
+    targetScope: "local",
+    runtimeLockHash: hash,
+  });
+  assert.equal(readable.runId, "dev-20260101-d290f1ee");
 });
 
 test("project store rejects run configurations without a current purpose", async () => {
@@ -278,6 +285,19 @@ test("kernel validates freeform, single-select, and multi-select answers", () =>
         [complianceQuestion],
         [{ questionId: "compliance", value: { kind: "compliance", scopes: ["gdpr", "none"] } }],
       ),
+    /cannot combine none/u,
+  );
+  const multiSelectWithNone = {
+    id: "operations",
+    prompt: "Operations?",
+    options: ["azure-monitor", "none"],
+    multiSelect: true,
+  };
+  assert.deepEqual(validateInputAnswers([multiSelectWithNone], [{ questionId: "operations", value: ["none"] }]), [
+    { questionId: "operations", value: ["none"] },
+  ]);
+  assert.throws(
+    () => validateInputAnswers([multiSelectWithNone], [{ questionId: "operations", value: ["azure-monitor", "none"] }]),
     /cannot combine none/u,
   );
 });
