@@ -10,6 +10,8 @@ import {
   generateBicepTree,
   generateTerraformTree,
   ProcessRunner,
+  RESOURCE_GROUP_REQUIRED_TAG_KEYS,
+  resolveResourceGroupTags,
   sha256,
   validateGeneratedTree,
   validateBicepResourceParity,
@@ -763,4 +765,77 @@ test("writer creates files atomically and refuses overwrite, traversal, and syml
     await rm(root, { recursive: true, force: true });
     await rm(outside, { recursive: true, force: true });
   }
+});
+
+test("resource group tag contract always populates the 9 policy-required tags and normalizes environment and sla", () => {
+  const resolved = resolveResourceGroupTags({
+    projectId: "ghrunners",
+    environment: "staging",
+    riskOwner: "jonathan-vella",
+    overrides: {
+      workload: "gh-runners-windows",
+      sla: "development",
+      "tech-contact": "jonathan-vella",
+    },
+  });
+  assert.deepEqual(Object.keys(resolved).sort(), [...RESOURCE_GROUP_REQUIRED_TAG_KEYS].sort());
+  assert.deepEqual(resolved, {
+    environment: "test",
+    owner: "jonathan-vella",
+    costcenter: "platform-engineering",
+    application: "ghrunners",
+    workload: "gh-runners-windows",
+    sla: "low",
+    "backup-policy": "none",
+    "maint-window": "none",
+    "technical-contact": "jonathan-vella",
+  });
+
+  const rgIntent = intent([
+    {
+      id: "rg",
+      type: "Microsoft.Resources/resourceGroups",
+      purpose: "Workload resource group",
+      dependsOn: [],
+      controls: [],
+    },
+  ]);
+  const bicepRg = generateBicepTree(rgIntent, {
+    ...binding("bicep", "native:Microsoft.Resources/resourceGroups@2024-03-01", "2024-03-01", {}),
+    resourceBindings: {
+      rg: {
+        implementation: "native:Microsoft.Resources/resourceGroups@2024-03-01",
+        version: "2024-03-01",
+        parameters: {
+          name: "rg-project-dev-swc",
+          location: "swedencentral",
+          parentId: "/subscriptions/sub",
+          properties: {},
+          tags: { sla: "development" },
+        },
+      },
+    },
+  });
+  const bicepContent = bicepRg.files.find(({ path }) => path === "infra/main.bicep")!.content;
+  for (const key of RESOURCE_GROUP_REQUIRED_TAG_KEYS) {
+    assert.match(bicepContent, new RegExp(`${key.includes("-") ? `'${key}'` : key}:`, "u"));
+  }
+  assert.match(bicepContent, /sla: 'low'/u);
+
+  const liveOverride = resolveResourceGroupTags({
+    projectId: "ghrunners",
+    environment: "prod",
+    riskOwner: "customer",
+    liveGovernanceOverride: true,
+    overrides: {
+      environment: "staging",
+      sla: "gold",
+      "tech-contact": "ops-team",
+    },
+  });
+  assert.equal(liveOverride.environment, "staging");
+  assert.equal(liveOverride.sla, "gold");
+  assert.equal(liveOverride.owner, "customer");
+  assert.equal(liveOverride["technical-contact"], "customer");
+  assert.equal(liveOverride["tech-contact"], "ops-team");
 });

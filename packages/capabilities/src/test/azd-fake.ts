@@ -118,6 +118,25 @@ export async function handleFakeAzd(state: FakeAzdState, request: ProcessRequest
   if (request.executable === "az") {
     state.calls.push(request);
     if (request.args[0] === "account") return JSON.stringify(state.account);
+    if (request.args[0] === "group" && request.args[1] === "create") {
+      const nameIndex = request.args.indexOf("--name");
+      const name = nameIndex === -1 ? AZD_GROUP : (request.args[nameIndex + 1] ?? AZD_GROUP);
+      const tagsIndex = request.args.indexOf("--tags");
+      const outputIndex = request.args.indexOf("--output");
+      const rawTags =
+        tagsIndex === -1 ? [] : request.args.slice(tagsIndex + 1, outputIndex === -1 ? undefined : outputIndex);
+      const tags = Object.fromEntries(
+        rawTags.map((pair) => {
+          const eq = pair.indexOf("=");
+          return eq === -1 ? [pair, ""] : [pair.slice(0, eq), pair.slice(eq + 1)];
+        }),
+      );
+      const existing = state.groups.find((group) => group.name.toLowerCase() === name.toLowerCase());
+      if (existing === undefined) state.groups.push({ name, tags });
+      else Object.assign(existing.tags, tags);
+      state.groupMissing = false;
+      return JSON.stringify({ name, tags });
+    }
     if (request.args[0] === "group") return JSON.stringify(state.groups);
     if (request.args[0] === "resource" && request.args[1] === "show") {
       const found = state.resources.find(({ id }) => id.toLowerCase() === request.args[3]!.toLowerCase());

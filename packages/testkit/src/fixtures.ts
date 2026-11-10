@@ -25,8 +25,8 @@ export function fixtureHash(label: string): string {
 export function runtimeLockFixture(overrides: Partial<RuntimeBundleLockV1> = {}): RuntimeBundleLockV1 {
   return {
     schemaVersion: CONTRACT_VERSION,
-    cliVersion: "0.11.0-next.10",
-    customizationVersion: "0.11.0-next.10",
+    cliVersion: "0.11.0-next.11",
+    customizationVersion: "0.11.0-next.11",
     workflowHash: fixtureHash("workflow"),
     defaultsHash: fixtureHash("defaults"),
     validatorHash: fixtureHash("validator"),

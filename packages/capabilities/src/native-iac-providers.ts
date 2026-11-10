@@ -44,7 +44,7 @@ import {
 import { assertAzdIdentityMatchesBinding, buildAzdArguments } from "./azd-execution-envelope.js";
 import { evaluateAzdPrerequisite } from "./azd-prerequisites.js";
 import { AzdBindingError } from "./azd-project-files.js";
-import { AZD_GENERATED_TEMPLATE as BICEP_TEMPLATE } from "./iac-generation.js";
+import { AZD_GENERATED_TEMPLATE as BICEP_TEMPLATE, resolveResourceGroupTags } from "./iac-generation.js";
 import {
   authorizeDeploymentPreview,
   IacProviderError,
@@ -113,6 +113,10 @@ export interface AzdBicepTarget {
   readonly cloud?: AzdExecutionEnvelopeV1["identityPreflight"]["cloud"];
   /** Exact azd release bundled with APEX; undefined when the bundle carries none, which fails every run. */
   readonly azdVersion: string | undefined;
+  /** Optional project risk owner used for default resource-group ownership tags when creating a missing group. */
+  readonly riskOwner?: string | undefined;
+  /** Optional resource-group tag overrides merged onto the canonical 9-tag contract when creating a missing group. */
+  readonly resourceGroupTags?: Readonly<Record<string, string>> | undefined;
 }
 
 export interface AzdBicepProviderOptions extends NativeProviderRuntime {
@@ -163,6 +167,8 @@ export interface BicepPreviewBinding extends NativePolicyBinding {
   readonly azdBinding: AzdBindingV1;
   /** Digest of the azd environment's resource group tagging and resources at preview time. */
   readonly ownedStateHash: string;
+  /** Resolved tags bound at preview time when apply will create a missing resource group. */
+  readonly resourceGroupTags?: Readonly<Record<string, string>> | undefined;
 }
 
 export interface TerraformPreviewBinding extends NativePolicyBinding {
@@ -944,6 +950,7 @@ interface ApprovedAzdTarget {
 interface AzdOwnedState {
   readonly taggedGroups: readonly string[];
   readonly resources: readonly AzdOwnedResource[];
+  readonly groupMissing: boolean;
   readonly hash: string;
 }
 
@@ -1031,7 +1038,12 @@ export class AzdBicepProvider extends NativeProviderBase implements IacProvider 
     if (
       preview.artifactHash !== binding.providerBindingHash ||
       preview.artifactHash !==
-        this.#providerBindingHash(binding.azdBinding.bindingHash, binding.ownedStateHash, binding)
+        this.#providerBindingHash(
+          binding.azdBinding.bindingHash,
+          binding.ownedStateHash,
+          binding,
+          binding.resourceGroupTags,
+        )
     )
       throw new IacProviderError("PREVIEW_HASH_MISMATCH", "Delegated preview binding is invalid");
     const target = this.#approvedTarget(preview);
@@ -1039,7 +1051,11 @@ export class AzdBicepProvider extends NativeProviderBase implements IacProvider 
     const current = await this.#assertInputsUnchanged(binding.azdBinding, target, azdVersion);
     await this.#assertIdentity(current);
     const owned = await this.#ownedState(target);
-    if (owned.hash !== binding.ownedStateHash || this.#ownershipBlockers(target, owned).length > 0)
+    if (
+      owned.groupMissing ||
+      owned.hash !== binding.ownedStateHash ||
+      this.#ownershipBlockers(target, owned).length > 0
+    )
       throw new IacProviderError("PREVIEW_HASH_MISMATCH", "Resource-group state changed after the delegated preview");
     const ids = preview.changes.map(({ resourceId }) => resourceId);
     if (ids.length > 256 || ids.some((id) => !id.startsWith(`${target.scope}/providers/`)))
@@ -1084,7 +1100,7 @@ export class AzdBicepProvider extends NativeProviderBase implements IacProvider 
       this.#previewAzd(inspected, request.resources, target, azdVersion, source),
       this.#ownedState(target),
     ]);
-    normalized.blockers.push(...this.#ownershipBlockers(target, owned));
+    normalized.blockers.push(...this.#ownershipBlockers(target, owned, "apply"));
     await this.#assertInputsUnchanged(inspected, target, azdVersion);
     if (source !== undefined) await readGeneratedSource(source, source);
     let policy: NativePolicyBinding = {};
@@ -1441,7 +1457,12 @@ export class AzdBicepProvider extends NativeProviderBase implements IacProvider 
     return {
       taggedGroups,
       resources: listed,
-      hash: sha256({ taggedGroups: taggedGroups.map((name) => name.toLowerCase()), resources: listed }),
+      groupMissing: resources === undefined,
+      hash: sha256({
+        taggedGroups: taggedGroups.map((name) => name.toLowerCase()),
+        resources: listed,
+        ...(resources === undefined ? { groupMissing: true } : {}),
+      }),
     };
   }
 
@@ -1449,9 +1470,13 @@ export class AzdBicepProvider extends NativeProviderBase implements IacProvider 
     return owned.taggedGroups.some((name) => name.toLowerCase() === target.resourceGroup.toLowerCase());
   }
 
-  #ownershipBlockers(target: ApprovedAzdTarget, owned: AzdOwnedState): string[] {
+  #ownershipBlockers(
+    target: ApprovedAzdTarget,
+    owned: AzdOwnedState,
+    operation: "apply" | "destroy" = "destroy",
+  ): string[] {
     const blockers: string[] = [];
-    if (!this.#isTagged(target, owned))
+    if (!this.#isTagged(target, owned) && !(operation === "apply" && owned.groupMissing))
       blockers.push(
         `The approved resource group is not tagged azd-env-name=${this.#target.environmentName}; azd finds an environment's resources through that tag`,
       );
@@ -1463,6 +1488,23 @@ export class AzdBicepProvider extends NativeProviderBase implements IacProvider 
     return blockers;
   }
 
+  #resolvedResourceGroupTags(
+    target: ApprovedAzdTarget,
+    owned: AzdOwnedState,
+    operation: "apply" | "destroy",
+  ): Readonly<Record<string, string>> | undefined {
+    if (operation !== "apply" || !owned.groupMissing) return undefined;
+    return {
+      ...resolveResourceGroupTags({
+        projectId: target.projectId,
+        environment: this.#target.environmentName,
+        riskOwner: this.#target.riskOwner,
+        overrides: this.#target.resourceGroupTags,
+      }),
+      "azd-env-name": this.#target.environmentName,
+    };
+  }
+
   async #bind(
     request: PreviewRequest,
     operation: "apply" | "destroy",
@@ -1472,7 +1514,13 @@ export class AzdBicepProvider extends NativeProviderBase implements IacProvider 
     owned: AzdOwnedState,
     policy: NativePolicyBinding = {},
   ): Promise<DeploymentPreviewV1> {
-    const providerBindingHash = this.#providerBindingHash(azdBinding.bindingHash, owned.hash, policy);
+    const resourceGroupTags = this.#resolvedResourceGroupTags(target, owned, operation);
+    const providerBindingHash = this.#providerBindingHash(
+      azdBinding.bindingHash,
+      owned.hash,
+      policy,
+      resourceGroupTags,
+    );
     const preview = this.createPreview(this.track, operation, request, normalized, {
       artifactHash: providerBindingHash,
     });
@@ -1482,6 +1530,7 @@ export class AzdBicepProvider extends NativeProviderBase implements IacProvider 
       providerBindingHash,
       azdBinding,
       ownedStateHash: owned.hash,
+      ...(resourceGroupTags === undefined ? {} : { resourceGroupTags }),
       ...policy,
     };
     this.#targets.set(`${target.projectId}\u0000${target.runId}`, target);
@@ -1491,10 +1540,16 @@ export class AzdBicepProvider extends NativeProviderBase implements IacProvider 
     return preview;
   }
 
-  #providerBindingHash(azdBindingHash: string, ownedStateHash: string, policy: NativePolicyBinding): string {
+  #providerBindingHash(
+    azdBindingHash: string,
+    ownedStateHash: string,
+    policy: NativePolicyBinding,
+    resourceGroupTags?: Readonly<Record<string, string>>,
+  ): string {
     return sha256({
       azdBindingHash,
       ownedStateHash,
+      ...(resourceGroupTags === undefined ? {} : { resourceGroupTags }),
       ...(policy.policyValidationBinding === undefined ? {} : { policyValidation: policy.policyValidationBinding }),
     });
   }
@@ -1564,7 +1619,8 @@ export class AzdBicepProvider extends NativeProviderBase implements IacProvider 
     const environment = accepted.environment;
     if (
       preview.artifactHash !== binding.providerBindingHash ||
-      preview.artifactHash !== this.#providerBindingHash(accepted.bindingHash, binding.ownedStateHash, binding) ||
+      preview.artifactHash !==
+        this.#providerBindingHash(accepted.bindingHash, binding.ownedStateHash, binding, binding.resourceGroupTags) ||
       accepted.projectId !== preview.projectId ||
       accepted.runId !== preview.runId ||
       environment.name !== this.#target.environmentName ||
@@ -1590,14 +1646,20 @@ export class AzdBicepProvider extends NativeProviderBase implements IacProvider 
     const current = await this.#assertInputsUnchanged(accepted, target, azdVersion);
     await this.#assertIdentity(current);
     const owned = await this.#ownedState(target);
-    if (owned.hash !== binding.ownedStateHash) {
+    const currentTags = this.#resolvedResourceGroupTags(target, owned, operation);
+    if (
+      owned.hash !== binding.ownedStateHash ||
+      this.#ownershipBlockers(target, owned, operation).length > 0 ||
+      sha256(currentTags ?? null) !== sha256(binding.resourceGroupTags ?? null)
+    ) {
       throw new IacProviderError(
         "PREVIEW_HASH_MISMATCH",
         "The azd environment's resource group or resources changed after preview",
       );
     }
     if (approval.mechanism === "lab-delegation") {
-      if (operation !== "apply") throw new IacProviderError("PREVIEW_BLOCKED", "Delegated destroy is unsupported");
+      if (operation !== "apply" || owned.groupMissing)
+        throw new IacProviderError("PREVIEW_BLOCKED", "Delegated destroy or missing resource group is unsupported");
       const scope = await this.labApplyScope(preview.previewHash);
       if (approval.scopeEvidenceHash !== sha256(scope))
         throw new IacProviderError("PREVIEW_HASH_MISMATCH", "Delegated resource observations changed before execution");
@@ -1605,6 +1667,16 @@ export class AzdBicepProvider extends NativeProviderBase implements IacProvider 
     }
     this.#targets.set(`${target.projectId}\u0000${target.runId}`, target);
     this.rememberPolicy(preview, binding);
+    if (operation === "apply" && owned.groupMissing && binding.resourceGroupTags !== undefined) {
+      await this.run(
+        this.#reads.ensureResourceGroup(
+          target.subscriptionId,
+          target.resourceGroup,
+          this.#target.location,
+          binding.resourceGroupTags,
+        ),
+      );
+    }
     const completed: string[] = [];
     for (const { layer, plan } of this.#azdPlans(operation === "apply" ? "provision" : "down", current)) {
       if (completed.length > 0) {

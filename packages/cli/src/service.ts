@@ -4788,14 +4788,24 @@ export class ApexService {
     run: RunConfigV1,
     intent: ImplementationIntentV1,
     binding: IacBindingV1,
-    options: GenerateIacOptions = {},
+    options: GenerateIacOptions & { riskOwner?: string; liveGovernanceOverride?: boolean } = {},
   ) {
     try {
       return run.iacTool === "bicep"
         ? generateBicepTree(intent, binding, {
+            environment: run.environment,
+            ...(options.riskOwner === undefined ? {} : { riskOwner: options.riskOwner }),
+            ...(options.liveGovernanceOverride === undefined
+              ? {}
+              : { liveGovernanceOverride: options.liveGovernanceOverride }),
             ...(options.existingResources === undefined ? {} : { existingResources: options.existingResources }),
           })
         : generateTerraformTree(intent, binding, {
+            environment: run.environment,
+            ...(options.riskOwner === undefined ? {} : { riskOwner: options.riskOwner }),
+            ...(options.liveGovernanceOverride === undefined
+              ? {}
+              : { liveGovernanceOverride: options.liveGovernanceOverride }),
             ...(options.existingResources === undefined ? {} : { existingResources: options.existingResources }),
             ...(options.azurermProviderConstraint === undefined
               ? {}
@@ -4820,8 +4830,13 @@ export class ApexService {
    * rejects is refused here instead of after the review gates. For Bicep, ownership is also resolved when the run
    * targets an exact resource group; without one, only AVM bindings with no physical resource map are refused here.
    */
-  private assertPlanGeneratable(run: RunConfigV1, intent: ImplementationIntentV1, binding: IacBindingV1): void {
-    const tree = this.generateIacTree(run, intent, binding);
+  private assertPlanGeneratable(
+    run: RunConfigV1,
+    intent: ImplementationIntentV1,
+    binding: IacBindingV1,
+    options: { riskOwner?: string; liveGovernanceOverride?: boolean } = {},
+  ): void {
+    const tree = this.generateIacTree(run, intent, binding, options);
     if (run.iacTool !== "bicep") return;
     const issues = bicepResourceGroupScopePattern.test(run.targetScope)
       ? resolveNativeBicepResourceOwnership({
@@ -4879,7 +4894,15 @@ export class ApexService {
         EXIT_CODES.validation,
       );
     }
-    const tree = this.generateIacTree(run, intent, binding, options);
+    const project = await this.projects.getProject(run.projectId);
+    const governanceHash = this.artifactHash(events, "governance-constraints");
+    const governance =
+      governanceHash === undefined ? undefined : await this.objects.getJson<GovernanceConstraintsV1>(governanceHash);
+    const tree = this.generateIacTree(run, intent, binding, {
+      ...options,
+      riskOwner: project.riskOwner,
+      liveGovernanceOverride: governance?.source === "collected",
+    });
     const files: StagedFile[] = [];
     const sourceRoot =
       previousHandoff?.treeHash === tree.treeHash
@@ -11245,7 +11268,14 @@ export class ApexService {
           EXIT_CODES.validation,
         );
       }
-      this.assertPlanGeneratable(run, intent, binding);
+      const project = await this.projects.getProject(run.projectId);
+      const governanceHash = this.artifactHash(events, "governance-constraints");
+      const governance =
+        governanceHash === undefined ? undefined : await this.objects.getJson<GovernanceConstraintsV1>(governanceHash);
+      this.assertPlanGeneratable(run, intent, binding, {
+        riskOwner: project.riskOwner,
+        liveGovernanceOverride: governance?.source === "collected",
+      });
     }
     if (descriptor.id.startsWith("codegen-")) {
       const manifest = byKind["logical-resource-manifest"] as LogicalResourceManifestV1;
