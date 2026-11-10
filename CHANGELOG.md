@@ -12,6 +12,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0-next.8] — Preview
+
+This release adds `azd` layered provisioning support (`infra.layers[]` in `azure.yaml`, #480), adds per-stage
+decision-change guidance and top-level user-requested input amendment routing (#517), shards Linux package tests in `ci`
+to cut PR CI wall-clock time from ~19m to ~6m (#476), and bumps `peter-evans/create-pull-request` to `v8.1.2` (#538).
+
+### Added
+
+- Support `azd` layered provisioning (`infra.layers[]` in `azure.yaml`) in `AzdBicepProvider`: order layers
+  deterministically (`orderAzdInfraRoots` / `declaredAzdBicepRoots`), validate and compile declared layer roots without
+  requiring `infra/main.bicep`, preview and apply layers in topological dependency order, re-verify bound inputs at
+  every layer boundary, stop on partial failure while naming completed vs failed layers, and tear down layers in reverse
+  dependency order (#480).
+- Add a per-stage `## Change A Decision` table in `docs/how-to/run-workflow.md` and a top-level user-requested amendment
+  route (`apex/inputHistory` -> `apex/previewInputAmendment` -> confirmation -> `apex/amendInput`) in
+  `customizations/.github/agents/apex.agent.md` (#517).
+
+### Changed
+
+- Add `linux-package-shards` (`core` + `cli-1-of-8` through `cli-8-of-8`) to `.github/workflows/ci.yml` and enforce the
+  Linux shard matrix and `ci` aggregate gate invariants in `tools/scripts/validate-github-workflows.mjs` (#476).
+- Bump `peter-evans/create-pull-request` from `8.1.1` to `8.1.2` (#538).
+
 ## [0.11.0-next.7] — Preview
 
 This release cleans the repository and shipped plugin to vNext-only (#539), syncs upstream Azure Bicep, retail-pricing,
