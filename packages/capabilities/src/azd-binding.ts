@@ -878,6 +878,54 @@ export function orderAzdInfraRoots(
   return direction === "destroy" ? [...ordered].reverse() : ordered;
 }
 
+export interface DeclaredAzdBicepRoot {
+  readonly name: string;
+  readonly path: string;
+  readonly module: string;
+  readonly dependsOn: readonly string[];
+}
+
+/**
+ * Parses `azure.yaml` source text and returns its declared Bicep infrastructure roots in topological apply order.
+ */
+export function declaredAzdBicepRoots(source: string): {
+  readonly layered: boolean;
+  readonly roots: readonly DeclaredAzdBicepRoot[];
+} {
+  const project = parseYaml(Buffer.from(source, "utf8"));
+  const { layered, roots } = declareRoots(
+    project.infra === undefined ? {} : plain(project.infra, "infra", "AZD_PROJECT_UNSUPPORTED"),
+  );
+  if (!layered) {
+    return {
+      layered: false,
+      roots: roots.map(({ name, path, module, dependsOn }) => ({ name, path, module, dependsOn })),
+    };
+  }
+  const ordered = orderAzdInfraRoots(
+    {
+      infra: {
+        provider: "bicep",
+        layered: true,
+        roots: roots.map((root) => ({
+          name: root.name,
+          path: root.path,
+          module: root.module,
+          provider: "bicep" as const,
+          dependsOn: [...root.dependsOn],
+          treeHash: "0".repeat(64),
+          resolvedParametersHash: "0".repeat(64),
+        })),
+      },
+    },
+    "apply",
+  );
+  return {
+    layered: true,
+    roots: ordered.map(({ name, path, module, dependsOn }) => ({ name, path, module, dependsOn })),
+  };
+}
+
 /** Names the sections that differ between an accepted binding and the current one, never their values. */
 export function diffAzdBindings(accepted: AzdBindingV1, current: AzdBindingV1): string[] {
   const section = (name: string, left: unknown, right: unknown): string[] =>

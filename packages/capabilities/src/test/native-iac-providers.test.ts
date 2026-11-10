@@ -2598,6 +2598,195 @@ test("azd previews, applies in topological layer order, validates policy across 
     layered.provider.apply(policyPreview, approval(policyPreview), authority),
     (error) => error instanceof IacProviderError && error.code === "PREVIEW_HASH_MISMATCH",
   );
+  storageSecurity = "enforced";
+
+  // validate() and validateSource() compile every declared layer root without requiring infra/main.bicep.
+  await layered.provider.validate();
+  const validationReceipt = await layered.provider.validateSource({
+    projectId: "project",
+    runId: "run",
+    sourceHash: hashes.iac,
+    policyHash: hashes.policy,
+    inputHash: "5".repeat(64),
+    generatedSource: layeredGeneratedSource,
+  });
+  assert.equal(validationReceipt.outcome, "pass");
+
+  // Duplicate symbols across layers require explicit layer-qualified codeSymbols (`network::shared` / `app::shared`)
+  // and mixed array/object layer templates preserve object-form codeSymbols alongside array-form physicalIds.
+  layered.runner.run = async (process) => {
+    if (process.executable === "bicep" && process.args[0] === "build") {
+      if (process.args[1] === "infra/network/main.bicep") {
+        return {
+          exitCode: 0,
+          signal: null,
+          stdout: JSON.stringify({
+            resources: {
+              shared: { properties: { security: "enforced" } },
+              vnet: { properties: { encryption: "enabled" } },
+            },
+          }),
+          stderr: "",
+          timedOut: false,
+          outputTruncated: false,
+        };
+      }
+      if (process.args[1] === "infra/app/main.bicep") {
+        return {
+          exitCode: 0,
+          signal: null,
+          stdout: JSON.stringify({
+            resources: {
+              shared: { properties: { security: "noncompliant" } },
+            },
+          }),
+          stderr: "",
+          timedOut: false,
+          outputTruncated: false,
+        };
+      }
+    }
+    return await baseRun(process);
+  };
+  const ambiguousSymbolPreview = await layered.provider.previewApply(
+    layered.preview({
+      resources: managed(VNET, STORAGE),
+      generatedSource: layeredGeneratedSource,
+      policyValidation: {
+        policyMap: {
+          schemaVersion: "1.0.0",
+          projectId: "project",
+          runId: "run",
+          governanceHash: hashes.policy,
+          mappings: [
+            {
+              policyAssignmentId: "/assignments/app",
+              effect: "deny",
+              logicalResourceId: "shared",
+              propertyPath: "properties.security",
+              expectedValue: "enforced",
+              disposition: "planned",
+            },
+          ],
+        },
+        logicalResourceManifest: {
+          shared: { codeSymbol: "shared" },
+        },
+      },
+    }),
+  );
+  assert.match(ambiguousSymbolPreview.blockers.join("\n"), /resource-not-found/u);
+
+  const qualifiedSymbolPreview = await layered.provider.previewApply(
+    layered.preview({
+      resources: managed(VNET, STORAGE),
+      generatedSource: layeredGeneratedSource,
+      policyValidation: {
+        policyMap: {
+          schemaVersion: "1.0.0",
+          projectId: "project",
+          runId: "run",
+          governanceHash: hashes.policy,
+          mappings: [
+            {
+              policyAssignmentId: "/assignments/net",
+              effect: "deny",
+              logicalResourceId: "netShared",
+              propertyPath: "properties.security",
+              expectedValue: "enforced",
+              disposition: "planned",
+            },
+          ],
+        },
+        logicalResourceManifest: {
+          netShared: { codeSymbol: "network::shared" },
+        },
+      },
+    }),
+  );
+  assert.deepEqual(qualifiedSymbolPreview.blockers, []);
+
+  // Mixed array-form and object-form layer templates preserve object-form codeSymbols and array-form physicalIds.
+  layered.runner.run = async (process) => {
+    if (process.executable === "bicep" && process.args[0] === "build") {
+      if (process.args[1] === "infra/network/main.bicep") {
+        return {
+          exitCode: 0,
+          signal: null,
+          stdout: JSON.stringify({
+            resources: [{ id: VNET_ID, type: VNET.type, properties: { encryption: "enabled" } }],
+          }),
+          stderr: "",
+          timedOut: false,
+          outputTruncated: false,
+        };
+      }
+      if (process.args[1] === "infra/app/main.bicep") {
+        return {
+          exitCode: 0,
+          signal: null,
+          stdout: JSON.stringify({
+            resources: { storage: { properties: { security: "enforced" } } },
+          }),
+          stderr: "",
+          timedOut: false,
+          outputTruncated: false,
+        };
+      }
+    }
+    return await baseRun(process);
+  };
+  const mixedPreview = await layered.provider.previewApply(
+    layered.preview({
+      resources: managed(VNET, STORAGE),
+      generatedSource: layeredGeneratedSource,
+      policyValidation: {
+        policyMap: {
+          schemaVersion: "1.0.0",
+          projectId: "project",
+          runId: "run",
+          governanceHash: hashes.policy,
+          mappings: [
+            {
+              policyAssignmentId: "/assignments/net",
+              effect: "deny",
+              logicalResourceId: "vnet",
+              propertyPath: "properties.encryption",
+              expectedValue: "enabled",
+              disposition: "planned",
+            },
+            {
+              policyAssignmentId: "/assignments/app",
+              effect: "deny",
+              logicalResourceId: "storage",
+              propertyPath: "properties.security",
+              expectedValue: "enforced",
+              disposition: "planned",
+            },
+          ],
+        },
+        logicalResourceManifest: {
+          vnet: { physicalId: VNET_ID },
+          storage: { codeSymbol: "storage" },
+        },
+      },
+    }),
+  );
+  assert.deepEqual(mixedPreview.blockers, []);
+
+  // Mutating the second layer's Bicep source while the first layer executes stops before the second layer runs.
+  layered.runner.requests.length = 0;
+  layered.state.duringExecute = async () => {
+    await writeFile(join(layered.root, "infra", "app", "main.bicep"), "targetScope = 'subscription'\n");
+  };
+  await assert.rejects(
+    layered.provider.apply(mixedPreview, approval(mixedPreview), authority),
+    (error) => error instanceof IacProviderError && error.code === "PREVIEW_HASH_MISMATCH",
+  );
+  assert.deepEqual(
+    layered.executions().map((entry) => entry.args.slice(0, 2)),
+    [["provision", "network"]],
+  );
 });
 
 test("azd fails closed for non-group scopes, untagged groups and shared environments", async (context) => {

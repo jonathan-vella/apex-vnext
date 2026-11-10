@@ -33,11 +33,13 @@ import type {
 import { AzureCliReadAdapter, TerraformCommandAdapter, type CommandPlan } from "./command-plans.js";
 import {
   assertAzdBindingUnchanged,
+  declaredAzdBicepRoots,
   describeAzdBinding,
   inspectAzdBicepProject,
   orderAzdInfraRoots,
   type AzdApprovalMaterial,
   type AzdBindingRequest,
+  type DeclaredAzdBicepRoot,
 } from "./azd-binding.js";
 import { assertAzdIdentityMatchesBinding, buildAzdArguments } from "./azd-execution-envelope.js";
 import { evaluateAzdPrerequisite } from "./azd-prerequisites.js";
@@ -307,6 +309,75 @@ export async function assertGeneratedSourceUnchanged(
   await readGeneratedSource(source);
 }
 
+function resolveDeclaredBicepRoots(source: GeneratedSourceSnapshot): {
+  readonly layered: boolean;
+  readonly roots: readonly DeclaredAzdBicepRoot[];
+} {
+  const azureYaml = source.fileContents.get("azure.yaml")?.toString("utf8");
+  if (azureYaml === undefined || !/\blayers\s*:/u.test(azureYaml)) {
+    return {
+      layered: false,
+      roots: [{ name: "default", path: "infra", module: "main", dependsOn: [] }],
+    };
+  }
+  try {
+    return declaredAzdBicepRoots(azureYaml);
+  } catch {
+    throw sourceBindingError();
+  }
+}
+
+function mergeCompiledBicepLayers(layers: readonly { readonly name: string; readonly stdout: string }[]): string {
+  const compiledLayers: { readonly name: string; readonly parsed: Record<string, unknown> }[] = [];
+  for (const { name, stdout } of layers) {
+    const parsed = parseJsonProcessOutput("bicep-build", stdout);
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error("Invalid compiled Bicep layer template");
+    }
+    compiledLayers.push({ name, parsed: parsed as Record<string, unknown> });
+  }
+  const symbolCounts = new Map<string, number>();
+  let hasObjectLayer = false;
+  for (const { parsed } of compiledLayers) {
+    if (parsed.resources !== null && typeof parsed.resources === "object" && !Array.isArray(parsed.resources)) {
+      hasObjectLayer = true;
+      for (const symbol of Object.keys(parsed.resources as Record<string, unknown>)) {
+        symbolCounts.set(symbol, (symbolCounts.get(symbol) ?? 0) + 1);
+      }
+    } else if (!Array.isArray(parsed.resources)) {
+      throw new Error("Invalid compiled Bicep layer resources");
+    }
+  }
+  const schema =
+    typeof compiledLayers[0]?.parsed.$schema === "string"
+      ? compiledLayers[0].parsed.$schema
+      : "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#";
+  if (!hasObjectLayer) {
+    return JSON.stringify({
+      $schema: schema,
+      resources: compiledLayers.flatMap(({ parsed }) => parsed.resources as unknown[]),
+    });
+  }
+  const mergedObject: Record<string, unknown> = {};
+  const anonymousResources: unknown[] = [];
+  for (const { name, parsed } of compiledLayers) {
+    if (Array.isArray(parsed.resources)) {
+      anonymousResources.push(...parsed.resources);
+      continue;
+    }
+    for (const [symbol, resource] of Object.entries(parsed.resources as Record<string, unknown>)) {
+      const key = (symbolCounts.get(symbol) ?? 0) > 1 ? `${name}::${symbol}` : symbol;
+      mergedObject[key] = resource;
+    }
+  }
+  return JSON.stringify({
+    $schema: schema,
+    languageVersion: "2.0",
+    resources: mergedObject,
+    ...(anonymousResources.length === 0 ? {} : { anonymousResources }),
+  });
+}
+
 async function bindGeneratedSource(
   request: Pick<PreviewRequest, "generatedSource">,
   cwd: string | undefined,
@@ -323,6 +394,20 @@ async function bindGeneratedSource(
     resolve(source.rootPath, templateFile) !== resolve(source.rootPath, BICEP_TEMPLATE)
   ) {
     throw sourceBindingError();
+  }
+  if (templateFile !== undefined) {
+    const declared = resolveDeclaredBicepRoots(source);
+    if (declared.layered) {
+      for (const root of declared.roots) {
+        if (
+          !source.paths.has(`${root.path}/${root.module}.bicep`) ||
+          !source.paths.has(`${root.path}/bicepconfig.json`)
+        ) {
+          throw sourceBindingError();
+        }
+      }
+      return source;
+    }
   }
   for (const file of [templateFile, parametersFile]) {
     if (file === undefined) continue;
@@ -514,8 +599,48 @@ abstract class NativeProviderBase {
         }
         await readGeneratedSource(scratch, scratch, outputs);
       };
+      const declaredBicep = track === "bicep" ? resolveDeclaredBicepRoots(source) : undefined;
       let compiledTemplate: string | undefined;
       for (const command of commands) {
+        if (command.validatorId === "bicep:build" && declaredBicep?.layered) {
+          const layerOutputs: { readonly name: string; readonly stdout: string }[] = [];
+          for (const root of declaredBicep.roots) {
+            await verify();
+            let failure = `Native validation command failed: ${command.validatorId}`;
+            try {
+              const result = await this.runner.run({
+                executable: command.executable,
+                args: ["build", `${root.path}/${root.module}.bicep`, "--stdout"],
+                cwd: scratchRoot,
+                rawOutput: true,
+                timeoutMs: this.#timeoutMs,
+                maxOutputBytes: this.#maxOutputBytes,
+              });
+              if (
+                result.exitCode !== 0 ||
+                result.signal !== null ||
+                result.timedOut !== false ||
+                result.outputTruncated !== false
+              ) {
+                failure += ` (exit ${result.exitCode ?? "none"}${result.signal === null ? "" : `, signal ${result.signal}`}${result.timedOut ? ", timed out" : ""}${result.outputTruncated ? ", output truncated" : ""})`;
+                throw new Error();
+              }
+              layerOutputs.push({ name: root.name, stdout: result.stdout });
+            } catch (error) {
+              const code = (error as { code?: unknown }).code;
+              if (typeof code === "string" && /^[A-Z_]{1,64}$/.test(code)) failure += ` (${code})`;
+              throw new IacProviderError("NATIVE_VALIDATION_FAILED", failure);
+            } finally {
+              await verify();
+            }
+          }
+          try {
+            compiledTemplate = mergeCompiledBicepLayers(layerOutputs);
+          } catch {
+            compiledTemplate = "";
+          }
+          continue;
+        }
         await verify();
         let failure = `Native validation command failed: ${command.validatorId}`;
         try {
@@ -847,6 +972,20 @@ export class AzdBicepProvider extends NativeProviderBase implements IacProvider 
    * Full source-bound policy and resource-parity validation runs through `validateSource()`.
    */
   async validate(): Promise<readonly string[]> {
+    const azureYaml = await readFile(resolve(this.#target.projectRoot, "azure.yaml"), "utf8").catch(() => undefined);
+    const declared =
+      azureYaml !== undefined && /\blayers\s*:/u.test(azureYaml) ? declaredAzdBicepRoots(azureYaml) : undefined;
+    if (declared?.layered) {
+      for (const root of declared.roots) {
+        await this.run({
+          executable: "bicep",
+          args: ["build", `${root.path}/${root.module}.bicep`, "--stdout"],
+          cwd: this.#target.projectRoot,
+          rawOutput: true,
+        });
+      }
+      return [];
+    }
     await this.#compiledTemplate();
     return [];
   }
@@ -942,7 +1081,7 @@ export class AzdBicepProvider extends NativeProviderBase implements IacProvider 
     this.#assertSourceRootsPresent(source, inspected);
     await this.#assertIdentity(inspected);
     const [normalized, owned] = await Promise.all([
-      this.#previewAzd(inspected, request.resources),
+      this.#previewAzd(inspected, request.resources, target, azdVersion, source),
       this.#ownedState(target),
     ]);
     normalized.blockers.push(...this.#ownershipBlockers(target, owned));
@@ -1119,7 +1258,13 @@ export class AzdBicepProvider extends NativeProviderBase implements IacProvider 
     return ordered.map((root) => ({ layer: root.name, plan: this.#azdPlan(operation, binding, root.name) }));
   }
 
-  async #previewAzd(binding: AzdBindingV1, accepted: PreviewRequest["resources"]): Promise<NormalizedPreview> {
+  async #previewAzd(
+    binding: AzdBindingV1,
+    accepted: PreviewRequest["resources"],
+    target: ApprovedAzdTarget,
+    azdVersion: string,
+    source: GeneratedSourceSnapshot | undefined,
+  ): Promise<NormalizedPreview> {
     if (!binding.infra.layered) {
       const stdout = await this.runWithStderr(this.#azdPlan("provision-preview", binding));
       return normalizeAzdPreview(stdout, accepted);
@@ -1128,6 +1273,10 @@ export class AzdBicepProvider extends NativeProviderBase implements IacProvider 
     const blockers: string[] = [];
     const completed: string[] = [];
     for (const { layer, plan } of this.#azdPlans("provision-preview", binding)) {
+      if (completed.length > 0) {
+        await this.#assertInputsUnchanged(binding, target, azdVersion);
+        if (source !== undefined) await readGeneratedSource(source, source);
+      }
       let stdout: string;
       try {
         stdout = await this.runWithStderr(plan);
@@ -1137,6 +1286,8 @@ export class AzdBicepProvider extends NativeProviderBase implements IacProvider 
         }
         throw error;
       }
+      await this.#assertInputsUnchanged(binding, target, azdVersion);
+      if (source !== undefined) await readGeneratedSource(source, source);
       const normalized = normalizeAzdPreview(stdout, accepted);
       changes.push(...normalized.changes);
       blockers.push(...normalized.blockers);
@@ -1362,55 +1513,17 @@ export class AzdBicepProvider extends NativeProviderBase implements IacProvider 
       });
     }
     const ordered = orderAzdInfraRoots(binding, "apply");
-    const compiledLayers: Record<string, unknown>[] = [];
+    const layerOutputs: { readonly name: string; readonly stdout: string }[] = [];
     for (const root of ordered) {
-      const raw = await this.run({
+      const stdout = await this.run({
         executable: "bicep",
         args: ["build", `${root.path}/${root.module}.bicep`, "--stdout"],
         cwd: this.#target.projectRoot,
         rawOutput: true,
       });
-      const parsed = parseJsonProcessOutput("bicep-build", raw);
-      if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
-        throw new Error("Invalid compiled Bicep layer template");
-      }
-      compiledLayers.push(parsed as Record<string, unknown>);
+      layerOutputs.push({ name: root.name, stdout });
     }
-    const allObjects = compiledLayers.every(
-      (layer) => layer.resources !== null && typeof layer.resources === "object" && !Array.isArray(layer.resources),
-    );
-    if (allObjects) {
-      const merged: Record<string, unknown> = {};
-      for (const [index, layer] of compiledLayers.entries()) {
-        const rootName = ordered[index]!.name;
-        for (const [symbol, resource] of Object.entries(layer.resources as Record<string, unknown>)) {
-          const key = Object.hasOwn(merged, symbol) ? `${rootName}::${symbol}` : symbol;
-          merged[key] = resource;
-        }
-      }
-      return JSON.stringify({
-        $schema:
-          typeof compiledLayers[0]?.$schema === "string"
-            ? compiledLayers[0].$schema
-            : "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
-        languageVersion: "2.0",
-        resources: merged,
-      });
-    }
-    const mergedArray: unknown[] = [];
-    for (const layer of compiledLayers) {
-      if (Array.isArray(layer.resources)) mergedArray.push(...layer.resources);
-      else if (layer.resources !== null && typeof layer.resources === "object")
-        mergedArray.push(...Object.values(layer.resources as Record<string, unknown>));
-      else throw new Error("Invalid compiled Bicep layer resources");
-    }
-    return JSON.stringify({
-      $schema:
-        typeof compiledLayers[0]?.$schema === "string"
-          ? compiledLayers[0].$schema
-          : "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
-      resources: mergedArray,
-    });
+    return mergeCompiledBicepLayers(layerOutputs);
   }
 
   async #execute(
@@ -1494,6 +1607,17 @@ export class AzdBicepProvider extends NativeProviderBase implements IacProvider 
     this.rememberPolicy(preview, binding);
     const completed: string[] = [];
     for (const { layer, plan } of this.#azdPlans(operation === "apply" ? "provision" : "down", current)) {
+      if (completed.length > 0) {
+        await this.#assertInputsUnchanged(accepted, target, azdVersion);
+        if (
+          binding.policyValidationBinding !== undefined &&
+          createHash("sha256")
+            .update(await this.#compiledTemplate(binding.azdBinding))
+            .digest("hex") !== binding.policyValidationBinding.inputHash
+        ) {
+          throw new IacProviderError("PREVIEW_HASH_MISMATCH", "Bicep compiler output changed after policy validation");
+        }
+      }
       try {
         await this.run(plan);
       } catch (error) {
