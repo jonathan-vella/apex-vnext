@@ -3,7 +3,7 @@
 # Consolidates: lint, agent-validation, policy-compliance-check
 # Runs markdown linting + all Node.js validators + handoff validation, then installs the agent plugin
 # with a pinned Copilot CLI and smoke-tests the installed MCP server (no Copilot sign-in or secret)
-# Skips the "Qualify APEX vNext" and plugin install steps, and the Windows package test shards, for PRs whose changes
+# Skips the Linux and Windows package test shards and plugin install smoke for PRs whose changes
 # are entirely under docs/ or are the root contributor documents (README, CONTRIBUTING, CONTRIBUTORS, SECURITY)
 # (push and workflow_dispatch runs always run the full qualification)
 
@@ -24,8 +24,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Decides whether a pull request only changes documentation. The required `ci` job repeats this check itself so a
-  # failure here can never turn a required check into a skipped (passing) one; only the optional Windows job waits for it.
+  # Decides whether a pull request only changes documentation. The required `ci` job repeats this check itself and
+  # runs with `if: always()` so a failed dependency can never turn a required check into a skipped (passing) one.
   scope:
     name: scope
     runs-on: ubuntu-latest
@@ -48,9 +48,77 @@ jobs:
             echo "docs_only=false" >> "$GITHUB_OUTPUT"
           fi
 
+  # Parallel Linux vNext qualification shards (`core` + 8 CLI test shards). `ci` below aggregates them with `if: always()`.
+  linux-package-shards:
+    name: ubuntu-latest shard (${{ matrix.suite }})
+    needs: scope
+    if: needs.scope.outputs.docs_only != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - suite: core
+          - suite: cli-1-of-8
+            cli_shard: 1/8
+          - suite: cli-2-of-8
+            cli_shard: 2/8
+          - suite: cli-3-of-8
+            cli_shard: 3/8
+          - suite: cli-4-of-8
+            cli_shard: 4/8
+          - suite: cli-5-of-8
+            cli_shard: 5/8
+          - suite: cli-6-of-8
+            cli_shard: 6/8
+          - suite: cli-7-of-8
+            cli_shard: 7/8
+          - suite: cli-8-of-8
+            cli_shard: 8/8
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: ./.github/actions/setup-node-repo
+
+      - name: Prepare CLI assets
+        run: npm run prepare:assets --workspace @apexops/cli
+
+      - name: Build vNext packages
+        run: npm run build:vnext
+
+      - name: Validate vNext contracts and run non-CLI package suites
+        if: matrix.suite == 'core'
+        run: |
+          npm run validate:vnext
+          npm --workspace @apexops/contracts run test
+          npm --workspace @apexops/kernel run test
+          npm --workspace @apexops/capabilities run test
+          npm --workspace @apexops/renderers run test
+          npm --workspace @apexops/testkit run test
+          npm run test:vnext-validator
+          npm run test:vnext-pack
+
+      - name: Test CLI shard
+        if: matrix.suite != 'core'
+        env:
+          APEX_TEST_SHARD: ${{ matrix.cli_shard }}
+        run: (cd packages/cli && node --test dist/test/*.test.js)
+
   ci:
     name: ci
+    needs: [scope, linux-package-shards]
+    if: always()
     runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -67,6 +135,27 @@ jobs:
           else
             echo "docs_only=false" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Require the scope decision and every Linux shard
+        env:
+          DOCS_ONLY: ${{ needs.scope.outputs.docs_only }}
+          LOCAL_DOCS_ONLY: ${{ steps.scope.outputs.docs_only }}
+          SCOPE_RESULT: ${{ needs.scope.result }}
+          SHARDS_RESULT: ${{ needs.linux-package-shards.result }}
+        run: |
+          if [ "$SCOPE_RESULT" != "success" ] || [ "$DOCS_ONLY" != "$LOCAL_DOCS_ONLY" ]; then
+            echo "The scope job finished as '$SCOPE_RESULT' (docs_only='$DOCS_ONLY', local='$LOCAL_DOCS_ONLY')."
+            exit 1
+          fi
+          if [ "$DOCS_ONLY" = "true" ]; then
+            echo "Documentation-only change: the Linux shards were skipped."
+            exit 0
+          fi
+          if [ "$SHARDS_RESULT" != "success" ]; then
+            echo "The Linux shards finished as '$SHARDS_RESULT'."
+            exit 1
+          fi
+          echo "Every Linux shard passed."
 
       - name: Setup Node
         uses: ./.github/actions/setup-node-repo
@@ -94,10 +183,6 @@ jobs:
 
       - name: Run hook tests
         run: npm run test:hooks
-
-      - name: Qualify APEX vNext
-        if: steps.scope.outputs.docs_only != 'true'
-        run: npm run qualify:vnext
 
       # Exact pin: bump deliberately. Local-path installs need no Copilot sign-in, token or secret.
       - name: Install the Copilot CLI

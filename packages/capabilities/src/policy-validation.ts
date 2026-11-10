@@ -166,6 +166,10 @@ function resourcesFromJson(json: string, track: IacTool): readonly Resource[] {
       }
     };
     visit(root.resources);
+    if (Object.hasOwn(root, "anonymousResources")) {
+      if (!Array.isArray(root.anonymousResources)) throw new Error("POLICY_VALIDATION_INVALID_SOURCE");
+      visit(root.anonymousResources, false, []);
+    }
   } else {
     if (
       root.errored === true ||

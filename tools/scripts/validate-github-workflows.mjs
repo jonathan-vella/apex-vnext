@@ -262,6 +262,22 @@ export function loadLocalActionTexts(paths) {
   );
 }
 
+const LINUX_AGGREGATE_SCRIPT = [
+  'if [ "$SCOPE_RESULT" != "success" ] || [ "$DOCS_ONLY" != "$LOCAL_DOCS_ONLY" ]; then',
+  `  echo "The scope job finished as '$SCOPE_RESULT' (docs_only='$DOCS_ONLY', local='$LOCAL_DOCS_ONLY')."`,
+  "  exit 1",
+  "fi",
+  'if [ "$DOCS_ONLY" = "true" ]; then',
+  '  echo "Documentation-only change: the Linux shards were skipped."',
+  "  exit 0",
+  "fi",
+  'if [ "$SHARDS_RESULT" != "success" ]; then',
+  `  echo "The Linux shards finished as '$SHARDS_RESULT'."`,
+  "  exit 1",
+  "fi",
+  'echo "Every Linux shard passed."',
+].join("\n");
+
 const WINDOWS_AGGREGATE_SCRIPT = [
   'if [ "$SCOPE_RESULT" != "success" ]; then',
   `  echo "The scope job finished as '$SCOPE_RESULT'."`,
@@ -293,7 +309,7 @@ const hasKeys = (object, expected) =>
 
 // The shard matrix must be one `core` entry plus CLI shards cli-1-of-N ... cli-N-of-N: exactly the set of
 // APEX_TEST_SHARD values whose slices cover every CLI test once.
-function windowsShardMatrixIsComplete(job) {
+function shardMatrixIsComplete(job) {
   const include = job?.strategy?.matrix?.include;
   if (
     !hasKeys(job?.strategy, ["fail-fast", "matrix"]) ||
@@ -315,6 +331,72 @@ function windowsShardMatrixIsComplete(job) {
         entry.suite === `cli-${index + 1}-of-${total}` &&
         entry.cli_shard === `${index + 1}/${total}`,
     );
+}
+
+function linuxShardJobErrors(job) {
+  const steps = Array.isArray(job?.steps) ? job.steps : [];
+  const runs = (text) => steps.filter((step) => typeof step?.run === "string" && step.run.includes(text));
+  const unconditional = (text) => runs(text).length === 1 && runs(text)[0].if === undefined;
+  const conditional = (text, condition) => runs(text).length === 1 && runs(text)[0].if === condition;
+  const cliTest = runs("(cd packages/cli && node --test dist/test/*.test.js)")[0];
+  const errors = [];
+  if (
+    job?.name !== "ubuntu-latest shard (${{ matrix.suite }})" ||
+    job?.["runs-on"] !== "ubuntu-latest" ||
+    job?.permissions?.contents !== "read" ||
+    job?.["timeout-minutes"] !== 60 ||
+    job?.["continue-on-error"] !== undefined ||
+    steps.some((step) => step?.["continue-on-error"] !== undefined) ||
+    !steps.some((step) => step?.uses === "./.github/actions/setup-node-repo" && step.if === undefined) ||
+    !unconditional("npm run prepare:assets --workspace @apexops/cli") ||
+    !unconditional("npm run build:vnext") ||
+    !conditional("npm run validate:vnext", "matrix.suite == 'core'") ||
+    !conditional("npm --workspace @apexops/contracts run test", "matrix.suite == 'core'") ||
+    !conditional("npm --workspace @apexops/kernel run test", "matrix.suite == 'core'") ||
+    !conditional("npm --workspace @apexops/capabilities run test", "matrix.suite == 'core'") ||
+    !conditional("npm --workspace @apexops/renderers run test", "matrix.suite == 'core'") ||
+    !conditional("npm --workspace @apexops/testkit run test", "matrix.suite == 'core'") ||
+    !conditional("npm run test:vnext-validator", "matrix.suite == 'core'") ||
+    !conditional("npm run test:vnext-pack", "matrix.suite == 'core'") ||
+    !conditional("(cd packages/cli && node --test dist/test/*.test.js)", "matrix.suite != 'core'") ||
+    !hasKeys(cliTest?.env, ["APEX_TEST_SHARD"]) ||
+    cliTest.env.APEX_TEST_SHARD !== "${{ matrix.cli_shard }}"
+  ) {
+    errors.push("ci workflow must retain the ubuntu-latest vNext qualification and CLI test lane");
+  }
+  if (!shardMatrixIsComplete(job)) {
+    errors.push("ci workflow's Linux shard matrix must be core plus every CLI shard exactly once");
+  }
+  return errors;
+}
+
+function linuxAggregateJobErrors(job) {
+  const steps = Array.isArray(job?.steps) ? job.steps : [];
+  const step = steps.find((candidate) => candidate?.name === "Require the scope decision and every Linux shard");
+  if (
+    job?.name !== "ci" ||
+    job?.["runs-on"] !== "ubuntu-latest" ||
+    JSON.stringify(job?.needs) !== JSON.stringify(["scope", "linux-package-shards"]) ||
+    job?.if !== "always()" ||
+    job?.["timeout-minutes"] !== 60 ||
+    job?.permissions?.contents !== "read" ||
+    job?.["continue-on-error"] !== undefined ||
+    steps.some((candidate) => candidate?.["continue-on-error"] !== undefined) ||
+    step === undefined ||
+    step.if !== undefined ||
+    step.uses !== undefined ||
+    !hasKeys(step.env, ["DOCS_ONLY", "LOCAL_DOCS_ONLY", "SCOPE_RESULT", "SHARDS_RESULT"]) ||
+    step.env.DOCS_ONLY !== "${{ needs.scope.outputs.docs_only }}" ||
+    step.env.LOCAL_DOCS_ONLY !== "${{ steps.scope.outputs.docs_only }}" ||
+    step.env.SCOPE_RESULT !== "${{ needs.scope.result }}" ||
+    step.env.SHARDS_RESULT !== "${{ needs.linux-package-shards.result }}" ||
+    normalizeScript(step.run) !== LINUX_AGGREGATE_SCRIPT
+  ) {
+    return [
+      "ci workflow's required ci job must always run and pass only for a docs-only change or when the scope job and every Linux shard succeeded",
+    ];
+  }
+  return [];
 }
 
 function windowsShardJobErrors(job) {
@@ -346,7 +428,7 @@ function windowsShardJobErrors(job) {
   ) {
     errors.push("ci workflow must retain the windows-2025 kernel, capabilities and CLI test lane");
   }
-  if (!windowsShardMatrixIsComplete(job)) {
+  if (!shardMatrixIsComplete(job)) {
     errors.push("ci workflow's Windows shard matrix must be core plus every CLI shard exactly once");
   }
   return errors;
@@ -517,14 +599,16 @@ export function validateGithubWorkflowContract({ contract, schema, workflowTexts
   const ciJobIds = Object.keys(ci?.jobs ?? {});
   if (
     ci?.jobs?.ci?.name !== "ci" ||
-    JSON.stringify(ciJobIds) !== JSON.stringify(["scope", "ci", "windows-package-shards", "windows-package-tests"])
+    JSON.stringify(ciJobIds) !==
+      JSON.stringify(["scope", "linux-package-shards", "ci", "windows-package-shards", "windows-package-tests"])
   ) {
     errors.push("ci workflow must preserve the required vNext and Windows package-test jobs");
   }
-  // The required `ci` check must never wait on another job: a failed dependency would skip it, and GitHub treats a
-  // skipped required check as passing. Only the optional Windows lane waits for the docs-only scope decision.
-  if (ci?.jobs?.ci?.needs !== undefined || ci?.jobs?.ci?.if !== undefined) {
-    errors.push("ci workflow's required ci job must not depend on or be conditional on another job");
+  if (
+    ci?.jobs?.["linux-package-shards"]?.needs !== "scope" ||
+    ci?.jobs?.["linux-package-shards"]?.if !== "needs.scope.outputs.docs_only != 'true'"
+  ) {
+    errors.push("ci workflow must run the Linux package test shards unless the scope job reports a docs-only change");
   }
   if (
     ci?.jobs?.["windows-package-shards"]?.needs !== "scope" ||
@@ -569,6 +653,8 @@ export function validateGithubWorkflowContract({ contract, schema, workflowTexts
     errors.push("ci workflow must install an exact Copilot CLI version and then run the plugin install smoke");
   }
   errors.push(
+    ...linuxShardJobErrors(ci?.jobs?.["linux-package-shards"]),
+    ...linuxAggregateJobErrors(ci?.jobs?.ci),
     ...windowsShardJobErrors(ci?.jobs?.["windows-package-shards"]),
     ...windowsAggregateJobErrors(ci?.jobs?.["windows-package-tests"]),
   );

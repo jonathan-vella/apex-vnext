@@ -839,6 +839,93 @@ export async function inspectAzdBicepProject(input: AzdBindingRequest): Promise<
   return binding;
 }
 
+/**
+ * Orders an azd project's infrastructure roots in deterministic topological dependency order (`direction === "apply"`)
+ * or reverse topological order (`direction === "destroy"`). Independent layers preserve their `azure.yaml` declaration
+ * order; unknown, repeated, self or cyclic dependencies fail closed.
+ */
+export function orderAzdInfraRoots(
+  binding: Pick<AzdBindingV1, "infra">,
+  direction: "apply" | "destroy" = "apply",
+): readonly AzdInfraRootV1[] {
+  const roots = binding.infra.roots;
+  if (!binding.infra.layered) return [...roots];
+  const byName = new Map<string, AzdInfraRootV1>();
+  for (const root of roots) {
+    if (byName.has(root.name))
+      fail("AZD_LAYER_UNSUPPORTED", `Infra layer name ${safeKey(root.name)} is invalid, reserved or repeated`);
+    byName.set(root.name, root);
+  }
+  const state = new Map<string, "visiting" | "done">();
+  const ordered: AzdInfraRootV1[] = [];
+  const visit = (root: AzdInfraRootV1): void => {
+    const current = state.get(root.name);
+    if (current === "done") return;
+    if (current === "visiting") fail("AZD_LAYER_UNSUPPORTED", "Infra layer dependencies are cyclic");
+    if (new Set(root.dependsOn).size !== root.dependsOn.length)
+      fail("AZD_LAYER_UNSUPPORTED", `Infra layer ${root.name} has an unknown, repeated or self dependency`);
+    state.set(root.name, "visiting");
+    for (const dependency of root.dependsOn) {
+      const target = byName.get(dependency);
+      if (target === undefined || dependency === root.name)
+        fail("AZD_LAYER_UNSUPPORTED", `Infra layer ${root.name} has an unknown, repeated or self dependency`);
+      visit(target);
+    }
+    state.set(root.name, "done");
+    ordered.push(root);
+  };
+  for (const root of roots) visit(root);
+  return direction === "destroy" ? [...ordered].reverse() : ordered;
+}
+
+export interface DeclaredAzdBicepRoot {
+  readonly name: string;
+  readonly path: string;
+  readonly module: string;
+  readonly dependsOn: readonly string[];
+}
+
+/**
+ * Parses `azure.yaml` source text and returns its declared Bicep infrastructure roots in topological apply order.
+ */
+export function declaredAzdBicepRoots(source: string): {
+  readonly layered: boolean;
+  readonly roots: readonly DeclaredAzdBicepRoot[];
+} {
+  const project = parseYaml(Buffer.from(source, "utf8"));
+  const { layered, roots } = declareRoots(
+    project.infra === undefined ? {} : plain(project.infra, "infra", "AZD_PROJECT_UNSUPPORTED"),
+  );
+  if (!layered) {
+    return {
+      layered: false,
+      roots: roots.map(({ name, path, module, dependsOn }) => ({ name, path, module, dependsOn })),
+    };
+  }
+  const ordered = orderAzdInfraRoots(
+    {
+      infra: {
+        provider: "bicep",
+        layered: true,
+        roots: roots.map((root) => ({
+          name: root.name,
+          path: root.path,
+          module: root.module,
+          provider: "bicep" as const,
+          dependsOn: [...root.dependsOn],
+          treeHash: "0".repeat(64),
+          resolvedParametersHash: "0".repeat(64),
+        })),
+      },
+    },
+    "apply",
+  );
+  return {
+    layered: true,
+    roots: ordered.map(({ name, path, module, dependsOn }) => ({ name, path, module, dependsOn })),
+  };
+}
+
 /** Names the sections that differ between an accepted binding and the current one, never their values. */
 export function diffAzdBindings(accepted: AzdBindingV1, current: AzdBindingV1): string[] {
   const section = (name: string, left: unknown, right: unknown): string[] =>

@@ -94,7 +94,7 @@ test("approved Action updates need no structural hash changes", () => {
 test("pin normalization never masks executable workflow changes", () => {
   const path = ".github/workflows/ci.yml";
   const texts = mutate(path, checkoutPin, `actions/checkout@${"a".repeat(40)}`);
-  texts[path] = texts[path].replace("run: npm run qualify:vnext", "run: echo skipped");
+  texts[path] = texts[path].replace("run: npm run build:vnext", "run: echo skipped");
   const changedContract = structuredClone(contract);
   changedContract.actionVersions["actions/checkout"].sha = "a".repeat(40);
   assert.ok(validate(texts, changedContract).some((error) => error.includes("complete job contract drift")));
@@ -138,14 +138,18 @@ test("rejects trigger, permission, and action-version drift", () => {
 test("rejects job permission escalation, no-op execution, and exact action substitution", () => {
   const path = ".github/workflows/ci.yml";
   assert.ok(
-    validate(mutate(path, "  ci:\n    name: ci", "  ci:\n    name: ci\n    permissions:\n      contents: write")).some(
-      (error) => error.includes("complete job contract drift"),
-    ),
+    validate(
+      mutate(path, "  scope:\n    name: scope", "  scope:\n    name: scope\n    permissions:\n      contents: write"),
+    ).some((error) => error.includes("complete job contract drift")),
   );
   assert.ok(
-    validate(mutate(path, "  ci:\n    name: ci", "  ci:\n    name: ci\n    if: false")).some((error) =>
-      error.includes("complete job contract drift"),
-    ),
+    validate(
+      mutate(
+        path,
+        "  ci:\n    name: ci\n    needs: [scope, linux-package-shards]\n    if: always()",
+        "  ci:\n    name: ci\n    needs: [scope, linux-package-shards]\n    if: false",
+      ),
+    ).some((error) => error.includes("complete job contract drift")),
   );
   assert.ok(
     validate(mutate(path, checkoutPin, "actions/checkout@v6")).some((error) =>
@@ -153,7 +157,7 @@ test("rejects job permission escalation, no-op execution, and exact action subst
     ),
   );
   assert.ok(
-    validate(mutate(path, "run: npm run qualify:vnext", "run: echo skipped-qualification")).some((error) =>
+    validate(mutate(path, "run: npm run build:vnext", "run: echo skipped-qualification")).some((error) =>
       error.includes("complete job contract drift"),
     ),
   );
@@ -292,18 +296,28 @@ test("rejects an unpinned or missing Copilot CLI plugin install smoke after reba
   );
 });
 
-test("keeps the required ci job independent and gates only the Windows lane on the docs-only scope", () => {
+test("keeps the required ci job always-running and gates both shard lanes on the docs-only scope", () => {
   const ciPath = ".github/workflows/ci.yml";
   for (const [search, replacement, expected] of [
     [
-      "  ci:\n    name: ci\n    runs-on: ubuntu-latest\n",
-      "  ci:\n    name: ci\n    needs: scope\n    runs-on: ubuntu-latest\n",
-      "required ci job must not depend on or be conditional on another job",
+      "  ci:\n    name: ci\n    needs: [scope, linux-package-shards]\n    if: always()\n",
+      "  ci:\n    name: ci\n    needs: [scope, linux-package-shards]\n",
+      "required ci job must always run and pass only for a docs-only change or when the scope job and every Linux shard succeeded",
     ],
     [
-      "  ci:\n    name: ci\n    runs-on: ubuntu-latest\n",
-      "  ci:\n    name: ci\n    if: needs.scope.outputs.docs_only != 'true'\n    runs-on: ubuntu-latest\n",
-      "required ci job must not depend on or be conditional on another job",
+      "  ci:\n    name: ci\n    needs: [scope, linux-package-shards]\n    if: always()\n",
+      "  ci:\n    name: ci\n    needs: [scope]\n    if: always()\n",
+      "required ci job must always run and pass only for a docs-only change or when the scope job and every Linux shard succeeded",
+    ],
+    [
+      "    needs: scope\n    if: needs.scope.outputs.docs_only != 'true'\n    runs-on: ubuntu-latest",
+      "    runs-on: ubuntu-latest",
+      "unless the scope job reports a docs-only change",
+    ],
+    [
+      "    if: needs.scope.outputs.docs_only != 'true'\n    runs-on: ubuntu-latest",
+      "    if: always()\n    runs-on: ubuntu-latest",
+      "unless the scope job reports a docs-only change",
     ],
     [
       "    needs: scope\n    if: needs.scope.outputs.docs_only != 'true'\n    runs-on: windows-2025",
@@ -366,14 +380,28 @@ test("classifies docs-only changes with the one rule that both the scope and ci 
   assert.equal(isDocsOnly([]), false);
 });
 
+const LINUX_LANE = "ubuntu-latest vNext qualification and CLI test lane";
+const LINUX_MATRIX = "Linux shard matrix must be core plus every CLI shard exactly once";
+const LINUX_AGGREGATE = "required ci job must always run";
 const LANE = "windows-2025 kernel, capabilities and CLI test lane";
 const MATRIX = "Windows shard matrix must be core plus every CLI shard exactly once";
 const AGGREGATE = "windows-2025 package tests job must always run";
 
-function assertRejected(cases) {
+function assertRejected(cases, sectionAnchor) {
   const ciPath = ".github/workflows/ci.yml";
   for (const [search, replacement, expected] of cases) {
-    const texts = mutate(ciPath, search, replacement);
+    const texts = structuredClone(workflowTexts);
+    if (sectionAnchor === undefined) {
+      assert.ok(texts[ciPath].includes(search), `${search} missing from ${ciPath}`);
+      texts[ciPath] = texts[ciPath].replace(search, replacement);
+    } else {
+      const start = texts[ciPath].indexOf(sectionAnchor);
+      assert.ok(start >= 0, `${sectionAnchor} missing from ${ciPath}`);
+      const head = texts[ciPath].slice(0, start);
+      const tail = texts[ciPath].slice(start);
+      assert.ok(tail.includes(search), `${search} missing after ${sectionAnchor}`);
+      texts[ciPath] = `${head}${tail.replace(search, replacement)}`;
+    }
     const errors = validate(texts, rebaseline(ciPath, texts));
     assert.ok(
       errors.some((error) => error.includes(expected)),
@@ -382,78 +410,152 @@ function assertRejected(cases) {
   }
 }
 
+test("rejects Linux package-test lane, matrix, and aggregate weakening after rebaselining", () => {
+  assertRejected(
+    [
+      ["  linux-package-shards:", "  linux-shards:", "required vNext and Windows package-test jobs"],
+      ["    timeout-minutes: 60\n", "    timeout-minutes: 30\n", LINUX_LANE],
+      ["    timeout-minutes: 60\n", "    timeout-minutes: 60\n    continue-on-error: true\n", LINUX_LANE],
+      [
+        "      - name: Prepare CLI assets\n        run: npm run prepare:assets --workspace @apexops/cli\n\n",
+        "",
+        LINUX_LANE,
+      ],
+      ["      - name: Build vNext packages\n        run: npm run build:vnext\n\n", "", LINUX_LANE],
+      ["          npm run validate:vnext\n", "", LINUX_LANE],
+      ["          npm --workspace @apexops/kernel run test\n", "", LINUX_LANE],
+      ["          npm run test:vnext-pack\n", "", LINUX_LANE],
+      ["        run: (cd packages/cli && node --test dist/test/*.test.js)", "        run: echo skipped", LINUX_LANE],
+      [
+        "        env:\n          APEX_TEST_SHARD: ${{ matrix.cli_shard }}\n",
+        "        env:\n          APEX_TEST_SHARD: 1/8\n",
+        LINUX_LANE,
+      ],
+      ["          - suite: cli-8-of-8\n            cli_shard: 8/8\n", "", LINUX_MATRIX],
+      ["      fail-fast: false", "      fail-fast: true", LINUX_MATRIX],
+      ["          SHARDS_RESULT: ${{ needs.linux-package-shards.result }}\n", "", LINUX_AGGREGATE],
+      [
+        "          SHARDS_RESULT: ${{ needs.linux-package-shards.result }}",
+        "          SHARDS_RESULT: success",
+        LINUX_AGGREGATE,
+      ],
+    ],
+    "  linux-package-shards:",
+  );
+});
+
+test("the aggregate Linux status step in ci passes only for docs-only changes or fully successful shards", () => {
+  const workflow = yaml.load(workflowTexts[".github/workflows/ci.yml"]);
+  const step = workflow.jobs.ci.steps.find(({ name }) => name === "Require the scope decision and every Linux shard");
+  assert.ok(step);
+  const verdict = (scope, docsOnly, shards, localDocsOnly = docsOnly) =>
+    spawnSync("bash", ["-c", step.run], {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        SCOPE_RESULT: scope,
+        DOCS_ONLY: docsOnly,
+        LOCAL_DOCS_ONLY: localDocsOnly,
+        SHARDS_RESULT: shards,
+      },
+    }).status;
+
+  assert.equal(verdict("success", "true", "skipped"), 0, "docs-only skips the shards");
+  assert.equal(verdict("success", "false", "success"), 0);
+  assert.equal(verdict("success", "", "success"), 0, "push and dispatch runs have no docs-only output");
+  assert.equal(verdict("success", "true", "skipped", "false"), 1, "mismatched local docs_only fails closed");
+  for (const shards of ["failure", "cancelled", "skipped", ""]) {
+    assert.equal(verdict("success", "false", shards), 1, `shards ${shards}`);
+    assert.equal(verdict("success", "", shards), 1, `shards ${shards} without a docs-only output`);
+  }
+  for (const scope of ["failure", "cancelled", "skipped", ""]) {
+    assert.equal(verdict(scope, "", "skipped"), 1, `scope ${scope}`);
+    assert.equal(verdict(scope, "true", "skipped"), 1, `docs-only with scope ${scope}`);
+    assert.equal(verdict(scope, "false", "success"), 1, `scope ${scope} with passing shards`);
+  }
+});
+
 test("rejects Windows package-test lane weakening after rebaselining", () => {
-  assertRejected([
-    ["  windows-package-shards:", "  windows-shards:", "required vNext and Windows package-test jobs"],
-    ["  windows-package-tests:", "  windows-tests:", "required vNext and Windows package-test jobs"],
-    ["    runs-on: windows-2025", "    runs-on: windows-latest", LANE],
-    ["    timeout-minutes: 60\n", "    timeout-minutes: 30\n", LANE],
-    ["    timeout-minutes: 60\n", "    timeout-minutes: 60\n    continue-on-error: true\n", LANE],
+  assertRejected(
     [
-      "      - name: Prepare CLI assets\n        shell: bash\n        run: npm run prepare:assets --workspace @apexops/cli\n\n",
-      "",
-      LANE,
+      ["  windows-package-shards:", "  windows-shards:", "required vNext and Windows package-test jobs"],
+      ["  windows-package-tests:", "  windows-tests:", "required vNext and Windows package-test jobs"],
+      ["    runs-on: windows-2025", "    runs-on: windows-latest", LANE],
+      ["    timeout-minutes: 60\n", "    timeout-minutes: 30\n", LANE],
+      ["    timeout-minutes: 60\n", "    timeout-minutes: 60\n    continue-on-error: true\n", LANE],
+      [
+        "      - name: Prepare CLI assets\n        shell: bash\n        run: npm run prepare:assets --workspace @apexops/cli\n\n",
+        "",
+        LANE,
+      ],
+      ["          npm run build --workspace @apexops/capabilities\n", "", LANE],
+      ["          (cd packages/kernel && node --test dist/test/*.test.js)\n", "", LANE],
+      ["          (cd packages/capabilities && node --test dist/test/*.test.js)\n", "", LANE],
+      ["        run: (cd packages/cli && node --test dist/test/*.test.js)", "        run: echo skipped", LANE],
+      [
+        "        env:\n          APEX_TEST_SHARD: ${{ matrix.cli_shard }}\n",
+        "        env:\n          APEX_TEST_SHARD: 1/8\n",
+        LANE,
+      ],
+      ["        env:\n          APEX_TEST_SHARD: ${{ matrix.cli_shard }}\n", "", LANE],
+      [
+        "      - name: Build and test the agent plugin package\n        if: matrix.suite == 'core'",
+        "      - name: Build and test the agent plugin package\n        if: matrix.suite == 'none'",
+        LANE,
+      ],
+      ["        run: npm run test:plugin\n\n", "        run: echo skipped\n\n", LANE],
+      ["        shell: bash", "", LANE],
     ],
-    ["          npm run build --workspace @apexops/capabilities\n", "", LANE],
-    ["          (cd packages/kernel && node --test dist/test/*.test.js)\n", "", LANE],
-    ["          (cd packages/capabilities && node --test dist/test/*.test.js)\n", "", LANE],
-    ["        run: (cd packages/cli && node --test dist/test/*.test.js)", "        run: echo skipped", LANE],
-    [
-      "        env:\n          APEX_TEST_SHARD: ${{ matrix.cli_shard }}\n",
-      "        env:\n          APEX_TEST_SHARD: 1/8\n",
-      LANE,
-    ],
-    ["        env:\n          APEX_TEST_SHARD: ${{ matrix.cli_shard }}\n", "", LANE],
-    [
-      "      - name: Build and test the agent plugin package\n        if: matrix.suite == 'core'",
-      "      - name: Build and test the agent plugin package\n        if: matrix.suite == 'none'",
-      LANE,
-    ],
-    ["        run: npm run test:plugin\n\n", "        run: echo skipped\n\n", LANE],
-    ["        shell: bash", "", LANE],
-  ]);
+    "  windows-package-shards:",
+  );
 });
 
 test("rejects Windows shard matrices that skip or repeat a CLI shard", () => {
-  assertRejected([
-    ["          - suite: cli-8-of-8\n            cli_shard: 8/8\n", "", MATRIX],
-    ["            cli_shard: 8/8", "            cli_shard: 7/8", MATRIX],
-    ["          - suite: core\n", "", MATRIX],
-    ["      fail-fast: false", "      fail-fast: true", MATRIX],
+  assertRejected(
     [
-      "          - suite: cli-2-of-8\n            cli_shard: 2/8",
-      "          - suite: cli-2-of-8\n            cli_shard: 2/9",
-      MATRIX,
+      ["          - suite: cli-8-of-8\n            cli_shard: 8/8\n", "", MATRIX],
+      ["            cli_shard: 8/8", "            cli_shard: 7/8", MATRIX],
+      ["          - suite: core\n", "", MATRIX],
+      ["      fail-fast: false", "      fail-fast: true", MATRIX],
+      [
+        "          - suite: cli-2-of-8\n            cli_shard: 2/8",
+        "          - suite: cli-2-of-8\n            cli_shard: 2/9",
+        MATRIX,
+      ],
+      ["          - suite: core\n", "          - suite: core\n          - suite: core\n", MATRIX],
     ],
-    ["          - suite: core\n", "          - suite: core\n          - suite: core\n", MATRIX],
-  ]);
+    "  windows-package-shards:",
+  );
 });
 
 test("rejects an aggregate Windows status that can pass without every shard", () => {
-  assertRejected([
-    ["    if: always()\n", "", AGGREGATE],
-    ["    if: always()\n", "    if: success()\n", AGGREGATE],
-    ["    needs: [scope, windows-package-shards]", "    needs: [scope]", AGGREGATE],
-    ["    needs: [scope, windows-package-shards]", "    needs: [windows-package-shards]", AGGREGATE],
+  assertRejected(
     [
-      '          if [ "$SHARDS_RESULT" != "success" ]; then\n            echo "The Windows shards finished as \'$SHARDS_RESULT\'."\n            exit 1\n          fi\n',
-      "",
-      AGGREGATE,
+      ["    if: always()\n", "", AGGREGATE],
+      ["    if: always()\n", "    if: success()\n", AGGREGATE],
+      ["    needs: [scope, windows-package-shards]", "    needs: [scope]", AGGREGATE],
+      ["    needs: [scope, windows-package-shards]", "    needs: [windows-package-shards]", AGGREGATE],
+      [
+        '          if [ "$SHARDS_RESULT" != "success" ]; then\n            echo "The Windows shards finished as \'$SHARDS_RESULT\'."\n            exit 1\n          fi\n',
+        "",
+        AGGREGATE,
+      ],
+      [
+        '          if [ "$SCOPE_RESULT" != "success" ]; then\n            echo "The scope job finished as \'$SCOPE_RESULT\'."\n            exit 1\n          fi\n',
+        "",
+        AGGREGATE,
+      ],
+      ['if [ "$DOCS_ONLY" = "true" ]', 'if [ "$DOCS_ONLY" != "x" ]', AGGREGATE],
+      ["          SHARDS_RESULT: ${{ needs.windows-package-shards.result }}\n", "", AGGREGATE],
+      [
+        "          SHARDS_RESULT: ${{ needs.windows-package-shards.result }}",
+        "          SHARDS_RESULT: success",
+        AGGREGATE,
+      ],
+      ["    timeout-minutes: 5\n", "    timeout-minutes: 5\n    continue-on-error: true\n", AGGREGATE],
     ],
-    [
-      '          if [ "$SCOPE_RESULT" != "success" ]; then\n            echo "The scope job finished as \'$SCOPE_RESULT\'."\n            exit 1\n          fi\n',
-      "",
-      AGGREGATE,
-    ],
-    ['if [ "$DOCS_ONLY" = "true" ]', 'if [ "$DOCS_ONLY" != "x" ]', AGGREGATE],
-    ["          SHARDS_RESULT: ${{ needs.windows-package-shards.result }}\n", "", AGGREGATE],
-    [
-      "          SHARDS_RESULT: ${{ needs.windows-package-shards.result }}",
-      "          SHARDS_RESULT: success",
-      AGGREGATE,
-    ],
-    ["    timeout-minutes: 5\n", "    timeout-minutes: 5\n    continue-on-error: true\n", AGGREGATE],
-  ]);
+    "  windows-package-tests:",
+  );
 });
 
 test("the aggregate Windows status passes only for docs-only changes or fully successful shards", () => {
