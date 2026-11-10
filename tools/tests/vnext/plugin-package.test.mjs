@@ -124,6 +124,8 @@ test("plugin layout, manifests, agents, skills and bundle are valid", async (con
   assert.ok(files.includes("cli/apex.mjs"), "packaged plugin ships cli/apex.mjs");
   assert.ok(files.includes("scripts/onboard.ps1"), "packaged plugin ships scripts/onboard.ps1");
   assert.ok(files.includes("scripts/onboard.sh"), "packaged plugin ships scripts/onboard.sh");
+  const onboardPs1 = await readFile(join(outputDirectory, "scripts/onboard.ps1"), "utf8");
+  assert.match(onboardPs1, /if \(\$arg -ieq "-Yes"\) \{ "--yes" \}/u);
 
   const plugin = await readJson(join(outputDirectory, "plugin.json"));
   validatePluginJson(plugin);

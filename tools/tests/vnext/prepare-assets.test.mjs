@@ -483,6 +483,16 @@ test("managed routing distinguishes input, review dispositions, and exact task c
   }
 });
 
+test("asset generator normalizes CRLF line endings in text source files to LF", async (context) => {
+  const root = await mkdtemp(join(tmpdir(), "apex-asset-crlf-"));
+  context.after(() => rm(root, { recursive: true, force: true }));
+  const markdownPath = join(root, "sample.md");
+  await writeFile(markdownPath, "# Title\r\n\r\nLine two\r\n");
+  const normalized = await readSourceFile(root, markdownPath);
+  assert.equal(normalized.toString("utf8"), "# Title\n\nLine two\n");
+  assert.equal(normalized.includes(13), false);
+});
+
 test("asset generator refuses a source replaced by a symlink before open", async (context) => {
   const root = await mkdtemp(join(tmpdir(), "apex-asset-source-"));
   context.after(() => rm(root, { recursive: true, force: true }));
@@ -533,7 +543,7 @@ test("asset generator refuses a source root replaced before pinning completes", 
 
 test("asset generator rejects inconsistent bundle declarations", () => {
   const customization = {
-    version: "0.11.0-next.8",
+    version: "0.11.0-next.9",
     bundle: {
       id: "apex-managed-workspace",
       authority: "npm:@apexops/cli",
@@ -544,10 +554,10 @@ test("asset generator rejects inconsistent bundle declarations", () => {
   };
   const runtime = {
     schemaVersion: "1.0.0",
-    bundleVersion: "0.11.0-next.8",
+    bundleVersion: "0.11.0-next.9",
     components: {
       customizationBundle: {
-        version: "0.11.0-next.8",
+        version: "0.11.0-next.9",
         manifest: "@apexops/cli/assets/customizations/manifest.json",
         assetManifest: "@apexops/cli/assets/manifest.json",
         compositionId: "apex-managed-workspace",

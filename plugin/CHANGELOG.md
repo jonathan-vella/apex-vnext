@@ -10,6 +10,17 @@ When you prepare a release, rename `## [Unreleased]` to the new version.
 
 ## [Unreleased]
 
+## [0.11.0-next.9] - 2026-11-10
+
+This release fixes Windows CRLF asset hash drift in `assets/manifest.json` and allows `scripts/onboard.ps1` to accept
+`-Yes` alongside `--yes`.
+
+### Fixed
+
+- Normalize text source files to LF in `packages/cli/scripts/prepare-assets.mjs` so `assets/manifest.json` digests match
+  the LF-normalized files written by `tools/scripts/build-plugin.mjs` on Windows.
+- Map `-Yes` (case-insensitive) to `--yes` in `scripts/onboard.ps1`.
+
 ## [0.11.0-next.8] - 2026-11-10
 
 This release ships `azd` layered provisioning support (`infra.layers[]` in `azure.yaml`, #480) and top-level
