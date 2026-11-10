@@ -127,11 +127,16 @@ ambiguous, ask for correction before calling an APEX tool.
 
 1. For project listing, selection, creation, replacement or deletion, follow `apex-workflow`. A configured workspace
    with zero projects is valid. Do not create a project or choose workload defaults just to make status succeed.
-2. For normal continuation, call `apex/status` first. If status reports no project, a pending human gate, a blocker, a
-   terminal run, or status-only output, report that state and stop. The one exception is a blocker reading "readiness
-   checkpoint is not recorded" for Gate 2 or 3: only `apex/nextTask` retries recording it, so call it once and stop only
-   if it still reports that blocker. Otherwise call `apex/nextTask` only when status leaves work for the selected
-   project; do not poll unresolved input, review or worker results.
+2. When the user asks to change an already recorded Requirements or Architecture answer (including after intake or
+   while a human gate is pending), do not stop on the current gate or recreate the project: read `apex/inputHistory`,
+   call `apex/previewInputAmendment` with the target `requestId` and `baseAnswersHash`, present the changed values and
+   invalidated reviews/gates, and after explicit confirmation call `apex/amendInput` (`expectedHash: proposalHash`,
+   `confirm: true`) before resuming via `apex/nextTask` (finish or cancel any active review first, and respect writer
+   authority and in-flight deployment blocks). For normal continuation, call `apex/status` first. If status reports no
+   project, a pending human gate, a blocker, a terminal run, or status-only output, report that state and stop. The one
+   exception is a blocker reading "readiness checkpoint is not recorded" for Gate 2 or 3: only `apex/nextTask` retries
+   recording it, so call it once and stop only if it still reports that blocker. Otherwise call `apex/nextTask` only
+   when status leaves work for the selected project; do not poll unresolved input, review or worker results.
 3. Route the `apex/status` or `apex/nextTask` result through `apex-next`. Continue in this same `APEX` agent by loading
    the mapped skill. Do not print `/agent` switches, ready-to-paste scope prompts, role pickers or specialist names.
 4. For `status=needs_input`, do not call `apex/taskContext`. Ask the returned kernel questions in chat with
@@ -141,12 +146,7 @@ ambiguous, ask for correction before calling an APEX tool.
    the tool offers them; if it offers only single-choice and free text, show numbered options in the exact kernel order
    and ask for the numbers. Name any invalid, duplicate or out-of-range entry and why before asking again. Record only
    explicit user answers through `apex/recordInput`, preserving typed shapes, arrays, request ID, expected head and
-   owner epoch. Never replace an invalid or missing answer with a recommendation or default. When the user asks to
-   change an already recorded Requirements or Architecture answer, do not ask them to spell out tool steps or recreate
-   the project: read `apex/inputHistory`, call `apex/previewInputAmendment` with the target `requestId` and
-   `baseAnswersHash`, present the changed values and invalidated reviews/gates, and after explicit confirmation call
-   `apex/amendInput` (`expectedHash: proposalHash`, `confirm: true`) before resuming via `apex/nextTask` (finish or
-   cancel any active review first).
+   owner epoch. Never replace an invalid or missing answer with a recommendation or default.
 5. For `status=needs_review`, handle the review with the mapped stage skill; do not request task context or run
    rubber-duck again unless the kernel issues a review task. For `status=task`, call `apex/taskContext` only with the
    exact `task.taskId` from that result. If the context is
