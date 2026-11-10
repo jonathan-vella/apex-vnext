@@ -168,6 +168,7 @@ writer claim before deployment.
 
 ## Related
 
+- [Change a decision](run-workflow.md#change-a-decision)
 - [Security and authority](../explanation/security-and-authority.md)
 - [Bicep and Terraform](../reference/iac-tracks.md)
 - [Qualify a candidate](qualify-candidate.md)
