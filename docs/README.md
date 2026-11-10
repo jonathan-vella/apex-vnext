@@ -20,6 +20,7 @@ Plugin bundling both the MCP server (`mcp/apex.mjs`) and CLI (`cli/apex.mjs`).
 | Start in Copilot CLI on Linux or WSL2    | [Copilot CLI on WSL2 runbook](tutorials/wsl2-vscode-consumer-runbook.md)             |
 | Evaluate APEX locally                    | [Complete the first local run](tutorials/first-run.md)                               |
 | Run a governed workflow                  | [Run the workflow](how-to/run-workflow.md)                                           |
+| Change a recorded answer or stage output | [Change a decision](how-to/run-workflow.md#change-a-decision)                        |
 | Understand planned COE reuse and changes | [Project adaptation](explanation/workflow-and-gates.md#planned-coe-reuse-and-change) |
 | Review output quality expectations       | [Quality reference](vnext/PRD.md#output-quality-reference)                           |
 | Preview or reconcile infrastructure      | [Operate a project](how-to/operate-project.md)                                       |

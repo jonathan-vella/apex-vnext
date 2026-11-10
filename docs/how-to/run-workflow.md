@@ -68,6 +68,30 @@ Call `nextTask` again after every accepted round. Continue until it returns `sta
 that result. Recommendations are visible defaults or non-binding candidates and enter the journal only after
 confirmation. Architecture selection, SKU decisions, and implementation stay with later workflow stages.
 
+## Change A Decision
+
+You never need to delete a project or edit `.apex/` or `agent-output/` by hand to correct a mistake. Every stage has a
+hash-bound amendment or revision path that records an audit event and reopens only the affected downstream reviews and
+gates:
+
+| What needs to change                                                  | In chat (`APEX` agent / MCP)                                                                                                                                                         | From the terminal (`.apex/bin/apex.mjs`)                                                                                                                                                                                                             | Downstream authority & reopened gates                                                                                                                   |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Recorded Requirements intake answer (rounds 1–3)                      | Ask to change the answer; `APEX` calls `apex/inputHistory` → `apex/previewInputAmendment` → confirms with you → `apex/amendInput`, then regenerates Requirements via `apex/nextTask` | `node .apex/bin/apex.mjs input history --json`<br>`node .apex/bin/apex.mjs input preview-amendment --file fix.json --reason "..." --json`<br>`node .apex/bin/apex.mjs input amend --file fix.json --reason "..." --expected-hash HASH --yes --json`  | Updates effective `recordedInput` and invalidates `requirements`, `requirements-review`, Gate 1, Architecture, Plan, Validation, and Gates 2–4          |
+| Accepted `RequirementsV1` artifact after Gate 1                       | Amend the underlying intake answer above (recommended), or apply a CLI requirements revision and resume in chat                                                                      | `node .apex/bin/apex.mjs requirements preview-amendment --file patch.json --reason "..." --json`<br>`node .apex/bin/apex.mjs requirements amend --file patch.json --reason "..." --expected-hash HASH --yes --json` (or `preview-change` / `revise`) | Produces a new `RequirementsV1` hash and reopens `requirements-review`, Gate 1, Architecture, Plan, Validation, and Gates 2–4                           |
+| Recorded Architecture decision answer                                 | Ask to change the Architecture decision; `APEX` runs `apex/inputHistory` → `apex/previewInputAmendment` → confirms with you → `apex/amendInput`, then reruns Architecture            | Same `input history` / `input preview-amendment` / `input amend --yes` commands targeting the Architecture `requestId`                                                                                                                               | Keeps Gate 1 intact; invalidates Architecture, `architecture-review`, Plan, Validation, and Gates 2–4                                                   |
+| Governance baseline (replacing reference or updating policy snapshot) | During `governance-refresh` / `policy-refresh`, `APEX` imports the reviewed baseline and updates only changed `policy-property-map` rows                                             | `node .apex/bin/apex.mjs governance revise --path baseline.json --reason "..." --yes --json`<br>`node .apex/bin/apex.mjs governance import --path baseline.json --json`                                                                              | `governance-refresh` + `policy-refresh` keep Gate 2 `ready` unless a policy is `blocked`; `governance revise` keeps Gate 1 intact and reopens Gates 2–4 |
+| Plan / IaC module binding or CodeGen output                           | Reopen by amending the upstream Architecture/Requirements decision or rejecting at review/Gate 4, then rerun `planComplete` / `APEX CodeGen`                                         | Reject Gate 4 (`gate decide --gate 4 --decision rejected`) or amend the upstream decision                                                                                                                                                            | Reopens Gate 3 readiness, Validation, preview, and Gate 4                                                                                               |
+| Project `purpose`, `iacTool`, or `targetScope`                        | Ask `APEX` to create a new project or promote to a new environment run                                                                                                               | `node .apex/bin/apex.mjs project promote --environment <env> --target <scope> --json` or `project create`                                                                                                                                            | Creates a new run; a different target reopens Requirements review and Gate 1                                                                            |
+
+**How corrections flow downstream:**
+
+- `inputHistory` and `amendInput` append a `requirements.input-amended` or `architecture.input-amended` event to the run
+  journal, updating the effective answers projected in `taskContext.recordedInput` and `taskContext.decisions`.
+- Once `apex/requirementsComplete` is accepted, downstream Architecture and Planning tasks consume the accepted
+  `RequirementsV1` artifact (`sourceHashes.requirements`), while governance discovery and `policyMappings` evaluate the
+  run's `targetScope` and `ArchitectureV1.components[].resourceTypes` rather than raw intake strings.
+- If a `rubber-duck` review is in flight, finish or cancel that review before calling `amendInput`.
+
 ## Complete Creative Stages
 
 The APEX agent completes interactive stages by loading the matching stage skill:
@@ -325,15 +349,6 @@ chooses Bicep or Terraform; outputs for the other track are invalid.
 apex validate --json
 apex status --json
 ```
-
-## Legacy Promotion Alias
-
-```bash
-apex promote --environment test --target TARGET_SCOPE --json
-```
-
-Promotion creates a linked run. Only dependency-matching upstream attestations can carry forward. Every environment
-requires a fresh preview, Gate 4 decision, operation, inventory, and evidence.
 
 ## Related
 

@@ -141,7 +141,12 @@ ambiguous, ask for correction before calling an APEX tool.
    the tool offers them; if it offers only single-choice and free text, show numbered options in the exact kernel order
    and ask for the numbers. Name any invalid, duplicate or out-of-range entry and why before asking again. Record only
    explicit user answers through `apex/recordInput`, preserving typed shapes, arrays, request ID, expected head and
-   owner epoch. Never replace an invalid or missing answer with a recommendation or default.
+   owner epoch. Never replace an invalid or missing answer with a recommendation or default. When the user asks to
+   change an already recorded Requirements or Architecture answer, do not ask them to spell out tool steps or recreate
+   the project: read `apex/inputHistory`, call `apex/previewInputAmendment` with the target `requestId` and
+   `baseAnswersHash`, present the changed values and invalidated reviews/gates, and after explicit confirmation call
+   `apex/amendInput` (`expectedHash: proposalHash`, `confirm: true`) before resuming via `apex/nextTask` (finish or
+   cancel any active review first).
 5. For `status=needs_review`, handle the review with the mapped stage skill; do not request task context or run
    rubber-duck again unless the kernel issues a review task. For `status=task`, call `apex/taskContext` only with the
    exact `task.taskId` from that result. If the context is
