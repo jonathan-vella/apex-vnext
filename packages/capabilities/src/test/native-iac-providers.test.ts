@@ -2385,22 +2385,222 @@ test("azd apply re-checks the azd version and identity right before running", as
   assert.equal((await fixture.provider.apply(preview, approval(preview), authority)).state, "succeeded");
 });
 
-test("azd fails closed for layered projects, non-group scopes, untagged groups and shared environments", async (context) => {
+test("azd previews, applies in topological layer order, validates policy across layers, stops on partial failure, and destroys in reverse order", async (context) => {
+  const VNET = { type: "Microsoft.Network/virtualNetworks", name: "vnetlab" };
+  const VNET_ID = resourceId(VNET.type, VNET.name);
   const layered = await azdFixture(context, {
-    azureYaml:
-      "name: project\ninfra:\n  layers:\n    - name: network\n      path: infra/network\n    - name: app\n      path: infra/app\n      dependsOn: [network]\n",
+    azureYaml: [
+      "name: project",
+      "infra:",
+      "  layers:",
+      "    - name: app",
+      "      path: infra/app",
+      "      dependsOn: [network]",
+      "    - name: network",
+      "      path: infra/network",
+      "",
+    ].join("\n"),
+    state: {
+      previewByLayer: {
+        network: [{ Operation: "Create", Type: VNET.type, Name: VNET.name }],
+        app: [{ Operation: "Create", Type: STORAGE.type, Name: STORAGE.name }],
+      },
+    },
   });
+  await rm(join(layered.root, "infra", "main.bicep"));
+  await rm(join(layered.root, "infra", "bicepconfig.json"));
   await mkdir(join(layered.root, "infra", "network"), { recursive: true });
   await mkdir(join(layered.root, "infra", "app"), { recursive: true });
   for (const layer of ["network", "app"])
     await writeFile(join(layered.root, "infra", layer, "bicepconfig.json"), BICEP_CONFIG);
   await writeFile(join(layered.root, "infra", "network", "main.bicep"), "targetScope = 'resourceGroup'\n");
   await writeFile(join(layered.root, "infra", "app", "main.bicep"), "targetScope = 'resourceGroup'\n");
-  await assert.rejects(
-    layered.provider.previewApply({ ...layered.preview(), generatedSource: undefined as never }),
-    (error) => error instanceof AzdBindingError && /AZD_LAYER_UNSUPPORTED|layer/.test(`${error.code} ${error.message}`),
+  const layeredFiles = [
+    { path: "azure.yaml", content: await readFile(join(layered.root, "azure.yaml"), "utf8") },
+    { path: "infra/app/bicepconfig.json", content: BICEP_CONFIG },
+    { path: "infra/app/main.bicep", content: "targetScope = 'resourceGroup'\n" },
+    { path: "infra/network/bicepconfig.json", content: BICEP_CONFIG },
+    { path: "infra/network/main.bicep", content: "targetScope = 'resourceGroup'\n" },
+  ];
+  const layeredGeneratedSource = { rootPath: layered.root, treeHash: sha256(layeredFiles) };
+
+  const preview = await layered.provider.previewApply(
+    layered.preview({
+      resources: managed(VNET, STORAGE),
+      generatedSource: layeredGeneratedSource,
+    }),
+  );
+  assert.deepEqual(preview.blockers, []);
+  assert.deepEqual(
+    preview.changes.map(({ resourceId: id, action }) => [id, action]),
+    [
+      [VNET_ID, "create"],
+      [STORAGE_ID, "create"],
+    ],
+  );
+  const previewLayers = layered.runner.requests
+    .filter((entry) => entry.executable === "azd" && entry.args.includes("--preview"))
+    .map((entry) => entry.args[1]);
+  assert.deepEqual(previewLayers, ["network", "app"]);
+  assert.match(
+    layered.provider.approvalMaterial(preview.previewHash)!.warnings.join("\n"),
+    /Provisioning runs 2 layers in dependency order/,
   );
 
+  // Partial failure on the first layer stops before running dependent layers and names completed layers.
+  layered.state.failOnLayer = "network";
+  await assert.rejects(
+    layered.provider.apply(preview, approval(preview), authority),
+    /azd layer 'network' failed; completed layers: none/u,
+  );
+  assert.deepEqual(
+    layered.executions().map((entry) => entry.args.slice(0, 2)),
+    [["provision", "network"]],
+  );
+
+  // Partial failure on the second layer reports the completed prerequisite layer.
+  layered.runner.requests.length = 0;
+  layered.state.failOnLayer = "app";
+  await assert.rejects(
+    layered.provider.apply(preview, approval(preview), authority),
+    /azd layer 'app' failed; completed layers: network/u,
+  );
+  assert.deepEqual(
+    layered.executions().map((entry) => entry.args.slice(0, 2)),
+    [
+      ["provision", "network"],
+      ["provision", "app"],
+    ],
+  );
+
+  // Full apply runs layers in topological order (network -> app).
+  layered.runner.requests.length = 0;
+  layered.state.failOnLayer = undefined;
+  const applyRecord = await layered.provider.apply(preview, approval(preview), authority);
+  assert.equal(applyRecord.state, "succeeded");
+  assert.deepEqual(
+    layered.executions().map((entry) => entry.args.slice(0, 2)),
+    [
+      ["provision", "network"],
+      ["provision", "app"],
+    ],
+  );
+
+  // Destroy runs layers in reverse topological order (app -> network).
+  layered.runner.requests.length = 0;
+  layered.state.resources = [
+    { id: VNET_ID, type: VNET.type, name: VNET.name, location: "swedencentral" },
+    { id: STORAGE_ID, type: STORAGE.type, name: STORAGE.name, location: "swedencentral" },
+  ];
+  const destroyPreview = await layered.provider.previewDestroy(
+    layered.preview({
+      resources: managed(VNET, STORAGE),
+      generatedSource: layeredGeneratedSource,
+    }),
+  );
+  assert.deepEqual(destroyPreview.blockers, []);
+  const destroyRecord = await layered.provider.destroy(destroyPreview, approval(destroyPreview), authority);
+  assert.equal(destroyRecord.state, "succeeded");
+  assert.deepEqual(
+    layered.executions().map((entry) => entry.args.slice(0, 3)),
+    [
+      ["down", "app", "--force"],
+      ["down", "network", "--force"],
+    ],
+  );
+
+  // Cross-layer duplicate material resource blocks preview.
+  layered.state.previewByLayer = {
+    network: [{ Operation: "Create", Type: STORAGE.type, Name: STORAGE.name }],
+    app: [{ Operation: "Modify", Type: STORAGE.type, Name: STORAGE.name }],
+  };
+  const duplicatePreview = await layered.provider.previewApply(
+    layered.preview({
+      resources: managed(VNET, STORAGE),
+      generatedSource: layeredGeneratedSource,
+    }),
+  );
+  assert.match(duplicatePreview.blockers.join("\n"), /duplicate material resource/u);
+
+  // Multi-layer policy validation compiles all layers in topological order and rejects compiler drift before apply.
+  layered.state.previewByLayer = {
+    network: [{ Operation: "Create", Type: VNET.type, Name: VNET.name }],
+    app: [{ Operation: "Create", Type: STORAGE.type, Name: STORAGE.name }],
+  };
+  let storageSecurity = "enforced";
+  const baseRun = layered.runner.run.bind(layered.runner);
+  layered.runner.run = async (process) => {
+    if (process.executable === "bicep" && process.args[0] === "build") {
+      const targetFile = process.args[1];
+      if (targetFile === "infra/network/main.bicep") {
+        return {
+          exitCode: 0,
+          signal: null,
+          stdout: JSON.stringify({ resources: { vnet: { properties: { encryption: "enabled" } } } }),
+          stderr: "",
+          timedOut: false,
+          outputTruncated: false,
+        };
+      }
+      if (targetFile === "infra/app/main.bicep") {
+        return {
+          exitCode: 0,
+          signal: null,
+          stdout: JSON.stringify({ resources: { storage: { properties: { security: storageSecurity } } } }),
+          stderr: "",
+          timedOut: false,
+          outputTruncated: false,
+        };
+      }
+    }
+    return await baseRun(process);
+  };
+  const policyPreview = await layered.provider.previewApply(
+    layered.preview({
+      resources: managed(VNET, STORAGE),
+      generatedSource: layeredGeneratedSource,
+      policyValidation: {
+        policyMap: {
+          schemaVersion: "1.0.0",
+          projectId: "project",
+          runId: "run",
+          governanceHash: hashes.policy,
+          mappings: [
+            {
+              policyAssignmentId: "/assignments/net",
+              effect: "deny",
+              logicalResourceId: "vnet",
+              propertyPath: "properties.encryption",
+              expectedValue: "enabled",
+              disposition: "planned",
+            },
+            {
+              policyAssignmentId: "/assignments/app",
+              effect: "deny",
+              logicalResourceId: "storage",
+              propertyPath: "properties.security",
+              expectedValue: "enforced",
+              disposition: "planned",
+            },
+          ],
+        },
+        logicalResourceManifest: {
+          vnet: { codeSymbol: "vnet" },
+          storage: { codeSymbol: "storage" },
+        },
+      },
+    }),
+  );
+  assert.deepEqual(policyPreview.blockers, []);
+  assert.equal(layered.provider.policyValidation(policyPreview.previewHash)?.outcome, "pass");
+  storageSecurity = "drifted";
+  await assert.rejects(
+    layered.provider.apply(policyPreview, approval(policyPreview), authority),
+    (error) => error instanceof IacProviderError && error.code === "PREVIEW_HASH_MISMATCH",
+  );
+});
+
+test("azd fails closed for non-group scopes, untagged groups and shared environments", async (context) => {
   const plain = await azdFixture(context);
   await assert.rejects(
     plain.provider.previewApply(plain.preview({ target: `/subscriptions/${AZD_SUBSCRIPTION}` })),

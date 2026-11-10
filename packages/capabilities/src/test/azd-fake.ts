@@ -32,6 +32,10 @@ export interface FakeAzdState {
   resources: FakeAzdResource[];
   /** Entries `azd provision --preview --output json` reports. */
   preview: { Operation: string; Type: string; Name: string }[];
+  /** Per-layer entries `azd provision <layer> --preview --output json` reports. */
+  previewByLayer: Record<string, readonly { Operation: string; Type: string; Name: string }[]>;
+  /** Layer name that should fail when azd runs against it. */
+  failOnLayer: string | undefined;
   /** Makes `az resource list` fail the way Azure reports a deleted resource group. */
   groupMissing: boolean;
   /** Replaces the whole preview stdout when set. */
@@ -58,6 +62,8 @@ export function createFakeAzd(overrides: Partial<FakeAzdState> = {}): FakeAzdSta
     groups: [{ name: AZD_GROUP, tags: { "azd-env-name": AZD_ENVIRONMENT } }],
     resources: [],
     preview: [],
+    previewByLayer: {},
+    failOnLayer: undefined,
     groupMissing: false,
     previewStdout: undefined,
     duringPreview: undefined,
@@ -85,9 +91,26 @@ export async function handleFakeAzd(state: FakeAzdState, request: ProcessRequest
       }
       return state.version;
     }
+    const candidateLayer =
+      (request.args[0] === "provision" || request.args[0] === "down") &&
+      request.args[1] !== undefined &&
+      !request.args[1].startsWith("-")
+        ? request.args[1]
+        : undefined;
+    if (candidateLayer !== undefined && state.failOnLayer === candidateLayer) {
+      throw new ProcessRunnerError("PROCESS_EXIT_NONZERO", `azd ${request.args[0]} ${candidateLayer} failed`, {
+        exitCode: 1,
+        signal: null,
+        stdout: "",
+        stderr: `ERROR: failed layer ${candidateLayer}`,
+        timedOut: false,
+        outputTruncated: false,
+      });
+    }
     if (request.args.includes("--preview")) {
       await state.duringPreview?.();
-      return state.previewStdout ?? azdPreviewStdout(state.preview);
+      const layerPreview = candidateLayer === undefined ? undefined : state.previewByLayer[candidateLayer];
+      return state.previewStdout ?? azdPreviewStdout(layerPreview ?? state.preview);
     }
     await state.duringExecute?.();
     return "";

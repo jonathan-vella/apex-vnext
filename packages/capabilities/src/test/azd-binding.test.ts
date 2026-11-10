@@ -10,6 +10,7 @@ import {
   AZD_HOOKS_EXTENSIONS_WARNING,
   describeAzdBinding,
   inspectAzdBicepProject,
+  orderAzdInfraRoots,
   type AzdBindingErrorCode,
   type AzdBindingRequest,
 } from "../index.js";
@@ -280,6 +281,44 @@ test("layered provisioning is inventoried per layer with layer hooks", async () 
     "azure.yaml": yaml.replace("dependsOn: [network]", "dependsOn: []"),
   });
   assert.notEqual(reordered.bindingHash, binding.bindingHash);
+
+  const diamond = await inspect({
+    "azure.yaml": [
+      "name: demo",
+      "infra:",
+      "  layers:",
+      "    - name: app",
+      "      path: infra/app",
+      "      dependsOn: [data, identity]",
+      "    - name: data",
+      "      path: infra/data",
+      "      dependsOn: [network]",
+      "    - name: network",
+      "      path: infra/network",
+      "    - name: identity",
+      "      path: infra/identity",
+      "      dependsOn: [network]",
+      "",
+    ].join("\n"),
+    "infra/main.bicep": null,
+    "infra/main.parameters.json": null,
+    "infra/app/main.bicep": "param a string = 'a'\n",
+    "infra/app/bicepconfig.json": "{}\n",
+    "infra/data/main.bicep": "param d string = 'd'\n",
+    "infra/data/bicepconfig.json": "{}\n",
+    "infra/network/main.bicep": "param n string = 'n'\n",
+    "infra/network/bicepconfig.json": "{}\n",
+    "infra/identity/main.bicep": "param i string = 'i'\n",
+    "infra/identity/bicepconfig.json": "{}\n",
+  });
+  assert.deepEqual(
+    orderAzdInfraRoots(diamond, "apply").map(({ name }) => name),
+    ["network", "data", "identity", "app"],
+  );
+  assert.deepEqual(
+    orderAzdInfraRoots(diamond, "destroy").map(({ name }) => name),
+    ["app", "identity", "data", "network"],
+  );
 });
 
 test("extensions are listed exactly as declared", async () => {

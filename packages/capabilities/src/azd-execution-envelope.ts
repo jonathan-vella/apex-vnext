@@ -29,9 +29,12 @@ export function buildAzdExecutionEnvelope(request: AzdEnvelopeRequest): AzdExecu
 
 export type AzdOperation = "provision-preview" | "provision" | "down";
 
+const LAYER_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/u;
+
 /**
  * azd arguments for the operations a bound project supports; `azd up`, `azd deploy`, `--purge` and every other command
- * are unrepresentable. The project root is passed with `--cwd` so azd never depends on the process directory.
+ * are unrepresentable. The project root is passed with `--cwd` so azd never depends on the process directory. When
+ * `layer` is supplied for a layered project, it is passed as the positional `<layer>` argument.
  *
  * - `--no-state` makes `provision` always deploy the approved Bicep instead of skipping when azd's stored deployment
  *   state hash is unchanged, which would hide drift the approved what-if showed.
@@ -43,6 +46,7 @@ export function buildAzdArguments(
   envelope: AzdExecutionEnvelopeV1,
   operation: AzdOperation,
   projectRoot: string,
+  layer?: string,
 ): string[] {
   if (operation !== "provision-preview" && operation !== "provision" && operation !== "down")
     throw new AzdBindingError(
@@ -51,12 +55,15 @@ export function buildAzdArguments(
     );
   if (!isAbsolute(projectRoot) || projectRoot.startsWith("-"))
     throw new AzdBindingError("AZD_BINDING_INPUT_INVALID", "The azd project root must be an absolute path");
+  if (layer !== undefined && (!LAYER_NAME.test(layer) || layer === "default"))
+    throw new AzdBindingError("AZD_BINDING_INPUT_INVALID", "The azd layer name is invalid");
+  const layerArg = layer === undefined ? [] : [layer];
   const command =
     operation === "provision-preview"
-      ? ["provision", "--preview", "--no-state"]
+      ? ["provision", ...layerArg, "--preview", "--no-state"]
       : operation === "provision"
-        ? ["provision", "--no-state"]
-        : ["down", "--force"];
+        ? ["provision", ...layerArg, "--no-state"]
+        : ["down", ...layerArg, "--force"];
   return [
     ...command,
     "--environment",

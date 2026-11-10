@@ -65,9 +65,10 @@
       "triggerDigest": "5c375602c9ef5d8ec711bfa7db1aaaf0484d84e8339627fa7f3bcb8de81edbb6",
       "permissionsDigest": "d8d6aceb1abc41990618a503082c3badcca8897feee0976f222af5b74e30bec2",
       "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
-      "jobsDigest": "4a6dec30092711d700ed5fb954500e430bce37b12736f5a31c73723e02594bbc",
+      "jobsDigest": "91eadb9a02a7690ad7be266251589e4ea98256a23656ffe705b1cef959ef175d",
       "jobs": {
         "scope": "scope",
+        "linux-package-shards": "ubuntu-latest shard (${{ matrix.suite }})",
         "ci": "ci",
         "windows-package-shards": "windows-2025 shard (${{ matrix.suite }})",
         "windows-package-tests": "windows-2025 package tests"

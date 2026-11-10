@@ -160,10 +160,12 @@ group.
 Before every preview, apply and destroy the executor verifies the pinned azd version, re-inspects the azd binding and
 runs the identity preflight (cloud, tenant and default subscription from `az account show`). At apply and destroy it
 additionally requires that the binding is unchanged, that the azd version equals the one bound at preview, and that
-the owned state below is unchanged. Layered projects fail with `AZD_LAYER_UNSUPPORTED`, because azd previews one layer
-at a time. The preview hash binds the azd binding hash, the owned-state hash and the policy validation receipt, so
-reusing a preview across apply and destroy, an expired or superseded preview, a stale owner epoch or recipient and a
-changed input all stop before azd runs.
+the owned state below is unchanged. When `azure.yaml` declares `infra.layers[]`, the executor previews and applies
+each layer (`azd provision <layer> --preview` / `azd provision <layer>`) in topological dependency order, aggregates
+their changes and policy validation into a single bound preview, and tears down layers (`azd down <layer> --force`) in
+reverse topological order. The preview hash binds the azd binding hash, the owned-state hash and the policy validation
+receipt, so reusing a preview across apply and destroy, an expired or superseded preview, a stale owner epoch or
+recipient and a changed input all stop before azd runs.
 
 ### Preview format
 
