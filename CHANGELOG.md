@@ -12,6 +12,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0-next.10] — Preview
+
+This release improves Requirements intake UX across all supported clients (GitHub Copilot App, VS Code Copilot harness,
+and Copilot CLI) by adding baseline and workload-derived recommendations for `availability-recovery`, `operations`,
+`compliance`, and stateless container `service-preferences`, enabling one-click round summary confirmations, and
+requiring selectable single-choice options on multi-value `ask_user` prompts so clients never render a bare `Skip`-only
+prompt.
+
+### Changed
+
+- Add baseline recommendations for `availability-recovery` (`["single-region-availability"]`) and `operations`
+  (`["azure-monitor", "application-insights", "log-analytics"]`), derive `compliance` recommendations (`gdpr`, `hipaa`,
+  `pci-dss`, `iso-27001`, `soc-2`) from the confirmed workload description, and recommend `container-apps` (without
+  database services when stateless/no-database is specified) in `recommendedServiceCandidates`
+  (`packages/cli/src/service.ts`).
+- Update `packages/cli/scripts/prepare-assets.mjs`, `customizations/.github/agents/apex.agent.md`, and
+  `customizations/.github/skills/apex-requirements/SKILL.md` so the agent can offer a one-click round answer summary
+  confirmation when user facts and recommendations cover a round, and always includes selectable single-choice options
+  on `ask_user` when asking or customizing multi-value questions.
+
 ## [0.11.0-next.9] — Preview
 
 This release normalizes CRLF line endings in `prepare-assets.mjs` so Windows asset generation and `build-plugin.mjs`

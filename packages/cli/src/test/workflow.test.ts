@@ -1034,6 +1034,12 @@ test("greenfield service intake skips retained services and uses selectable reco
         "none",
       ],
       multiSelect: true,
+      recommendation: {
+        value: ["single-region-availability"],
+        source: "default",
+        rationale:
+          "Single-region availability baseline; select availability zones, backups, or cross-region DR when required.",
+      },
     },
   );
   assert.deepEqual(
@@ -1154,6 +1160,62 @@ test("requirements intake provides selectable Azure service and security recomme
   ]);
   assert.equal(security.request.questions.find(({ id }) => id === "authentication")?.multiSelect, true);
   assert.equal(security.request.questions.find(({ id }) => id === "operations")?.multiSelect, true);
+  assert.deepEqual(security.request.questions.find(({ id }) => id === "operations")?.recommendation, {
+    value: ["azure-monitor", "application-insights", "log-analytics"],
+    source: "default",
+    rationale: "Standard Azure observability baseline for application and platform diagnostics.",
+  });
+
+  const containerService = new ApexService(await tempRoot());
+  await containerService.init({ projectId: "demo", riskOwner: "partner" });
+  await recordRequirementsRound(containerService, {
+    workload:
+      "Stateless containerized webhook gateway with automatic scale-to-zero without managing Kubernetes, no database, under GDPR",
+    industry: "technology",
+    "delivery-scenario": "greenfield",
+    "target-environments": ["dev"],
+    "workload-profile": "standalone-lab",
+  });
+  const containerRound2 = await containerService.nextTask();
+  assert.equal(containerRound2.status, "needs_input");
+  if (containerRound2.status !== "needs_input") return;
+  assert.deepEqual(
+    containerRound2.request.questions.find(({ id }) => id === "service-preferences")?.recommendation?.value,
+    ["container-apps", "azure-monitor", "application-insights"],
+  );
+  await containerService.recordInput({
+    schemaVersion: "1.0.0",
+    requestId: containerRound2.request.requestId,
+    expectedHead: containerRound2.request.expectedHead,
+    ownerEpoch: containerRound2.request.ownerEpoch,
+    answers: containerRound2.request.questions.map(({ id, options, multiSelect, valueType }) => ({
+      questionId: id,
+      value:
+        valueType === "budget"
+          ? { kind: "budget" as const, amount: 100, currency: "USD", cadence: "monthly" as const }
+          : valueType === "data-classification"
+            ? { kind: "data-classification" as const, classification: "internal" as const }
+            : id === "service-preferences"
+              ? ["container-apps", "application-insights"]
+              : id === "scale"
+                ? "100 rps"
+                : id === "prohibited-services" || id === "environment-overrides"
+                  ? "none"
+                  : id === "sku-preferences"
+                    ? "no preference"
+                    : options === undefined
+                      ? `test-${id}`
+                      : multiSelect === true
+                        ? [options[0]!]
+                        : options[0]!,
+    })),
+  });
+  const containerRound3 = await containerService.nextTask();
+  assert.equal(containerRound3.status, "needs_input");
+  if (containerRound3.status !== "needs_input") return;
+  assert.deepEqual(containerRound3.request.questions.find(({ id }) => id === "compliance")?.recommendation?.value, [
+    "gdpr",
+  ]);
 });
 
 test("governance reference import ignores tampered workspace runtime copies", async () => {
