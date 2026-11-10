@@ -249,7 +249,7 @@ and the repository archives.
 
 As of 2026-10-05, DECISION-033 makes the VS Code Copilot harness and the GitHub Copilot app on native Windows and
 Copilot CLI on Linux and WSL2 the target release clients, delivered as one Agent Plugin with a thin `apex init`
-workspace projection (`0.11.0-next.5`). Historical desktop probes remain provenance
+workspace projection (`0.11.0-next.8`). Historical desktop probes remain provenance
 ([superseded plan](ROADMAP.md#superseded-standalone-copilot-desktop-plan)) and do not show CLI parity. One foreground
 `APEX` agent and hidden `APEX CodeGen` and `APEX Validator` workers ship under DECISION-032 and revised ADR-0006,
 while captured `rubber-duck` reviews replace `APEX Reviewer` (DECISION-031); kernel checks, not profile visibility,

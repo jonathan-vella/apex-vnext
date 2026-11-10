@@ -1,10 +1,10 @@
 # APEX vNext Checkpoint
 
-- **Updated:** 2026-10-24
+- **Updated:** 2026-11-10
 - **Repository:** `jonathan-vella/apex-vnext`
 - **Integration branch:** `main`
-- **Product status:** Pre-release
-- **Release candidate:** None selected
+- **Product status:** Preview published (`apex@apex-plugins` `0.11.0-next.8`)
+- **Release candidate:** `0.11.0-next.8` (`a349fed7`)
 
 ## Current State
 
@@ -17,6 +17,18 @@ payload reduction (`27,505` bytes across 31 role-scoped tools with server-side `
 and the `.apex/bin/apex.mjs` workspace CLI launcher (`CP-35`, `#507`), a static context-budget validator in CI
 (`67,855 / 70,500` bytes total across always-loaded surfaces, `CP-36`), tiered client acceptance (`CP-37`), and
 deferral of production CI/setup, sandboxing, and Terraform live deployment to post-launch (`CP-38`).
+
+All preview launch gates (`CP-33` through `CP-39`, [#13](https://github.com/jonathan-vella/apex-vnext/issues/13),
+[#386](https://github.com/jonathan-vella/apex-vnext/issues/386), [#387](https://github.com/jonathan-vella/apex-vnext/issues/387),
+[#455](https://github.com/jonathan-vella/apex-vnext/issues/455), and [#533](https://github.com/jonathan-vella/apex-vnext/issues/533))
+plus post-launch follow-ups [#476](https://github.com/jonathan-vella/apex-vnext/issues/476) (Linux CI shard parallelization),
+[#480](https://github.com/jonathan-vella/apex-vnext/issues/480) (`azd` layered provisioning `infra.layers[]`),
+[#500](https://github.com/jonathan-vella/apex-vnext/issues/500) (diagram, run-slug, and intake UX polish), and
+[#517](https://github.com/jonathan-vella/apex-vnext/issues/517) (per-stage decision amendment guide and agent routing)
+are complete and published in `apex@apex-plugins` `0.11.0-next.8` (`a349fed7`, marketplace commit `d8c91de`).
+Only four `Post-launch` milestone items remain open ([#443](https://github.com/jonathan-vella/apex-vnext/issues/443),
+[#457](https://github.com/jonathan-vella/apex-vnext/issues/457), [#458](https://github.com/jonathan-vella/apex-vnext/issues/458),
+and [#515](https://github.com/jonathan-vella/apex-vnext/issues/515)).
 
 CP-32 audit remediation merged in [#496](https://github.com/jonathan-vella/apex-vnext/pull/496) at
 `4ccd5d80043e19067e1e0c83a8023c53cdef00e6`; tracking issue #495 is closed. The repaired PR head and the exact
@@ -52,7 +64,7 @@ retired-root rules and guidance provenance; maintenance archives do not supply a
 The approved direction is a COE workload factory with independent archetype reuse and conversational changes. Both
 ALZ-backed workloads and standalone single-subscription labs/demos are day-one requirements. Under DECISION-033 the
 supported clients are the VS Code Copilot harness and the GitHub Copilot app on native Windows and Copilot CLI on
-Linux and WSL2, delivered as an Agent Plugin with a thin `apex init` workspace projection (`0.11.0-next.5`).
+Linux and WSL2, delivered as an Agent Plugin with a thin `apex init` workspace projection (`0.11.0-next.8`).
 [PRD.md](PRD.md) is the canonical scope and quality reference.
 
 The standalone vNext repository owns a deterministic TypeScript runtime, versioned contracts, bounded capabilities,

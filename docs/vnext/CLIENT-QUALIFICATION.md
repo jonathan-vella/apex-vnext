@@ -5,17 +5,17 @@ This control defines release-blocking evidence for the three supported clients u
 Code Copilot harness and the GitHub Copilot app on native Windows, and GitHub Copilot CLI on Linux and WSL2. Generated
 projection and plugin tests are necessary but do not replace live client interaction.
 
-The release target is the [client pivot scenarios](#client-pivot-scenarios) plus the shared matrix below. The plugin
-and thin workspace projection are shipped in the `0.11.0-next.5` preview; live qualification remains pending. The
-slice results below are exploratory history, not current release evidence. Use the
+The release target is the [client pivot scenarios](#client-pivot-scenarios) plus the shared matrix below. Under
+[DECISION-040](DECISIONS.md#decision-040-launch-scope-reset-single-plugin-artifact-static-context-budget-and-tiered-client-acceptance),
+tiered live client qualification (`CP-37`, [#533](https://github.com/jonathan-vella/apex-vnext/issues/533),
+[#386](https://github.com/jonathan-vella/apex-vnext/issues/386), [#455](https://github.com/jonathan-vella/apex-vnext/issues/455))
+passed on candidate `27999482` and the resulting preview is published in the `apex@apex-plugins` marketplace at
+`0.11.0-next.8` (source `a349fed742c2c8815bf27a13b807c06c8406f5e1`, plugin tree SHA-256
+`4266ebfc5f7b6b0898217c6b09794595b22daa3e0db53c30aeeae25d001de863`, marketplace commit `d8c91de`). Use the
 [human-run qualification kit](../how-to/qualify-live-clients.md) to freeze a candidate, prepare each host and record
-scenario applicability and bounded evidence. The current candidate is published `0.11.0-next.5`: plugin source
-`bc781afc03a18a9b5c3007813dfa8756bcf62af9`, npm `gitHead` `ab892a8f20ece801d2360586b349dd9804e68a42`, plugin tree
-SHA-256 `e1a1794d7c9a189eb40b8e8f33b5f5737a0da99c6f90ef334ba3e22d0e53c2eb`, marketplace commit
-`298194df5ad5309f53c6d35c37b33656ed788b79`. A later source commit is a new candidate and must not be identified by the
-version alone. Earlier candidates (`0.11.0-next.2` and source `a4bc16fbe4eadea48902ab054ea7f02a8bdd008a`, main
-after #454) and their exploratory results remain historical; the current candidate needs fresh affected-scenario
-evidence without restoring retired root guidance.
+scenario applicability and bounded evidence. Earlier candidates (`0.11.0-next.5` at
+`bc781afc03a18a9b5c3007813dfa8756bcf62af9`, `0.11.0-next.2`, and source `a4bc16fbe4eadea48902ab054ea7f02a8bdd008a`,
+main after #454) and their exploratory slice results below remain historical provenance.
 
 Each client runs on its supported host without Docker or a devcontainer; client local sandboxing is deferred until after
 launch and is not part of qualification. Under
