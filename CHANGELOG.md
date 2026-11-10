@@ -12,6 +12,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0-next.9] — Preview
+
+This release normalizes CRLF line endings in `prepare-assets.mjs` so Windows asset generation and `build-plugin.mjs`
+always record identical LF digests in `assets/manifest.json`, and allows `scripts/onboard.ps1` to accept PowerShell's
+`-Yes` switch alongside `--yes`.
+
+### Fixed
+
+- Normalize `\r\n` to `\n` for text source files in `packages/cli/scripts/prepare-assets.mjs` (`readSourceFile` and
+  `copilot-cli-agent-tools.json`) so `assets/manifest.json` digests match the LF-normalized files emitted by
+  `tools/scripts/build-plugin.mjs` on Windows.
+- Accept `-Yes` (case-insensitive) in `plugin/scripts/onboard.ps1` and map it to `--yes` before invoking
+  `cli/apex.mjs bootstrap`.
+
 ## [0.11.0-next.8] — Preview
 
 This release adds `azd` layered provisioning support (`infra.layers[]` in `azure.yaml`, #480), adds per-stage

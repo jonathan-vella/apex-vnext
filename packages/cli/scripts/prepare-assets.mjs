@@ -2,7 +2,7 @@
 import { createHash } from "node:crypto";
 import { constants } from "node:fs";
 import { lstat, mkdir, open, readFile, readdir, realpath, rename, rm, writeFile } from "node:fs/promises";
-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { dump as dumpYaml, load as loadYaml } from "js-yaml";
 
@@ -308,6 +308,33 @@ export function canonicalJson(value, ancestors = new Set()) {
   return result;
 }
 
+const TEXT_ASSET_EXTENSIONS = new Set([
+  ".bat",
+  ".cjs",
+  ".cmd",
+  ".css",
+  ".html",
+  ".js",
+  ".json",
+  ".md",
+  ".mjs",
+  ".ps1",
+  ".sh",
+  ".svg",
+  ".ts",
+  ".txt",
+  ".xml",
+  ".yaml",
+  ".yml",
+]);
+
+function normalizeTextAsset(path, buffer) {
+  if (!buffer.includes(0) && buffer.includes(13) && TEXT_ASSET_EXTENSIONS.has(extname(path))) {
+    return Buffer.from(buffer.toString("utf8").replace(/\r\n/g, "\n"));
+  }
+  return buffer;
+}
+
 export async function readSourceFile(resolvedRoot, path, beforeOpen = async () => {}, expectedIdentity) {
   const resolvedPath = await realpath(path);
   assertContained(resolvedRoot, resolvedPath);
@@ -337,7 +364,7 @@ export async function readSourceFile(resolvedRoot, path, beforeOpen = async () =
     if (openedPath !== resolvedPath) {
       throw new Error(`Asset source path changed during generation: ${path}`);
     }
-    return await handle.readFile();
+    return normalizeTextAsset(path, await handle.readFile());
   } finally {
     await handle.close();
   }
@@ -545,7 +572,7 @@ async function prepareClientProjections(
   validateCliToolInventory(JSON.parse(await readFile(toolInventoryPath, "utf8")));
   const metadataDestination = join(targetAssetsRoot, "client-projection-metadata", "copilot-cli-agent-tools.json");
   await mkdir(dirname(metadataDestination), { recursive: true });
-  const metadataBytes = await readFile(toolInventoryPath);
+  const metadataBytes = normalizeTextAsset(toolInventoryPath, await readFile(toolInventoryPath));
   await writeFile(metadataDestination, metadataBytes);
   inventory.push({
     path: portablePath(relative(targetAssetsRoot, metadataDestination)),
