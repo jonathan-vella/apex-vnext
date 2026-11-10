@@ -416,6 +416,11 @@ test("rejects Linux package-test lane, matrix, and aggregate weakening after reb
       ["  linux-package-shards:", "  linux-shards:", "required vNext and Windows package-test jobs"],
       ["    timeout-minutes: 60\n", "    timeout-minutes: 30\n", LINUX_LANE],
       ["    timeout-minutes: 60\n", "    timeout-minutes: 60\n    continue-on-error: true\n", LINUX_LANE],
+      [
+        "      - name: Prepare CLI assets\n        run: npm run prepare:assets --workspace @apexops/cli\n\n",
+        "",
+        LINUX_LANE,
+      ],
       ["      - name: Build vNext packages\n        run: npm run build:vnext\n\n", "", LINUX_LANE],
       ["          npm run validate:vnext\n", "", LINUX_LANE],
       ["          npm --workspace @apexops/kernel run test\n", "", LINUX_LANE],

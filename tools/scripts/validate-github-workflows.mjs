@@ -348,6 +348,7 @@ function linuxShardJobErrors(job) {
     job?.["continue-on-error"] !== undefined ||
     steps.some((step) => step?.["continue-on-error"] !== undefined) ||
     !steps.some((step) => step?.uses === "./.github/actions/setup-node-repo" && step.if === undefined) ||
+    !unconditional("npm run prepare:assets --workspace @apexops/cli") ||
     !unconditional("npm run build:vnext") ||
     !conditional("npm run validate:vnext", "matrix.suite == 'core'") ||
     !conditional("npm --workspace @apexops/contracts run test", "matrix.suite == 'core'") ||

@@ -87,6 +87,9 @@ jobs:
       - name: Setup Node
         uses: ./.github/actions/setup-node-repo
 
+      - name: Prepare CLI assets
+        run: npm run prepare:assets --workspace @apexops/cli
+
       - name: Build vNext packages
         run: npm run build:vnext
 
