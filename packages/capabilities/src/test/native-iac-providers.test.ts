@@ -2825,6 +2825,16 @@ test("azd fails closed for non-group scopes, untagged groups and shared environm
   });
   const preview = await greenfield.provider.previewApply(greenfield.preview());
   assert.deepEqual(preview.blockers, []);
+  await assert.rejects(greenfield.provider.labApplyScope(preview.previewHash), {
+    code: "PREVIEW_HASH_MISMATCH",
+  });
+  greenfield.state.groupMissing = false;
+  greenfield.state.groups.push({ name: AZD_GROUP, tags: {} });
+  await assert.rejects(greenfield.provider.apply(preview, approval(preview), authority), {
+    code: "PREVIEW_HASH_MISMATCH",
+  });
+  greenfield.state.groups.length = 0;
+  greenfield.state.groupMissing = true;
   await greenfield.provider.apply(preview, approval(preview), authority);
   const groupCreate = greenfield.state.calls.find(
     ({ executable, args }) => executable === "az" && args[0] === "group" && args[1] === "create",

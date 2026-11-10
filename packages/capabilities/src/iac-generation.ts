@@ -18,14 +18,20 @@ export interface GeneratedVirtualTree {
 }
 
 export interface BicepGenerationOptions {
-  readonly existingResources?: readonly string[];
+  readonly existingResources?: readonly string[] | undefined;
+  readonly environment?: string | undefined;
+  readonly riskOwner?: string | undefined;
+  readonly liveGovernanceOverride?: boolean | undefined;
 }
 
 export interface TerraformGenerationOptions {
-  readonly azurermProviderConstraint?: string;
-  readonly azapiProviderConstraint?: string;
-  readonly lockFileContent?: string;
-  readonly existingResources?: readonly string[];
+  readonly azurermProviderConstraint?: string | undefined;
+  readonly azapiProviderConstraint?: string | undefined;
+  readonly lockFileContent?: string | undefined;
+  readonly existingResources?: readonly string[] | undefined;
+  readonly environment?: string | undefined;
+  readonly riskOwner?: string | undefined;
+  readonly liveGovernanceOverride?: boolean | undefined;
 }
 
 export interface WriteVirtualTreeOptions {
@@ -292,6 +298,9 @@ export interface ResourceGroupTagOptions {
   readonly backupPolicy?: string | undefined;
   readonly maintWindow?: string | undefined;
   readonly overrides?: Readonly<Record<string, unknown>> | undefined;
+  readonly allowedEnvironments?: readonly string[] | undefined;
+  readonly allowedSlas?: readonly string[] | undefined;
+  readonly liveGovernanceOverride?: boolean | undefined;
 }
 
 export function resolveResourceGroupTags(options: ResourceGroupTagOptions): Record<string, string> {
@@ -301,24 +310,30 @@ export function resolveResourceGroupTags(options: ResourceGroupTagOptions): Reco
       : {};
   const text = (value: unknown): string | undefined =>
     typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
-  const rawEnv = (text(rawOverrides.environment) ?? text(options.environment) ?? "dev").toLowerCase();
-  const environment = (RESOURCE_GROUP_ALLOWED_ENVIRONMENTS as readonly string[]).includes(rawEnv)
-    ? rawEnv
-    : rawEnv === "staging" || rawEnv === "qa" || rawEnv === "uat"
-      ? "test"
-      : rawEnv === "production"
-        ? "prod"
-        : "dev";
-  const rawSla = (
-    text(rawOverrides.sla) ??
-    text(options.sla) ??
-    (environment === "prod" ? "medium" : "low")
-  ).toLowerCase();
-  const sla = (RESOURCE_GROUP_ALLOWED_SLAS as readonly string[]).includes(rawSla)
-    ? rawSla
-    : environment === "prod"
-      ? "medium"
-      : "low";
+  const allowedEnvs = options.allowedEnvironments ?? RESOURCE_GROUP_ALLOWED_ENVIRONMENTS;
+  const allowedSlas = options.allowedSlas ?? RESOURCE_GROUP_ALLOWED_SLAS;
+  const explicitEnv = text(rawOverrides.environment);
+  const rawEnv = (explicitEnv ?? text(options.environment) ?? "dev").toLowerCase();
+  const environment =
+    options.liveGovernanceOverride === true && explicitEnv !== undefined
+      ? explicitEnv
+      : allowedEnvs.includes(rawEnv)
+        ? rawEnv
+        : rawEnv === "staging" || rawEnv === "qa" || rawEnv === "uat"
+          ? "test"
+          : rawEnv === "production"
+            ? "prod"
+            : "dev";
+  const explicitSla = text(rawOverrides.sla);
+  const rawSla = (explicitSla ?? text(options.sla) ?? (environment === "prod" ? "medium" : "low")).toLowerCase();
+  const sla =
+    options.liveGovernanceOverride === true && explicitSla !== undefined
+      ? explicitSla
+      : allowedSlas.includes(rawSla)
+        ? rawSla
+        : environment === "prod"
+          ? "medium"
+          : "low";
   const owner = text(rawOverrides.owner) ?? text(options.riskOwner) ?? "partner";
   const base: Record<string, string> = {
     environment,
@@ -332,7 +347,7 @@ export function resolveResourceGroupTags(options: ResourceGroupTagOptions): Reco
     "technical-contact": text(rawOverrides["technical-contact"]) ?? owner,
   };
   for (const [key, value] of Object.entries(rawOverrides)) {
-    if (key === "tech-contact" || Object.hasOwn(base, key)) continue;
+    if ((key === "tech-contact" && options.liveGovernanceOverride !== true) || Object.hasOwn(base, key)) continue;
     const str = text(value);
     if (str !== undefined) base[key] = str;
   }
@@ -361,12 +376,15 @@ function secureStorageProperties(type: string, properties: unknown): unknown {
   };
 }
 
-function secureBicepParameters(context: ResourceContext, projectId: string): Readonly<Record<string, unknown>> {
+function secureBicepParameters(
+  context: ResourceContext,
+  tagOptions: Omit<ResourceGroupTagOptions, "overrides">,
+): Readonly<Record<string, unknown>> {
   const parameters = isResourceGroupContext(context)
     ? {
         ...context.binding.parameters,
         tags: resolveResourceGroupTags({
-          projectId,
+          ...tagOptions,
           overrides: context.binding.parameters.tags as Readonly<Record<string, unknown>> | undefined,
         }),
       }
@@ -381,12 +399,15 @@ function secureBicepParameters(context: ResourceContext, projectId: string): Rea
   };
 }
 
-function secureTerraformParameters(context: ResourceContext, projectId: string): Readonly<Record<string, unknown>> {
+function secureTerraformParameters(
+  context: ResourceContext,
+  tagOptions: Omit<ResourceGroupTagOptions, "overrides">,
+): Readonly<Record<string, unknown>> {
   const parameters = isResourceGroupContext(context)
     ? {
         ...context.binding.parameters,
         tags: resolveResourceGroupTags({
-          projectId,
+          ...tagOptions,
           overrides: context.binding.parameters.tags as Readonly<Record<string, unknown>> | undefined,
         }),
       }
@@ -473,6 +494,12 @@ export function generateBicepTree(
     if (!logicalIds.has(logicalId))
       throw new TypeError(`Existing resource '${logicalId}' is not present in the intent`);
   }
+  const tagOptions: Omit<ResourceGroupTagOptions, "overrides"> = {
+    projectId: intent.projectId,
+    environment: options.environment,
+    riskOwner: options.riskOwner,
+    liveGovernanceOverride: options.liveGovernanceOverride,
+  };
   const blocks = contexts.map((context) => {
     if (context.parsed.kind === "native") {
       const parameters = requiredGenericParameters(context);
@@ -494,7 +521,7 @@ export function generateBicepTree(
         ? {
             ...parameters.bodyFields,
             tags: resolveResourceGroupTags({
-              projectId: intent.projectId,
+              ...tagOptions,
               overrides: parameters.bodyFields.tags as Readonly<Record<string, unknown>> | undefined,
             }),
           }
@@ -512,7 +539,7 @@ export function generateBicepTree(
     }
     const source = context.parsed.source;
     const moduleReference = source.startsWith("br/") ? source : `br/public:${source}`;
-    const renderedParameters = Object.entries(secureBicepParameters(context, intent.projectId))
+    const renderedParameters = Object.entries(secureBicepParameters(context, tagOptions))
       .sort(([left], [right]) => left.localeCompare(right))
       .map(([name, value]) => {
         assertIdentifier(name, "Bicep parameter name");
@@ -587,13 +614,17 @@ export function generateTerraformTree(
   const azurerm = exactProviderConstraint(options.azurermProviderConstraint, "= 4.0.0", "azurerm provider constraint");
   const azapi = exactProviderConstraint(options.azapiProviderConstraint, "= 2.0.0", "azapi provider constraint");
   const versions = `terraform {\n  required_providers {\n    azapi = {\n      source  = "Azure/azapi"\n      version = "${azapi}"\n    }\n    azurerm = {\n      source  = "hashicorp/azurerm"\n      version = "${azurerm}"\n    }\n  }\n}\n`;
+  const tagOptions: Omit<ResourceGroupTagOptions, "overrides"> = {
+    projectId: intent.projectId,
+    environment: options.environment,
+    riskOwner: options.riskOwner,
+    liveGovernanceOverride: options.liveGovernanceOverride,
+  };
   const variables = [
     ...new Set(
       contexts.flatMap((context) =>
         Object.keys(
-          context.parsed.kind === "avm"
-            ? secureTerraformParameters(context, intent.projectId)
-            : context.binding.parameters,
+          context.parsed.kind === "avm" ? secureTerraformParameters(context, tagOptions) : context.binding.parameters,
         ),
       ),
     ),
@@ -616,7 +647,7 @@ export function generateTerraformTree(
             ? {
                 ...parameters.bodyFields,
                 tags: resolveResourceGroupTags({
-                  projectId: intent.projectId,
+                  ...tagOptions,
                   overrides: parameters.bodyFields.tags as Readonly<Record<string, unknown>> | undefined,
                 }),
               }
@@ -630,7 +661,7 @@ export function generateTerraformTree(
         if (existing.has(context.resource.id)) {
           throw new TypeError(`Existing AVM resource '${context.resource.id}' is unsupported; use a native binding`);
         }
-        const argumentsText = Object.entries(secureTerraformParameters(context, intent.projectId))
+        const argumentsText = Object.entries(secureTerraformParameters(context, tagOptions))
           .sort(([left], [right]) => left.localeCompare(right))
           .map(([name, value]) => `  ${name} = ${renderHclValue(value, 2)}`)
           .join("\n");

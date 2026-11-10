@@ -821,4 +821,21 @@ test("resource group tag contract always populates the 9 policy-required tags an
     assert.match(bicepContent, new RegExp(`${key.includes("-") ? `'${key}'` : key}:`, "u"));
   }
   assert.match(bicepContent, /sla: 'low'/u);
+
+  const liveOverride = resolveResourceGroupTags({
+    projectId: "ghrunners",
+    environment: "prod",
+    riskOwner: "customer",
+    liveGovernanceOverride: true,
+    overrides: {
+      environment: "staging",
+      sla: "gold",
+      "tech-contact": "ops-team",
+    },
+  });
+  assert.equal(liveOverride.environment, "staging");
+  assert.equal(liveOverride.sla, "gold");
+  assert.equal(liveOverride.owner, "customer");
+  assert.equal(liveOverride["technical-contact"], "customer");
+  assert.equal(liveOverride["tech-contact"], "ops-team");
 });

@@ -157,6 +157,7 @@ interface NativeProviderConfig {
     tenantId: string;
     location: string;
     cloud?: "AzureCloud" | "AzureUSGovernment" | "AzureChinaCloud";
+    riskOwner?: string | undefined;
     resourceGroupTags?: Readonly<Record<string, string>> | undefined;
   };
   terraform?: {
@@ -253,7 +254,7 @@ async function configuredProviders(
   if (config.bicep !== undefined) {
     const value = config.bicep;
     for (const key of Object.keys(value)) {
-      if (!["cwd", "environmentName", "tenantId", "location", "cloud", "resourceGroupTags"].includes(key))
+      if (!["cwd", "environmentName", "tenantId", "location", "cloud", "riskOwner", "resourceGroupTags"].includes(key))
         throw new ApexError(
           "APEX_USAGE",
           `Bicep provider config does not support '${key}'; azd is the only Bicep executor and Deployment Stacks are not supported`,
@@ -276,6 +277,7 @@ async function configuredProviders(
         location: value.location,
         azdVersion: (await bundledToolchainMinimums()).azd,
         ...(value.cloud === undefined ? {} : { cloud: value.cloud }),
+        ...(value.riskOwner === undefined ? {} : { riskOwner: value.riskOwner }),
         ...(value.resourceGroupTags === undefined ? {} : { resourceGroupTags: value.resourceGroupTags }),
       },
     });
