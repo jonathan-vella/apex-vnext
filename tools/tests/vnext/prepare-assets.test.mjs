@@ -69,7 +69,7 @@ test("governance collection files ship from canonical sources to both client pro
   ];
   for (const path of paths) assert.ok(customization.sharedFiles.includes(path));
   for (const path of paths) {
-    const bytes = await readFile(join(root, path));
+    const bytes = await readSourceFile(root, join(root, path));
     const hash = createHash("sha256").update(bytes).digest("hex");
     assert.ok(customization.managedFiles.includes(path));
     await assert.rejects(readFile(join(root, "customizations", path)), { code: "ENOENT" });
@@ -263,7 +263,7 @@ test("asset generator inventories only the reviewed governance baseline schema",
   const assets = join(root, "packages/cli/assets");
   const schemaName = "governance-baseline.schema.json";
   const sourcePath = `tools/schemas/${schemaName}`;
-  const source = await readFile(join(root, sourcePath));
+  const source = await readSourceFile(root, join(root, sourcePath));
   assert.deepEqual(await readdir(join(assets, "schemas")), [schemaName]);
   assert.deepEqual(await readFile(join(assets, "schemas", schemaName)), source);
   const manifest = JSON.parse(await readFile(join(assets, "manifest.json"), "utf8"));
