@@ -10,6 +10,22 @@ When you prepare a release, rename `## [Unreleased]` to the new version.
 
 ## [Unreleased]
 
+## [0.11.0-next.10] - 2026-11-10
+
+This release improves Requirements intake UX across the GitHub Copilot App, VS Code Copilot harness, and Copilot CLI by
+adding baseline and workload-derived recommendations (`availability-recovery`, `operations`, `compliance`, and
+stateless container `service-preferences`), enabling one-click round summary confirmations, and ensuring multi-value
+`ask_user` prompts always include selectable single-choice options instead of rendering a bare `Skip` button.
+
+### Changed
+
+- Add baseline recommendations for `availability-recovery` (`["single-region-availability"]`) and `operations`
+  (`["azure-monitor", "application-insights", "log-analytics"]`), derive `compliance` recommendations from the
+  confirmed workload description, and recommend `container-apps` for container/scale-to-zero workloads in
+  `recommendedServiceCandidates`.
+- Update `APEX` and `apex-requirements` intake mechanics to support one-click round answer table confirmation and
+  always pass selectable single-choice options on multi-value `ask_user` prompts.
+
 ## [0.11.0-next.9] - 2026-11-10
 
 This release fixes Windows CRLF asset hash drift in `assets/manifest.json` and allows `scripts/onboard.ps1` to accept
