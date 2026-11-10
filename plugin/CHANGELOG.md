@@ -10,6 +10,20 @@ When you prepare a release, rename `## [Unreleased]` to the new version.
 
 ## [Unreleased]
 
+## [0.11.0-next.8] - 2026-11-10
+
+This release ships `azd` layered provisioning support (`infra.layers[]` in `azure.yaml`, #480) and top-level
+user-requested input amendment routing in the `APEX` agent (#517).
+
+### Added
+
+- Support `azd` layered provisioning (`infra.layers[]` in `azure.yaml`) in `AzdBicepProvider`: validate and compile
+  declared layer roots without requiring `infra/main.bicep`, preview and apply layers in topological dependency order,
+  re-verify bound inputs at every layer boundary, stop on partial failure while naming completed vs failed layers, and
+  tear down layers in reverse dependency order (#480).
+- Add top-level user-requested decision-amendment routing (`apex/inputHistory` -> `apex/previewInputAmendment` ->
+  confirmation -> `apex/amendInput`) in `agents/apex.agent.md` before normal gate stops (#517).
+
 ## [0.11.0-next.7] - 2026-11-09
 
 This release ships the vNext-only plugin cleanup (#539), syncs upstream Azure Bicep, retail-pricing, and diagram

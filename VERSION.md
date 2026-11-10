@@ -2,11 +2,11 @@
 
 # Version Information
 
-**Current Version:** 0.11.0-next.7 (preview)
+**Current Version:** 0.11.0-next.8 (preview)
 
 **Status:** Preview - non-production marketplace plugin distribution (`apex@apex-plugins`)
 
-**Last Content Update:** 2026-11-09
+**Last Content Update:** 2026-11-10
 
 **Build:** standalone-vnext
 
