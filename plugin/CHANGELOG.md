@@ -10,6 +10,22 @@ When you prepare a release, rename `## [Unreleased]` to the new version.
 
 ## [Unreleased]
 
+## [0.11.0-next.11] - 2026-11-10
+
+This release codifies the canonical 9-tag resource-group contract from `jonathan-vella/azure-landing-zones`
+(`enforce-resource-group-tags-exclude-resource-groups-based-on-name.json`) with automatic runtime default values so
+resource-group creation in Bicep and Terraform always includes all required tags without blocking on missing baseline
+tag inputs.
+
+### Changed
+
+- Add `resourceGroupTagContract` (`environment`, `owner`, `costcenter`, `application`, `workload`, `sla`,
+  `backup-policy`, `maint-window`, `technical-contact` plus allowed `environment` and `sla` values) to
+  `config/defaults.v1.json` and update `apex-azure-defaults` references (`baseline-fallbacks.md`, `tag-precedence.md`)
+  with automatic default resolution.
+- Enforce the 9-tag contract and value normalization in `resolveResourceGroupTags`, `generateBicepTree`,
+  `generateTerraformTree`, and `AzdBicepProvider` greenfield resource-group provisioning.
+
 ## [0.11.0-next.10] - 2026-11-10
 
 This release improves Requirements intake UX across the GitHub Copilot App, VS Code Copilot harness, and Copilot CLI by

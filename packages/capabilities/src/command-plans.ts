@@ -102,6 +102,34 @@ export class AzureCliReadAdapter {
     };
   }
 
+  /** Creates or updates a resource group with the required governance tags and azd environment tag. */
+  ensureResourceGroup(
+    subscriptionId: string,
+    resourceGroup: string,
+    location: string,
+    tags: Readonly<Record<string, string>>,
+  ): CommandPlan {
+    const tagArgs = Object.entries(tags)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, value]) => `${key}=${value}`);
+    return {
+      executable: "az",
+      args: [
+        "group",
+        "create",
+        "--subscription",
+        subscriptionId,
+        "--name",
+        resourceGroup,
+        "--location",
+        location,
+        ...(tagArgs.length === 0 ? [] : ["--tags", ...tagArgs]),
+        "--output",
+        "json",
+      ],
+    };
+  }
+
   resourceGroupResources(subscriptionId: string, resourceGroup: string): CommandPlan {
     return {
       executable: "az",

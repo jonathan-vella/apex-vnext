@@ -2819,6 +2819,34 @@ test("azd fails closed for non-group scopes, untagged groups and shared environm
       assert.equal(fixture.executions().length, 0);
     }
   }
+
+  const greenfield = await azdFixture(context, {
+    state: { groups: [], groupMissing: true },
+  });
+  const preview = await greenfield.provider.previewApply(greenfield.preview());
+  assert.deepEqual(preview.blockers, []);
+  await greenfield.provider.apply(preview, approval(preview), authority);
+  const groupCreate = greenfield.state.calls.find(
+    ({ executable, args }) => executable === "az" && args[0] === "group" && args[1] === "create",
+  );
+  assert.ok(groupCreate);
+  assert.deepEqual(greenfield.state.groups, [
+    {
+      name: AZD_GROUP,
+      tags: {
+        application: "project",
+        "azd-env-name": "dev",
+        "backup-policy": "none",
+        costcenter: "platform-engineering",
+        environment: "dev",
+        "maint-window": "none",
+        owner: "partner",
+        sla: "low",
+        "technical-contact": "partner",
+        workload: "project",
+      },
+    },
+  ]);
 });
 
 test("azd destroy previews every resource in the owned group, binds that list and never purges", async (context) => {
