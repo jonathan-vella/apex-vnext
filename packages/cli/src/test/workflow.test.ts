@@ -1170,7 +1170,7 @@ test("requirements intake provides selectable Azure service and security recomme
   await containerService.init({ projectId: "demo", riskOwner: "partner" });
   await recordRequirementsRound(containerService, {
     workload:
-      "Stateless containerized webhook gateway with automatic scale-to-zero without managing Kubernetes, no database, under GDPR",
+      "Stateless containerized webhook gateway with automatic scale-to-zero without managing Kubernetes, no database, under GDPR, PCI DSS, ISO 27001 and SOC 2",
     industry: "technology",
     "delivery-scenario": "greenfield",
     "target-environments": ["dev"],
@@ -1215,6 +1215,9 @@ test("requirements intake provides selectable Azure service and security recomme
   if (containerRound3.status !== "needs_input") return;
   assert.deepEqual(containerRound3.request.questions.find(({ id }) => id === "compliance")?.recommendation?.value, [
     "gdpr",
+    "pci-dss",
+    "iso-27001",
+    "soc-2",
   ]);
 });
 

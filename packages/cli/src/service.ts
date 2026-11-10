@@ -9854,16 +9854,21 @@ export class ApexService {
     if (round.round === "security-compliance") {
       const input = this.recordedRequirementsInput(events);
       const workload = typeof input?.workload === "string" ? input.workload.toLowerCase() : "";
-      const scopes = (["gdpr", "hipaa", "pci-dss", "iso-27001", "soc-2"] as const).filter((scope) =>
-        workload.includes(scope),
-      );
+      const compliancePatterns: readonly [string, RegExp][] = [
+        ["gdpr", /\bgdpr\b/u],
+        ["hipaa", /\bhipaa\b/u],
+        ["pci-dss", /\bpci[\s-]*dss\b/u],
+        ["iso-27001", /\biso[\s/-]*27001\b/u],
+        ["soc-2", /\bsoc[\s-]*2\b/u],
+      ];
+      const scopes = compliancePatterns.filter(([, pattern]) => pattern.test(workload)).map(([id]) => id);
       if (scopes.length === 0) return round.questions;
       return round.questions.map((question) =>
         question.id === "compliance"
           ? {
               ...question,
               recommendation: {
-                value: [...scopes],
+                value: scopes,
                 source: "prior-answer" as const,
                 rationale: "Derived from compliance frameworks named in the confirmed workload description.",
               },
@@ -9912,7 +9917,7 @@ export class ApexService {
     const wantsAks =
       /\b(aks|kubernetes)\b/u.test(workload) &&
       !/\b(no|without)\s+(?:managing\s+)?(?:aks|kubernetes)\b/u.test(workload);
-    const noDatabase = /\b(no database|without a database|stateless)\b/u.test(workload);
+    const noDatabase = /\b(no\s+database|without\s+(?:a\s+)?database)\b/u.test(workload);
     const webCompute = wantsAks
       ? "aks"
       : wantsContainers
@@ -9920,12 +9925,13 @@ export class ApexService {
         : lowBudget
           ? "azure-functions"
           : "app-service";
+    const workerCompute = wantsAks ? "aks" : wantsContainers ? "container-apps" : "azure-functions";
     const candidates = {
       "web-api": noDatabase ? [webCompute] : [webCompute, "azure-sql", "storage", "service-bus"],
-      "event-driven": [wantsContainers ? "container-apps" : "azure-functions", "service-bus", "storage"],
+      "event-driven": [workerCompute, "service-bus", "storage"],
       "data-analytics": ["azure-functions", "storage", "event-hubs"],
       iot: ["azure-functions", "event-hubs", "storage"],
-      batch: [wantsContainers ? "container-apps" : "azure-functions", "storage", "service-bus"],
+      batch: [workerCompute, "storage", "service-bus"],
     } as const;
     const selected =
       typeof pattern === "string" && pattern in candidates
