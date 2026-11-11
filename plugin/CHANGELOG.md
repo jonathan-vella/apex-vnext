@@ -10,6 +10,20 @@ When you prepare a release, rename `## [Unreleased]` to the new version.
 
 ## [Unreleased]
 
+## [0.11.0-next.13] - 2026-11-11
+
+This release ensures governance and Architecture only stop or mark controls `blocked` on active `deny` policies, never
+pausing on `modify`, `deployIfNotExists`, `audit`, or unconfirmed reference-baseline assignments.
+
+### Changed
+
+- Restrict `disposition: "blocked"` and `policy-refresh` Architecture reopening to `effect: "deny"` in `ApexService`,
+  and update `rubber-duck` Architecture review instructions so `modify`, `deployIfNotExists`, `audit`, and accepted
+  reference-baseline assumptions are non-blocking.
+- Update `apex-architecture`, `apex-azure-governance`, `apex-operations`, `apex-azure-defaults` references, and `APEX`
+  boundaries so `apex-azure/policy` (`policy_assignment_list`) is not called when `governance-constraints` uses
+  `source: "reference"` and non-`deny` effects never pause the workflow.
+
 ## [0.11.0-next.12] - 2026-11-11
 
 This release resolves end-to-end worktree, provider handoff, Bicep AVM/generator, and native Terraform validation gaps

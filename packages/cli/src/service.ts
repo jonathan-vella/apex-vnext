@@ -5212,7 +5212,8 @@ export class ApexService {
     const refresh = (await this.readTask(run, taskId)).taskType === "policy-refresh";
     const completed = await this.acceptTaskOutputs(taskId, outputs);
     const policy = outputs.find(({ kind }) => kind === "policy-property-map")?.value as PolicyPropertyMapV1 | undefined;
-    if (!refresh || !policy?.mappings.some(({ disposition }) => disposition === "blocked")) return completed;
+    if (!refresh || !policy?.mappings.some(({ effect, disposition }) => effect === "deny" && disposition === "blocked"))
+      return completed;
     await this.reopenArchitecture("Refreshed subscription governance blocks the approved Architecture");
     return {
       ...completed,
@@ -11754,6 +11755,13 @@ export class ApexService {
       seen.add(key);
       if (mapping.disposition === "exempt")
         issues.push({ path: `${path}/disposition`, message: `Reported exemptions are not verified: ${label}` });
+      if (mapping.disposition === "blocked" && mapping.effect !== "deny")
+        issues.push({
+          path: `${path}/disposition`,
+          message:
+            `Only "deny" policy findings can be marked "blocked": ${label} (effect ${mapping.effect}) is non-blocking; ` +
+            `use "planned" (omit expectedValue when platform-remediated), "satisfied", or "not-applicable" with a reason`,
+        });
       if (mapping.disposition === "not-applicable") {
         if (mapping.reason === undefined)
           issues.push({ path: `${path}/reason`, message: `Not-applicable policy mapping needs a reason: ${label}` });

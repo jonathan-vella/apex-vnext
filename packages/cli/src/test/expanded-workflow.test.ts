@@ -5986,6 +5986,53 @@ test("a blocked control after governance refresh reopens Architecture and Gate 2
   await task(service, "architecture");
 });
 
+test("only deny policy findings may use blocked disposition or reopen Architecture", async () => {
+  const { service, policyTask, template } = await approveOnReferenceGovernance();
+  for (const effect of ["modify", "deployIfNotExists"] as const) {
+    await assert.rejects(
+      service.completeTaskOutputs(policyTask, [
+        {
+          kind: "policy-property-map",
+          value: {
+            ...template,
+            mappings: [
+              ...template.mappings,
+              {
+                policyAssignmentId: `non-blocking-${effect}`,
+                effect,
+                logicalResourceId: "api",
+                propertyPath: "properties.enableDdosProtection",
+                disposition: "blocked",
+              },
+            ],
+          },
+        },
+      ]),
+      /Only "deny" policy findings can be marked "blocked"/u,
+    );
+  }
+  const completed = await service.completeTaskOutputs(policyTask, [
+    {
+      kind: "policy-property-map",
+      value: {
+        ...template,
+        mappings: [
+          ...template.mappings,
+          {
+            policyAssignmentId: "ddos-modify",
+            effect: "modify",
+            logicalResourceId: "api",
+            propertyPath: "properties.enableDdosProtection",
+            disposition: "planned",
+          },
+        ],
+      },
+    },
+  ]);
+  assert.doesNotMatch(completed.summary, /reopened/u);
+  assert.equal((await service.status()).run.gates[1]?.state, "ready");
+});
+
 test("governance refresh carries matching mappings and asks only for new controls", async () => {
   const scope = "/subscriptions/11111111-1111-1111-1111-111111111111";
   const finding = (name: string, resourceTypes: string[], policyDefinitionReferenceId?: string) => ({

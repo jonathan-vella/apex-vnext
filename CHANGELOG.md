@@ -12,6 +12,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0-next.13] — Preview
+
+This release ensures governance and Architecture only stop or mark controls `blocked` on active `deny` policies, never
+pausing on `modify`, `deployIfNotExists`, `audit`, or unconfirmed reference-baseline assignments.
+
+### Changed
+
+- Restrict `disposition: "blocked"` and `policy-refresh` Architecture reopening to `effect: "deny"` in `ApexService`,
+  and update `rubber-duck` Architecture review instructions so `modify`, `deployIfNotExists`, `audit`, and accepted
+  reference-baseline assumptions are treated as non-blocking.
+- Update `apex-architecture`, `apex-azure-governance`, `apex-operations`, `apex-azure-defaults` references, and `APEX`
+  boundaries so `apex-azure/policy` (`policy_assignment_list`) is never called to second-guess an accepted
+  `source: "reference"` baseline and non-`deny` effects (`modify`, `deployIfNotExists`, `audit`, `append`, `disabled`)
+  never stop the workflow.
+
 ## [0.11.0-next.12] — Preview
 
 This release resolves end-to-end worktree, provider handoff, Bicep AVM/generator, and native Terraform validation gaps
