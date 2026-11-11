@@ -11,7 +11,7 @@ import {
   SECRET_VALUE_PATTERN,
   hasValidLiveQualification,
 } from "../../../packages/contracts/dist/index.js";
-import { ApexService } from "../../../packages/cli/dist/index.js";
+import { APEX_VERSION, ApexService } from "../../../packages/cli/dist/index.js";
 import { EventJournal, ObjectStore, sha256Json } from "../../../packages/kernel/dist/index.js";
 import {
   assertCleanGitStatus,
@@ -76,8 +76,8 @@ const releaseManifest = {
   packages: [
     {
       package: "@apexops/cli",
-      version: "0.11.0-next.11",
-      file: "apex-cli-0.11.0-next.11.tgz",
+      version: APEX_VERSION,
+      file: `apex-cli-${APEX_VERSION}.tgz`,
       sha256: hash,
       bytes: 1,
       dependencies: {},
@@ -105,7 +105,7 @@ function fixture() {
     actor: "maintainer",
     environment: "sandbox",
     targetScope: "subscription/example",
-    toolVersions: { apex: "0.11.0-next.11" },
+    toolVersions: { apex: APEX_VERSION },
   });
   return { evidenceManifest, qualification, actual: { candidate, evidenceManifestHash: hash } };
 }

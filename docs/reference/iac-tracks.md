@@ -8,11 +8,10 @@ Current provider behavior is documented below.
 [DECISION-036](../vnext/DECISIONS.md#decision-036-deliver-non-production-first-with-purpose-bound-approval) selects a
 bounded azd executor for Bicep and retains native Terraform CLI. azd is not a third IaC language, and it is the only
 Bicep executor: the native `az deployment` and Azure Deployment Stack paths are removed, with no fallback. CP-26
-delivers it in three steps. The first added the typed `azd-binding-v1` contract, its deterministic inspection and the
-azd prerequisite check. The second (the azd executor section below) runs Bicep previews, applies and destroys through
-azd; it is implemented but not qualified, so Bicep live runs stay unavailable until CP-30
-([#455](https://github.com/jonathan-vella/apex-vnext/issues/455)) qualifies it. The third, `azd deploy` application
-packages, is not available.
+delivered it in three steps. The first added the typed `azd-binding-v1` contract, its deterministic inspection and
+the azd prerequisite check. The second (the azd executor section below) runs Bicep previews, applies and destroys
+through azd and was qualified live in CP-30 ([#455](https://github.com/jonathan-vella/apex-vnext/issues/455)). The
+third, `azd deploy` application packages, remains unavailable.
 
 Non-production (`lab`) purpose is implemented (`CP-27`): it uses one confirmed intent at Gate 1, kernel-recorded Gate
 2 and 3 readiness checkpoints with required reviews/checks retained, and final Gate 4 preview approval. Production
@@ -44,12 +43,18 @@ and the parent scope is the selected resource group. IDs interleave type/name se
 authority over its parent, siblings or undeclared descendants. Expression-based names and unresolved ownership still
 block preview.
 
-Native Bicep diagnostic-settings bindings can additionally declare `scopeLogicalId` for one managed native resource in
-the same accepted intent. The target must be a declared dependency; missing targets, modules, protected existing
-resources, self-reference, chained extension scopes and competing raw scope/parent parameters are rejected. The
-generator emits a symbolic `scope`, and ownership resolves only the diagnostic extension ID beneath that target.
-Terraform does not accept this Bicep-only field. Plan review displays the scope reference; it is not evidence that
-diagnostics ran.
+Native Bicep `Microsoft.Insights/diagnosticSettings` and `Microsoft.Authorization/roleAssignments` bindings can
+additionally declare `scopeLogicalId` for one managed native resource in the same accepted intent. The target must be a
+declared dependency; missing targets, modules, protected existing resources, self-reference, chained extension scopes
+and competing raw scope/parent parameters are rejected. The generator emits a symbolic `scope`, and ownership resolves
+only the extension resource ID beneath that target. Terraform does not accept this Bicep-only field. Plan review
+displays the scope reference; it is not evidence that diagnostics or RBAC propagation ran.
+
+Offline source validation (`validateTask` and `completeTask`) runs automatically without `.apex/provider-config.json` on
+both tracks: Bicep compiles with `bicep format`, `bicep build`, and `bicep lint` and evaluates inner AVM module and
+native resource parity, policy mappings, and storage baseline controls; Terraform runs `terraform fmt -check`,
+`terraform init -backend=false` + `validate` when available, and evaluates HCL root-module parity and storage baseline
+controls across the staged `.tf` file set.
 
 ## azd Binding For Bicep
 
@@ -141,11 +146,13 @@ falls back to another path.
 
 ## azd Bicep Executor
 
-`AzdBicepProvider` is configured in `.apex/provider-config.json` with a `bicep` block of `cwd` (the generated azd
-project root, which must be the accepted generated source), `environmentName`, `tenantId`, `location` and an optional
-`cloud`. The subscription and resource group come from the run's exact resource-group target scope. Any other key,
-including the retired `stackName`, `actionOnUnmanage`, `denySettingsMode`, `templateFile` and `resourceGroup` fields,
-is rejected. When the project has no `.azure/<environment>/.env`, APEX writes the five allowlisted, non-secret keys
+`AzdBicepProvider` is configured in `.apex/provider-config.json` with a `bicep` block of `tenantId`, `location`, and
+optional `cwd`, `environmentName`, and `cloud` (`cwd`, `environmentName`, and `riskOwner` default automatically from the
+active run's accepted `iac-handoff` when omitted, and `.apex/provider-config.json` is reloaded dynamically on each
+preview/deploy/inventory call without restarting MCP). The subscription and resource group come from the run's exact
+resource-group target scope. Any other key, including the retired `stackName`, `actionOnUnmanage`, `denySettingsMode`,
+`templateFile` and `resourceGroup` fields, is rejected. When the project has no `.azure/<environment>/.env`, APEX
+writes the five allowlisted, non-secret keys
 from the approved target; an existing file is bound as it is and never overwritten. The environment name must be a
 valid APEX environment name (checked before any path is built), and an existing environment must itself name the
 approved resource group in `AZURE_RESOURCE_GROUP` (`AZD_ENV_TARGET_MISMATCH` otherwise), so azd cannot derive another

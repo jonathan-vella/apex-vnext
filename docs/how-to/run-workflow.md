@@ -16,6 +16,11 @@ apex status --json
 apex task next --json
 ```
 
+When working across linked Git worktrees, both CLI commands and MCP tools resolve `.apex/` at the shared main checkout
+while mirroring `agent-output/` into the active worktree. If switching between worktrees or clients leaves a stale
+writer lease (`WRITER_AUTHORITY_CONFLICT`), release and claim it explicitly with `apex release-writer --yes --json` (or
+MCP `apex/releaseWriter` with `confirm: true`).
+
 ## Add A Project
 
 After initializing the customer workspace, add each additional workload without reinstalling the shared client

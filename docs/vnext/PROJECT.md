@@ -1,10 +1,10 @@
 # APEX vNext Checkpoint
 
-- **Updated:** 2026-11-10
+- **Updated:** 2026-11-11
 - **Repository:** `jonathan-vella/apex-vnext`
 - **Integration branch:** `main`
-- **Product status:** Preview published (`apex@apex-plugins` `0.11.0-next.8`)
-- **Release candidate:** `0.11.0-next.8` (`a349fed7`)
+- **Product status:** Preview published (`apex@apex-plugins` `0.11.0-next.12`)
+- **Release candidate:** `0.11.0-next.12` (`771aa9c2`)
 
 ## Current State
 
@@ -23,9 +23,12 @@ All preview launch gates (`CP-33` through `CP-39`, [#13](https://github.com/jona
 [#455](https://github.com/jonathan-vella/apex-vnext/issues/455), and [#533](https://github.com/jonathan-vella/apex-vnext/issues/533))
 plus post-launch follow-ups [#476](https://github.com/jonathan-vella/apex-vnext/issues/476) (Linux CI shard parallelization),
 [#480](https://github.com/jonathan-vella/apex-vnext/issues/480) (`azd` layered provisioning `infra.layers[]`),
-[#500](https://github.com/jonathan-vella/apex-vnext/issues/500) (diagram, run-slug, and intake UX polish), and
-[#517](https://github.com/jonathan-vella/apex-vnext/issues/517) (per-stage decision amendment guide and agent routing)
-are complete and published in `apex@apex-plugins` `0.11.0-next.8` (`a349fed7`, marketplace commit `d8c91de`).
+[#500](https://github.com/jonathan-vella/apex-vnext/issues/500) (diagram, run-slug, and intake UX polish),
+[#517](https://github.com/jonathan-vella/apex-vnext/issues/517) (per-stage decision amendment guide and agent routing),
+and post-review runtime, worktree, AVM/Bicep and Terraform validation fixes ([#546](https://github.com/jonathan-vella/apex-vnext/pull/546),
+[#548](https://github.com/jonathan-vella/apex-vnext/pull/548), [#549](https://github.com/jonathan-vella/apex-vnext/pull/549),
+[#550](https://github.com/jonathan-vella/apex-vnext/pull/550), and [#551](https://github.com/jonathan-vella/apex-vnext/pull/551))
+are integrated on `main` and packaged for `apex@apex-plugins`.
 Only four `Post-launch` milestone items remain open ([#443](https://github.com/jonathan-vella/apex-vnext/issues/443),
 [#457](https://github.com/jonathan-vella/apex-vnext/issues/457), [#458](https://github.com/jonathan-vella/apex-vnext/issues/458),
 and [#515](https://github.com/jonathan-vella/apex-vnext/issues/515)).

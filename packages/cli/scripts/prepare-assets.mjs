@@ -33,6 +33,19 @@ async function sleep(milliseconds) {
   await new Promise((done) => setTimeout(done, milliseconds));
 }
 
+async function renameWithRetry(sourcePath, destPath, attempts = 20) {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      await rename(sourcePath, destPath);
+      return;
+    } catch (error) {
+      const transient = error?.code === "EPERM" || error?.code === "EBUSY" || error?.code === "EACCES";
+      if (!transient || attempt >= attempts) throw error;
+      await sleep(25 * Math.min(attempt, 8));
+    }
+  }
+}
+
 async function withAssetLockGuard(guardPath, deadline, retryMs, now, action) {
   for (;;) {
     try {
@@ -117,15 +130,15 @@ export async function acquireAssetGenerationLock(options = {}) {
           await rm(previousRoot, { recursive: true, force: true });
           let movedPrevious = false;
           try {
-            await rename(targetRoot, previousRoot);
+            await renameWithRetry(targetRoot, previousRoot);
             movedPrevious = true;
           } catch (error) {
             if (error?.code !== "ENOENT") throw error;
           }
           try {
-            await rename(stagingRoot, targetRoot);
+            await renameWithRetry(stagingRoot, targetRoot);
           } catch (error) {
-            if (movedPrevious) await rename(previousRoot, targetRoot).catch(() => {});
+            if (movedPrevious) await renameWithRetry(previousRoot, targetRoot).catch(() => {});
             throw error;
           }
           if (movedPrevious) await rm(previousRoot, { recursive: true, force: true });

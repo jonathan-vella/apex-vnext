@@ -10,6 +10,22 @@ When you prepare a release, rename `## [Unreleased]` to the new version.
 
 ## [Unreleased]
 
+## [0.11.0-next.12] - 2026-11-11
+
+This release resolves end-to-end worktree, provider handoff, Bicep AVM/generator, and native Terraform validation gaps
+across the bundled runtime and managed `APEX` guidance.
+
+### Changed
+
+- Unify linked Git worktree `.apex/` resolution across CLI and MCP, add `apex release-writer` / `apex/releaseWriter`,
+  mirror `agent-output/` into linked worktrees, dynamically reload `.apex/provider-config.json` with active-run
+  `iac-handoff` defaults, provide zero-config offline source validation for `validateTask` and `completeTask`, block
+  runtime downgrades in `update` and `doctor --fix`, and include generated `.apex/work/<runId>/...` IaC files in state
+  transfer bundles.
+- Support AVM Bicep module evaluation, `targetScope`-bound Log Analytics resolution, Bicep output/interpolation/RBAC
+  `scopeLogicalId` generation, and root-module Terraform HCL parity/baseline validation; route missing governance
+  baselines through `ask_user`; and trim duplicated `APEX` coordinator prose.
+
 ## [0.11.0-next.11] - 2026-11-10
 
 This release codifies the canonical 9-tag resource-group contract from `jonathan-vella/azure-landing-zones`

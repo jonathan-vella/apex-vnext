@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { execFile as execFileCallback } from "node:child_process";
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, readdir, rename, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
@@ -542,8 +543,9 @@ test("asset generator refuses a source root replaced before pinning completes", 
 });
 
 test("asset generator rejects inconsistent bundle declarations", () => {
+  const repoVersion = JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version;
   const customization = {
-    version: "0.11.0-next.11",
+    version: repoVersion,
     bundle: {
       id: "apex-managed-workspace",
       authority: "npm:@apexops/cli",
@@ -554,10 +556,10 @@ test("asset generator rejects inconsistent bundle declarations", () => {
   };
   const runtime = {
     schemaVersion: "1.0.0",
-    bundleVersion: "0.11.0-next.11",
+    bundleVersion: repoVersion,
     components: {
       customizationBundle: {
-        version: "0.11.0-next.11",
+        version: repoVersion,
         manifest: "@apexops/cli/assets/customizations/manifest.json",
         assetManifest: "@apexops/cli/assets/manifest.json",
         compositionId: "apex-managed-workspace",
