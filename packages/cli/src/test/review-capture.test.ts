@@ -516,6 +516,7 @@ test(
 test("an oversized capture is rejected and quarantined rather than deleted", async () => {
   const { service, journal, taskId } = await setup();
   const { nonce } = (await service.taskContext(taskId)).reviewRequest!;
+  await mkdir(join(reviewHome(), "captures"), { recursive: true, mode: 0o700 });
   const path = join(reviewHome(), "captures", `${nonce}-0000000000000000.json`);
   await writeFile(path, "x".repeat(1024 * 1024 + 1));
   await rejectsWith(() => service.completeReview(taskId), "REVIEW_CAPTURE_MALFORMED");
@@ -565,6 +566,7 @@ test("a capture consumed by a concurrent reviewComplete reports a conflict, not 
 test("rejected captures keep state transfer working, and non-UTF-8 captures are quarantined", async () => {
   const { root, service, journal, taskId } = await setup();
   const { nonce } = (await service.taskContext(taskId)).reviewRequest!;
+  await mkdir(join(reviewHome(), "captures"), { recursive: true, mode: 0o700 });
   const malformed = join(reviewHome(), "captures", `${nonce}-0000000000000000.json`);
   const binary = join(reviewHome(), "captures", `${nonce}-1111111111111111.json`);
   await writeFile(malformed, "{not json");
