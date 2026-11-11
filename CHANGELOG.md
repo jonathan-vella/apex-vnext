@@ -12,6 +12,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0-next.14] — Preview
+
+This release replaces bundled multi-finding review prompts with a scannable Markdown overview table followed by
+sequential one-by-one `ask_user` prompts per actionable finding (`1/N`) across Requirements, Architecture, and Planning
+reviews.
+
+### Changed
+
+- Update `APEX` client mechanics (`packages/cli/scripts/prepare-assets.mjs` and `apex.agent.md`), `apex-next`,
+  `apex-requirements`, `apex-architecture`, `apex-planning`, and `docs/how-to/run-workflow.md` so stage-defined
+  out-of-scope noise is auto-dismissed silently, actionable review findings are displayed in a Markdown overview table
+  first and answered one finding at a time via sequential `ask_user` prompts with explicit disposition choices
+  (`Revise`, `Accept risk`, `Dismiss`, plus `Acknowledge` in Requirements), and all decisions are submitted together in
+  a single `apex/reviewDecide` call.
+
 ## [0.11.0-next.13] — Preview
 
 This release ensures governance and Architecture only stop or mark controls `blocked` on active `deny` policies, never

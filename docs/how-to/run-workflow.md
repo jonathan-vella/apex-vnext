@@ -108,8 +108,9 @@ The APEX agent completes interactive stages by loading the matching stage skill:
 4. Operations handles preview, approval, deployment, recovery, and evidence.
 
 The APEX agent delegates bounded code generation and validation tasks to its hidden workers and runs captured
-`rubber-duck` reviews. Review findings return as a single decision panel; permitted risk acceptance is time-bound,
-while revision creates a fresh artifact and review.
+`rubber-duck` reviews. Review findings are shown in a Markdown overview table in chat and answered one finding at a time
+via sequential `ask_user` prompts before submitting one batched `apex/reviewDecide` call; permitted risk acceptance is
+time-bound, while revision creates a fresh artifact and review.
 
 ## Governance Freshness
 

@@ -90,10 +90,33 @@ output and the kernel derives the findings from that capture; this agent never w
    `rubber-duck-review` task, and use that task's prompt. Then call `apex/reviewComplete` again. If that second attempt
    fails, stop and report the error to the user. Never complete a review task with `apex/completeTask` or author
    findings yourself.
-5. When `apex/nextTask` returns `needs_review`, load the stage skill for that gate. Record a disposition for every
-   finding through `apex/reviewDecide`: fix (`revise`), accept (`accept-risk`), or dismiss with a reason; Requirements
-   obligations may also be acknowledged with an owner. Only Gate 1 (intent) and Gate 4 (final preview) need the user's
-   explicit decision; Gate 2 and 3 readiness is recorded by the kernel.
+5. When `apex/nextTask` returns `needs_review`, load the stage skill for that gate and collect dispositions **one
+   finding at a time**:
+   - **Step A — Auto-dismiss stage-defined out-of-scope noise first:** Prepare `dismiss` decisions (with factual
+     rationales) for findings that the active stage skill marks for automatic dismissal (such as deferred
+     `Check later: performance and scale validation`, partial/unpriced retail queries, regional/quota/failover checks,
+     live confirmation of accepted reference baselines, or non-`deny` policy effects) without creating `ask_user`
+     prompts for them.
+   - **Step B — Print a Markdown overview table in chat before calling `ask_user`:** Show
+     `| ID | Severity | Finding & Impact | Recommended Action |` for all `N` actionable findings (plus a one-line note
+     naming any auto-dismissed finding IDs and why). If `N = 0`, call `apex/reviewDecide` directly with the
+     auto-dismissed decisions.
+   - **Step C — Ask `ask_user` sequentially, one finding per call (`1/N` .. `N/N`):** Never cram multiple findings into
+     one `ask_user` paragraph and never offer `"Accept all / Let me choose individually"` batch shortcuts. For each
+     actionable finding `i` of `N`, set `question` to
+     `[<SEVERITY>] <ID> (<i>/<N>): <title> — <1–2 sentence plain-English explanation of what is missing/wrong and its impact>`
+     and provide concrete single-choice options matching that finding's `actions` (put the recommended choice first with
+     `(Recommended)`):
+     - `Revise: <concrete fix summary>` (`action: "revise"`)
+     - `Accept risk (90d, owner: <project risk owner>): <draft 1-line rationale>` (`action: "accept-risk"`)
+     - `Dismiss: <factual reason why out of scope or already satisfied>` (`action: "dismiss"`)
+     - *(when `actions` includes `"acknowledge"` in Requirements)*
+       `Acknowledge obligation (owner: <accountable owner>): <scope>` (`action: "acknowledge"`)
+     Ask a brief follow-up only when a freeform choice omits a required rationale or accountable owner.
+   - **Step D — Submit once via `apex/reviewDecide`:** Combine the `N` user decisions with any auto-dismissed decisions
+     into one `apex/reviewDecide` call so multiple `revise` selections run together in a single revision pass. Only Gate
+     1 (intent) and Gate 4 (final preview) need the user's explicit gate decision; Gate 2 and 3 readiness is recorded by
+     the kernel.
 
 ## Boundaries
 

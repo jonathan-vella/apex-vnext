@@ -265,7 +265,7 @@ export function renderClientAgentProjection(source, clientId, toolInventory, opt
     (inventory.agentReadTools ?? []).every((tool) => tools.includes(tool));
   const mechanics = [
     frontmatter.name === "APEX"
-      ? `Route through the \`apex-next\` skill in this same APEX agent. Use \`${inventory.interactiveTools.delegate}\` only for the hidden workers and kernel rubber-duck reviews it names, never for interactive intake, gates or governance choices, and do not substitute Explore. Use \`${inventory.interactiveTools.askUser}\` for project lifecycle choices and kernel-owned input or review decisions. Reuse values the user already stated, ask only for missing values, and never invent defaults.`
+      ? `Route through the \`apex-next\` skill in this same APEX agent. Use \`${inventory.interactiveTools.delegate}\` only for the hidden workers and kernel rubber-duck reviews it names, never for interactive intake, gates or governance choices, and do not substitute Explore. Use \`${inventory.interactiveTools.askUser}\` for project lifecycle choices and kernel-owned input or review decisions; for \`status=needs_review\`, print a Markdown overview table of actionable findings in chat first, then ask one \`${inventory.interactiveTools.askUser}\` question per actionable finding (\`1/N\`) with concrete per-finding disposition choices before submitting one batched \`apex/reviewDecide\` call—never bundle multiple findings into a single \`${inventory.interactiveTools.askUser}\` prompt. Reuse values the user already stated, ask only for missing values, and never invent defaults.`
       : tools.includes(inventory.interactiveTools.askUser)
         ? `Use \`${inventory.interactiveTools.askUser}\` for kernel-owned input requests.`
         : null,

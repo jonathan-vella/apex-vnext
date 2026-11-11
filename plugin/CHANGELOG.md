@@ -10,6 +10,19 @@ When you prepare a release, rename `## [Unreleased]` to the new version.
 
 ## [Unreleased]
 
+## [0.11.0-next.14] - 2026-11-11
+
+This release replaces bundled multi-finding review prompts with a scannable Markdown overview table followed by
+sequential one-by-one `ask_user` prompts per actionable finding (`1/N`) across Requirements, Architecture, and Planning
+reviews.
+
+### Changed
+
+- Update `APEX`, `apex-next`, `apex-requirements`, `apex-architecture`, and `apex-planning` so out-of-scope review noise
+  is auto-dismissed silently, actionable findings render in a Markdown overview table first, users answer one finding at
+  a time via sequential `ask_user` prompts with concrete per-finding choices (`Revise`, `Accept risk`, `Dismiss`, plus
+  `Acknowledge` in Requirements), and decisions submit together in one `apex/reviewDecide` call.
+
 ## [0.11.0-next.13] - 2026-11-11
 
 This release ensures governance and Architecture only stop or mark controls `blocked` on active `deny` policies, never
