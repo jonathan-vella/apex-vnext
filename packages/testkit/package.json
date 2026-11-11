@@ -1,6 +1,6 @@
 {
   "name": "@apexops/testkit",
-  "version": "0.11.0-next.13",
+  "version": "0.11.0-next.14",
   "description": "Deterministic fixtures and scenarios for APEX vNext tests",
   "license": "MIT",
   "repository": {
@@ -26,11 +26,11 @@
     "dist"
   ],
   "dependencies": {
-    "@apexops/capabilities": "0.11.0-next.13",
-    "@apexops/cli": "0.11.0-next.13",
-    "@apexops/contracts": "0.11.0-next.13",
-    "@apexops/kernel": "0.11.0-next.13",
-    "@apexops/renderers": "0.11.0-next.13",
+    "@apexops/capabilities": "0.11.0-next.14",
+    "@apexops/cli": "0.11.0-next.14",
+    "@apexops/contracts": "0.11.0-next.14",
+    "@apexops/kernel": "0.11.0-next.14",
+    "@apexops/renderers": "0.11.0-next.14",
     "@sinclair/typebox": "0.34.52"
   },
   "scripts": {

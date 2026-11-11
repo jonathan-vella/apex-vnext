@@ -475,6 +475,11 @@ test("managed routing distinguishes input, review dispositions, and exact task c
         assert.match(content, /Continue in the same foreground `APEX` agent/u);
         assert.match(content, /\| `quality-owner`\s+\| `apex-operations`/u);
         assert.match(content, /Never delegate intake, user questions, gate decisions/u);
+        assert.match(content, /collect dispositions \*\*one\s+finding at a time\*\*/u);
+      }
+      if (["apex-requirements", "apex-architecture", "apex-planning"].includes(skill)) {
+        assert.doesNotMatch(content, /decision panel/iu, `${client}/${skill}: must not bundle findings into one panel`);
+        assert.match(content, /one finding at a time/u, `${client}/${skill}: must collect findings one at a time`);
       }
       for (const state of ["needs_input", "needs_review", "status=task", "task.taskId"]) {
         assert.ok(content.includes(state), `${client}/${skill}: missing ${state} routing`);
