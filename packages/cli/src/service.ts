@@ -6388,6 +6388,10 @@ export class ApexService {
     return join(this.root, ".apex", "generated-review-bases", sha256Bytes(Buffer.from(relative(this.root, path))));
   }
 
+  private generatedReviewMirrorBase(mirrorPath: string): string {
+    return join(this.root, ".apex", "generated-review-bases", sha256Bytes(Buffer.from(`mirror:${mirrorPath}`)));
+  }
+
   private async workspaceMirrorPath(path: string): Promise<string | undefined> {
     const canonicalRoot = await realpath(this.root).catch(() => this.root);
     const canonicalWorkspace = await realpath(this.workspacePath).catch(() => this.workspacePath);
@@ -6407,17 +6411,26 @@ export class ApexService {
     const mirror = await this.workspaceMirrorPath(path);
     const mirrorCurrent = mirror === undefined ? undefined : await this.readOptional(mirror);
     if (current === undefined && mirrorCurrent === undefined) return;
-    const base = await this.readOptional(basePath);
-    if (
-      base === undefined ||
-      (current !== undefined && !current.equals(base)) ||
-      (mirrorCurrent !== undefined && !mirrorCurrent.equals(base))
-    )
-      throw new ApexError(
-        "APEX_CONFLICT",
-        `Generated review file has manual edits: ${relative(this.root, path)}`,
-        EXIT_CODES.conflict,
-      );
+    if (current !== undefined) {
+      const base = await this.readOptional(basePath);
+      if (base === undefined || !current.equals(base))
+        throw new ApexError(
+          "APEX_CONFLICT",
+          `Generated review file has manual edits: ${relative(this.root, path)}`,
+          EXIT_CODES.conflict,
+        );
+    }
+    if (mirror !== undefined && mirrorCurrent !== undefined) {
+      const mirrorBasePath = this.generatedReviewMirrorBase(mirror);
+      await this.assertSafeDestination(this.root, mirrorBasePath);
+      const mirrorBase = await this.readOptional(mirrorBasePath);
+      if (mirrorBase === undefined || !mirrorCurrent.equals(mirrorBase))
+        throw new ApexError(
+          "APEX_CONFLICT",
+          `Generated review file has manual edits: ${relative(this.root, path)}`,
+          EXIT_CODES.conflict,
+        );
+    }
   }
 
   private async assertTaskReviewFilesUnmodified(run: RunConfigV1, descriptor: WorkflowTaskDescriptor): Promise<void> {
@@ -6480,7 +6493,12 @@ export class ApexService {
     await this.assertGeneratedReviewUnmodified(path);
     const mirror = await this.workspaceMirrorPath(path);
     await rm(path, { force: true });
-    if (mirror !== undefined) await rm(mirror, { force: true });
+    if (mirror !== undefined) {
+      await rm(mirror, { force: true });
+      const mirrorBasePath = this.generatedReviewMirrorBase(mirror);
+      await this.assertSafeDestination(this.root, mirrorBasePath);
+      await rm(mirrorBasePath, { force: true });
+    }
     const basePath = this.generatedReviewBase(path);
     await this.assertSafeDestination(this.root, basePath);
     await rm(basePath, { force: true });
@@ -6598,6 +6616,9 @@ export class ApexService {
     if (mirror !== undefined && !mirrorCurrent?.equals(content)) {
       await mkdir(dirname(mirror), { recursive: true });
       await atomicWriteBytes(mirror, content, { refuseOverwrite: mirrorCurrent === undefined });
+      const mirrorBasePath = this.generatedReviewMirrorBase(mirror);
+      await this.assertSafeDestination(this.root, mirrorBasePath);
+      await atomicWriteBytes(mirrorBasePath, content);
     }
   }
 
@@ -11999,9 +12020,28 @@ export class ApexService {
     if (descriptor.id === `validation-${run.iacTool}`) {
       for (const id of validatorIds) nativeEvidenceModes[id] = "simulated";
       const currentHandoff = artifacts["iac-handoff"] as IacHandoffV1 | undefined;
+      const submittedEvidence = context.outputs["validation-evidence"] as EvidenceManifestV1 | undefined;
+      let hasNativeReceiptSubmission = false;
+      for (const entry of submittedEvidence?.entries ?? []) {
+        try {
+          const candidate = await this.objects.getJson<Record<string, unknown>>(entry.hash);
+          if (
+            candidate !== null &&
+            typeof candidate === "object" &&
+            Array.isArray(candidate.commands) &&
+            typeof candidate.receiptHash === "string"
+          ) {
+            hasNativeReceiptSubmission = true;
+            break;
+          }
+        } catch {
+          // Simulated evidence entries may reference synthetic hashes rather than NativeValidationReceiptV1 objects.
+        }
+      }
       const provider = await this.resolveProvider(run.iacTool, {
         run,
         ...(currentHandoff === undefined ? {} : { handoffRootPath: currentHandoff.rootPath }),
+        ...(hasNativeReceiptSubmission ? { sourceValidationOnly: true } : {}),
       });
       if (provider !== undefined && provider.validateSource === undefined && provider.validationMode !== "simulated")
         throw new ApexError(

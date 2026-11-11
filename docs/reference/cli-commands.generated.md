@@ -72,6 +72,7 @@ This file is generated from [packages/cli/src/cli.ts](../../packages/cli/src/cli
 - `quality scan`
 - `quality status`
 - `reconcile`
+- `release-writer`
 - `render`
 - `requirements adopt`
 - `requirements amend`
@@ -97,6 +98,7 @@ This file is generated from [packages/cli/src/cli.ts](../../packages/cli/src/cli
 - `update`
 - `validate`
 - `version`
+- `writer release`
 - `writer show`
 - `writer transfer-accept`
 - `writer transfer-create`

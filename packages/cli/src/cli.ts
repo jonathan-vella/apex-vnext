@@ -195,8 +195,12 @@ async function activeRunProviderContext(root: string): Promise<ProviderResolutio
     let handoffHash: string | undefined;
     for (const event of events) {
       if (event.type === "task.completed") {
-        const outputHashes = (event.payload as { outputHashes?: Record<string, unknown> }).outputHashes;
-        if (typeof outputHashes?.["iac-handoff"] === "string") handoffHash = outputHashes["iac-handoff"];
+        const payload = event.payload as {
+          artifactHashes?: Record<string, unknown>;
+          outputHashes?: Record<string, unknown>;
+        };
+        const candidate = payload.artifactHashes?.["iac-handoff"] ?? payload.outputHashes?.["iac-handoff"];
+        if (typeof candidate === "string") handoffHash = candidate;
       }
     }
     const handoff =

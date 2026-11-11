@@ -83,6 +83,33 @@ function safeRelativePath(path: string): boolean {
   );
 }
 
+const ALLOWED_WORK_SOURCE_SUFFIXES = [
+  ".terraform.lock.hcl",
+  ".tfvars.example",
+  ".bicep",
+  ".json",
+  ".tf",
+  ".md",
+  ".yaml",
+] as const;
+
+function isAllowedWorkSourcePath(path: string, runId: string): boolean {
+  const prefix = `work/${runId}/`;
+  if (!path.startsWith(prefix)) return false;
+  const rest = path.slice(prefix.length).split("/");
+  if (rest.length < 3 || rest[1] !== "code" || !IDENTIFIER_PATTERN.test(rest[0]!)) return false;
+  const codeSegments = rest.slice(2);
+  if (
+    codeSegments.some(
+      (segment) => segment.length === 0 || (segment.startsWith(".") && segment !== ".terraform.lock.hcl"),
+    )
+  ) {
+    return false;
+  }
+  const relativeCodePath = codeSegments.join("/");
+  return ALLOWED_WORK_SOURCE_SUFFIXES.some((suffix) => relativeCodePath.endsWith(suffix));
+}
+
 function prohibitedStatePath(path: string): boolean {
   if (
     path
@@ -90,6 +117,9 @@ function prohibitedStatePath(path: string): boolean {
       .some(
         (part) =>
           part === ".terraform" ||
+          part === ".azure" ||
+          part === ".env" ||
+          part.startsWith(".env.") ||
           part.startsWith(".run-mutation.") ||
           part === ".run-transaction.json" ||
           part === ".run-writer-lease.json" ||
@@ -98,7 +128,7 @@ function prohibitedStatePath(path: string): boolean {
   ) {
     return true;
   }
-  return /(?:^|\/)(?:credentials?(?:\.json)?|terraform\.tfstate(?:\.[^/]*)?|[^/]+\.tfplan(?:\.enc)?|state-plans?)(?:\/|$)/i.test(
+  return /(?:^|\/)(?:credentials?(?:\.json)?|terraform\.tfstate(?:\.[^/]*)?|[^/]+\.tfplan(?:\.enc)?|[^/]+\.tfvars(?:\.json)?|state-plans?)(?:\/|$)/i.test(
     path,
   );
 }
@@ -221,15 +251,45 @@ async function collectObjectClosure(apexRoot: string, seedFiles: readonly Buffer
   return objects;
 }
 
+function hasSecretTextAssignment(text: string): boolean {
+  for (const rawLine of text.split(/\r?\n/u)) {
+    const line = rawLine.trim();
+    if (line.length === 0 || line.startsWith("#") || line.startsWith("//")) continue;
+    const match =
+      /^(?:export\s+|param\s+|var\s+)?['"]?([A-Za-z_][A-Za-z0-9_-]*)['"]?(?:\s+[A-Za-z]+)?\s*(?:=|:)\s*(.+?)\s*,?$/u.exec(
+        line,
+      );
+    if (match === null) continue;
+    const [, key, rawValue] = match;
+    if (!SECRET_FIELD_PATTERN.test(key!)) continue;
+    const value = rawValue!.trim();
+    if (
+      value.length > 0 &&
+      value !== "null" &&
+      value !== "false" &&
+      value !== "true" &&
+      value !== '""' &&
+      value !== "''" &&
+      value !== "{}" &&
+      value !== "[]"
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function validateEntrySafety(bytes: Buffer, path: string): void {
   if (path === ".gitignore") {
-    if (SECRET_VALUE_PATTERN.test(bytes.toString("utf8"))) {
+    const text = bytes.toString("utf8");
+    if (SECRET_VALUE_PATTERN.test(text) || hasSecretTextAssignment(text)) {
       throw new Error(`State transfer contains secret-bearing text in ${path}`);
     }
     return;
   }
   if (path.startsWith("work/") && !path.endsWith(".json")) {
-    if (SECRET_VALUE_PATTERN.test(bytes.toString("utf8"))) {
+    const text = bytes.toString("utf8");
+    if (SECRET_VALUE_PATTERN.test(text) || hasSecretTextAssignment(text)) {
       throw new Error(`State transfer contains secret-bearing text in ${path}`);
     }
     return;
@@ -338,9 +398,12 @@ export async function createStateTransferBundle(
   }
   const workRoot = join(state.apexRoot, "work", state.selection.runId);
   try {
-    for (const path of await walkRegularFiles(workRoot, workRoot, { skipDirectories: new Set([".terraform"]) })) {
-      if (!prohibitedStatePath(`work/${state.selection.runId}/${path}`)) {
-        paths.add(`work/${state.selection.runId}/${path}`);
+    for (const path of await walkRegularFiles(workRoot, workRoot, {
+      skipDirectories: new Set([".terraform", ".azure"]),
+    })) {
+      const candidate = `work/${state.selection.runId}/${path}`;
+      if (!prohibitedStatePath(candidate) && isAllowedWorkSourcePath(candidate, state.selection.runId)) {
+        paths.add(candidate);
       }
     }
   } catch (error) {
@@ -425,7 +488,6 @@ export async function exportStateTransfer(
 function allowedBundlePath(path: string, bindings: StateTransferBindings): boolean {
   if (prohibitedStatePath(path)) return false;
   const runPrefix = `projects/${bindings.projectId}/runs/${bindings.runId}/`;
-  const workPrefix = `work/${bindings.runId}/`;
   return (
     path === ".gitignore" ||
     path === "config.json" ||
@@ -433,7 +495,7 @@ function allowedBundlePath(path: string, bindings: StateTransferBindings): boole
     /^runtime\/[^/]+\.json$/.test(path) ||
     path === `projects/${bindings.projectId}/project.json` ||
     path.startsWith(runPrefix) ||
-    path.startsWith(workPrefix) ||
+    isAllowedWorkSourcePath(path, bindings.runId) ||
     /^objects\/sha256\/[0-9a-f]{2}\/[0-9a-f]{62}$/.test(path)
   );
 }
