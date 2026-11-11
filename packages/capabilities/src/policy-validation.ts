@@ -328,25 +328,55 @@ function observeBoundProperty(
     segments[0] === "properties" &&
     segments.length >= 2 &&
     segments[1] !== "parameters" &&
-    segments[1] !== "template"
+    segments[1] !== "template" &&
+    codeSymbol !== undefined
   ) {
-    const paramEntry = object(own(own(resource.value.properties, "parameters"), segments[1]!));
-    if (paramEntry !== undefined && Object.hasOwn(paramEntry, "value")) {
-      walked = walkPath(paramEntry.value, undefined, segments.slice(2));
-    } else if (codeSymbol !== undefined) {
-      const prefix = `${codeSymbol}::`;
-      const innerCandidates = resources.filter(
-        (candidate) =>
-          candidate.codeSymbol !== undefined &&
-          candidate.codeSymbol.startsWith(prefix) &&
-          !candidate.codeSymbol.slice(prefix.length).includes("::") &&
-          candidate.resourceType?.toLowerCase() !== "microsoft.resources/deployments" &&
-          !candidate.unsupported &&
-          candidate.existing !== true,
-      );
-      if (innerCandidates.length === 1) {
-        walked = walkPath(innerCandidates[0]!.value, innerCandidates[0]!.unknown, segments);
+    const prefix = `${codeSymbol}::`;
+    const innerCandidates = resources.filter(
+      (candidate) =>
+        candidate.codeSymbol !== undefined &&
+        candidate.codeSymbol.startsWith(prefix) &&
+        !candidate.codeSymbol.slice(prefix.length).includes("::") &&
+        candidate.resourceType?.toLowerCase() !== "microsoft.resources/deployments" &&
+        !candidate.unsupported &&
+        candidate.existing !== true,
+    );
+    if (innerCandidates.length !== 1) {
+      return { outcome: "unsupported", reason: "unsupported-resource" };
+    }
+    const innerResource = innerCandidates[0]!;
+    const parametersObj = object(own(resource.value.properties, "parameters"));
+    let currentObserved: unknown = innerResource.value;
+    let currentUnknown: unknown = innerResource.unknown;
+    let resolvedViaInner = true;
+    for (let idx = 0; idx < segments.length; idx += 1) {
+      if (currentUnknown === true) return { outcome: "unsupported", reason: "unsupported-expression" };
+      if (typeof currentObserved === "string") {
+        const paramRef = /^\[parameters\('([A-Za-z_][A-Za-z0-9_]*)'\)\]$/u.exec(currentObserved.trim());
+        if (paramRef === null) return { outcome: "unsupported", reason: "unsupported-expression" };
+        const paramDef = object(own(parametersObj, paramRef[1]!));
+        if (paramDef === undefined || !Object.hasOwn(paramDef, "value")) {
+          return { outcome: "unsupported", reason: "unsupported-expression" };
+        }
+        currentObserved = paramDef.value;
+        currentUnknown = undefined;
       }
+      currentObserved = own(currentObserved, segments[idx]!);
+      currentUnknown = own(currentUnknown, segments[idx]!);
+    }
+    if (typeof currentObserved === "string") {
+      const paramRef = /^\[parameters\('([A-Za-z_][A-Za-z0-9_]*)'\)\]$/u.exec(currentObserved.trim());
+      if (paramRef !== null) {
+        const paramDef = object(own(parametersObj, paramRef[1]!));
+        if (paramDef === undefined || !Object.hasOwn(paramDef, "value")) {
+          return { outcome: "unsupported", reason: "unsupported-expression" };
+        }
+        currentObserved = paramDef.value;
+        currentUnknown = undefined;
+      }
+    }
+    if (resolvedViaInner) {
+      walked = { observed: currentObserved, unknown: currentUnknown, expressionHit: false };
     }
   }
   if (walked.expressionHit || hasUnknown(walked.unknown) || expression(walked.observed, request.track))
@@ -444,6 +474,7 @@ export function validateBicepStorageDiagnostics(request: {
   readonly binding: PolicyResourceBinding;
   readonly workspaceResourceId: string;
   readonly json: string;
+  readonly targetScope?: string;
 }): NonNullable<NativeValidationReceiptV1["storageDiagnostics"]>[string] {
   assertPolicyValidationJson(request.binding);
   if (
@@ -532,18 +563,27 @@ export function validateBicepStorageDiagnostics(request: {
     )
       return result("unsupported", "unsupported-diagnostics");
     const properties = object(setting.value.properties);
-    const expectedWorkspaceName = request.workspaceResourceId.split("/").at(-1);
-    const sameRgWorkspaceExpr =
-      expectedWorkspaceName === undefined
-        ? undefined
-        : `[resourceId('Microsoft.OperationalInsights/workspaces', '${expectedWorkspaceName}')]`;
-    if (
-      properties === undefined ||
-      typeof properties.workspaceId !== "string" ||
-      (properties.workspaceId.toLowerCase() !== request.workspaceResourceId.toLowerCase() &&
-        properties.workspaceId !== sameRgWorkspaceExpr)
-    )
+    if (properties === undefined || typeof properties.workspaceId !== "string") {
       return result("fail", "workspace-mismatch");
+    }
+    const workspaceExprMatch =
+      /^\[resourceId\('Microsoft\.OperationalInsights\/workspaces',\s*'([A-Za-z0-9][A-Za-z0-9-]*)'\)\]$/iu.exec(
+        properties.workspaceId.trim(),
+      );
+    if (workspaceExprMatch !== null) {
+      if (
+        request.targetScope === undefined ||
+        !/^\/subscriptions\/[a-f0-9-]{36}\/resourceGroups\/[^/]+$/i.test(request.targetScope)
+      ) {
+        return result("unsupported", "unsupported-diagnostics");
+      }
+      const resolvedId = `${request.targetScope}/providers/Microsoft.OperationalInsights/workspaces/${workspaceExprMatch[1]!}`;
+      if (resolvedId.toLowerCase() !== request.workspaceResourceId.toLowerCase()) {
+        return result("fail", "workspace-mismatch");
+      }
+    } else if (properties.workspaceId.toLowerCase() !== request.workspaceResourceId.toLowerCase()) {
+      return result("fail", "workspace-mismatch");
+    }
     const logs = properties.logs;
     const metrics = properties.metrics;
     if (!Array.isArray(logs) || !Array.isArray(metrics)) return result("fail", "missing-categories");
@@ -732,6 +772,7 @@ export function validateBicepStorageBaseline(request: {
   readonly manifest: LogicalResourceManifestV1;
   readonly binding: IacBindingV1;
   readonly json: string;
+  readonly targetScope?: string;
 }): NonNullable<NativeValidationReceiptV1["securityBaseline"]> {
   const parity = validateBicepResourceParity(request);
   const result = (
@@ -871,15 +912,22 @@ export function validateBicepStorageBaseline(request: {
   )) {
     const deployment = resources.find(({ codeSymbol }) => codeSymbol === moduleStorage.executionAddress);
     const params = object(own(deployment?.value.properties, "parameters"));
-    if (
-      params === undefined ||
-      own(params.allowBlobPublicAccess, "value") !== false ||
-      own(params.allowSharedKeyAccess, "value") !== false ||
-      own(params.minimumTlsVersion, "value") !== "TLS1_2" ||
-      own(params.supportsHttpsTrafficOnly, "value") !== true ||
-      own(params.publicNetworkAccess, "value") === "Enabled"
-    ) {
-      return result("fail", "storage-controls");
+    if (params === undefined) return result("unsupported", "unsupported-resource");
+    const requiredControls: readonly (readonly [string, unknown])[] = [
+      ["allowBlobPublicAccess", false],
+      ["allowSharedKeyAccess", false],
+      ["minimumTlsVersion", "TLS1_2"],
+      ["supportsHttpsTrafficOnly", true],
+      ["publicNetworkAccess", "Disabled"],
+    ];
+    for (const [paramKey, expectedVal] of requiredControls) {
+      const entryObj = object(params[paramKey]);
+      if (entryObj === undefined || !Object.hasOwn(entryObj, "value") || expression(entryObj.value, "bicep")) {
+        return result("unsupported", "unsupported-resource");
+      }
+      if (entryObj.value !== expectedVal) {
+        return result("fail", "storage-controls");
+      }
     }
   }
   for (const account of accounts) {
@@ -954,14 +1002,43 @@ export function validateBicepStorageBaseline(request: {
       services.some((service) => request.binding.resourceBindings[logicalId]?.scopeLogicalId === service.logicalId),
     );
     if (services.length > 0 || settings.length > 0) {
+      const sameRunWorkspaces = new Map<string, string>();
+      if (
+        request.targetScope !== undefined &&
+        /^\/subscriptions\/[a-f0-9-]{36}\/resourceGroups\/[^/]+$/i.test(request.targetScope)
+      ) {
+        for (const entry of request.manifest.resources) {
+          if (entry.type.toLowerCase() !== "microsoft.operationalinsights/workspaces") continue;
+          const wsName = request.binding.resourceBindings[entry.logicalId]?.parameters.name;
+          if (typeof wsName === "string" && wsName.length > 0) {
+            const fullId = `${request.targetScope}/providers/Microsoft.OperationalInsights/workspaces/${wsName}`;
+            sameRunWorkspaces.set(entry.logicalId, fullId);
+            if (entry.executionAddress !== undefined) sameRunWorkspaces.set(entry.executionAddress, fullId);
+            sameRunWorkspaces.set(`[resourceId('Microsoft.OperationalInsights/workspaces', '${wsName}')]`, fullId);
+          }
+        }
+      }
+      const resolveBaselineWorkspace = (raw: unknown): string | undefined => {
+        if (typeof raw !== "string") return undefined;
+        if (
+          /^\/subscriptions\/[a-f0-9-]{36}\/resourceGroups\/[^/]+\/providers\/Microsoft\.OperationalInsights\/workspaces\/[^/]+$/i.test(
+            raw,
+          )
+        ) {
+          return raw;
+        }
+        return sameRunWorkspaces.get(raw);
+      };
       const workspaceIds = settings.map(({ logicalId }) =>
-        own(request.binding.resourceBindings[logicalId]?.parameters.properties, "workspaceId"),
+        resolveBaselineWorkspace(
+          own(request.binding.resourceBindings[logicalId]?.parameters.properties, "workspaceId"),
+        ),
       );
       if (
         services.length !== 4 ||
         settings.length !== 4 ||
         workspaceIds.some((id) => typeof id !== "string") ||
-        new Set(workspaceIds).size !== 1
+        new Set(workspaceIds.map((id) => id!.toLowerCase())).size !== 1
       )
         return result("unsupported", "diagnostic-routing");
       let routing: ReturnType<typeof validateBicepStorageDiagnostics>;
@@ -969,8 +1046,9 @@ export function validateBicepStorageBaseline(request: {
         routing = validateBicepStorageDiagnostics({
           sourceHash: request.sourceHash,
           binding: { codeSymbol: account.codeSymbol! },
-          workspaceResourceId: workspaceIds[0] as string,
+          workspaceResourceId: workspaceIds[0]!,
           json: request.json,
+          ...(request.targetScope === undefined ? {} : { targetScope: request.targetScope }),
         });
       } catch {
         return result("unsupported", "diagnostic-routing");
@@ -1043,48 +1121,154 @@ export function validatePolicyProperties(request: PolicyValidationInput): Policy
 
 interface ParsedTerraformBlock {
   readonly address: string;
-  readonly kind: "resource" | "data" | "module";
+  readonly kind: "resource" | "data" | "module" | "variable" | "output" | "provider" | "terraform";
   readonly blockType?: string;
   readonly body: string;
   readonly dependsOn: readonly string[];
 }
 
-function parseTerraformMainBlocks(hcl: string): readonly ParsedTerraformBlock[] | undefined {
+function stripHclComments(hcl: string): string {
+  let out = "";
+  let idx = 0;
+  let inString = false;
+  while (idx < hcl.length) {
+    const ch = hcl[idx]!;
+    if (inString) {
+      if (ch === "\\" && idx + 1 < hcl.length) {
+        out += hcl.slice(idx, idx + 2);
+        idx += 2;
+      } else {
+        if (ch === '"') inString = false;
+        out += ch;
+        idx += 1;
+      }
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+      out += ch;
+      idx += 1;
+      continue;
+    }
+    if (ch === "#" || hcl.startsWith("//", idx)) {
+      while (idx < hcl.length && hcl[idx] !== "\n") idx += 1;
+      continue;
+    }
+    if (hcl.startsWith("/*", idx)) {
+      const end = hcl.indexOf("*/", idx + 2);
+      idx = end === -1 ? hcl.length : end + 2;
+      continue;
+    }
+    out += ch;
+    idx += 1;
+  }
+  return out;
+}
+
+function parseTopLevelHclAttributes(body: string): ReadonlyMap<string, string> | undefined {
+  const clean = stripHclComments(body);
+  const attrs = new Map<string, string>();
+  let idx = 0;
+  while (idx < clean.length) {
+    while (idx < clean.length && /[\s,]/u.test(clean[idx]!)) idx += 1;
+    if (idx >= clean.length) break;
+    const keyMatch = /^(?:"([^"]+)"|([A-Za-z_][A-Za-z0-9_-]*))\s*(=|\{)/u.exec(clean.slice(idx));
+    if (keyMatch === null) return undefined;
+    const key = (keyMatch[1] ?? keyMatch[2])!;
+    const separator = keyMatch[3]!;
+    idx += keyMatch[0].length;
+    if (separator === "{") {
+      let depth = 1;
+      let inStr = false;
+      while (idx < clean.length && depth > 0) {
+        const ch = clean[idx]!;
+        if (inStr) {
+          if (ch === "\\") idx += 2;
+          else {
+            if (ch === '"') inStr = false;
+            idx += 1;
+          }
+          continue;
+        }
+        if (ch === '"') inStr = true;
+        else if (ch === "{") depth += 1;
+        else if (ch === "}") depth -= 1;
+        idx += 1;
+      }
+      if (depth !== 0) return undefined;
+      continue;
+    }
+    while (idx < clean.length && (clean[idx] === " " || clean[idx] === "\t")) idx += 1;
+    const valueStart = idx;
+    let braceDepth = 0;
+    let bracketDepth = 0;
+    let parenDepth = 0;
+    let inStr = false;
+    while (idx < clean.length) {
+      const ch = clean[idx]!;
+      if (inStr) {
+        if (ch === "\\") idx += 2;
+        else {
+          if (ch === '"') inStr = false;
+          idx += 1;
+        }
+        continue;
+      }
+      if (ch === '"') {
+        inStr = true;
+        idx += 1;
+        continue;
+      }
+      if (ch === "{") braceDepth += 1;
+      else if (ch === "}") braceDepth -= 1;
+      else if (ch === "[") bracketDepth += 1;
+      else if (ch === "]") bracketDepth -= 1;
+      else if (ch === "(") parenDepth += 1;
+      else if (ch === ")") parenDepth -= 1;
+      else if ((ch === "\n" || ch === ",") && braceDepth === 0 && bracketDepth === 0 && parenDepth === 0) {
+        break;
+      }
+      if (braceDepth < 0 || bracketDepth < 0 || parenDepth < 0) return undefined;
+      idx += 1;
+    }
+    if (inStr || braceDepth !== 0 || bracketDepth !== 0 || parenDepth !== 0) return undefined;
+    if (attrs.has(key)) return undefined;
+    attrs.set(key, clean.slice(valueStart, idx).trim());
+    if (idx < clean.length && (clean[idx] === "\n" || clean[idx] === ",")) idx += 1;
+  }
+  return attrs;
+}
+
+function parseHclStringLiteral(raw: string | undefined): string | undefined {
+  if (raw === undefined || !raw.startsWith('"') || !raw.endsWith('"') || /\$\{|%\{/u.test(raw)) return undefined;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return typeof parsed === "string" ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function parseTerraformBlocks(hcl: string): readonly ParsedTerraformBlock[] | undefined {
+  const clean = stripHclComments(hcl);
   const blocks: ParsedTerraformBlock[] = [];
   let index = 0;
-  const length = hcl.length;
-  const skipWhitespaceAndComments = (): void => {
-    while (index < length) {
-      const ch = hcl[index]!;
-      if (/\s/u.test(ch)) {
-        index += 1;
-        continue;
-      }
-      if (ch === "#" || hcl.startsWith("//", index)) {
-        while (index < length && hcl[index] !== "\n") index += 1;
-        continue;
-      }
-      if (hcl.startsWith("/*", index)) {
-        const end = hcl.indexOf("*/", index + 2);
-        index = end === -1 ? length : end + 2;
-        continue;
-      }
-      break;
-    }
-  };
+  const length = clean.length;
   while (index < length) {
-    skipWhitespaceAndComments();
+    while (index < length && /\s/u.test(clean[index]!)) index += 1;
     if (index >= length) break;
-    const headerMatch =
-      /^(resource|data)\s+"([^"]+)"\s+"([^"]+)"\s*\{/u.exec(hcl.slice(index)) ??
-      /^(module)\s+"([^"]+)"\s*\{/u.exec(hcl.slice(index));
+    const twoLabel = /^(resource|data)\s+"([^"]+)"\s+"([^"]+)"\s*\{/u.exec(clean.slice(index));
+    const oneLabel =
+      twoLabel === null ? /^(module|variable|output|provider)\s+"([^"]+)"\s*\{/u.exec(clean.slice(index)) : null;
+    const zeroLabel = twoLabel === null && oneLabel === null ? /^(terraform)\s*\{/u.exec(clean.slice(index)) : null;
+    const headerMatch = twoLabel ?? oneLabel ?? zeroLabel;
     if (headerMatch === null) return undefined;
     const openBraceOffset = index + headerMatch[0].length - 1;
     let depth = 1;
     let cursor = openBraceOffset + 1;
     let inString = false;
     while (cursor < length && depth > 0) {
-      const ch = hcl[cursor]!;
+      const ch = clean[cursor]!;
       if (inString) {
         if (ch === "\\") cursor += 2;
         else {
@@ -1098,45 +1282,46 @@ function parseTerraformMainBlocks(hcl: string): readonly ParsedTerraformBlock[] 
         cursor += 1;
         continue;
       }
-      if (ch === "#" || hcl.startsWith("//", cursor)) {
-        while (cursor < length && hcl[cursor] !== "\n") cursor += 1;
-        continue;
-      }
-      if (hcl.startsWith("/*", cursor)) {
-        const end = hcl.indexOf("*/", cursor + 2);
-        cursor = end === -1 ? length : end + 2;
-        continue;
-      }
       if (ch === "{") depth += 1;
       else if (ch === "}") depth -= 1;
       cursor += 1;
     }
     if (depth !== 0) return undefined;
-    const body = hcl.slice(openBraceOffset + 1, cursor - 1);
-    const depsMatch = /\bdepends_on\s*=\s*\[([^\]]*)\]/u.exec(body);
-    const dependsOn =
-      depsMatch === null
-        ? []
-        : depsMatch[1]!
-            .split(",")
-            .map((token) => token.trim())
-            .filter((token) => token.length > 0);
-    if (headerMatch[1] === "module") {
+    const body = clean.slice(openBraceOffset + 1, cursor - 1);
+    const attrs = parseTopLevelHclAttributes(body);
+    let dependsOn: string[] = [];
+    const rawDeps = attrs?.get("depends_on");
+    if (rawDeps !== undefined) {
+      if (!rawDeps.startsWith("[") || !rawDeps.endsWith("]")) return undefined;
+      dependsOn = rawDeps
+        .slice(1, -1)
+        .split(",")
+        .map((token) => token.trim())
+        .filter((token) => token.length > 0);
+    }
+    if (twoLabel !== null) {
+      const kind = twoLabel[1] as "resource" | "data";
       blocks.push({
-        address: `module.${headerMatch[2]!}`,
-        kind: "module",
+        address: kind === "data" ? `data.${twoLabel[2]!}.${twoLabel[3]!}` : `${twoLabel[2]!}.${twoLabel[3]!}`,
+        kind,
+        blockType: twoLabel[2]!,
+        body,
+        dependsOn,
+      });
+    } else if (oneLabel !== null) {
+      const kind = oneLabel[1] as "module" | "variable" | "output" | "provider";
+      blocks.push({
+        address: `${kind}.${oneLabel[2]!}`,
+        kind,
         body,
         dependsOn,
       });
     } else {
-      const kind = headerMatch[1] as "resource" | "data";
       blocks.push({
-        address:
-          kind === "data" ? `data.${headerMatch[2]!}.${headerMatch[3]!}` : `${headerMatch[2]!}.${headerMatch[3]!}`,
-        kind,
-        blockType: headerMatch[2]!,
+        address: "terraform",
+        kind: "terraform",
         body,
-        dependsOn,
+        dependsOn: [],
       });
     }
     index = cursor;
@@ -1144,11 +1329,54 @@ function parseTerraformMainBlocks(hcl: string): readonly ParsedTerraformBlock[] 
   return blocks;
 }
 
+const ALLOWED_TERRAFORM_ROOT_FILES = new Map<string, ParsedTerraformBlock["kind"]>([
+  ["outputs.tf", "output"],
+  ["provider.tf", "provider"],
+  ["variables.tf", "variable"],
+  ["versions.tf", "terraform"],
+]);
+
+function normalizeTerraformSourceFiles(request: {
+  readonly hcl?: string;
+  readonly files?: Readonly<Record<string, string>>;
+}): { readonly inputDigest: string; readonly files: Readonly<Record<string, string>>; readonly validLayout: boolean } {
+  const files: Record<string, string> =
+    request.files !== undefined
+      ? Object.fromEntries(Object.entries(request.files).sort(([a], [b]) => a.localeCompare(b)))
+      : { "main.tf": request.hcl ?? "" };
+  const inputDigest =
+    request.files !== undefined
+      ? calculatePolicyValidationDigest(files)
+      : createHash("sha256")
+          .update(request.hcl ?? "")
+          .digest("hex");
+  let validLayout = Object.hasOwn(files, "main.tf");
+  for (const [path, content] of Object.entries(files)) {
+    if (path === ".terraform.lock.hcl" || path === "main.tf") continue;
+    if (/\.tf\.json$/iu.test(path) || /(?:^|\/)override\.tf$/iu.test(path) || /_override\.tf$/iu.test(path)) {
+      validLayout = false;
+      break;
+    }
+    const expectedBlockKind = ALLOWED_TERRAFORM_ROOT_FILES.get(path);
+    if (expectedBlockKind === undefined) {
+      validLayout = false;
+      break;
+    }
+    const auxBlocks = parseTerraformBlocks(content);
+    if (auxBlocks === undefined || auxBlocks.some(({ kind }) => kind !== expectedBlockKind)) {
+      validLayout = false;
+      break;
+    }
+  }
+  return { inputDigest, files, validLayout };
+}
+
 export function validateTerraformResourceParity(request: {
   readonly sourceHash: string;
   readonly manifest: LogicalResourceManifestV1;
   readonly binding?: IacBindingV1;
-  readonly hcl: string;
+  readonly hcl?: string;
+  readonly files?: Readonly<Record<string, string>>;
 }): NonNullable<NativeValidationReceiptV1["resourceParity"]> {
   assertPolicyValidationJson(request.manifest);
   if (request.binding !== undefined) {
@@ -1161,15 +1389,22 @@ export function validateTerraformResourceParity(request: {
     )
       throw new TypeError("RESOURCE_PARITY_INVALID_INPUT");
   }
+  const totalBytes =
+    request.files !== undefined
+      ? Object.values(request.files).reduce((sum, text) => sum + Buffer.byteLength(text), 0)
+      : typeof request.hcl === "string"
+        ? Buffer.byteLength(request.hcl)
+        : POLICY_VALIDATION_LIMITS.bytes + 1;
   if (
     !Value.Check(LogicalResourceManifestV1Schema, request.manifest) ||
     request.manifest.track !== "terraform" ||
     request.manifest.resources.length > 1000 ||
     !/^[a-f0-9]{64}$/.test(request.sourceHash) ||
-    typeof request.hcl !== "string" ||
-    Buffer.byteLength(request.hcl) > POLICY_VALIDATION_LIMITS.bytes
+    (request.files === undefined && typeof request.hcl !== "string") ||
+    totalBytes > POLICY_VALIDATION_LIMITS.bytes
   )
     throw new TypeError("RESOURCE_PARITY_INVALID_INPUT");
+  const sourceSet = normalizeTerraformSourceFiles(request);
   const result = (
     outcome: "pass" | "fail" | "unsupported",
     reason:
@@ -1184,10 +1419,11 @@ export function validateTerraformResourceParity(request: {
     sourceHash: request.sourceHash,
     manifestHash: calculatePolicyValidationDigest(request.manifest),
     ...(request.binding === undefined ? {} : { bindingHash: calculatePolicyValidationDigest(request.binding) }),
-    inputHash: createHash("sha256").update(request.hcl).digest("hex"),
+    inputHash: sourceSet.inputDigest,
     outcome,
     reason,
   });
+  if (!sourceSet.validLayout) return result("unsupported", "unsupported-resource");
   const expected = request.manifest.resources;
   const byId = new Map(expected.map((resource) => [resource.logicalId, resource]));
   if (
@@ -1202,8 +1438,11 @@ export function validateTerraformResourceParity(request: {
   ) {
     return result("unsupported", "unsupported-resource");
   }
-  const blocks = parseTerraformMainBlocks(request.hcl);
+  const blocks = parseTerraformBlocks(sourceSet.files["main.tf"] ?? "");
   if (blocks === undefined) return result("unsupported", "invalid-source");
+  if (blocks.some(({ kind }) => kind !== "resource" && kind !== "data" && kind !== "module")) {
+    return result("unsupported", "unsupported-resource");
+  }
   if (
     blocks.length !== expected.length ||
     expected.some((resource) => blocks.filter(({ address }) => address === resource.executionAddress).length !== 1)
@@ -1215,6 +1454,40 @@ export function validateTerraformResourceParity(request: {
     const expectedKind =
       resource.ownership === "existing" ? "data" : resource.implementationKind === "module" ? "module" : "resource";
     if (block.kind !== expectedKind) return result("fail", "type-mismatch");
+    const attrs = parseTopLevelHclAttributes(block.body);
+    if (attrs === undefined) return result("unsupported", "unsupported-resource");
+    const bound = request.binding?.resourceBindings[resource.logicalId];
+    if (bound !== undefined && bound.implementation !== resource.implementationAddress) {
+      return result("fail", "type-mismatch");
+    }
+    if (block.kind === "module") {
+      const avmMatch = /^avm:([^@\s]+)@([^@\s]+)$/u.exec(resource.implementationAddress);
+      if (avmMatch === null) return result("unsupported", "unsupported-resource");
+      const sourceAttr = parseHclStringLiteral(attrs.get("source"));
+      const versionAttr = parseHclStringLiteral(attrs.get("version"));
+      if (sourceAttr === undefined || versionAttr === undefined) return result("unsupported", "unsupported-resource");
+      if (
+        sourceAttr !== avmMatch[1] ||
+        versionAttr.replace(/^=\s*/u, "") !== avmMatch[2]!.replace(/^=\s*/u, "") ||
+        (bound !== undefined && bound.version !== avmMatch[2])
+      ) {
+        return result("fail", "type-mismatch");
+      }
+    } else if (block.blockType === "azapi_resource") {
+      const nativeMatch = /^native:([^@\s]+)@([^@\s]+)$/u.exec(resource.implementationAddress);
+      if (nativeMatch === null) return result("unsupported", "unsupported-resource");
+      const typeAttr = parseHclStringLiteral(attrs.get("type"));
+      if (typeAttr === undefined) return result("unsupported", "unsupported-resource");
+      if (
+        typeAttr.toLowerCase() !== `${nativeMatch[1]!}@${nativeMatch[2]!}`.toLowerCase() ||
+        nativeMatch[1]!.toLowerCase() !== resource.type.toLowerCase() ||
+        (bound !== undefined && bound.version !== nativeMatch[2])
+      ) {
+        return result("fail", "type-mismatch");
+      }
+    } else {
+      return result("unsupported", "unsupported-resource");
+    }
     if (resource.ownership !== "existing") {
       const expectedDeps = resource.dependsOn.map((id) => byId.get(id)!.executionAddress!).sort();
       if (JSON.stringify([...block.dependsOn].sort()) !== JSON.stringify(expectedDeps)) {
@@ -1229,7 +1502,8 @@ export function validateTerraformStorageBaseline(request: {
   readonly sourceHash: string;
   readonly manifest: LogicalResourceManifestV1;
   readonly binding: IacBindingV1;
-  readonly hcl: string;
+  readonly hcl?: string;
+  readonly files?: Readonly<Record<string, string>>;
 }): NonNullable<NativeValidationReceiptV1["securityBaseline"]> {
   const parity = validateTerraformResourceParity(request);
   const result = (
@@ -1251,16 +1525,20 @@ export function validateTerraformStorageBaseline(request: {
     reason,
   });
   if (parity.outcome !== "pass") return result(parity.outcome, "resource-parity");
-  if (SECRET_VALUE_PATTERN.test(request.hcl)) return result("fail", "credential-content");
-  for (const rawLine of request.hcl.split(/\r?\n/u)) {
-    const line = rawLine.trim();
-    if (line.length === 0 || line.startsWith("#") || line.startsWith("//")) continue;
-    const match = /^"?([A-Za-z_][A-Za-z0-9_-]*)"?\s*=\s*"([^"]+)"\s*,?$/u.exec(line);
-    if (match !== null && isSecretBearingField(match[1]!, match[2]!)) {
-      return result("fail", "credential-content");
+  const sourceSet = normalizeTerraformSourceFiles(request);
+  for (const [path, fileText] of Object.entries(sourceSet.files)) {
+    if (path === ".terraform.lock.hcl") continue;
+    if (SECRET_VALUE_PATTERN.test(fileText)) return result("fail", "credential-content");
+    for (const rawLine of stripHclComments(fileText).split(/\r?\n/u)) {
+      const line = rawLine.trim();
+      if (line.length === 0) continue;
+      const match = /^"?([A-Za-z_][A-Za-z0-9_-]*)"?\s*=\s*"([^"]+)"\s*,?$/u.exec(line);
+      if (match !== null && isSecretBearingField(match[1]!, match[2]!)) {
+        return result("fail", "credential-content");
+      }
     }
   }
-  const blocks = parseTerraformMainBlocks(request.hcl);
+  const blocks = parseTerraformBlocks(sourceSet.files["main.tf"] ?? "");
   if (blocks === undefined) return result("unsupported", "unsupported-resource");
   for (const resource of request.manifest.resources) {
     if (resource.ownership !== "managed" || resource.type.toLowerCase() !== "microsoft.storage/storageaccounts") {
@@ -1268,23 +1546,48 @@ export function validateTerraformStorageBaseline(request: {
     }
     const block = blocks.find(({ address }) => address === resource.executionAddress);
     if (block === undefined) return result("fail", "storage-controls");
-    if (block.kind === "module" || block.blockType === "azurerm_storage_account") {
-      if (
-        !/\ballow_nested_items_to_be_public\s*=\s*false\b/u.test(block.body) ||
-        !/\bhttps_traffic_only_enabled\s*=\s*true\b/u.test(block.body) ||
-        !/\bmin_tls_version\s*=\s*"TLS1_2"/u.test(block.body) ||
-        !/\bshared_access_key_enabled\s*=\s*false\b/u.test(block.body)
-      ) {
-        return result("fail", "storage-controls");
+    const attrs = parseTopLevelHclAttributes(block.body);
+    if (attrs === undefined) return result("unsupported", "unsupported-resource");
+    if (block.kind === "module") {
+      const expectedModuleControls: readonly (readonly [string, string])[] = [
+        ["allow_nested_items_to_be_public", "false"],
+        ["https_traffic_only_enabled", "true"],
+        ["min_tls_version", '"TLS1_2"'],
+        ["shared_access_key_enabled", "false"],
+      ];
+      for (const [key, expectedRaw] of expectedModuleControls) {
+        const raw = attrs.get(key);
+        if (raw === undefined) return result("fail", "storage-controls");
+        if (raw !== "true" && raw !== "false" && parseHclStringLiteral(raw) === undefined) {
+          return result("unsupported", "unsupported-resource");
+        }
+        if (raw !== expectedRaw) return result("fail", "storage-controls");
       }
     } else if (block.blockType === "azapi_resource") {
-      if (
-        !/"allowBlobPublicAccess"\s*=\s*false\b/u.test(block.body) ||
-        !/"allowSharedKeyAccess"\s*=\s*false\b/u.test(block.body) ||
-        !/"minimumTlsVersion"\s*=\s*"TLS1_2"/u.test(block.body) ||
-        !/"supportsHttpsTrafficOnly"\s*=\s*true\b/u.test(block.body)
-      ) {
-        return result("fail", "storage-controls");
+      const rawBody = attrs.get("body");
+      if (rawBody === undefined || !rawBody.startsWith("{") || !rawBody.endsWith("}")) {
+        return result("unsupported", "unsupported-resource");
+      }
+      const bodyAttrs = parseTopLevelHclAttributes(rawBody.slice(1, -1));
+      const rawProps = bodyAttrs?.get("properties");
+      if (rawProps === undefined || !rawProps.startsWith("{") || !rawProps.endsWith("}")) {
+        return result("unsupported", "unsupported-resource");
+      }
+      const propAttrs = parseTopLevelHclAttributes(rawProps.slice(1, -1));
+      if (propAttrs === undefined) return result("unsupported", "unsupported-resource");
+      const expectedAzapiControls: readonly (readonly [string, string])[] = [
+        ["allowBlobPublicAccess", "false"],
+        ["allowSharedKeyAccess", "false"],
+        ["minimumTlsVersion", '"TLS1_2"'],
+        ["supportsHttpsTrafficOnly", "true"],
+      ];
+      for (const [key, expectedRaw] of expectedAzapiControls) {
+        const raw = propAttrs.get(key);
+        if (raw === undefined) return result("fail", "storage-controls");
+        if (raw !== "true" && raw !== "false" && parseHclStringLiteral(raw) === undefined) {
+          return result("unsupported", "unsupported-resource");
+        }
+        if (raw !== expectedRaw) return result("fail", "storage-controls");
       }
     }
   }

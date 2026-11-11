@@ -5132,6 +5132,7 @@ export class ApexService {
           ? {
               storageSecurityBindings: this.storageSecurityBindings(manifest),
               storageDiagnosticsTargets: diagnosticsTargets,
+              targetScope: run.targetScope,
             }
           : {}),
       };
@@ -12117,6 +12118,7 @@ export class ApexService {
             ? {
                 storageSecurityBindings: this.storageSecurityBindings(validationManifest),
                 storageDiagnosticsTargets: diagnosticsTargets,
+                targetScope: run.targetScope,
               }
             : {}),
         };

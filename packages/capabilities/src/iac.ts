@@ -90,6 +90,7 @@ export interface NativeValidationRequest {
   readonly storageDiagnosticsTargets?: Readonly<
     Record<string, { readonly binding: PolicyResourceBinding; readonly workspaceResourceId: string }>
   >;
+  readonly targetScope?: string;
 }
 
 export interface CurrentDeploymentAuthority {

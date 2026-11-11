@@ -1487,7 +1487,14 @@ describe("bounded policy property validation", () => {
             },
             template: {
               resources: {
-                innerVault: { type: "Microsoft.KeyVault/vaults", name: "kv-demo" },
+                innerVault: {
+                  type: "Microsoft.KeyVault/vaults",
+                  name: "kv-demo",
+                  properties: {
+                    publicNetworkAccess: "[parameters('publicNetworkAccess')]",
+                    enableRbacAuthorization: "[parameters('enableRbacAuthorization')]",
+                  },
+                },
               },
             },
           },
@@ -1503,6 +1510,45 @@ describe("bounded policy property validation", () => {
       json: bicepCompiled,
     });
     assert.equal(bicepReceipt.outcome, "pass");
+
+    // An inner literal that contradicts an unused outer parameter fails instead of trusting the parameter name.
+    const contradictedCompiled = JSON.stringify({
+      resources: {
+        vault: {
+          type: "Microsoft.Resources/deployments",
+          name: "vault-deployment",
+          properties: {
+            parameters: {
+              publicNetworkAccess: { value: "Disabled" },
+              enableRbacAuthorization: { value: true },
+            },
+            template: {
+              resources: {
+                innerVault: {
+                  type: "Microsoft.KeyVault/vaults",
+                  name: "kv-demo",
+                  properties: {
+                    publicNetworkAccess: "Enabled",
+                    enableRbacAuthorization: "[parameters('enableRbacAuthorization')]",
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    assert.equal(
+      validatePolicyProperties({
+        track: "bicep",
+        sourceHash: hash,
+        policyMapHash: calculatePolicyValidationDigest(bicepPolicy),
+        policyMap: bicepPolicy,
+        logicalResourceManifest: { vault: { codeSymbol: "vault" } },
+        json: contradictedCompiled,
+      }).outcome,
+      "fail",
+    );
 
     const tfPolicy: PolicyPropertyMapV1 = {
       ...bicepPolicy,
@@ -1720,9 +1766,18 @@ describe("bounded policy property validation", () => {
         sourceHash: hash,
         manifest: tfManifest,
         binding: tfBinding,
-        hcl: secureHcl.replace("shared_access_key_enabled = false", "shared_access_key_enabled = true"),
+        hcl: `${secureHcl.replace("shared_access_key_enabled = false", "shared_access_key_enabled = true")}\n# shared_access_key_enabled = false\n`,
       }).reason,
       "storage-controls",
+    );
+    assert.equal(
+      validateTerraformResourceParity({
+        sourceHash: hash,
+        manifest: tfManifest,
+        binding: tfBinding,
+        files: { "main.tf": secureHcl, "extra.tf": 'resource "azapi_resource" "extra" {}' },
+      }).outcome,
+      "unsupported",
     );
   });
 });

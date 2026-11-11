@@ -678,7 +678,12 @@ abstract class NativeProviderBase {
           await verify();
         }
       }
-      const mainTerraform = track === "terraform" ? (source.fileContents.get("main.tf")?.toString("utf8") ?? "") : "";
+      const terraformFiles =
+        track === "terraform"
+          ? Object.fromEntries(
+              [...source.paths].sort().map((path) => [path, source.fileContents.get(path)?.toString("utf8") ?? ""]),
+            )
+          : {};
       if (parityManifest !== undefined) {
         receipt.resourceParity =
           track === "bicep"
@@ -692,7 +697,7 @@ abstract class NativeProviderBase {
                 sourceHash: receipt.sourceHash,
                 manifest: parityManifest,
                 ...(parityBinding === undefined ? {} : { binding: parityBinding }),
-                hcl: mainTerraform,
+                files: terraformFiles,
               });
         const { receiptHash: previousHash, ...updated } = receipt;
         if (!previousHash) throw sourceBindingError();
@@ -706,12 +711,13 @@ abstract class NativeProviderBase {
                 manifest: parityManifest,
                 binding: parityBinding,
                 json: compiledTemplate ?? "",
+                ...(request.targetScope === undefined ? {} : { targetScope: request.targetScope }),
               })
             : validateTerraformStorageBaseline({
                 sourceHash: receipt.sourceHash,
                 manifest: parityManifest,
                 binding: parityBinding,
-                hcl: mainTerraform,
+                files: terraformFiles,
               });
         const { receiptHash: previousHash, ...updated } = receipt;
         if (!previousHash) throw sourceBindingError();
@@ -725,6 +731,7 @@ abstract class NativeProviderBase {
               ...target,
               sourceHash: receipt.sourceHash,
               json: compiledTemplate ?? "",
+              ...(request.targetScope === undefined ? {} : { targetScope: request.targetScope }),
             }),
           ]),
         );
