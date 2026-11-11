@@ -69,7 +69,7 @@ test("review prompts carry the nonce header, bound file hashes and the answer co
   );
   assert.throws(() => buildReviewPrompt({ nonce, gate: 1, subjectKind: "x", wellArchitected: false, files: [] }));
   assert.match(buildReviewInstructions("architecture"), /Well-Architected pillar/u);
-  assert.match(buildReviewInstructions("architecture"), /Only active `deny` policies block a design/u);
+  assert.match(buildReviewInstructions("architecture"), /Only active `deny` policies.*block a design/u);
   assert.match(buildReviewInstructions("requirements"), /advisory when documented as proposed recommendations/u);
 });
 

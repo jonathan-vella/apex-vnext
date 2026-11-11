@@ -87,9 +87,11 @@ review or task.
    again at the final Gate 4 approval.
 10. When the `architecture-review` task appears, run the rubber-duck review steps in `apex-next` with the exact
     `task.taskId`. For `needs_review`, do not request task context or run rubber-duck again. Present findings in one
-    decision panel and record a disposition for every finding through `apex/reviewDecide`. Automatically
-    dismiss findings that only request regional, zonal, quota, deployment, restore, failover, complete pricing checks,
-    or live confirmation/blocking of `modify`, `deployIfNotExists`, `audit` or accepted reference-baseline assumptions.
+    decision panel and record a disposition for every finding through `apex/reviewDecide`. Automatically dismiss
+    findings that only request regional, zonal, quota, deployment, restore, failover, complete pricing checks, live
+    confirmation of accepted reference-baseline assignments, or findings based solely on non-`deny` effects (`modify`,
+    `deployIfNotExists`, `audit`, `append`, `disabled` or `DoNotEnforce` `deny`); retain findings about violations of
+    accepted active `deny` controls regardless of governance source.
 11. For a `policy-refresh` task after Gate 2, start from the `policy-property-map` template in task context. Decide only
     rows listed in `governanceFindings`, submit the complete map through `apex/completeTask`, and let blocked `deny`
     rows reopen Architecture and Gate 2 (`modify` and `deployIfNotExists` rows are non-blocking and never use `blocked`).

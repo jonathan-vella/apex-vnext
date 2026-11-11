@@ -5212,7 +5212,27 @@ export class ApexService {
     const refresh = (await this.readTask(run, taskId)).taskType === "policy-refresh";
     const completed = await this.acceptTaskOutputs(taskId, outputs);
     const policy = outputs.find(({ kind }) => kind === "policy-property-map")?.value as PolicyPropertyMapV1 | undefined;
-    if (!refresh || !policy?.mappings.some(({ effect, disposition }) => effect === "deny" && disposition === "blocked"))
+    if (!refresh || policy === undefined) return completed;
+    const events = await this.journal(run).replay();
+    const activeDenyKeys = new Set(
+      (await this.enforcingGovernanceFindings(run, events))
+        .filter(({ effect }) => effect === "deny")
+        .map((finding) =>
+          this.policyMappingKey({
+            policyAssignmentId: finding.assignmentId,
+            policyDefinitionId: finding.policyId,
+            ...(finding.policyDefinitionReferenceId === undefined
+              ? {}
+              : { policyDefinitionReferenceId: finding.policyDefinitionReferenceId }),
+            effect: finding.effect,
+          }),
+        ),
+    );
+    if (
+      !policy.mappings.some(
+        (mapping) => mapping.disposition === "blocked" && activeDenyKeys.has(this.policyMappingKey(mapping)),
+      )
+    )
       return completed;
     await this.reopenArchitecture("Refreshed subscription governance blocks the approved Architecture");
     return {
@@ -11728,8 +11748,23 @@ export class ApexService {
       ).values(),
     ];
     const designed = new Set(designedTypes.map((type) => type.toLowerCase()));
+    const enforcing = await this.enforcingGovernanceFindings(run, events);
+    const activeDenyKeys = new Set(
+      enforcing
+        .filter(({ effect }) => effect === "deny")
+        .map((finding) =>
+          this.policyMappingKey({
+            policyAssignmentId: finding.assignmentId,
+            policyDefinitionId: finding.policyId,
+            ...(finding.policyDefinitionReferenceId === undefined
+              ? {}
+              : { policyDefinitionReferenceId: finding.policyDefinitionReferenceId }),
+            effect: finding.effect,
+          }),
+        ),
+    );
     const findings = new Map(
-      (await this.enforcingGovernanceFindings(run, events))
+      enforcing
         .filter(
           ({ resourceTypes }) =>
             resourceTypes.length === 0 || resourceTypes.some((type) => designed.has(type.toLowerCase())),
@@ -11755,11 +11790,11 @@ export class ApexService {
       seen.add(key);
       if (mapping.disposition === "exempt")
         issues.push({ path: `${path}/disposition`, message: `Reported exemptions are not verified: ${label}` });
-      if (mapping.disposition === "blocked" && mapping.effect !== "deny")
+      if (mapping.disposition === "blocked" && (mapping.effect !== "deny" || !activeDenyKeys.has(key)))
         issues.push({
           path: `${path}/disposition`,
           message:
-            `Only "deny" policy findings can be marked "blocked": ${label} (effect ${mapping.effect}) is non-blocking; ` +
+            `Only accepted active "deny" policy findings can be marked "blocked": ${label} (effect ${mapping.effect}) is non-blocking or not an active deny finding; ` +
             `use "planned" (omit expectedValue when platform-remediated), "satisfied", or "not-applicable" with a reason`,
         });
       if (mapping.disposition === "not-applicable") {

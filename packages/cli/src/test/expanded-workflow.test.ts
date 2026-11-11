@@ -5794,7 +5794,9 @@ function baselineWithFindings(subscriptionId: string, observedAt: string, findin
   const baseline = emptyGovernanceBaseline(subscriptionId, observedAt);
   const scope = `/subscriptions/${subscriptionId}`;
   const entry = baseline.subscriptions[subscriptionId]!;
-  const blockers = findings.filter(({ effect }) => effect === "deny").length;
+  const blockers = findings.filter(({ classification }) => classification === "blocker").length;
+  const autoRemediate = findings.filter(({ classification }) => classification === "auto-remediate").length;
+  const informational = findings.filter(({ classification }) => classification === "informational").length;
   Object.assign(entry, {
     findings,
     assignment_inventory: findings.map((finding) => ({
@@ -5810,7 +5812,8 @@ function baselineWithFindings(subscriptionId: string, observedAt: string, findin
     assignment_kept: findings.length,
     subscription_scope_count: findings.length,
     blocker_count: blockers,
-    auto_remediate_count: findings.length - blockers,
+    auto_remediate_count: autoRemediate,
+    informational_count: informational,
     classified_policy_count: findings.length,
   });
   entry.discovery_metadata.page_counts.policyAssignments = findings.length;
@@ -5818,7 +5821,7 @@ function baselineWithFindings(subscriptionId: string, observedAt: string, findin
   Object.assign(baseline.summary, {
     total_findings: findings.length,
     total_blockers: blockers,
-    total_auto_remediate: findings.length - blockers,
+    total_auto_remediate: autoRemediate,
   });
   return baseline;
 }
@@ -5962,22 +5965,35 @@ test("reference governance refreshes to the subscription baseline without reopen
 });
 
 test("a blocked control after governance refresh reopens Architecture and Gate 2", async () => {
-  const { service, policyTask, template } = await approveOnReferenceGovernance();
+  const scope = "/subscriptions/11111111-1111-1111-1111-111111111111";
+  const { service, policyTask, template } = await approveOnReferenceGovernance([
+    {
+      policy_id: "/providers/Microsoft.Authorization/policyDefinitions/blocked-control",
+      display_name: "blocked-control",
+      effect: "deny",
+      scope,
+      assignment_id: `${scope}/providers/Microsoft.Authorization/policyAssignments/blocked-control`,
+      classification: "blocker",
+      resource_types: ["Microsoft.Web/sites"],
+      exemption: null,
+      reported_exemptions: [],
+    },
+  ]);
   const completed = await service.completeTaskOutputs(policyTask, [
     {
       kind: "policy-property-map",
       value: {
         ...template,
-        mappings: [
-          ...template.mappings,
-          {
-            policyAssignmentId: "blocked-control",
-            effect: "deny",
-            logicalResourceId: "api",
-            propertyPath: "properties.publicNetworkAccess",
-            disposition: "blocked",
-          },
-        ],
+        mappings: template.mappings.map((mapping) =>
+          mapping.policyAssignmentId.endsWith("/blocked-control")
+            ? {
+                ...mapping,
+                logicalResourceId: "api",
+                propertyPath: "properties.publicNetworkAccess",
+                disposition: "blocked" as const,
+              }
+            : mapping,
+        ),
       },
     },
   ]);
@@ -5987,28 +6003,58 @@ test("a blocked control after governance refresh reopens Architecture and Gate 2
 });
 
 test("only deny policy findings may use blocked disposition or reopen Architecture", async () => {
-  const { service, policyTask, template } = await approveOnReferenceGovernance();
-  for (const effect of ["modify", "deployIfNotExists"] as const) {
+  const scope = "/subscriptions/11111111-1111-1111-1111-111111111111";
+  const doNotEnforceAssignmentId = `${scope}/providers/Microsoft.Authorization/policyAssignments/do-not-enforce-deny`;
+  const doNotEnforceDefinitionId = "/providers/Microsoft.Authorization/policyDefinitions/do-not-enforce-deny";
+  const { service, policyTask, template } = await approveOnReferenceGovernance([
+    {
+      policy_id: doNotEnforceDefinitionId,
+      display_name: "do-not-enforce-deny",
+      effect: "deny",
+      enforcementMode: "DoNotEnforce",
+      scope,
+      assignment_id: doNotEnforceAssignmentId,
+      classification: "informational",
+      resource_types: ["Microsoft.Web/sites"],
+      exemption: null,
+      reported_exemptions: [],
+    },
+  ]);
+  for (const mapping of [
+    {
+      policyAssignmentId: "non-blocking-modify",
+      effect: "modify" as const,
+      logicalResourceId: "api",
+      propertyPath: "properties.enableDdosProtection",
+      disposition: "blocked" as const,
+    },
+    {
+      policyAssignmentId: "non-blocking-dine",
+      effect: "deployIfNotExists" as const,
+      logicalResourceId: "api",
+      propertyPath: "properties.enableDdosProtection",
+      disposition: "blocked" as const,
+    },
+    {
+      policyAssignmentId: doNotEnforceAssignmentId,
+      policyDefinitionId: doNotEnforceDefinitionId,
+      effect: "deny" as const,
+      logicalResourceId: "api",
+      propertyPath: "properties.publicNetworkAccess",
+      disposition: "blocked" as const,
+    },
+  ]) {
     await assert.rejects(
       service.completeTaskOutputs(policyTask, [
         {
           kind: "policy-property-map",
           value: {
             ...template,
-            mappings: [
-              ...template.mappings,
-              {
-                policyAssignmentId: `non-blocking-${effect}`,
-                effect,
-                logicalResourceId: "api",
-                propertyPath: "properties.enableDdosProtection",
-                disposition: "blocked",
-              },
-            ],
+            mappings: [...template.mappings, mapping],
           },
         },
       ]),
-      /Only "deny" policy findings can be marked "blocked"/u,
+      /Only accepted active "deny" policy findings can be marked "blocked"/u,
     );
   }
   const completed = await service.completeTaskOutputs(policyTask, [
