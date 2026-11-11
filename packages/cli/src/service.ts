@@ -11501,6 +11501,7 @@ export class ApexService {
         byKind["policy-property-map"] as PolicyPropertyMapV1,
         (byKind.architecture as ArchitectureV1 | undefined) ??
           (await this.objects.getJson<ArchitectureV1>(this.artifactHash(events, "architecture")!)),
+        descriptor.id === "policy-refresh",
       );
     if (descriptor.reviewSubject !== undefined) {
       const review = byKind["review-findings"] as {
@@ -11724,8 +11725,9 @@ export class ApexService {
     events: EventV1[],
     policyMap: PolicyPropertyMapV1,
     architecture: ArchitectureV1,
+    requireAcceptedBlockedDeny = false,
   ): Promise<void> {
-    const issues = await this.policyMapCoverageIssues(run, events, policyMap, architecture);
+    const issues = await this.policyMapCoverageIssues(run, events, policyMap, architecture, requireAcceptedBlockedDeny);
     if (issues.length > 0)
       throw new ApexError("APEX_VALIDATION", issues.map(({ message }) => message).join("; "), EXIT_CODES.validation);
   }
@@ -11735,9 +11737,11 @@ export class ApexService {
     events: EventV1[],
     policyMap: PolicyPropertyMapV1,
     architecture: ArchitectureV1,
+    requireAcceptedBlockedDeny = false,
   ): Promise<ValidationIssue[]> {
     const issues: ValidationIssue[] = [];
-    if (policyMap.governanceHash !== this.artifactHash(events, "governance-constraints"))
+    const governanceHash = this.artifactHash(events, "governance-constraints");
+    if (governanceHash === undefined || policyMap.governanceHash !== governanceHash)
       return [
         { path: "/policyMappings", message: "Policy property map does not bind accepted governance constraints" },
       ];
@@ -11748,7 +11752,19 @@ export class ApexService {
       ).values(),
     ];
     const designed = new Set(designedTypes.map((type) => type.toLowerCase()));
-    const enforcing = await this.enforcingGovernanceFindings(run, events);
+    const snapshot = await this.selectedGovernanceSnapshot(
+      run,
+      await this.objects.getJson<GovernanceConstraintsV1>(governanceHash),
+    );
+    const inactiveDenyAssignments = new Set(
+      snapshot.findings
+        .filter(({ effect, enforcementMode }) => effect === "deny" && enforcementMode === "DoNotEnforce")
+        .map(({ assignmentId }) => assignmentId.toLowerCase()),
+    );
+    const enforcing = snapshot.findings.filter(
+      ({ effect, enforcementMode }) =>
+        ENFORCING_POLICY_EFFECTS.has(effect) && !(effect === "deny" && enforcementMode === "DoNotEnforce"),
+    );
     const activeDenyKeys = new Set(
       enforcing
         .filter(({ effect }) => effect === "deny")
@@ -11790,7 +11806,12 @@ export class ApexService {
       seen.add(key);
       if (mapping.disposition === "exempt")
         issues.push({ path: `${path}/disposition`, message: `Reported exemptions are not verified: ${label}` });
-      if (mapping.disposition === "blocked" && (mapping.effect !== "deny" || !activeDenyKeys.has(key)))
+      if (
+        mapping.disposition === "blocked" &&
+        (mapping.effect !== "deny" ||
+          inactiveDenyAssignments.has(mapping.policyAssignmentId.toLowerCase()) ||
+          (requireAcceptedBlockedDeny && !activeDenyKeys.has(key)))
+      )
         issues.push({
           path: `${path}/disposition`,
           message:
