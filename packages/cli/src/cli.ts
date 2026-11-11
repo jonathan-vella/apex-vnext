@@ -1,10 +1,11 @@
 #!/usr/bin/env node
-import { mkdir, readFile, realpath, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, realpath, writeFile } from "node:fs/promises";
 import { userInfo } from "node:os";
 import { createInterface } from "node:readline/promises";
 import { AzdBicepProvider, NativeTerraformProvider, ProcessRunner, type IacProvider } from "@apexops/capabilities";
 import {
   CONTRACT_VERSION,
+  type IacHandoffV1,
   OnboardingConfigV1Schema,
   type DeploymentPurpose,
   QualityMeasurementsV1Schema,
@@ -22,6 +23,8 @@ import {
 import { Value } from "@sinclair/typebox/value";
 import {
   EventJournal,
+  ObjectStore,
+  ProjectStore,
   ValidatorRegistry,
   WriterTransferStore,
   atomicWriteJson,
@@ -43,7 +46,7 @@ import { assertTargetScope } from "./target-scope.js";
 import { serveMcp, type McpServiceResolver } from "./mcp.js";
 import { createFileProviderRuntime, hashTerraformConfiguration, hashTerraformLockFile } from "./provider-runtime.js";
 import { exportProviderTransfer, importProviderTransfer } from "./provider-transfer.js";
-import { ApexService, type ServiceOptions, type TaskOutput } from "./service.js";
+import { ApexService, type ProviderResolutionContext, type ServiceOptions, type TaskOutput } from "./service.js";
 import { exportStateTransfer, importStateTransfer } from "./state-transfer.js";
 import { APEX_VERSION } from "./version.js";
 import { interactiveBootstrap, type BootstrapInteraction } from "./bootstrap-wizard.js";
@@ -151,9 +154,9 @@ async function onboardingConfig(flags: Flags, _root: string): Promise<Onboarding
 
 interface NativeProviderConfig {
   bicep?: {
-    /** Accepted generated azd project root, relative to the workspace. */
-    cwd: string;
-    environmentName: string;
+    /** Accepted generated azd project root, relative to the workspace (defaults to active iac-handoff rootPath). */
+    cwd?: string;
+    environmentName?: string;
     tenantId: string;
     location: string;
     cloud?: "AzureCloud" | "AzureUSGovernment" | "AzureChinaCloud";
@@ -161,36 +164,59 @@ interface NativeProviderConfig {
     resourceGroupTags?: Readonly<Record<string, string>> | undefined;
   };
   terraform?: {
-    cwd: string;
-    target: string;
-    planDirectory: string;
-    lockfileHash: string;
+    cwd?: string;
+    target?: string;
+    planDirectory?: string;
+    lockfileHash?: string;
     configHash?: string;
   };
 }
 
-async function configuredProviders(
-  root: string,
-  flags: Flags,
-): Promise<Partial<Record<"bicep" | "terraform", IacProvider>>> {
-  const persistedPath = join(root, ".apex", "provider-config.json");
-  const explicitPath = typeof flags["provider-config"] === "string" ? resolve(flags["provider-config"]) : undefined;
-  let config: NativeProviderConfig;
+async function activeRunProviderContext(root: string): Promise<ProviderResolutionContext | undefined> {
   try {
-    config = JSON.parse(await readFile(explicitPath ?? persistedPath, "utf8")) as NativeProviderConfig;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return {};
-    throw error;
+    const selection = JSON.parse(await readFile(join(root, ".apex", "config.json"), "utf8")) as {
+      projectId?: unknown;
+      runId?: unknown;
+    } | null;
+    if (
+      selection === null ||
+      typeof selection !== "object" ||
+      typeof selection.projectId !== "string" ||
+      selection.projectId.length === 0 ||
+      typeof selection.runId !== "string" ||
+      selection.runId.length === 0
+    ) {
+      return undefined;
+    }
+    const runDirectory = join(root, ".apex", "projects", selection.projectId, "runs", selection.runId);
+    const run = parseRunConfig(await readFile(join(runDirectory, "run.json"), "utf8"));
+    const project = await new ProjectStore(root).getProject(selection.projectId as never);
+    const events = await new EventJournal(join(runDirectory, "journal")).replay();
+    let handoffHash: string | undefined;
+    for (const event of events) {
+      if (event.type === "task.completed") {
+        const payload = event.payload as {
+          artifactHashes?: Record<string, unknown>;
+          outputHashes?: Record<string, unknown>;
+        };
+        const candidate = payload.artifactHashes?.["iac-handoff"] ?? payload.outputHashes?.["iac-handoff"];
+        if (typeof candidate === "string") handoffHash = candidate;
+      }
+    }
+    const handoff =
+      handoffHash === undefined ? undefined : await new ObjectStore(root).getJson<IacHandoffV1>(handoffHash);
+    return {
+      run,
+      ...(handoff === undefined ? {} : { handoffRootPath: handoff.rootPath }),
+      riskOwner: project.riskOwner,
+    };
+  } catch {
+    return undefined;
   }
-  assertSecretFreeConfig(config);
-  if (explicitPath !== undefined) {
-    await mkdir(join(root, ".apex"), { recursive: true });
-    await atomicWriteJson(persistedPath, config);
-  }
-  const runner = new ProcessRunner();
-  let providerRuntime: Awaited<ReturnType<typeof createFileProviderRuntime>> | undefined;
-  const runtime = async () => (providerRuntime ??= await createFileProviderRuntime(root));
-  const currentAuthority = async () => {
+}
+
+function makeProviderAuthorityReader(root: string) {
+  return async () => {
     const selection = JSON.parse(await readFile(join(root, ".apex", "config.json"), "utf8")) as {
       projectId: string;
       runId: string;
@@ -250,7 +276,32 @@ async function configuredProviders(
       ...delegationAuthority,
     };
   };
-  const providers: Partial<Record<"bicep" | "terraform", IacProvider>> = {};
+}
+
+async function validateProviderConfig(
+  root: string,
+  config: NativeProviderConfig,
+  context?: ProviderResolutionContext,
+): Promise<{
+  bicep?: {
+    projectRoot: string;
+    environmentName: string;
+    tenantId: string;
+    location: string;
+    cloud?: "AzureCloud" | "AzureUSGovernment" | "AzureChinaCloud";
+    riskOwner?: string;
+    resourceGroupTags?: Readonly<Record<string, string>>;
+  };
+  terraform?: {
+    terraformRoot: string;
+    target: string;
+    planDirectory: string;
+    actualLockfileHash: string;
+    configHashValue?: string;
+  };
+}> {
+  assertSecretFreeConfig(config);
+  const validated: Awaited<ReturnType<typeof validateProviderConfig>> = {};
   if (config.bicep !== undefined) {
     const value = config.bicep;
     for (const key of Object.keys(value)) {
@@ -261,49 +312,92 @@ async function configuredProviders(
           EXIT_CODES.usage,
         );
     }
+    const cwd = value.cwd ?? context?.handoffRootPath;
+    const environmentName = value.environmentName ?? context?.run.environment;
+    const riskOwnerValue = value.riskOwner ?? context?.riskOwner;
+    const resolvedFields = { cwd, environmentName, tenantId: value.tenantId, location: value.location };
     for (const key of ["cwd", "environmentName", "tenantId", "location"] as const) {
-      if (typeof value[key] !== "string" || value[key].length === 0)
+      if (typeof resolvedFields[key] !== "string" || resolvedFields[key].length === 0)
         throw new ApexError("APEX_USAGE", `Bicep provider config requires ${key}`, EXIT_CODES.usage);
     }
-    const localRuntime = await runtime();
-    providers.bicep = new AzdBicepProvider({
-      runner,
-      currentAuthority,
-      bindingStore: localRuntime.bindingStores.bicep,
-      target: {
-        projectRoot: resolve(root, value.cwd),
-        environmentName: value.environmentName,
-        tenantId: value.tenantId,
-        location: value.location,
-        azdVersion: (await bundledToolchainMinimums()).azd,
-        ...(value.cloud === undefined ? {} : { cloud: value.cloud }),
-        ...(value.riskOwner === undefined ? {} : { riskOwner: value.riskOwner }),
-        ...(value.resourceGroupTags === undefined ? {} : { resourceGroupTags: value.resourceGroupTags }),
-      },
-    });
+    validated.bicep = {
+      projectRoot: resolve(root, cwd!),
+      environmentName: environmentName!,
+      tenantId: value.tenantId,
+      location: value.location,
+      ...(value.cloud === undefined ? {} : { cloud: value.cloud }),
+      ...(riskOwnerValue === undefined ? {} : { riskOwner: riskOwnerValue }),
+      ...(value.resourceGroupTags === undefined ? {} : { resourceGroupTags: value.resourceGroupTags }),
+    };
   }
   if (config.terraform !== undefined) {
     const value = config.terraform;
-    for (const key of ["cwd", "target", "planDirectory", "lockfileHash"] as const) {
-      if (typeof value[key] !== "string" || value[key].length === 0)
+    const cwd = value.cwd ?? context?.handoffRootPath;
+    const target = value.target ?? context?.run.targetScope;
+    const planDirectory = value.planDirectory ?? (context !== undefined ? ".apex/local/terraform-plans" : undefined);
+    const requiredFields = { cwd, target, planDirectory };
+    for (const key of ["cwd", "target", "planDirectory"] as const) {
+      if (typeof requiredFields[key] !== "string" || requiredFields[key].length === 0)
         throw new ApexError("APEX_USAGE", `Terraform provider config requires ${key}`, EXIT_CODES.usage);
     }
-    const localRuntime = await runtime();
-    const terraformRoot = resolve(root, value.cwd);
+    if (context === undefined && (typeof value.lockfileHash !== "string" || value.lockfileHash.length === 0)) {
+      throw new ApexError("APEX_USAGE", "Terraform provider config requires lockfileHash", EXIT_CODES.usage);
+    }
+    const terraformRoot = resolve(root, cwd!);
     const actualLockfileHash = await hashTerraformLockFile(terraformRoot);
-    if (actualLockfileHash !== value.lockfileHash) {
+    if (
+      value.lockfileHash !== undefined &&
+      value.lockfileHash.length > 0 &&
+      actualLockfileHash !== value.lockfileHash
+    ) {
       throw new ApexError(
         "APEX_STALE",
         `Terraform lockfileHash is stale: expected ${value.lockfileHash}, found ${actualLockfileHash}`,
         EXIT_CODES.stale,
       );
     }
+    validated.terraform = {
+      terraformRoot,
+      target: target!,
+      planDirectory: planDirectory!,
+      actualLockfileHash,
+      ...(value.configHash === undefined ? {} : { configHashValue: value.configHash }),
+    };
+  }
+  return validated;
+}
+
+async function instantiateConfiguredProviders(
+  root: string,
+  config: NativeProviderConfig,
+  runner: ProcessRunner,
+  runtime: () => Promise<Awaited<ReturnType<typeof createFileProviderRuntime>>>,
+  currentAuthority: ReturnType<typeof makeProviderAuthorityReader>,
+  context?: ProviderResolutionContext,
+): Promise<Partial<Record<"bicep" | "terraform", IacProvider>>> {
+  const validated = await validateProviderConfig(root, config, context);
+  const providers: Partial<Record<"bicep" | "terraform", IacProvider>> = {};
+  if (validated.bicep !== undefined) {
+    const localRuntime = await runtime();
+    providers.bicep = new AzdBicepProvider({
+      runner,
+      currentAuthority,
+      bindingStore: localRuntime.bindingStores.bicep,
+      target: {
+        ...validated.bicep,
+        azdVersion: (await bundledToolchainMinimums()).azd,
+      },
+    });
+  }
+  if (validated.terraform !== undefined) {
+    const localRuntime = await runtime();
+    const { terraformRoot, target, planDirectory, actualLockfileHash, configHashValue } = validated.terraform;
     const configHash = async () => {
       const actual = await hashTerraformConfiguration(terraformRoot);
-      if (value.configHash !== undefined && value.configHash !== actual) {
+      if (configHashValue !== undefined && configHashValue !== actual) {
         throw new ApexError(
           "APEX_STALE",
-          `Terraform configHash is stale: expected ${value.configHash}, found ${actual}`,
+          `Terraform configHash is stale: expected ${configHashValue}, found ${actual}`,
           EXIT_CODES.stale,
         );
       }
@@ -316,15 +410,100 @@ async function configuredProviders(
       artifactStore: localRuntime.artifactStore,
       keyProvider: localRuntime.keyProvider,
       target: {
-        cwd: value.cwd,
-        target: value.target,
+        cwd: terraformRoot,
+        target,
         lockfileHash: actualLockfileHash,
         configHash,
-        planPath: (request, operation) => join(value.planDirectory, `${request.runId}-${operation}.tfplan`),
+        planPath: (request, operation) => join(resolve(root, planDirectory), `${request.runId}-${operation}.tfplan`),
       },
     });
   }
   return providers;
+}
+
+async function prepareProviderRegistry(
+  root: string,
+  flags: Flags,
+  command: string,
+): Promise<{
+  providerResolver: NonNullable<ServiceOptions["providerResolver"]>;
+  persistExplicitConfig?: () => Promise<void>;
+}> {
+  const persistedPath = join(root, ".apex", "provider-config.json");
+  const explicitPath = typeof flags["provider-config"] === "string" ? resolve(flags["provider-config"]) : undefined;
+  const runner = new ProcessRunner();
+  let providerRuntime: Awaited<ReturnType<typeof createFileProviderRuntime>> | undefined;
+  const runtime = async () => (providerRuntime ??= await createFileProviderRuntime(root));
+  const currentAuthority = makeProviderAuthorityReader(root);
+
+  let validatedExplicitConfig: NativeProviderConfig | undefined;
+  if (explicitPath !== undefined) {
+    const raw = JSON.parse(await readFile(explicitPath, "utf8")) as NativeProviderConfig;
+    const initialContext = await activeRunProviderContext(root);
+    await validateProviderConfig(root, raw, initialContext);
+    validatedExplicitConfig = raw;
+  }
+
+  const persistExplicitConfig =
+    validatedExplicitConfig === undefined
+      ? undefined
+      : async () => {
+          await mkdir(join(root, ".apex"), { recursive: true });
+          await atomicWriteJson(persistedPath, validatedExplicitConfig!);
+        };
+
+  if (persistExplicitConfig !== undefined && command !== "init" && !command.startsWith("bootstrap")) {
+    await persistExplicitConfig();
+  }
+
+  const providerResolver: NonNullable<ServiceOptions["providerResolver"]> = async (track, context) => {
+    let config: NativeProviderConfig | undefined;
+    try {
+      config = JSON.parse(await readFile(explicitPath ?? persistedPath, "utf8")) as NativeProviderConfig;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
+    if (config !== undefined) {
+      const configured = await instantiateConfiguredProviders(root, config, runner, runtime, currentAuthority, context);
+      if (configured[track] !== undefined) return configured[track];
+    }
+    if (context.sourceValidationOnly === true && context.handoffRootPath !== undefined) {
+      const sourceRoot = resolve(root, context.handoffRootPath);
+      if (track === "bicep") {
+        return new AzdBicepProvider({
+          runner,
+          currentAuthority,
+          target: {
+            projectRoot: sourceRoot,
+            environmentName: context.run.environment,
+            tenantId: "",
+            location: "",
+            azdVersion: (await bundledToolchainMinimums()).azd,
+          },
+        });
+      }
+      return new NativeTerraformProvider({
+        runner,
+        currentAuthority,
+        target: {
+          cwd: sourceRoot,
+          target: context.run.targetScope,
+          lockfileHash: "",
+          configHash: async () => "",
+          planPath: (request, operation) =>
+            join(root, ".apex", "local", "terraform-plans", `${request.runId}-${operation}.tfplan`),
+        },
+      });
+    }
+    return undefined;
+  };
+
+  return {
+    providerResolver,
+    ...(persistExplicitConfig !== undefined && (command === "init" || command.startsWith("bootstrap"))
+      ? { persistExplicitConfig }
+      : {}),
+  };
 }
 
 function assertSecretFreeConfig(value: unknown, path = "provider-config"): void {
@@ -452,16 +631,17 @@ async function qualityStatus(root: string): Promise<QualityEvaluationArtifact> {
   }
 }
 
-export async function createApexService(
+async function createApexServiceWithRegistry(
   root: string,
   flags: Flags = {},
   command = "",
   options: ServiceOptions = {},
-): Promise<ApexService> {
+): Promise<{ service: ApexService; persistExplicitConfig?: () => Promise<void> }> {
   const runner = new ProcessRunner();
-  return new ApexService(root, {
+  const registry = await prepareProviderRegistry(root, flags, command);
+  const service = new ApexService(root, {
     ...options,
-    providers: { ...options.providers, ...(await configuredProviders(root, flags)) },
+    providerResolver: options.providerResolver ?? registry.providerResolver,
     azureAuthStatus:
       options.azureAuthStatus ??
       (async (live) => {
@@ -483,28 +663,47 @@ export async function createApexService(
         }
       }),
   });
+  return {
+    service,
+    ...(registry.persistExplicitConfig === undefined ? {} : { persistExplicitConfig: registry.persistExplicitConfig }),
+  };
+}
+
+export async function createApexService(
+  root: string,
+  flags: Flags = {},
+  command = "",
+  options: ServiceOptions = {},
+): Promise<ApexService> {
+  const { service, persistExplicitConfig } = await createApexServiceWithRegistry(root, flags, command, options);
+  await persistExplicitConfig?.();
+  return service;
 }
 
 /**
- * One service per resolved workspace root. Every service sees the others as pending-review guard peers, so a guarded
- * call aimed at another workspace still fails while any served workspace has a review waiting for its capture.
+ * One service per resolved (workspaceRoot, workspacePath) pair. Every service sees the others as pending-review guard
+ * peers, so a guarded call aimed at another workspace still fails while any served workspace has a review waiting.
  */
 export function mcpServiceResolver(
   defaultService: ApexService,
   create: (workspaceRoot: string, workspacePath: string) => Promise<ApexService>,
 ): McpServiceResolver {
-  const cache = new Map<string, ApexService>([[defaultService.root, defaultService]]);
+  const keyOf = (root: string, workspacePath: string) => `${root}\u0000${workspacePath}`;
+  const cache = new Map<string, ApexService>([
+    [keyOf(defaultService.root, defaultService.currentWorkspacePath()), defaultService],
+  ]);
   const peers = () => cache.values();
   defaultService.setReviewGuardPeers(peers);
   return {
     defaultService,
     resolve: async (workspace) => {
       const resolved = await resolveMcpWorkspace(workspace);
-      let resolvedService = cache.get(resolved.root);
+      const cacheKey = keyOf(resolved.root, resolved.workspace);
+      let resolvedService = cache.get(cacheKey);
       if (resolvedService === undefined) {
         resolvedService = await create(resolved.root, resolved.workspace);
         resolvedService.setReviewGuardPeers(peers);
-        cache.set(resolved.root, resolvedService);
+        cache.set(cacheKey, resolvedService);
       }
       return { service: resolvedService, workspace: resolved.workspace };
     },
@@ -516,6 +715,37 @@ export interface CliInteraction {
   bootstrap?: BootstrapInteraction;
 }
 
+async function resolveCliWorkspace(
+  start: string,
+  command: string,
+  options: ServiceOptions,
+): Promise<{ root: string; options: ServiceOptions }> {
+  if (command === "mcp serve") {
+    return { root: await realpath(await mcpWorkspaceRoot(start)), options };
+  }
+  const localApex = await lstat(join(start, ".apex")).catch(() => undefined);
+  if (localApex?.isDirectory() === true) return { root: start, options };
+  if (command === "init" || command.startsWith("bootstrap")) {
+    const localGit = await lstat(join(start, ".git")).catch(() => undefined);
+    if (localGit?.isFile() !== true) return { root: start, options };
+  }
+  try {
+    const resolved = await resolveMcpWorkspace(start);
+    const resolvedApex = await lstat(join(resolved.root, ".apex")).catch(() => undefined);
+    if (resolved.root !== resolved.workspace || resolvedApex?.isDirectory() === true) {
+      return {
+        root: resolved.root,
+        options: { workspacePath: resolved.workspace, ...options },
+      };
+    }
+  } catch (error) {
+    if (command === "doctor" || command === "version") return { root: start, options };
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return { root: start, options };
+    throw error;
+  }
+  return { root: start, options };
+}
+
 export async function execute(
   argv: string[],
   root = process.cwd(),
@@ -524,9 +754,15 @@ export async function execute(
 ): Promise<unknown> {
   const { words, flags } = parse(argv);
   const command = words.join(" ");
-  if (command === "mcp serve") root = await realpath(await mcpWorkspaceRoot(root));
-  const service = await createApexService(root, flags, command, options);
-  const run = () => dispatch(service, command, flags, root, options, interaction);
+  const resolved = await resolveCliWorkspace(root, command, options);
+  root = resolved.root;
+  options = resolved.options;
+  const { service, persistExplicitConfig } = await createApexServiceWithRegistry(root, flags, command, options);
+  const run = async () => {
+    const output = await dispatch(service, command, flags, root, options, interaction);
+    await persistExplicitConfig?.();
+    return output;
+  };
   if (UNSERIALIZED_COMMANDS.has(command)) return run();
   // State-changing commands share the workspace lock that repeat-guarded MCP calls hold. They give it up only while
   // they wait for interactive input, and fail stale if the workspace changed meanwhile.
@@ -993,6 +1229,9 @@ async function dispatch(
       );
     case "writer show":
       return service.currentWriter();
+    case "release-writer":
+    case "writer release":
+      return service.releaseWriter();
     case "evidence accept":
       return service.acceptEvidence({
         kind: required(flags, "kind"),

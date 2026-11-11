@@ -261,6 +261,7 @@ import { currentHostEnvironment, firstReleaseVersion, hostDoctorChecks, type Hos
 import { ApexError, EXIT_CODES, governanceBaselineApexError, retiredProjectionError } from "./errors.js";
 import { SERVICE_REVIEW_GUARDS, type ServiceReviewGuardedOperation } from "./mcp-tool-effects.js";
 import { MCP_MAX_SERIALIZED_RESULT_BYTES, mcpResultEnvelopeBytes } from "./mcp-limits.js";
+import { runtimeMismatchError, workspaceRuntimeBinding } from "./runtime-binding.js";
 import { APEX_VERSION, meetsMinimumVersion, MINIMUM_NODE_VERSION } from "./version.js";
 import { bundledToolchainMinimums, type BundledToolchainMinimums } from "./toolchain-pin.js";
 import {
@@ -576,12 +577,23 @@ export interface ReviewDecision {
   expiresAt?: string;
 }
 
+export interface ProviderResolutionContext {
+  readonly run: RunConfigV1;
+  readonly handoffRootPath?: string;
+  readonly riskOwner?: string;
+  readonly sourceValidationOnly?: boolean;
+}
+
 export interface ServiceOptions {
   clock?: () => Date;
   idSource?: () => string;
   workspacePath?: string;
   writerLeaseTtlMs?: number;
   providers?: Partial<Record<"fake" | "bicep" | "terraform", IacProvider>>;
+  providerResolver?: (
+    track: "bicep" | "terraform",
+    context: ProviderResolutionContext,
+  ) => Promise<IacProvider | undefined>;
   architectureAvailabilityAdapter?: (evidence: ArchitectureAvailabilityV1) => Promise<void>;
   executableChecker?: (executable: string) => Promise<boolean>;
   azureAuthStatus?: (live: boolean) => Promise<{ authenticated: boolean; detail: string }>;
@@ -985,6 +997,7 @@ export class ApexService {
   private readonly cache: ContentCache;
   private readonly validators = new ValidatorRegistry();
   private readonly providers: Partial<Record<"fake" | "bicep" | "terraform", IacProvider>>;
+  private readonly providerResolver: ServiceOptions["providerResolver"];
   private readonly architectureAvailabilityAdapter?: ServiceOptions["architectureAvailabilityAdapter"];
   private readonly executableChecker: (executable: string) => Promise<boolean>;
   private readonly azureAuthStatus: (live: boolean) => Promise<{ authenticated: boolean; detail: string }>;
@@ -1034,6 +1047,7 @@ export class ApexService {
       fake: new FakeIaCProvider({ track: "bicep", now: this.clock, nextId: this.idSource }),
       ...options.providers,
     };
+    this.providerResolver = options.providerResolver;
     this.architectureAvailabilityAdapter = options.architectureAvailabilityAdapter;
     this.executableChecker = options.executableChecker ?? (async (executable) => this.pathExecutableExists(executable));
     this.azureAuthStatus =
@@ -1045,6 +1059,19 @@ export class ApexService {
 
   setWorkspacePath(workspacePath: string): void {
     this.workspacePath = canonicalWorkspacePath(workspacePath);
+  }
+
+  currentWorkspacePath(): string {
+    return this.workspacePath;
+  }
+
+  private async resolveProvider(
+    track: "bicep" | "terraform",
+    context: ProviderResolutionContext,
+  ): Promise<IacProvider | undefined> {
+    const explicit = this.providers[track];
+    if (explicit !== undefined) return explicit;
+    return this.providerResolver?.(track, context);
   }
 
   /**
@@ -1889,7 +1916,7 @@ export class ApexService {
         throw new ApexError("APEX_CONFLICT", "Workspace setup differs or requires repair", EXIT_CODES.conflict);
       return undefined;
     }
-    const selection = await this.selection();
+    const selection = await this.readValidSelection();
     if (selection?.projectId !== config.projectId || !Value.Check(RunIdSchema, selection.runId))
       throw new ApexError(
         "APEX_CONFLICT",
@@ -2097,20 +2124,24 @@ export class ApexService {
   }
 
   async update(customizationsSource?: string): Promise<{ updated: string[]; retired: string[]; conflicts: string[] }> {
-    const selection = (await this.workspaceHasNoProjects()) ? undefined : await this.selection();
-    if (selection !== undefined) await this.acquireRunWriterLease(await this.run(selection, { readOnly: true }));
-    await this.ensureLocalGitBoundary();
-    await this.ensureWorkspaceLauncher();
-    const assets = await resolveBundledAssets();
+    const binding = await workspaceRuntimeBinding(this.root);
+    if (binding.state === "mismatch" && binding.reason === "RUNTIME_WORKSPACE_NEWER") {
+      throw runtimeMismatchError(binding);
+    }
     const previousRuntimeLock = JSON.parse(
       await readFile(join(this.root, ".apex", "apex.lock.json"), "utf8"),
     ) as RuntimeBundleLockV1;
-    await this.installRuntimeGeneration(previousRuntimeLock);
     const persisted = await this.customizationSelection();
     const clientId = persisted.clientId;
     if (persisted.sourceMode === "custom-source" && customizationsSource === undefined) {
       throw new ApexError("APEX_USAGE", "Custom-source updates require --customizations-source", EXIT_CODES.usage);
     }
+    const selection = (await this.workspaceHasNoProjects()) ? undefined : await this.selection();
+    if (selection !== undefined) await this.acquireRunWriterLease(await this.run(selection, { readOnly: true }));
+    await this.ensureLocalGitBoundary();
+    await this.ensureWorkspaceLauncher();
+    const assets = await resolveBundledAssets();
+    await this.installRuntimeGeneration(previousRuntimeLock);
     const source = customizationsSource ?? assets.clientProjections[clientId];
     const {
       installed: updated,
@@ -2309,8 +2340,30 @@ export class ApexService {
     return projects.map(({ projectId, displayName }) => ({ projectId, displayName }));
   }
 
+  private async readValidSelection(): Promise<Selection | undefined> {
+    try {
+      const parsed = JSON.parse(
+        await readFile(join(this.root, ".apex", "config.json"), "utf8"),
+      ) as Partial<Selection> | null;
+      if (
+        parsed !== null &&
+        typeof parsed === "object" &&
+        typeof parsed.projectId === "string" &&
+        parsed.projectId.length > 0 &&
+        typeof parsed.runId === "string" &&
+        parsed.runId.length > 0
+      ) {
+        return { projectId: parsed.projectId, runId: parsed.runId };
+      }
+      return undefined;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+      throw error;
+    }
+  }
+
   private async workspaceHasNoProjects(): Promise<boolean> {
-    if (await this.pathExistsLstat(join(this.root, ".apex/config.json"))) return false;
+    if ((await this.readValidSelection()) !== undefined) return false;
     if ((await this.listProjects()).length > 0)
       throw new ApexError(
         "APEX_CONFLICT",
@@ -2929,13 +2982,8 @@ export class ApexService {
   }
 
   private async repeatScope(): Promise<RepeatScope | undefined> {
-    let selection: Selection;
-    try {
-      selection = await this.selection();
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
-      throw error;
-    }
+    const selection = await this.readValidSelection();
+    if (selection === undefined) return undefined;
     const state = await this.runRepository(selection).repeatState();
     const files = await snapshotRepeatFiles(await this.repeatFileRoots(selection));
     let projects: string[];
@@ -5023,20 +5071,28 @@ export class ApexService {
     if (head === null) throw new ApexError("APEX_STALE", "Task journal is empty", EXIT_CODES.stale);
     assertTaskCurrent(task, head, run.ownerEpoch, this.clock);
     if (output === undefined && task.taskType === `validation-${run.iacTool}`) {
-      const provider = this.providers[run.iacTool];
+      const events = await this.journal(run).replay();
+      const hashes = this.acceptedArtifactHashes(events);
+      const sourceHash = hashes["iac-handoff"];
+      const preloadedHandoff =
+        sourceHash !== undefined && task.inputRefs.includes(sourceHash)
+          ? await this.objects.getJson<IacHandoffV1>(sourceHash)
+          : undefined;
+      const provider = await this.resolveProvider(run.iacTool, {
+        run,
+        ...(preloadedHandoff === undefined ? {} : { handoffRootPath: preloadedHandoff.rootPath }),
+        sourceValidationOnly: true,
+      });
       if (provider?.validateSource === undefined)
         throw new ApexError(
           "APEX_VALIDATION",
           "A native source validation provider is required",
           EXIT_CODES.validation,
         );
-      const events = await this.journal(run).replay();
       const workflow = await this.lockedWorkflowEngine(run);
       const node = workflow.manifest.nodes.find(({ id }) => id === task.taskType);
       if (node === undefined) throw new ApexError("APEX_STALE", "Validation workflow is unavailable", EXIT_CODES.stale);
       const required = node.validators.filter((id) => workflowValidatorOwnership(id)?.boundary === "validation");
-      const hashes = this.acceptedArtifactHashes(events);
-      const sourceHash = hashes["iac-handoff"];
       const inputHash = hashes["implementation-intent"];
       const policyHash = hashes["policy-property-map"];
       const manifestHash = hashes["logical-resource-manifest"];
@@ -5045,7 +5101,7 @@ export class ApexService {
         [sourceHash, policyHash, manifestHash].some((hash) => hash === undefined || !task.inputRefs.includes(hash))
       )
         throw new ApexError("APEX_STALE", "Validation requires current accepted task inputs", EXIT_CODES.stale);
-      const handoff = await this.objects.getJson<IacHandoffV1>(sourceHash!);
+      const handoff = preloadedHandoff ?? (await this.objects.getJson<IacHandoffV1>(sourceHash!));
       if (handoff.intentHash !== inputHash || handoff.logicalResourceManifestHash !== manifestHash)
         throw new ApexError("APEX_STALE", "Validation handoff does not bind accepted inputs", EXIT_CODES.stale);
       const policy = await this.objects.getJson<PolicyPropertyMapV1>(policyHash!);
@@ -6332,19 +6388,49 @@ export class ApexService {
     return join(this.root, ".apex", "generated-review-bases", sha256Bytes(Buffer.from(relative(this.root, path))));
   }
 
+  private generatedReviewMirrorBase(mirrorPath: string): string {
+    return join(this.root, ".apex", "generated-review-bases", sha256Bytes(Buffer.from(`mirror:${mirrorPath}`)));
+  }
+
+  private async workspaceMirrorPath(path: string): Promise<string | undefined> {
+    const canonicalRoot = await realpath(this.root).catch(() => this.root);
+    const canonicalWorkspace = await realpath(this.workspacePath).catch(() => this.workspacePath);
+    if (canonicalWorkspace === canonicalRoot || !(await this.exists(canonicalWorkspace))) return undefined;
+    const rel = relative(this.root, path);
+    if (isAbsolute(rel) || rel === "" || rel.startsWith("..")) return undefined;
+    const mirror = join(canonicalWorkspace, rel);
+    await this.assertSafeDestination(canonicalWorkspace, mirror);
+    return mirror;
+  }
+
   private async assertGeneratedReviewUnmodified(path: string): Promise<void> {
     await this.assertSafeDestination(this.root, path);
-    const current = await this.readOptional(path);
-    if (current === undefined) return;
     const basePath = this.generatedReviewBase(path);
     await this.assertSafeDestination(this.root, basePath);
-    const base = await this.readOptional(basePath);
-    if (base === undefined || !current.equals(base))
-      throw new ApexError(
-        "APEX_CONFLICT",
-        `Generated review file has manual edits: ${relative(this.root, path)}`,
-        EXIT_CODES.conflict,
-      );
+    const current = await this.readOptional(path);
+    const mirror = await this.workspaceMirrorPath(path);
+    const mirrorCurrent = mirror === undefined ? undefined : await this.readOptional(mirror);
+    if (current === undefined && mirrorCurrent === undefined) return;
+    if (current !== undefined) {
+      const base = await this.readOptional(basePath);
+      if (base === undefined || !current.equals(base))
+        throw new ApexError(
+          "APEX_CONFLICT",
+          `Generated review file has manual edits: ${relative(this.root, path)}`,
+          EXIT_CODES.conflict,
+        );
+    }
+    if (mirror !== undefined && mirrorCurrent !== undefined) {
+      const mirrorBasePath = this.generatedReviewMirrorBase(mirror);
+      await this.assertSafeDestination(this.root, mirrorBasePath);
+      const mirrorBase = await this.readOptional(mirrorBasePath);
+      if (mirrorBase === undefined || !mirrorCurrent.equals(mirrorBase))
+        throw new ApexError(
+          "APEX_CONFLICT",
+          `Generated review file has manual edits: ${relative(this.root, path)}`,
+          EXIT_CODES.conflict,
+        );
+    }
   }
 
   private async assertTaskReviewFilesUnmodified(run: RunConfigV1, descriptor: WorkflowTaskDescriptor): Promise<void> {
@@ -6405,7 +6491,14 @@ export class ApexService {
   // Drops a previously generated file that the current render no longer produces, unless it has manual edits.
   private async removeGeneratedReview(path: string): Promise<void> {
     await this.assertGeneratedReviewUnmodified(path);
+    const mirror = await this.workspaceMirrorPath(path);
     await rm(path, { force: true });
+    if (mirror !== undefined) {
+      await rm(mirror, { force: true });
+      const mirrorBasePath = this.generatedReviewMirrorBase(mirror);
+      await this.assertSafeDestination(this.root, mirrorBasePath);
+      await rm(mirrorBasePath, { force: true });
+    }
     const basePath = this.generatedReviewBase(path);
     await this.assertSafeDestination(this.root, basePath);
     await rm(basePath, { force: true });
@@ -6512,11 +6605,21 @@ export class ApexService {
   private async writeGeneratedReview(path: string, content: Buffer): Promise<void> {
     await this.assertGeneratedReviewUnmodified(path);
     const current = await this.readOptional(path);
-    if (current?.equals(content)) return;
-    await atomicWriteBytes(path, content, { refuseOverwrite: current === undefined });
-    const basePath = this.generatedReviewBase(path);
-    await this.assertSafeDestination(this.root, basePath);
-    await atomicWriteBytes(basePath, content);
+    const mirror = await this.workspaceMirrorPath(path);
+    const mirrorCurrent = mirror === undefined ? undefined : await this.readOptional(mirror);
+    if (!current?.equals(content)) {
+      await atomicWriteBytes(path, content, { refuseOverwrite: current === undefined });
+      const basePath = this.generatedReviewBase(path);
+      await this.assertSafeDestination(this.root, basePath);
+      await atomicWriteBytes(basePath, content);
+    }
+    if (mirror !== undefined && !mirrorCurrent?.equals(content)) {
+      await mkdir(dirname(mirror), { recursive: true });
+      await atomicWriteBytes(mirror, content, { refuseOverwrite: mirrorCurrent === undefined });
+      const mirrorBasePath = this.generatedReviewMirrorBase(mirror);
+      await this.assertSafeDestination(this.root, mirrorBasePath);
+      await atomicWriteBytes(mirrorBasePath, content);
+    }
   }
 
   private async materializeOperationalIndex(
@@ -7510,7 +7613,17 @@ export class ApexService {
           EXIT_CODES.stale,
         );
       await this.readApprovalContext(run, preview.previewHash, approvalContextHash);
-      const provider = providerName === "bicep" ? this.providers.bicep : undefined;
+      const handoffHash = this.artifactHash(events, "iac-handoff");
+      const handoff = handoffHash === undefined ? undefined : await this.objects.getJson<IacHandoffV1>(handoffHash);
+      const project = await this.projects.getProject(run.projectId);
+      const provider =
+        providerName === "bicep"
+          ? await this.resolveProvider("bicep", {
+              run,
+              ...(handoff === undefined ? {} : { handoffRootPath: handoff.rootPath }),
+              riskOwner: project.riskOwner,
+            })
+          : undefined;
       if (provider?.labApplyScope === undefined || provider.validationMode === "simulated")
         throw new ApexError(
           "APEX_AUTHORIZATION",
@@ -7784,7 +7897,14 @@ export class ApexService {
           EXIT_CODES.validation,
         );
       }
-      const provider = this.providers[options.provider];
+      const handoffHash = this.artifactHash(events, "iac-handoff");
+      const handoff = handoffHash === undefined ? undefined : await this.objects.getJson<IacHandoffV1>(handoffHash);
+      const project = await this.projects.getProject(run.projectId);
+      const provider = await this.resolveProvider(options.provider, {
+        run,
+        ...(handoff === undefined ? {} : { handoffRootPath: handoff.rootPath }),
+        riskOwner: project.riskOwner,
+      });
       if (provider === undefined) {
         throw new ApexError(
           "APEX_VALIDATION",
@@ -7800,8 +7920,6 @@ export class ApexService {
         manifestHash === undefined ? undefined : await this.objects.getJson<LogicalResourceManifestV1>(manifestHash);
       const policyValidation =
         options.operation === "apply" ? this.policyValidationInput(run.iacTool, policyMap, logicalManifest) : undefined;
-      const handoffHash = this.artifactHash(events, "iac-handoff");
-      const handoff = handoffHash === undefined ? undefined : await this.objects.getJson<IacHandoffV1>(handoffHash);
       if (provider.validateSource === undefined && provider.validationMode !== "simulated")
         throw new ApexError(
           "APEX_VALIDATION",
@@ -8550,7 +8668,14 @@ export class ApexService {
     );
     const declaredValidatorIds = await this.deployValidatorIds(run);
     if (providerName?.provider === "bicep" || providerName?.provider === "terraform") {
-      const provider = this.providers[providerName.provider];
+      const handoffHash = this.artifactHash(events, "iac-handoff");
+      const handoff = handoffHash === undefined ? undefined : await this.objects.getJson<IacHandoffV1>(handoffHash);
+      const project = await this.projects.getProject(run.projectId);
+      const provider = await this.resolveProvider(providerName.provider, {
+        run,
+        ...(handoff === undefined ? {} : { handoffRootPath: handoff.rootPath }),
+        riskOwner: project.riskOwner,
+      });
       if (provider === undefined)
         throw new ApexError(
           "APEX_VALIDATION",
@@ -8926,9 +9051,10 @@ export class ApexService {
   ): Promise<{ healthy: boolean; checks: DoctorCheck[]; remedies: string[]; nextAction: string }> {
     const apexExists = await this.exists(join(this.root, ".apex"));
     if (fix && yes && apexExists) {
-      await this.ensureLocalGitBoundary(true);
-      await this.ensureWorkspaceLauncher();
-      const assets = await resolveBundledAssets();
+      const binding = await workspaceRuntimeBinding(this.root);
+      if (binding.state === "mismatch" && binding.reason === "RUNTIME_WORKSPACE_NEWER") {
+        throw runtimeMismatchError(binding);
+      }
       const selection = await this.customizationSelection();
       if (selection.sourceMode === "custom-source") {
         throw new ApexError(
@@ -8937,6 +9063,17 @@ export class ApexService {
           EXIT_CODES.usage,
         );
       }
+      let previousRuntimeLock: RuntimeBundleLockV1 | undefined;
+      try {
+        const candidate = JSON.parse(await readFile(join(this.root, ".apex", "apex.lock.json"), "utf8")) as unknown;
+        if (Value.Check(RuntimeBundleLockV1Schema, candidate)) previousRuntimeLock = candidate;
+      } catch {
+        previousRuntimeLock = undefined;
+      }
+      await this.ensureLocalGitBoundary(true);
+      await this.ensureWorkspaceLauncher();
+      const assets = await resolveBundledAssets();
+      if (previousRuntimeLock !== undefined) await this.installRuntimeGeneration(previousRuntimeLock);
       const clientId = selection.clientId;
       await this.installCustomizations(
         assets.clientProjections[clientId],
@@ -8947,7 +9084,10 @@ export class ApexService {
         assets.plugin,
       );
       await this.installCapabilityAssets(assets);
-      await atomicWriteJson(join(this.root, ".apex", "apex.lock.json"), await this.createRuntimeLock(assets));
+      const runtimeLock = await this.createRuntimeLock(assets);
+      await atomicWriteJson(join(this.root, ".apex", "apex.lock.json"), runtimeLock);
+      await atomicWriteJson(join(this.root, ".apex", "runtime", "apex.lock.json"), runtimeLock);
+      await this.installRuntimeGeneration(runtimeLock);
     }
     const checks: DoctorCheck[] = [
       {
@@ -9464,7 +9604,14 @@ export class ApexService {
     ) {
       throw new ApexError("APEX_VALIDATION", "Deployment execution receipt is invalid", EXIT_CODES.validation);
     }
-    const provider = this.providers[payload.provider];
+    const handoffHash = this.artifactHash(events, "iac-handoff");
+    const handoff = handoffHash === undefined ? undefined : await this.objects.getJson<IacHandoffV1>(handoffHash);
+    const project = await this.projects.getProject(run.projectId);
+    const provider = await this.resolveProvider(payload.provider, {
+      run,
+      ...(handoff === undefined ? {} : { handoffRootPath: handoff.rootPath }),
+      riskOwner: project.riskOwner,
+    });
     if (provider === undefined)
       throw new ApexError(
         "APEX_VALIDATION",
@@ -10120,7 +10267,15 @@ export class ApexService {
     return { workspacePath: this.workspacePath, sessionId: `${process.pid}` };
   }
   private async selection(): Promise<Selection> {
-    return JSON.parse(await readFile(join(this.root, ".apex", "config.json"), "utf8")) as Selection;
+    const selected = await this.readValidSelection();
+    if (selected === undefined) {
+      throw new ApexError(
+        "APEX_NOT_FOUND",
+        "No active project run is selected; create or select a project first",
+        EXIT_CODES.notFound,
+      );
+    }
+    return selected;
   }
   private async writeSelection(selection: Selection): Promise<void> {
     this.assertNotSnapshotRead();
@@ -11864,7 +12019,30 @@ export class ApexService {
     const nativeEvidenceModes: Record<string, "native" | "simulated"> = {};
     if (descriptor.id === `validation-${run.iacTool}`) {
       for (const id of validatorIds) nativeEvidenceModes[id] = "simulated";
-      const provider = this.providers[run.iacTool];
+      const currentHandoff = artifacts["iac-handoff"] as IacHandoffV1 | undefined;
+      const submittedEvidence = context.outputs["validation-evidence"] as EvidenceManifestV1 | undefined;
+      let hasNativeReceiptSubmission = false;
+      for (const entry of submittedEvidence?.entries ?? []) {
+        try {
+          const candidate = await this.objects.getJson<Record<string, unknown>>(entry.hash);
+          if (
+            candidate !== null &&
+            typeof candidate === "object" &&
+            Array.isArray(candidate.commands) &&
+            typeof candidate.receiptHash === "string"
+          ) {
+            hasNativeReceiptSubmission = true;
+            break;
+          }
+        } catch {
+          // Simulated evidence entries may reference synthetic hashes rather than NativeValidationReceiptV1 objects.
+        }
+      }
+      const provider = await this.resolveProvider(run.iacTool, {
+        run,
+        ...(currentHandoff === undefined ? {} : { handoffRootPath: currentHandoff.rootPath }),
+        ...(hasNativeReceiptSubmission ? { sourceValidationOnly: true } : {}),
+      });
       if (provider !== undefined && provider.validateSource === undefined && provider.validationMode !== "simulated")
         throw new ApexError(
           "APEX_VALIDATION",

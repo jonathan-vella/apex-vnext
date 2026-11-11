@@ -469,3 +469,51 @@ test("state transfer CLI adapters require confirmation without creating provider
     /ENOENT/,
   );
 });
+
+test("state transfer includes run-scoped generated IaC under .apex/work/<runId> while skipping .terraform and .azure", async () => {
+  const source = await sourceState();
+  const codeDir = join(source.root, ".apex", "work", source.runId, "task-1", "code");
+  const tfPluginDir = join(codeDir, ".terraform", "providers");
+  const azdEnvDir = join(codeDir, ".azure", "dev");
+  await mkdir(tfPluginDir, { recursive: true });
+  await mkdir(azdEnvDir, { recursive: true });
+  await writeFile(join(codeDir, "main.bicep"), "targetScope = 'resourceGroup'\n", "utf8");
+  await writeFile(join(codeDir, "azure.yaml"), "name: demo\n", "utf8");
+  await writeFile(join(tfPluginDir, "provider-bin"), "binary\n", "utf8");
+  await writeFile(join(azdEnvDir, ".env"), "AZURE_CLIENT_SECRET=ordinary-private-value\n", "utf8");
+
+  await exportStateTransfer(
+    source.root,
+    source.envelopePath,
+    { claimHash: source.claimHash, recipient: "ci", ttlMs: 1_800_000 },
+    { now: () => instant },
+  );
+  const destination = await tempRoot();
+  const envelope = JSON.parse(await readFile(source.envelopePath, "utf8")) as unknown;
+  await importStateTransfer(destination, envelope, "ci", () => instant);
+
+  assert.equal(
+    await readFile(join(destination, ".apex", "work", source.runId, "task-1", "code", "main.bicep"), "utf8"),
+    "targetScope = 'resourceGroup'\n",
+  );
+  assert.equal(
+    await readFile(join(destination, ".apex", "work", source.runId, "task-1", "code", "azure.yaml"), "utf8"),
+    "name: demo\n",
+  );
+  await assert.rejects(
+    readFile(
+      join(destination, ".apex", "work", source.runId, "task-1", "code", ".terraform", "providers", "provider-bin"),
+    ),
+    /ENOENT/,
+  );
+  await assert.rejects(
+    readFile(join(destination, ".apex", "work", source.runId, "task-1", "code", ".azure", "dev", ".env")),
+    /ENOENT/,
+  );
+
+  await writeFile(join(codeDir, "main.bicep"), "var clientSecret = 'ordinary-private-value'\n", "utf8");
+  await assert.rejects(
+    createStateTransferBundle(source.root, { claimHash: source.claimHash, recipient: "ci", ttlMs: 1_800_000 }, instant),
+    /secret-bearing text/,
+  );
+});

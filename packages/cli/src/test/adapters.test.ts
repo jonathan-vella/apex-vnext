@@ -1541,6 +1541,29 @@ test("CLI rejects incomplete native provider config before execution", async () 
   const path = join(root, "providers.json");
   await writeJson(path, { bicep: { cwd: "azd-project" } });
   await assert.rejects(execute(["version", "--provider-config", path], root), /requires environmentName/i);
+  await assert.rejects(readFile(join(root, ".apex", "provider-config.json")), /ENOENT/);
+});
+
+test("CLI init with --provider-config initializes cleanly before persisting provider config", async () => {
+  const root = await tempRoot();
+  const path = join(root, "providers.json");
+  await writeJson(path, {
+    bicep: {
+      tenantId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+      location: "swedencentral",
+      cwd: "infra/bicep",
+      environmentName: "dev",
+    },
+  });
+  const initialized = (await execute(
+    ["init", "--project", "demo", "--risk-owner", "partner", "--target", "local", "--provider-config", path],
+    root,
+  )) as { projectId: string };
+  assert.equal(initialized.projectId, "demo");
+  const persisted = JSON.parse(await readFile(join(root, ".apex", "provider-config.json"), "utf8")) as {
+    bicep: { location: string };
+  };
+  assert.equal(persisted.bicep.location, "swedencentral");
 });
 
 test("CLI rejects obsolete native and Deployment Stack Bicep provider config", async () => {
