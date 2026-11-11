@@ -7292,18 +7292,11 @@ export class ApexService {
       throw new ApexError("APEX_STALE", "Review decisions do not match current open findings", EXIT_CODES.stale);
     }
     const revisions = decisions.filter(({ action }) => action === "revise");
-    if (revisions.length > 0) {
-      await this.reviseReview(
-        reviewHash,
-        revisions.map(({ findingId }) => findingId),
-        revisions.map(({ rationale }) => rationale ?? "Revision requested").join("; "),
-      );
-      return { status: "revision_requested" };
-    }
-    if (decisions.length !== openIds.length) {
+    const nonRevisions = decisions.filter(({ action }) => action !== "revise");
+    if (revisions.length === 0 && decisions.length !== openIds.length) {
       throw new ApexError("APEX_VALIDATION", "Every open finding requires a decision", EXIT_CODES.validation);
     }
-    for (const decision of decisions) {
+    const preparedResolutions = nonRevisions.map((decision) => {
       if (decision.action === "acknowledge" && payload.nodeId !== "requirements-review") {
         throw new ApexError(
           "APEX_AUTHORIZATION",
@@ -7313,30 +7306,40 @@ export class ApexService {
       }
       const acceptedRisk =
         decision.action === "accept-risk" ? this.reviewAcceptedRiskDefaults(decision, project.riskOwner) : undefined;
-      await this.resolveReview({
+      return {
         findingId: decision.findingId,
         reviewHash,
         subjectHash: String(payload.subjectHash),
         dependencyHash: String(payload.dependencyHash),
-        disposition:
-          decision.action === "acknowledge"
-            ? "acknowledged"
-            : decision.action === "dismiss"
-              ? "dismissed"
-              : "accepted-risk",
+        disposition: (decision.action === "acknowledge"
+          ? "acknowledged"
+          : decision.action === "dismiss"
+            ? "dismissed"
+            : "accepted-risk") as ReviewResolution["disposition"],
         actor: userInfo().username,
         rationale:
           decision.action === "acknowledge"
             ? `Acknowledged for downstream owner: ${decision.owner}`
             : (decision.rationale ?? ""),
         ...(acceptedRisk === undefined ? {} : { owner: acceptedRisk.owner }),
-        evidenceRefs: [],
+        evidenceRefs: [] as string[],
         ...(acceptedRisk !== undefined
           ? { expiresAt: acceptedRisk.expiresAt }
           : decision.expiresAt === undefined
             ? {}
             : { expiresAt: decision.expiresAt }),
-      });
+      };
+    });
+    for (const resolution of preparedResolutions) {
+      await this.resolveReview(resolution);
+    }
+    if (revisions.length > 0) {
+      await this.reviseReview(
+        reviewHash,
+        revisions.map(({ findingId }) => findingId),
+        revisions.map(({ rationale }) => rationale ?? "Revision requested").join("; "),
+      );
+      return { status: "revision_requested" };
     }
     return { status: "resolved" };
   }

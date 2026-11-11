@@ -94,9 +94,10 @@ review or task.
     controls regardless of governance source. Print a Markdown overview table (`| ID | Severity | Finding & Impact |
     Recommended Action |`) of the remaining `N` actionable findings in chat (plus a 1-line note naming any auto-dismissed
     IDs), then call `ask_user` **one finding at a time** (`[<SEVERITY>] <ID> (<i>/<N>): <title> — <plain-English
-    impact>`, never bundling multiple findings into one `ask_user` prompt) with explicit choices (`Revise: <concrete
-    fix>`, `Accept risk (90d, owner: <project risk owner>): <draft rationale>`, `Dismiss: <factual reason>`), and submit
-    all decisions together in one `apex/reviewDecide` call.
+    impact>`, never bundling multiple findings into one `ask_user` prompt) offering **only** options present in that
+    finding's returned `finding.actions` (`Revise: <concrete fix>`, `Accept risk (90d, owner: <project risk owner>):
+    <draft rationale>` only when `"accept-risk"` is in `actions`, and `Dismiss: <factual reason>` when `"dismiss"` is in
+    `actions`), and submit all decisions together in one `apex/reviewDecide` call.
 11. For a `policy-refresh` task after Gate 2, start from the `policy-property-map` template in task context. Decide only
     rows listed in `governanceFindings`, submit the complete map through `apex/completeTask`, and let blocked `deny`
     rows reopen Architecture and Gate 2 (`modify` and `deployIfNotExists` rows are non-blocking and never use `blocked`).

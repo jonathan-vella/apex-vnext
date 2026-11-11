@@ -21,11 +21,11 @@ reviews.
 ### Changed
 
 - Update `APEX` client mechanics (`packages/cli/scripts/prepare-assets.mjs` and `apex.agent.md`), `apex-next`,
-  `apex-requirements`, `apex-architecture`, `apex-planning`, and `docs/how-to/run-workflow.md` so stage-defined
-  out-of-scope noise is auto-dismissed silently, actionable review findings are displayed in a Markdown overview table
-  first and answered one finding at a time via sequential `ask_user` prompts with explicit disposition choices
-  (`Revise`, `Accept risk`, `Dismiss`, plus `Acknowledge` in Requirements), and all decisions are submitted together in
-  a single `apex/reviewDecide` call.
+  `apex-requirements`, `apex-architecture`, `apex-planning`, `ApexService.decideReview`, and
+  `docs/how-to/run-workflow.md` so stage-defined Architecture review noise is auto-dismissed silently, actionable
+  findings are displayed in a Markdown overview table first and answered one finding at a time via sequential `ask_user`
+  prompts filtered by each finding's returned `finding.actions`, and mixed `revise` + disposition batches audit
+  non-`revise` answers against the current review without carrying approvals into a fresh review.
 
 ## [0.11.0-next.13] — Preview
 

@@ -18,10 +18,11 @@ reviews.
 
 ### Changed
 
-- Update `APEX`, `apex-next`, `apex-requirements`, `apex-architecture`, and `apex-planning` so out-of-scope review noise
-  is auto-dismissed silently, actionable findings render in a Markdown overview table first, users answer one finding at
-  a time via sequential `ask_user` prompts with concrete per-finding choices (`Revise`, `Accept risk`, `Dismiss`, plus
-  `Acknowledge` in Requirements), and decisions submit together in one `apex/reviewDecide` call.
+- Update `APEX`, `apex-next`, `apex-requirements`, `apex-architecture`, `apex-planning`, and `ApexService.decideReview`
+  so Architecture review noise is auto-dismissed silently, actionable findings render in a Markdown overview table
+  first, users answer one finding at a time via sequential `ask_user` prompts filtered by each finding's returned
+  `finding.actions`, and mixed `revise` + disposition batches audit non-`revise` answers on the current review before
+  invalidating for revision.
 
 ## [0.11.0-next.13] - 2026-11-11
 

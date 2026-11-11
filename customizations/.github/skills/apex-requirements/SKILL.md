@@ -78,16 +78,16 @@ or task.
     run the rubber-duck review steps in `apex-next` with that exact `task.taskId`. If rubber-duck is unavailable or the
     capture fails twice, report the pending review task and stop.
 11. When `needs_review` returns, do not request task context or run rubber-duck again. Follow the 1-by-1 disposition
-    flow in `apex-next`: automatically dismiss any `info` `Check later: performance and scale validation` finding, render
-    a Markdown overview table (`| ID | Severity | Finding & Impact | Recommended Action |`) in chat for the remaining
-    `N` actionable findings, then call `ask_user` sequentially once per finding (`[<SEVERITY>] <ID> (<i>/<N>): <title> —
-    <plain-English impact>`) with explicit single-choice options (`Revise: <concrete fix>`, `Accept risk (90d, owner:
-    <project risk owner>): <draft rationale>`, `Dismiss: <factual reason>`, and `Acknowledge obligation (owner:
-    <accountable owner>): <scope>` when permitted—never bundle multiple findings into one `ask_user` prompt). Existing
-    blocking findings require the normal user choice or revision path; do not silently acknowledge, dismiss or accept
-    risk on blocking items. Deferred validation and obligation owners are separate from the project's `riskOwner`; use
-    the user's explicit accountable owner (for example `partner`), not an inferred `customer` default. Submit all
-    collected decisions together in one `apex/reviewDecide` call.
+    flow in `apex-next`: render a Markdown overview table (`| ID | Severity | Finding & Impact | Recommended Action |`)
+    in chat for all `N` open findings, then call `ask_user` sequentially **one finding at a time**
+    (`[SEVERITY] <ID> (<i>/<N>): <title> — <plain-English impact>`, never bundling multiple findings into one
+    `ask_user` prompt). Offer **only** options present in that finding's returned `finding.actions` (`Revise: <concrete
+    fix>`, `Acknowledge obligation (owner: <accountable owner>): <scope>` when `"acknowledge"` is in `actions`, and
+    `Accept risk (90d, owner: <project risk owner>): <draft rationale>` when `"accept-risk"` is in `actions`—never offer
+    `Accept risk` on `critical`/`high` findings). Existing blocking findings require the normal user choice or revision
+    path; do not silently acknowledge, dismiss or accept risk on any item. Deferred validation and obligation owners are
+    separate from the project's `riskOwner`; use the user's explicit accountable owner (for example `partner`), not an
+    inferred `customer` default. Submit all collected decisions together in one `apex/reviewDecide` call.
 12. After `apex/reviewDecide`, call `apex/status`. If Gate 1 is pending, report it and stop. Do not call
     `apex/nextTask` while Gate 1 is pending. Gate 1 is the single intent confirmation: show the user the run's
     purpose (`lab` by default; `production` is unavailable until the CI-owned production flow ships), its target scope

@@ -419,6 +419,52 @@ test("dispositions resolve every finding but cannot add or edit findings, and th
   assert.equal((await service.status()).run.gates[0]!.state, "approved");
 });
 
+test("mixed revise and non-revise review decisions audit non-revise answers without carrying them into a fresh review", async () => {
+  const { service, journal, taskId } = await setup();
+  const findings = [
+    { id: "F-1", severity: "high" as const, title: "Missing recovery path", detail: "Document recovery path." },
+    { id: "R-2", severity: "info" as const, title: "Check later: performance", detail: "Validate after deploy." },
+  ];
+  await captureReview(service, taskId, { findings });
+  const reviewHash = (await service.completeReview(taskId)).outputHashes["review-findings"]!;
+  assert.deepEqual(
+    await service.decideReview(reviewHash, [
+      { findingId: "F-1", action: "revise", rationale: "Add explicit recovery path." },
+      { findingId: "R-2", action: "dismiss", rationale: "Performance validation is deferred." },
+    ]),
+    { status: "revision_requested" },
+  );
+  const events = await journal.replay();
+  const resolved = events.filter(({ type }) => type === "review.resolved");
+  assert.equal(resolved.length, 1);
+  assert.equal(
+    (resolved[0]!.payload as { resolution?: { findingId?: string; reviewHash?: string; disposition?: string } })
+      .resolution?.findingId,
+    "R-2",
+  );
+  assert.equal((resolved[0]!.payload as { resolution?: { reviewHash?: string } }).resolution?.reviewHash, reviewHash);
+  assert.equal((await service.status()).run.gates[0]!.state, "invalidated");
+
+  // Re-completing Requirements and running a fresh review leaves R-2 open in the new review.
+  const reqNext = await service.nextTask();
+  assert.equal(reqNext.status, "task");
+  if (reqNext.status !== "task") return;
+  await service.completeTaskOutputs(reqNext.task.taskId, [{ kind: "requirements", value: requirements() }]);
+  const freshReviewNext = await service.nextTask();
+  assert.equal(freshReviewNext.status, "task");
+  if (freshReviewNext.status !== "task") return;
+  await captureReview(service, freshReviewNext.task.taskId, { findings });
+  const freshReviewHash = (await service.completeReview(freshReviewNext.task.taskId)).outputHashes["review-findings"]!;
+  assert.notEqual(freshReviewHash, reviewHash);
+  const pending = await service.nextTask();
+  assert.equal(pending.status, "needs_review");
+  if (pending.status !== "needs_review") return;
+  assert.deepEqual(
+    pending.review.findings.map(({ id }) => id),
+    ["F-1", "R-2"],
+  );
+});
+
 test("ingested captures are removed and stray captures for other nonces are ignored", async () => {
   const { service, taskId } = await setup();
   const { nonce } = (await service.taskContext(taskId)).reviewRequest!;
