@@ -55,7 +55,7 @@ export class TerraformCommandAdapter {
 
   showJson(cwd: string, savedPlanPath: string): CommandPlan {
     this.#requirePlanPath(savedPlanPath);
-    return { executable: "terraform", args: ["show", "-json", savedPlanPath], cwd };
+    return { executable: "terraform", args: ["show", "-json", savedPlanPath], cwd, rawOutput: true };
   }
 
   statePull(cwd: string): CommandPlan {

@@ -1,7 +1,7 @@
 import { lstat, readFile, readdir } from "node:fs/promises";
 import { isAbsolute, join, posix, relative, resolve, sep } from "node:path";
 import { BoundEnvelopeTransport, type BoundEnvelope, type EnvelopeBindings } from "@apexops/capabilities";
-import { SECRET_FIELD_PATTERN, SECRET_VALUE_PATTERN } from "@apexops/contracts";
+import { SECRET_VALUE_PATTERN, isSecretBearingField } from "@apexops/contracts";
 import {
   EventJournal,
   REPEAT_GUARD_FILE,
@@ -164,7 +164,7 @@ function secretPaths(value: unknown, path: string, findings: string[]): void {
   for (const [key, entry] of Object.entries(value)) {
     const entryPath = `${path}/${key.replaceAll("~", "~0").replaceAll("/", "~1")}`;
     if (
-      SECRET_FIELD_PATTERN.test(key) &&
+      isSecretBearingField(key, entry) &&
       !(SAFE_POLICY_ASSERTIONS.has(entryPath) && SAFE_POLICY_ASSERTIONS.get(entryPath) === entry)
     ) {
       findings.push(entryPath);
@@ -261,8 +261,8 @@ function hasSecretTextAssignment(text: string): boolean {
       );
     if (match === null) continue;
     const [, key, rawValue] = match;
-    if (!SECRET_FIELD_PATTERN.test(key!)) continue;
     const value = rawValue!.trim();
+    if (!isSecretBearingField(key!, value === "true" || value === "false" ? value === "true" : value)) continue;
     if (
       value.length > 0 &&
       value !== "null" &&

@@ -6,11 +6,11 @@ import {
   PolicyPropertyMapV1Schema,
   LogicalResourceManifestV1Schema,
   IacBindingV1Schema,
-  SECRET_FIELD_PATTERN,
   SECRET_VALUE_PATTERN,
   assertPolicyValidationJson,
   calculatePolicyValidationDigest,
   calculatePolicyValidationHash,
+  isSecretBearingField,
   type IacTool,
   type PolicyPropertyMapV1,
   type PolicyValidationResultV1,
@@ -42,6 +42,7 @@ interface Resource {
   readonly codeSymbol?: string;
   readonly value: Record<string, unknown>;
   readonly unknown?: unknown;
+  readonly existing?: boolean;
   readonly unsupported: boolean;
 }
 
@@ -143,13 +144,13 @@ function resourcesFromJson(json: string, track: IacTool): readonly Resource[] {
         const unsupported =
           inheritedUnsupported ||
           Object.hasOwn(resource, "copy") ||
-          (Object.hasOwn(resource, "condition") && resource.condition !== true) ||
-          resource.existing === true;
+          (Object.hasOwn(resource, "condition") && resource.condition !== true);
         const physicalId = text(own(resource, "id"));
         const symbols = parentSymbols !== null && symbol !== undefined ? [...parentSymbols, symbol] : null;
         resources.push({
           value: resource,
           unsupported,
+          ...(resource.existing === true ? { existing: true } : {}),
           ...(text(resource.type) === undefined ? {} : { resourceType: text(resource.type)! }),
           ...(physicalId === undefined ? {} : { physicalId }),
           ...(symbols === null ? {} : { codeSymbol: symbols.join("::") }),
@@ -272,31 +273,86 @@ function observeBoundProperty(
   if (codeSymbol === undefined && (request.track === "terraform" || physicalId === undefined)) {
     return { outcome: "unsupported", reason: "resource-not-bound" };
   }
-  const matches = resources.filter((resource) =>
+  let matches = resources.filter((resource) =>
     request.track === "terraform"
       ? resource.codeSymbol === codeSymbol
       : (physicalId !== undefined && resource.physicalId === physicalId) ||
         (codeSymbol !== undefined && resource.codeSymbol === codeSymbol),
   );
+  if (matches.length === 0 && request.track === "terraform" && codeSymbol?.startsWith("module.")) {
+    const prefix = `${codeSymbol}.`;
+    matches = resources.filter(
+      (resource) =>
+        resource.codeSymbol !== undefined &&
+        resource.codeSymbol.startsWith(prefix) &&
+        !resource.codeSymbol.slice(prefix.length).includes(".module.") &&
+        !resource.unsupported &&
+        own(resource.value, segments[0]!) !== undefined,
+    );
+  }
   if (matches.length === 0) return { outcome: "unsupported", reason: "resource-not-found" };
   if (matches.length !== 1) return { outcome: "unsupported", reason: "ambiguous-resource" };
   const resource = matches[0]!;
-  if (resource.unsupported || (physicalId !== undefined && physicalId !== resource.physicalId)) {
+  if (
+    resource.unsupported ||
+    resource.existing === true ||
+    (physicalId !== undefined && physicalId !== resource.physicalId)
+  ) {
     return { outcome: "unsupported", reason: "unsupported-resource" };
   }
-  let observed: unknown = resource.value;
-  let unknown: unknown = resource.unknown;
-  for (const segment of segments) {
-    if (unknown === true || (typeof observed === "string" && expression(observed, request.track))) {
-      return { outcome: "unsupported", reason: "unsupported-expression" };
+  const walkPath = (
+    startValue: unknown,
+    startUnknown: unknown,
+    pathSegments: readonly string[],
+  ): { observed: unknown; unknown: unknown; expressionHit: boolean } => {
+    let currentObserved: unknown = startValue;
+    let currentUnknown: unknown = startUnknown;
+    for (const segment of pathSegments) {
+      if (
+        currentUnknown === true ||
+        (typeof currentObserved === "string" && expression(currentObserved, request.track))
+      ) {
+        return { observed: undefined, unknown: undefined, expressionHit: true };
+      }
+      currentObserved = own(currentObserved, segment);
+      currentUnknown = own(currentUnknown, segment);
     }
-    observed = own(observed, segment);
-    unknown = own(unknown, segment);
+    return { observed: currentObserved, unknown: currentUnknown, expressionHit: false };
+  };
+  let walked = walkPath(resource.value, resource.unknown, segments);
+  if (
+    walked.observed === undefined &&
+    !walked.expressionHit &&
+    request.track === "bicep" &&
+    resource.resourceType?.toLowerCase() === "microsoft.resources/deployments" &&
+    segments[0] === "properties" &&
+    segments.length >= 2 &&
+    segments[1] !== "parameters" &&
+    segments[1] !== "template"
+  ) {
+    const paramEntry = object(own(own(resource.value.properties, "parameters"), segments[1]!));
+    if (paramEntry !== undefined && Object.hasOwn(paramEntry, "value")) {
+      walked = walkPath(paramEntry.value, undefined, segments.slice(2));
+    } else if (codeSymbol !== undefined) {
+      const prefix = `${codeSymbol}::`;
+      const innerCandidates = resources.filter(
+        (candidate) =>
+          candidate.codeSymbol !== undefined &&
+          candidate.codeSymbol.startsWith(prefix) &&
+          !candidate.codeSymbol.slice(prefix.length).includes("::") &&
+          candidate.resourceType?.toLowerCase() !== "microsoft.resources/deployments" &&
+          !candidate.unsupported &&
+          candidate.existing !== true,
+      );
+      if (innerCandidates.length === 1) {
+        walked = walkPath(innerCandidates[0]!.value, innerCandidates[0]!.unknown, segments);
+      }
+    }
   }
-  if (hasUnknown(unknown) || expression(observed, request.track))
+  if (walked.expressionHit || hasUnknown(walked.unknown) || expression(walked.observed, request.track))
     return { outcome: "unsupported", reason: "unsupported-expression" };
-  if (observed === undefined) return { outcome: "fail", reason: "missing-property" };
-  const observedValueDigest = calculatePolicyValidationDigest(observed);
+  if (walked.observed === undefined) return { outcome: "fail", reason: "missing-property" };
+  const observedValueDigest = calculatePolicyValidationDigest(walked.observed);
   const matched = observedValueDigest === calculatePolicyValidationDigest(mapping.expectedValue);
   return { outcome: matched ? "pass" : "fail", reason: matched ? "matched" : "value-mismatch", observedValueDigest };
 }
@@ -343,7 +399,8 @@ export function validateStorageSecurityBindings(request: {
   try {
     resources = resourcesFromJson(request.json, request.track).map((resource) => ({
       ...resource,
-      unsupported: resource.unsupported || resource.resourceType?.toLowerCase() !== expectedType,
+      unsupported:
+        resource.unsupported || resource.existing === true || resource.resourceType?.toLowerCase() !== expectedType,
     }));
   } catch {
     resources = undefined;
@@ -475,10 +532,16 @@ export function validateBicepStorageDiagnostics(request: {
     )
       return result("unsupported", "unsupported-diagnostics");
     const properties = object(setting.value.properties);
+    const expectedWorkspaceName = request.workspaceResourceId.split("/").at(-1);
+    const sameRgWorkspaceExpr =
+      expectedWorkspaceName === undefined
+        ? undefined
+        : `[resourceId('Microsoft.OperationalInsights/workspaces', '${expectedWorkspaceName}')]`;
     if (
       properties === undefined ||
       typeof properties.workspaceId !== "string" ||
-      properties.workspaceId.toLowerCase() !== request.workspaceResourceId.toLowerCase()
+      (properties.workspaceId.toLowerCase() !== request.workspaceResourceId.toLowerCase() &&
+        properties.workspaceId !== sameRgWorkspaceExpr)
     )
       return result("fail", "workspace-mismatch");
     const logs = properties.logs;
@@ -549,8 +612,11 @@ export function validateBicepResourceParity(request: {
     new Set(expected.map(({ executionAddress }) => executionAddress)).size !== expected.length ||
     expected.some(
       (resource) =>
-        resource.ownership !== "managed" ||
-        (resource.implementationKind !== "resource" && resource.implementationKind !== "module") ||
+        !(
+          (resource.ownership === "managed" &&
+            (resource.implementationKind === "resource" || resource.implementationKind === "module")) ||
+          (resource.ownership === "existing" && resource.implementationKind === "existing")
+        ) ||
         !/^[A-Za-z_][A-Za-z0-9_]*$/.test(resource.executionAddress ?? "") ||
         resource.dependsOn.some((id) => !byId.has(id)) ||
         JSON.stringify([...resource.dependsOn].sort()) !== JSON.stringify([...resource.generatedDependencies].sort()),
@@ -592,9 +658,21 @@ export function validateBicepResourceParity(request: {
     return result("fail", "coverage-mismatch");
   for (const resource of expected) {
     const compiled = observed.find(({ codeSymbol }) => codeSymbol === resource.executionAddress)!;
+    if ((compiled.existing === true) !== (resource.ownership === "existing")) {
+      return result("unsupported", "unsupported-resource");
+    }
     const expectedType =
       resource.implementationKind === "module" ? "microsoft.resources/deployments" : resource.type.toLowerCase();
     if (compiled.resourceType?.toLowerCase() !== expectedType) return result("fail", "type-mismatch");
+    if (resource.ownership === "existing") {
+      if (
+        Object.hasOwn(compiled.value, "scope") ||
+        (Array.isArray(compiled.value.dependsOn) && compiled.value.dependsOn.length > 0)
+      ) {
+        return result("unsupported", "unsupported-resource");
+      }
+      continue;
+    }
     const selected = request.binding?.resourceBindings[resource.logicalId];
     const scopeId = selected?.scopeLogicalId;
     if (resource.implementationKind === "module") {
@@ -606,8 +684,12 @@ export function validateBicepResourceParity(request: {
       const targetCompiled =
         target === undefined ? undefined : observed.find(({ codeSymbol }) => codeSymbol === target.executionAddress);
       const targetName = targetBinding?.parameters.name;
+      const lowerType = resource.type.toLowerCase();
+      const allowedScopedType =
+        lowerType === "microsoft.insights/diagnosticsettings" ||
+        lowerType === "microsoft.authorization/roleassignments";
       if (
-        resource.type.toLowerCase() !== "microsoft.insights/diagnosticsettings" ||
+        !allowedScopedType ||
         target === undefined ||
         targetBinding === undefined ||
         targetBinding.scopeLogicalId !== undefined ||
@@ -697,9 +779,9 @@ export function validateBicepStorageBaseline(request: {
     return Object.entries(record).some(([key, child]) => {
       const nextInDeploymentProperties = isDeployment && key === "properties";
       const nextInsideTemplate = insideModuleTemplate || (inDeploymentProperties && key === "template");
-      if (SECRET_FIELD_PATTERN.test(key)) {
-        const paramValue = !insideModuleTemplate ? object(child)?.value : undefined;
-        const candidate = typeof child === "string" ? child : typeof paramValue === "string" ? paramValue : undefined;
+      const paramValue = !insideModuleTemplate ? object(child)?.value : undefined;
+      const candidate = typeof child === "string" ? child : typeof paramValue === "string" ? paramValue : undefined;
+      if (isSecretBearingField(key, candidate ?? child)) {
         if (
           candidate !== undefined &&
           candidate.length > 0 &&
@@ -738,13 +820,15 @@ export function validateBicepStorageBaseline(request: {
     return result("unsupported", "unsupported-resource");
   const resources = resourcesFromJson(request.json, "bicep").filter((resource) => !resource.codeSymbol?.includes("::"));
   const accounts = resources.filter(
-    ({ resourceType }) => resourceType?.toLowerCase() === "microsoft.storage/storageaccounts",
+    (resource) =>
+      resource.existing !== true && resource.resourceType?.toLowerCase() === "microsoft.storage/storageaccounts",
   );
   if (accounts.length > 0 && new Set(accounts.map(({ value }) => value.name)).size !== accounts.length)
     return result("unsupported", "unsupported-resource");
   for (const resource of resources) {
     if (
       !onlyKeys(resource.value, [
+        "existing",
         "type",
         "apiVersion",
         "name",
@@ -770,9 +854,33 @@ export function validateBicepStorageBaseline(request: {
     } else if (
       resource.resourceType?.toLowerCase().startsWith("microsoft.storage/storageaccounts/") &&
       resource.value.properties !== undefined &&
-      !onlyKeys(resource.value.properties, [])
+      !onlyKeys(resource.value.properties, [
+        "deleteRetentionPolicy",
+        "containerDeleteRetentionPolicy",
+        "isVersioningEnabled",
+        "changeFeed",
+      ])
     )
       return result("unsupported", "unsupported-resource");
+  }
+  for (const moduleStorage of request.manifest.resources.filter(
+    (entry) =>
+      entry.ownership === "managed" &&
+      entry.implementationKind === "module" &&
+      entry.type.toLowerCase() === "microsoft.storage/storageaccounts",
+  )) {
+    const deployment = resources.find(({ codeSymbol }) => codeSymbol === moduleStorage.executionAddress);
+    const params = object(own(deployment?.value.properties, "parameters"));
+    if (
+      params === undefined ||
+      own(params.allowBlobPublicAccess, "value") !== false ||
+      own(params.allowSharedKeyAccess, "value") !== false ||
+      own(params.minimumTlsVersion, "value") !== "TLS1_2" ||
+      own(params.supportsHttpsTrafficOnly, "value") !== true ||
+      own(params.publicNetworkAccess, "value") === "Enabled"
+    ) {
+      return result("fail", "storage-controls");
+    }
   }
   for (const account of accounts) {
     const properties = object(account.value.properties);
@@ -791,11 +899,27 @@ export function validateBicepStorageBaseline(request: {
         "networkAcls",
         "encryption",
         "accessTier",
+        "isHnsEnabled",
+        "allowCrossTenantReplication",
+        "allowedCopyScope",
+        "routing",
+        "sasPolicy",
+        "keyPolicy",
+        "largeFileSharesState",
+        "azureFilesIdentityBasedAuthentication",
+        "immutableStorageWithVersioning",
+        "customDomain",
       ]) ||
-      !onlyKeys(network, ["defaultAction", "bypass", "ipRules", "virtualNetworkRules"]) ||
-      !onlyKeys(identity, ["type"]) ||
-      !onlyKeys(encryption, ["keySource", "requireInfrastructureEncryption", "services"]) ||
-      !onlyKeys(encryptionServices, ["blob", "file"]) ||
+      !onlyKeys(network, ["defaultAction", "bypass", "ipRules", "virtualNetworkRules", "resourceAccessRules"]) ||
+      !onlyKeys(identity, ["type", "userAssignedIdentities"]) ||
+      !onlyKeys(encryption, [
+        "keySource",
+        "requireInfrastructureEncryption",
+        "services",
+        "identity",
+        "keyvaultproperties",
+      ]) ||
+      !onlyKeys(encryptionServices, ["blob", "file", "table", "queue"]) ||
       !["blob", "file"].every((service) => onlyKeys(own(encryptionServices, service), ["enabled", "keyType"]))
     )
       return result("unsupported", "unsupported-resource");
@@ -812,10 +936,10 @@ export function validateBicepStorageBaseline(request: {
       network.ipRules.length !== 0 ||
       !Array.isArray(network.virtualNetworkRules) ||
       network.virtualNetworkRules.length !== 0 ||
-      encryption?.keySource !== "Microsoft.Storage" ||
+      (encryption?.keySource !== "Microsoft.Storage" && encryption?.keySource !== "Microsoft.Keyvault") ||
       encryption.requireInfrastructureEncryption !== true ||
       !["blob", "file"].every((service) => own(own(encryptionServices, service), "enabled") === true) ||
-      identity?.type !== "SystemAssigned"
+      !["SystemAssigned", "UserAssigned", "SystemAssigned, UserAssigned"].includes(String(identity?.type ?? ""))
     )
       return result("fail", "storage-controls");
     const manifestAccount = request.manifest.resources.find(
@@ -915,4 +1039,254 @@ export function validatePolicyProperties(request: PolicyValidationInput): Policy
   for (const result of results) Object.freeze(result);
   Object.freeze(results);
   return Object.freeze({ ...receipt, receiptHash: calculatePolicyValidationHash(receipt) });
+}
+
+interface ParsedTerraformBlock {
+  readonly address: string;
+  readonly kind: "resource" | "data" | "module";
+  readonly blockType?: string;
+  readonly body: string;
+  readonly dependsOn: readonly string[];
+}
+
+function parseTerraformMainBlocks(hcl: string): readonly ParsedTerraformBlock[] | undefined {
+  const blocks: ParsedTerraformBlock[] = [];
+  let index = 0;
+  const length = hcl.length;
+  const skipWhitespaceAndComments = (): void => {
+    while (index < length) {
+      const ch = hcl[index]!;
+      if (/\s/u.test(ch)) {
+        index += 1;
+        continue;
+      }
+      if (ch === "#" || hcl.startsWith("//", index)) {
+        while (index < length && hcl[index] !== "\n") index += 1;
+        continue;
+      }
+      if (hcl.startsWith("/*", index)) {
+        const end = hcl.indexOf("*/", index + 2);
+        index = end === -1 ? length : end + 2;
+        continue;
+      }
+      break;
+    }
+  };
+  while (index < length) {
+    skipWhitespaceAndComments();
+    if (index >= length) break;
+    const headerMatch =
+      /^(resource|data)\s+"([^"]+)"\s+"([^"]+)"\s*\{/u.exec(hcl.slice(index)) ??
+      /^(module)\s+"([^"]+)"\s*\{/u.exec(hcl.slice(index));
+    if (headerMatch === null) return undefined;
+    const openBraceOffset = index + headerMatch[0].length - 1;
+    let depth = 1;
+    let cursor = openBraceOffset + 1;
+    let inString = false;
+    while (cursor < length && depth > 0) {
+      const ch = hcl[cursor]!;
+      if (inString) {
+        if (ch === "\\") cursor += 2;
+        else {
+          if (ch === '"') inString = false;
+          cursor += 1;
+        }
+        continue;
+      }
+      if (ch === '"') {
+        inString = true;
+        cursor += 1;
+        continue;
+      }
+      if (ch === "#" || hcl.startsWith("//", cursor)) {
+        while (cursor < length && hcl[cursor] !== "\n") cursor += 1;
+        continue;
+      }
+      if (hcl.startsWith("/*", cursor)) {
+        const end = hcl.indexOf("*/", cursor + 2);
+        cursor = end === -1 ? length : end + 2;
+        continue;
+      }
+      if (ch === "{") depth += 1;
+      else if (ch === "}") depth -= 1;
+      cursor += 1;
+    }
+    if (depth !== 0) return undefined;
+    const body = hcl.slice(openBraceOffset + 1, cursor - 1);
+    const depsMatch = /\bdepends_on\s*=\s*\[([^\]]*)\]/u.exec(body);
+    const dependsOn =
+      depsMatch === null
+        ? []
+        : depsMatch[1]!
+            .split(",")
+            .map((token) => token.trim())
+            .filter((token) => token.length > 0);
+    if (headerMatch[1] === "module") {
+      blocks.push({
+        address: `module.${headerMatch[2]!}`,
+        kind: "module",
+        body,
+        dependsOn,
+      });
+    } else {
+      const kind = headerMatch[1] as "resource" | "data";
+      blocks.push({
+        address:
+          kind === "data" ? `data.${headerMatch[2]!}.${headerMatch[3]!}` : `${headerMatch[2]!}.${headerMatch[3]!}`,
+        kind,
+        blockType: headerMatch[2]!,
+        body,
+        dependsOn,
+      });
+    }
+    index = cursor;
+  }
+  return blocks;
+}
+
+export function validateTerraformResourceParity(request: {
+  readonly sourceHash: string;
+  readonly manifest: LogicalResourceManifestV1;
+  readonly binding?: IacBindingV1;
+  readonly hcl: string;
+}): NonNullable<NativeValidationReceiptV1["resourceParity"]> {
+  assertPolicyValidationJson(request.manifest);
+  if (request.binding !== undefined) {
+    assertPolicyValidationJson(request.binding);
+    if (
+      !Value.Check(IacBindingV1Schema, request.binding) ||
+      request.binding.track !== "terraform" ||
+      request.binding.projectId !== request.manifest.projectId ||
+      request.binding.runId !== request.manifest.runId
+    )
+      throw new TypeError("RESOURCE_PARITY_INVALID_INPUT");
+  }
+  if (
+    !Value.Check(LogicalResourceManifestV1Schema, request.manifest) ||
+    request.manifest.track !== "terraform" ||
+    request.manifest.resources.length > 1000 ||
+    !/^[a-f0-9]{64}$/.test(request.sourceHash) ||
+    typeof request.hcl !== "string" ||
+    Buffer.byteLength(request.hcl) > POLICY_VALIDATION_LIMITS.bytes
+  )
+    throw new TypeError("RESOURCE_PARITY_INVALID_INPUT");
+  const result = (
+    outcome: "pass" | "fail" | "unsupported",
+    reason:
+      | "matched"
+      | "coverage-mismatch"
+      | "type-mismatch"
+      | "dependency-mismatch"
+      | "unsupported-resource"
+      | "invalid-source",
+  ) => ({
+    coverage: "terraform-symbolic-resource-parity-v1" as const,
+    sourceHash: request.sourceHash,
+    manifestHash: calculatePolicyValidationDigest(request.manifest),
+    ...(request.binding === undefined ? {} : { bindingHash: calculatePolicyValidationDigest(request.binding) }),
+    inputHash: createHash("sha256").update(request.hcl).digest("hex"),
+    outcome,
+    reason,
+  });
+  const expected = request.manifest.resources;
+  const byId = new Map(expected.map((resource) => [resource.logicalId, resource]));
+  if (
+    byId.size !== expected.length ||
+    new Set(expected.map(({ executionAddress }) => executionAddress)).size !== expected.length ||
+    expected.some(
+      (resource) =>
+        resource.executionAddress === undefined ||
+        resource.dependsOn.some((id) => !byId.has(id)) ||
+        JSON.stringify([...resource.dependsOn].sort()) !== JSON.stringify([...resource.generatedDependencies].sort()),
+    )
+  ) {
+    return result("unsupported", "unsupported-resource");
+  }
+  const blocks = parseTerraformMainBlocks(request.hcl);
+  if (blocks === undefined) return result("unsupported", "invalid-source");
+  if (
+    blocks.length !== expected.length ||
+    expected.some((resource) => blocks.filter(({ address }) => address === resource.executionAddress).length !== 1)
+  ) {
+    return result("fail", "coverage-mismatch");
+  }
+  for (const resource of expected) {
+    const block = blocks.find(({ address }) => address === resource.executionAddress)!;
+    const expectedKind =
+      resource.ownership === "existing" ? "data" : resource.implementationKind === "module" ? "module" : "resource";
+    if (block.kind !== expectedKind) return result("fail", "type-mismatch");
+    if (resource.ownership !== "existing") {
+      const expectedDeps = resource.dependsOn.map((id) => byId.get(id)!.executionAddress!).sort();
+      if (JSON.stringify([...block.dependsOn].sort()) !== JSON.stringify(expectedDeps)) {
+        return result("fail", "dependency-mismatch");
+      }
+    }
+  }
+  return result("pass", "matched");
+}
+
+export function validateTerraformStorageBaseline(request: {
+  readonly sourceHash: string;
+  readonly manifest: LogicalResourceManifestV1;
+  readonly binding: IacBindingV1;
+  readonly hcl: string;
+}): NonNullable<NativeValidationReceiptV1["securityBaseline"]> {
+  const parity = validateTerraformResourceParity(request);
+  const result = (
+    outcome: "pass" | "fail" | "unsupported",
+    reason:
+      | "matched"
+      | "resource-parity"
+      | "unsupported-resource"
+      | "credential-content"
+      | "storage-controls"
+      | "diagnostic-routing",
+  ) => ({
+    coverage: "terraform-source-baseline-v1" as const,
+    sourceHash: request.sourceHash,
+    inputHash: parity.inputHash,
+    manifestHash: parity.manifestHash,
+    bindingHash: calculatePolicyValidationDigest(request.binding),
+    outcome,
+    reason,
+  });
+  if (parity.outcome !== "pass") return result(parity.outcome, "resource-parity");
+  if (SECRET_VALUE_PATTERN.test(request.hcl)) return result("fail", "credential-content");
+  for (const rawLine of request.hcl.split(/\r?\n/u)) {
+    const line = rawLine.trim();
+    if (line.length === 0 || line.startsWith("#") || line.startsWith("//")) continue;
+    const match = /^"?([A-Za-z_][A-Za-z0-9_-]*)"?\s*=\s*"([^"]+)"\s*,?$/u.exec(line);
+    if (match !== null && isSecretBearingField(match[1]!, match[2]!)) {
+      return result("fail", "credential-content");
+    }
+  }
+  const blocks = parseTerraformMainBlocks(request.hcl);
+  if (blocks === undefined) return result("unsupported", "unsupported-resource");
+  for (const resource of request.manifest.resources) {
+    if (resource.ownership !== "managed" || resource.type.toLowerCase() !== "microsoft.storage/storageaccounts") {
+      continue;
+    }
+    const block = blocks.find(({ address }) => address === resource.executionAddress);
+    if (block === undefined) return result("fail", "storage-controls");
+    if (block.kind === "module" || block.blockType === "azurerm_storage_account") {
+      if (
+        !/\ballow_nested_items_to_be_public\s*=\s*false\b/u.test(block.body) ||
+        !/\bhttps_traffic_only_enabled\s*=\s*true\b/u.test(block.body) ||
+        !/\bmin_tls_version\s*=\s*"TLS1_2"/u.test(block.body) ||
+        !/\bshared_access_key_enabled\s*=\s*false\b/u.test(block.body)
+      ) {
+        return result("fail", "storage-controls");
+      }
+    } else if (block.blockType === "azapi_resource") {
+      if (
+        !/"allowBlobPublicAccess"\s*=\s*false\b/u.test(block.body) ||
+        !/"allowSharedKeyAccess"\s*=\s*false\b/u.test(block.body) ||
+        !/"minimumTlsVersion"\s*=\s*"TLS1_2"/u.test(block.body) ||
+        !/"supportsHttpsTrafficOnly"\s*=\s*true\b/u.test(block.body)
+      ) {
+        return result("fail", "storage-controls");
+      }
+    }
+  }
+  return result("pass", "matched");
 }

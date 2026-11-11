@@ -392,8 +392,16 @@
           "type": "string"
         },
         "coverage": {
-          "const": "bicep-symbolic-resource-parity-v1",
-          "type": "string"
+          "anyOf": [
+            {
+              "const": "bicep-symbolic-resource-parity-v1",
+              "type": "string"
+            },
+            {
+              "const": "terraform-symbolic-resource-parity-v1",
+              "type": "string"
+            }
+          ]
         },
         "inputHash": {
           "pattern": "^[0-9a-f]{64}$",
@@ -478,8 +486,16 @@
           "type": "string"
         },
         "coverage": {
-          "const": "bicep-storage-only-baseline-v1",
-          "type": "string"
+          "anyOf": [
+            {
+              "const": "bicep-storage-only-baseline-v1",
+              "type": "string"
+            },
+            {
+              "const": "terraform-source-baseline-v1",
+              "type": "string"
+            }
+          ]
         },
         "inputHash": {
           "pattern": "^[0-9a-f]{64}$",

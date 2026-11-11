@@ -73,6 +73,8 @@ import {
   validateBicepResourceParity,
   validateBicepStorageDiagnostics,
   validateBicepStorageBaseline,
+  validateTerraformResourceParity,
+  validateTerraformStorageBaseline,
 } from "./policy-validation.js";
 
 export interface NativeProviderRuntime {
@@ -483,7 +485,7 @@ abstract class NativeProviderBase {
     let parityBinding: NativeValidationRequest["resourceParityBinding"];
     let diagnosticsTargets: NativeValidationRequest["storageDiagnosticsTargets"];
     try {
-      if (track === "bicep" && request.resourceParityBinding !== undefined) {
+      if (request.resourceParityBinding !== undefined) {
         calculatePolicyValidationDigest(request.resourceParityBinding);
         parityBinding = structuredClone(request.resourceParityBinding);
         if (
@@ -501,7 +503,7 @@ abstract class NativeProviderBase {
         diagnosticsTargets = structuredClone(request.storageDiagnosticsTargets);
         if (Object.keys(diagnosticsTargets).length > 1000) throw new Error();
       }
-      if (track === "bicep" && request.resourceParityManifest !== undefined) {
+      if (request.resourceParityManifest !== undefined) {
         calculatePolicyValidationDigest(request.resourceParityManifest);
         parityManifest = structuredClone(request.resourceParityManifest);
         if (
@@ -676,24 +678,41 @@ abstract class NativeProviderBase {
           await verify();
         }
       }
+      const mainTerraform = track === "terraform" ? (source.fileContents.get("main.tf")?.toString("utf8") ?? "") : "";
       if (parityManifest !== undefined) {
-        receipt.resourceParity = validateBicepResourceParity({
-          sourceHash: receipt.sourceHash,
-          manifest: parityManifest,
-          ...(parityBinding === undefined ? {} : { binding: parityBinding }),
-          json: compiledTemplate ?? "",
-        });
+        receipt.resourceParity =
+          track === "bicep"
+            ? validateBicepResourceParity({
+                sourceHash: receipt.sourceHash,
+                manifest: parityManifest,
+                ...(parityBinding === undefined ? {} : { binding: parityBinding }),
+                json: compiledTemplate ?? "",
+              })
+            : validateTerraformResourceParity({
+                sourceHash: receipt.sourceHash,
+                manifest: parityManifest,
+                ...(parityBinding === undefined ? {} : { binding: parityBinding }),
+                hcl: mainTerraform,
+              });
         const { receiptHash: previousHash, ...updated } = receipt;
         if (!previousHash) throw sourceBindingError();
         receipt.receiptHash = calculateNativeValidationReceiptHash(updated);
       }
       if (parityManifest !== undefined && parityBinding !== undefined) {
-        receipt.securityBaseline = validateBicepStorageBaseline({
-          sourceHash: receipt.sourceHash,
-          manifest: parityManifest,
-          binding: parityBinding,
-          json: compiledTemplate ?? "",
-        });
+        receipt.securityBaseline =
+          track === "bicep"
+            ? validateBicepStorageBaseline({
+                sourceHash: receipt.sourceHash,
+                manifest: parityManifest,
+                binding: parityBinding,
+                json: compiledTemplate ?? "",
+              })
+            : validateTerraformStorageBaseline({
+                sourceHash: receipt.sourceHash,
+                manifest: parityManifest,
+                binding: parityBinding,
+                hcl: mainTerraform,
+              });
         const { receiptHash: previousHash, ...updated } = receipt;
         if (!previousHash) throw sourceBindingError();
         receipt.receiptHash = calculateNativeValidationReceiptHash(updated);
@@ -1758,7 +1777,12 @@ export class NativeTerraformProvider extends NativeProviderBase implements IacPr
   }
 
   async inventory(projectId: string, runId: string): Promise<ResourceInventoryV1> {
-    const stdout = await this.run({ executable: "terraform", args: ["show", "-json"], cwd: this.#target.cwd });
+    const stdout = await this.run({
+      executable: "terraform",
+      args: ["show", "-json"],
+      cwd: this.#target.cwd,
+      rawOutput: true,
+    });
     const root = parseJsonProcessOutput("terraform-plan", stdout) as Record<string, unknown>;
     const values = root.values as Record<string, unknown> | undefined;
     const rootModule = values?.root_module as Record<string, unknown> | undefined;

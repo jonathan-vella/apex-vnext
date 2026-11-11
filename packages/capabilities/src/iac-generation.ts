@@ -164,10 +164,15 @@ function resourceContexts(intent: ImplementationIntentV1, binding: IacBindingV1)
       const resourceBinding = binding.resourceBindings[resource.id]!;
       if (resourceBinding.scopeLogicalId !== undefined) {
         const target = binding.resourceBindings[resourceBinding.scopeLogicalId];
+        const lowerType = resource.type.toLowerCase();
+        const validScopedExtension =
+          (lowerType === "microsoft.insights/diagnosticsettings" &&
+            resourceBinding.implementation.startsWith("native:Microsoft.Insights/diagnosticSettings@")) ||
+          (lowerType === "microsoft.authorization/roleassignments" &&
+            resourceBinding.implementation.startsWith("native:Microsoft.Authorization/roleAssignments@"));
         if (
           binding.track !== "bicep" ||
-          resource.type.toLowerCase() !== "microsoft.insights/diagnosticsettings" ||
-          !resourceBinding.implementation.startsWith("native:Microsoft.Insights/diagnosticSettings@") ||
+          !validScopedExtension ||
           target === undefined ||
           !target.implementation.startsWith("native:") ||
           target.scopeLogicalId !== undefined ||
@@ -228,7 +233,13 @@ function canonicalJson(value: unknown): string {
 }
 
 function bicepString(value: string): string {
-  return `'${value.replaceAll("'", "''")}'`;
+  return `'${value
+    .replaceAll("\\", "\\\\")
+    .replaceAll("'", "\\'")
+    .replaceAll("\r", "\\r")
+    .replaceAll("\n", "\\n")
+    .replaceAll("\t", "\\t")
+    .replaceAll("${", "\\${")}'`;
 }
 
 function bicepObjectKey(value: string): string {
@@ -554,8 +565,23 @@ export function generateBicepTree(
             .join("\n")}\n  ]`;
     return `module ${context.declaration} '${moduleReference}:${context.parsed.version}' = {\n  name: ${bicepString(`${context.resource.id}-deployment`)}\n  params: {\n${renderedParameters.join("\n")}\n  }${dependencies}\n}`;
   });
+  const rgCount = contexts.filter(isResourceGroupContext).length;
+  if (rgCount > 0 && rgCount < contexts.length) {
+    throw new TypeError(
+      "Bicep generation cannot mix subscription-scoped Microsoft.Resources/resourceGroups with resource-group-scoped resources in one template; AzdBicepProvider owns the target resource group",
+    );
+  }
+  const bicepOutputs = [...intent.outputs]
+    .sort()
+    .map((name) => {
+      assertIdentifier(name, "Bicep output name");
+      return `output ${name} string = ''`;
+    })
+    .join("\n\n");
+  const targetScopeLine =
+    rgCount > 0 && contexts.length > 0 ? "targetScope = 'subscription'" : "targetScope = 'resourceGroup'";
   const content =
-    ["targetScope = 'resourceGroup'", blocks.join("\n\n")].filter((part) => part.length > 0).join("\n\n") + "\n";
+    [targetScopeLine, blocks.join("\n\n"), bicepOutputs].filter((part) => part.length > 0).join("\n\n") + "\n";
   // The generated tree is an azd project: azd, the only Bicep executor, compiles `infra/main.bicep` itself. It declares
   // no hooks, extensions, layers or services.
   return virtualTree(

@@ -838,4 +838,52 @@ test("resource group tag contract always populates the 9 policy-required tags an
   assert.equal(liveOverride.owner, "customer");
   assert.equal(liveOverride["technical-contact"], "customer");
   assert.equal(liveOverride["tech-contact"], "ops-team");
+
+  const mixedRgIntent = intent([
+    {
+      id: "rg",
+      type: "Microsoft.Resources/resourceGroups",
+      purpose: "Workload resource group",
+      dependsOn: [],
+      controls: [],
+    },
+    {
+      id: "vault",
+      type: "Microsoft.KeyVault/vaults",
+      purpose: "Secrets",
+      dependsOn: ["rg"],
+      controls: [],
+    },
+  ]);
+  assert.throws(
+    () =>
+      generateBicepTree(mixedRgIntent, {
+        ...binding("bicep", "native:Microsoft.Resources/resourceGroups@2024-03-01", "2024-03-01", {}),
+        resourceBindings: {
+          rg: {
+            implementation: "native:Microsoft.Resources/resourceGroups@2024-03-01",
+            version: "2024-03-01",
+            parameters: { name: "rg-demo", location: "swedencentral", parentId: "/", properties: {} },
+          },
+          vault: {
+            implementation: "native:Microsoft.KeyVault/vaults@2023-07-01",
+            version: "2023-07-01",
+            parameters: { name: "kv-demo", location: "swedencentral", parentId: "/", properties: {} },
+          },
+        },
+      }),
+    /cannot mix subscription-scoped Microsoft\.Resources\/resourceGroups/,
+  );
+});
+
+test("Bicep generator escapes quotes/backslashes/interpolations and renders declared outputs", () => {
+  const source = { ...intent(), outputs: ["storageEndpoint"] };
+  const selected = binding("bicep", "native:Microsoft.Storage/storageAccounts@2023-05-01", "2023-05-01", {
+    ...nativeParameters,
+    tags: { note: "partner's\\path\n${literal}" },
+  });
+  const tree = generateBicepTree(source, selected);
+  const bicepContent = tree.files.find(({ path }) => path === "infra/main.bicep")!.content;
+  assert.match(bicepContent, /note: 'partner\\'s\\\\path\\n\\\$\{literal\}'/u);
+  assert.match(bicepContent, /output storageEndpoint string = ''/u);
 });

@@ -8,6 +8,7 @@ import {
   calculatePolicyValidationDigest,
   calculatePolicyValidationHash,
   hasValidPolicyValidation,
+  isSecretBearingField,
   type PolicyPropertyMapV1,
   type LogicalResourceManifestV1,
   type IacBindingV1,
@@ -17,6 +18,8 @@ import {
   validateBicepResourceParity,
   validateBicepStorageDiagnostics,
   validateBicepStorageBaseline,
+  validateTerraformResourceParity,
+  validateTerraformStorageBaseline,
   validateStorageSecurityProperties,
   validateStorageSecurityBindings,
   type PolicyValidationInput,
@@ -1445,5 +1448,281 @@ describe("bounded policy property validation", () => {
       name: "TypeError",
       message: "POLICY_VALIDATION_NON_JSON_VALUE",
     });
+  });
+
+  it("evaluates AVM module parameters and Terraform module descendants for policy mappings", () => {
+    const bicepPolicy: PolicyPropertyMapV1 = {
+      schemaVersion: "1.0.0",
+      projectId: "demo",
+      runId: "run",
+      governanceHash: hash,
+      mappings: [
+        {
+          policyAssignmentId: "kv-public-network",
+          effect: "deny",
+          logicalResourceId: "vault",
+          propertyPath: "properties.publicNetworkAccess",
+          expectedValue: "Disabled",
+          disposition: "planned",
+        },
+        {
+          policyAssignmentId: "kv-rbac",
+          effect: "deny",
+          logicalResourceId: "vault",
+          propertyPath: "properties.enableRbacAuthorization",
+          expectedValue: true,
+          disposition: "planned",
+        },
+      ],
+    };
+    const bicepCompiled = JSON.stringify({
+      resources: {
+        vault: {
+          type: "Microsoft.Resources/deployments",
+          name: "vault-deployment",
+          properties: {
+            parameters: {
+              publicNetworkAccess: { value: "Disabled" },
+              enableRbacAuthorization: { value: true },
+            },
+            template: {
+              resources: {
+                innerVault: { type: "Microsoft.KeyVault/vaults", name: "kv-demo" },
+              },
+            },
+          },
+        },
+      },
+    });
+    const bicepReceipt = validatePolicyProperties({
+      track: "bicep",
+      sourceHash: hash,
+      policyMapHash: calculatePolicyValidationDigest(bicepPolicy),
+      policyMap: bicepPolicy,
+      logicalResourceManifest: { vault: { codeSymbol: "vault" } },
+      json: bicepCompiled,
+    });
+    assert.equal(bicepReceipt.outcome, "pass");
+
+    const tfPolicy: PolicyPropertyMapV1 = {
+      ...bicepPolicy,
+      mappings: [
+        {
+          policyAssignmentId: "storage-https",
+          effect: "deny",
+          logicalResourceId: "storage",
+          propertyPath: "https_traffic_only_enabled",
+          expectedValue: true,
+          disposition: "planned",
+        },
+      ],
+    };
+    const tfPlan = JSON.stringify({
+      planned_values: {
+        root_module: {
+          child_modules: [
+            {
+              address: "module.storage",
+              resources: [
+                {
+                  address: "module.storage.azurerm_storage_account.this",
+                  mode: "managed",
+                  type: "azurerm_storage_account",
+                  values: { https_traffic_only_enabled: true },
+                },
+              ],
+            },
+          ],
+        },
+      },
+      resource_changes: [
+        {
+          address: "module.storage.azurerm_storage_account.this",
+          mode: "managed",
+          type: "azurerm_storage_account",
+          change: {
+            actions: ["create"],
+            after: { https_traffic_only_enabled: true },
+            after_unknown: {},
+          },
+        },
+      ],
+    });
+    const tfReceipt = validatePolicyProperties({
+      track: "terraform",
+      sourceHash: hash,
+      policyMapHash: calculatePolicyValidationDigest(tfPolicy),
+      policyMap: tfPolicy,
+      logicalResourceManifest: { storage: { terraformAddress: "module.storage" } },
+      json: tfPlan,
+    });
+    assert.equal(tfReceipt.outcome, "pass");
+  });
+
+  it("distinguishes secret-bearing fields from boolean auth flags and Key Vault secret references", () => {
+    assert.equal(isSecretBearingField("enableRbacAuthorization", true), false);
+    assert.equal(isSecretBearingField("enableTokenAuthentication", true), false);
+    assert.equal(isSecretBearingField("tokenStoreEnabled", false), false);
+    assert.equal(isSecretBearingField("secretRef", "webhook-signing"), false);
+    assert.equal(isSecretBearingField("keyVaultSecretName", "webhook-signing"), false);
+    assert.equal(isSecretBearingField("secretPermissions", ["get"]), false);
+    assert.equal(isSecretBearingField("clientSecret", "super-secret"), true);
+    assert.equal(isSecretBearingField("adminPassword", "Hunter2!"), true);
+    assert.equal(isSecretBearingField("apiKey", "raw-key"), true);
+  });
+
+  it("validates existing Bicep declarations, AVM storage modules, and Terraform HCL parity/baseline", () => {
+    const existingManifest: LogicalResourceManifestV1 = {
+      schemaVersion: "1.0.0",
+      projectId: "demo",
+      runId: "run",
+      track: "bicep",
+      resources: [
+        {
+          logicalId: "vnet",
+          type: "Microsoft.Network/virtualNetworks",
+          implementationAddress: "native:Microsoft.Network/virtualNetworks@2024-01-01",
+          executionAddress: "vnet",
+          implementationKind: "existing",
+          ownership: "existing",
+          dependsOn: [],
+          generatedDependencies: [],
+          sourcePath: "infra/main.bicep",
+        },
+        {
+          logicalId: "storage",
+          type: "Microsoft.Storage/storageAccounts",
+          implementationAddress: "avm:br/public:avm/res/storage/storage-account@0.15.0",
+          executionAddress: "storage",
+          implementationKind: "module",
+          ownership: "managed",
+          dependsOn: ["vnet"],
+          generatedDependencies: ["vnet"],
+          sourcePath: "infra/main.bicep",
+        },
+      ],
+    };
+    const existingBinding: IacBindingV1 = {
+      schemaVersion: "1.0.0",
+      projectId: "demo",
+      runId: "run",
+      track: "bicep",
+      intentHash: hash,
+      resourceBindings: {
+        vnet: {
+          implementation: "native:Microsoft.Network/virtualNetworks@2024-01-01",
+          version: "2024-01-01",
+          parameters: { name: "vnet-shared" },
+        },
+        storage: {
+          implementation: "avm:br/public:avm/res/storage/storage-account@0.15.0",
+          version: "0.15.0",
+          parameters: { name: "stapexdemo" },
+        },
+      },
+    };
+    const compiledWithAvmStorage = (allowSharedKeyAccess: boolean) =>
+      JSON.stringify({
+        resources: {
+          vnet: { existing: true, type: "Microsoft.Network/virtualNetworks", name: "vnet-shared" },
+          storage: {
+            type: "Microsoft.Resources/deployments",
+            name: "storage-deployment",
+            dependsOn: ["vnet"],
+            properties: {
+              parameters: {
+                allowBlobPublicAccess: { value: false },
+                allowSharedKeyAccess: { value: allowSharedKeyAccess },
+                minimumTlsVersion: { value: "TLS1_2" },
+                supportsHttpsTrafficOnly: { value: true },
+                publicNetworkAccess: { value: "Disabled" },
+                secretPermissions: { value: ["get"] },
+              },
+              template: { resources: {} },
+            },
+          },
+        },
+      });
+    assert.equal(
+      validateBicepStorageBaseline({
+        sourceHash: hash,
+        manifest: existingManifest,
+        binding: existingBinding,
+        json: compiledWithAvmStorage(false),
+      }).outcome,
+      "pass",
+    );
+    assert.equal(
+      validateBicepStorageBaseline({
+        sourceHash: hash,
+        manifest: existingManifest,
+        binding: existingBinding,
+        json: compiledWithAvmStorage(true),
+      }).reason,
+      "storage-controls",
+    );
+
+    const tfManifest: LogicalResourceManifestV1 = {
+      schemaVersion: "1.0.0",
+      projectId: "demo",
+      runId: "run",
+      track: "terraform",
+      resources: [
+        {
+          logicalId: "storage",
+          type: "Microsoft.Storage/storageAccounts",
+          implementationAddress: "avm:Azure/avm-res-storage-storageaccount/azurerm@0.4.0",
+          executionAddress: "module.storage",
+          implementationKind: "module",
+          ownership: "managed",
+          dependsOn: [],
+          generatedDependencies: [],
+          sourcePath: "main.tf",
+        },
+      ],
+    };
+    const tfBinding: IacBindingV1 = {
+      schemaVersion: "1.0.0",
+      projectId: "demo",
+      runId: "run",
+      track: "terraform",
+      intentHash: hash,
+      resourceBindings: {
+        storage: {
+          implementation: "avm:Azure/avm-res-storage-storageaccount/azurerm@0.4.0",
+          version: "0.4.0",
+          parameters: { name: "stapexdemo" },
+        },
+      },
+    };
+    const secureHcl = [
+      'module "storage" {',
+      '  source  = "Azure/avm-res-storage-storageaccount/azurerm"',
+      '  version = "0.4.0"',
+      "  allow_nested_items_to_be_public = false",
+      "  https_traffic_only_enabled = true",
+      '  min_tls_version = "TLS1_2"',
+      "  shared_access_key_enabled = false",
+      "}",
+    ].join("\n");
+    assert.equal(
+      validateTerraformResourceParity({ sourceHash: hash, manifest: tfManifest, binding: tfBinding, hcl: secureHcl })
+        .outcome,
+      "pass",
+    );
+    assert.equal(
+      validateTerraformStorageBaseline({ sourceHash: hash, manifest: tfManifest, binding: tfBinding, hcl: secureHcl })
+        .outcome,
+      "pass",
+    );
+    assert.equal(
+      validateTerraformStorageBaseline({
+        sourceHash: hash,
+        manifest: tfManifest,
+        binding: tfBinding,
+        hcl: secureHcl.replace("shared_access_key_enabled = false", "shared_access_key_enabled = true"),
+      }).reason,
+      "storage-controls",
+    );
   });
 });

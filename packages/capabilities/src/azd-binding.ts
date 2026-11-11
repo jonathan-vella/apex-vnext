@@ -7,7 +7,7 @@ import {
   AzdEnvironmentV1Schema,
   AzdVersionSchema,
   hasValidAzdBinding,
-  SECRET_FIELD_PATTERN,
+  isSecretBearingField,
   AZD_BINDING_LIMITS,
   AZD_ENVIRONMENT_KEYS,
   SECRET_VALUE_PATTERN,
@@ -438,7 +438,7 @@ function resolveParameters(bytes: Buffer, values: ReadonlyMap<string, string>): 
     onlyKeys(parameter, ["value", "reference"], `Bicep parameter ${name}`, "AZD_PARAMETERS_UNSUPPORTED");
     if ((parameter.value === undefined) === (parameter.reference === undefined))
       fail("AZD_PARAMETERS_UNSUPPORTED", `Bicep parameter ${name} must declare exactly one of value or reference`);
-    if (parameter.value !== undefined && SECRET_FIELD_PATTERN.test(name))
+    if (parameter.value !== undefined && isSecretBearingField(name, parameter.value))
       fail(
         "AZD_PARAMETERS_SECRET",
         `Bicep parameter ${name} carries a secret-named literal; use a Key Vault reference`,
