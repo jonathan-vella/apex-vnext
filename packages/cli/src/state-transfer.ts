@@ -89,6 +89,7 @@ function prohibitedStatePath(path: string): boolean {
       .split("/")
       .some(
         (part) =>
+          part === ".terraform" ||
           part.startsWith(".run-mutation.") ||
           part === ".run-transaction.json" ||
           part === ".run-writer-lease.json" ||
@@ -168,11 +169,16 @@ async function readOptionalRegular(path: string, label: string): Promise<Buffer 
   }
 }
 
-async function walkRegularFiles(root: string, directory = root): Promise<string[]> {
+async function walkRegularFiles(
+  root: string,
+  directory = root,
+  options: { readonly skipDirectories?: ReadonlySet<string> } = {},
+): Promise<string[]> {
   const files: string[] = [];
   for (const entry of await readdir(directory, { withFileTypes: true })) {
     const path = join(directory, entry.name);
     if (entry.isSymbolicLink()) throw new Error(`State transfer source contains a symlink: ${path}`);
+    if (entry.isDirectory() && options.skipDirectories?.has(entry.name) === true) continue;
     if (directory === root) {
       // The writer lease and repeat records describe this machine's worktrees and are never transferred.
       if (entry.name === ".run-writer-lease.json" || entry.name === REPEAT_GUARD_FILE) continue;
@@ -186,7 +192,7 @@ async function walkRegularFiles(root: string, directory = root): Promise<string[
         continue;
       }
     }
-    if (entry.isDirectory()) files.push(...(await walkRegularFiles(root, path)));
+    if (entry.isDirectory()) files.push(...(await walkRegularFiles(root, path, options)));
     else if (entry.isFile()) files.push(relative(root, path).split(sep).join("/"));
     else throw new Error(`State transfer source is not a regular file: ${path}`);
   }
@@ -215,10 +221,26 @@ async function collectObjectClosure(apexRoot: string, seedFiles: readonly Buffer
   return objects;
 }
 
+function validateEntrySafety(bytes: Buffer, path: string): void {
+  if (path === ".gitignore") {
+    if (SECRET_VALUE_PATTERN.test(bytes.toString("utf8"))) {
+      throw new Error(`State transfer contains secret-bearing text in ${path}`);
+    }
+    return;
+  }
+  if (path.startsWith("work/") && !path.endsWith(".json")) {
+    if (SECRET_VALUE_PATTERN.test(bytes.toString("utf8"))) {
+      throw new Error(`State transfer contains secret-bearing text in ${path}`);
+    }
+    return;
+  }
+  validateJsonSafety(bytes, path);
+}
+
 function bundleFile(path: string, bytes: Buffer): StateTransferFile {
   if (!safeRelativePath(path)) throw new Error(`Unsafe state transfer path: ${path}`);
   if (prohibitedStatePath(path)) throw new Error(`State transfer path is prohibited: ${path}`);
-  if (path !== ".gitignore") validateJsonSafety(bytes, path);
+  validateEntrySafety(bytes, path);
   return { path, bytes: bytes.byteLength, sha256: sha256Bytes(bytes), content: bytes.toString("base64") };
 }
 
@@ -314,6 +336,16 @@ export async function createStateTransferBundle(
   for (const path of await walkRegularFiles(runRoot)) {
     paths.add(`projects/${state.selection.projectId}/runs/${state.selection.runId}/${path}`);
   }
+  const workRoot = join(state.apexRoot, "work", state.selection.runId);
+  try {
+    for (const path of await walkRegularFiles(workRoot, workRoot, { skipDirectories: new Set([".terraform"]) })) {
+      if (!prohibitedStatePath(`work/${state.selection.runId}/${path}`)) {
+        paths.add(`work/${state.selection.runId}/${path}`);
+      }
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
   const sourceFiles: Array<{ path: string; bytes: Buffer }> = [];
   for (const path of [...paths].sort()) {
     let sourcePath = join(state.apexRoot, ...path.split("/"));
@@ -393,6 +425,7 @@ export async function exportStateTransfer(
 function allowedBundlePath(path: string, bindings: StateTransferBindings): boolean {
   if (prohibitedStatePath(path)) return false;
   const runPrefix = `projects/${bindings.projectId}/runs/${bindings.runId}/`;
+  const workPrefix = `work/${bindings.runId}/`;
   return (
     path === ".gitignore" ||
     path === "config.json" ||
@@ -400,6 +433,7 @@ function allowedBundlePath(path: string, bindings: StateTransferBindings): boole
     /^runtime\/[^/]+\.json$/.test(path) ||
     path === `projects/${bindings.projectId}/project.json` ||
     path.startsWith(runPrefix) ||
+    path.startsWith(workPrefix) ||
     /^objects\/sha256\/[0-9a-f]{2}\/[0-9a-f]{62}$/.test(path)
   );
 }
@@ -429,7 +463,7 @@ function decodeEntry(entry: StateTransferFile, bindings: StateTransferBindings):
   if (objectMatch !== null && `${objectMatch[1]}${objectMatch[2]}` !== entry.sha256) {
     throw new Error(`State transfer object path does not match its content: ${entry.path}`);
   }
-  if (entry.path !== ".gitignore") validateJsonSafety(bytes, entry.path);
+  validateEntrySafety(bytes, entry.path);
   return bytes;
 }
 

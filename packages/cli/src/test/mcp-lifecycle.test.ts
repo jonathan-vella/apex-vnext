@@ -14,13 +14,7 @@ import { isJSONRPCResultResponse, type Client } from "@modelcontextprotocol/clie
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import { execute, mcpWorkspaceRoot, resolveMcpWorkspace } from "../cli.js";
 import { MCP_DOCTOR_CHECK_LIMIT, MCP_OUTPUT_SCHEMAS } from "../mcp-output-schemas.js";
-import {
-  MCP_MAX_SERIALIZED_RESULT_BYTES,
-  MCP_SERVER_INSTRUCTIONS,
-  serveMcp,
-  summarizeDoctorReport,
-  type McpServiceResolver,
-} from "../mcp.js";
+import { MCP_MAX_SERIALIZED_RESULT_BYTES, MCP_SERVER_INSTRUCTIONS, serveMcp, summarizeDoctorReport } from "../mcp.js";
 import { ApexError, EXIT_CODES } from "../errors.js";
 import { GovernanceBaselineError } from "@apexops/capabilities";
 import { withRepeatGuardLock } from "@apexops/kernel";
@@ -1462,13 +1456,17 @@ test("MCP workspace resolution shares APEX state across git worktrees and enforc
   assert.equal(resolvedMain.workspace, canonicalMain);
   assert.equal(resolvedWorktree.root, canonicalMain);
   assert.equal(resolvedWorktree.workspace, canonicalWorktree);
-  const resolver: McpServiceResolver = {
-    defaultService: serviceFor(main),
-    resolve: async (workspace) => {
-      const resolved = await resolveMcpWorkspace(workspace);
-      return { service: serviceFor(resolved.root), workspace: resolved.workspace };
-    },
-  };
+  const resolver = (await import("../cli.js")).mcpServiceResolver(
+    serviceFor(main),
+    async (workspaceRoot, workspacePath) =>
+      new ApexService(workspaceRoot, {
+        workspacePath,
+        clock: () => now.value,
+        writerLeaseTtlMs: 1_000,
+        executableChecker: async () => false,
+        azureAuthStatus: async () => ({ authenticated: false, detail: "Offline lifecycle test" }),
+      }),
+  );
   await serviceFor(main).init({ projectId: "demo", riskOwner: "partner" });
   const { client, close } = await connectMcp(resolver, { name: "worktree-test" });
   context.after(close);
@@ -1558,6 +1556,39 @@ test("MCP workspace resolution shares APEX state across git worktrees and enforc
       `${canonicalWorktree} until 2026-01-01T00:00:02.001Z; retry from that worktree, release the writer lease there, or wait for it to expire`,
   );
   await assert.rejects(readdir(join(main, ".apex", "work")), { code: "ENOENT" });
+
+  // CLI commands run from the linked worktree resolve shared .apex state and can release that worktree's lease.
+  const cliStatus = (await execute(["status"], worktree, { clock: () => now.value })) as {
+    run: { projectId: string; runId: string };
+  };
+  assert.equal(cliStatus.run.projectId, "demo");
+  assertSuccess(
+    "requirementsComplete",
+    await client.callTool({
+      name: "requirementsComplete",
+      arguments: {
+        workspace: worktree,
+        taskId: issued.task.taskId,
+        requirements: requirements("demo"),
+      },
+    }),
+  );
+  const indexRel = join("agent-output", "demo", cliStatus.run.runId, "00-index.md");
+  const mainIndex = await readFile(join(main, indexRel), "utf8");
+  const worktreeIndex = await readFile(join(worktree, indexRel), "utf8");
+  assert.equal(worktreeIndex, mainIndex);
+  const released = (await execute(["release-writer"], worktree, { clock: () => now.value })) as {
+    released: boolean;
+    projectId: string;
+  };
+  assert.equal(released.released, true);
+  assert.equal(released.projectId, "demo");
+  const mainNext = assertSuccess(
+    "nextTask",
+    await client.callTool({ name: "nextTask", arguments: { workspace: main } }),
+  ) as { status: string; task?: { taskType: string } };
+  assert.equal(mainNext.status, "task");
+  assert.equal(mainNext.task?.taskType, "requirements-review");
 
   const missing = await client.callTool({ name: "status", arguments: {} });
   assert.equal(missing.isError, true);

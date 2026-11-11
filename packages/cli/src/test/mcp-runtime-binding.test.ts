@@ -277,10 +277,32 @@ test("an initialized workspace binds to the runtime that initialized it", async 
   await service.update();
   assert.deepEqual(await workspaceRuntimeBinding(root), { state: "match", runtimeVersion: APEX_VERSION });
 
-  // Doctor repair rewrites a lock that has no readable version.
+  // Doctor repair rewrites a lock that has no readable version and updates runtime/apex.lock.json too.
   await writeLock(root, "{ not json");
   await service.doctor(true, true);
   assert.deepEqual(await workspaceRuntimeBinding(root), { state: "match", runtimeVersion: APEX_VERSION });
+  const repairedRuntimeLock = JSON.parse(await readFile(join(root, ".apex", "runtime", "apex.lock.json"), "utf8")) as {
+    cliVersion: string;
+  };
+  assert.equal(repairedRuntimeLock.cliVersion, APEX_VERSION);
+
+  // Neither `update` nor `doctor --fix` may downgrade a workspace locked to a newer runtime.
+  await writeLock(root, { ...lock, cliVersion: "999.0.0" });
+  await assert.rejects(
+    service.update(),
+    (error: unknown) => (error as { code?: unknown }).code === "APEX_RUNTIME_MISMATCH",
+  );
+  await assert.rejects(
+    service.doctor(true, true),
+    (error: unknown) => (error as { code?: unknown }).code === "APEX_RUNTIME_MISMATCH",
+  );
+  await writeLock(root, lock);
+
+  // Partial or null selection in .apex/config.json reports needs_project / APEX_NOT_FOUND instead of TypeError.
+  await writeFile(join(root, ".apex", "config.json"), '{"selectedProjectId":null}\n', "utf8");
+  const emptyStatus = await service.workspaceStatus();
+  assert.equal("status" in emptyStatus && emptyStatus.status, "needs_project");
+  await assert.rejects(service.status(), (error: unknown) => (error as { code?: unknown }).code === "APEX_NOT_FOUND");
 });
 
 test("workspace runtime binding classifies locks and fails closed on anything unreadable", async () => {
