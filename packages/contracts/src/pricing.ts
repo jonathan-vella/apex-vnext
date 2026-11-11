@@ -6,9 +6,9 @@ import {
   IsoDateTimeSchema,
   ProjectIdSchema,
   RunIdSchema,
-  SECRET_FIELD_PATTERN,
   SECRET_VALUE_PATTERN,
   Sha256Schema,
+  isSecretBearingField,
   registerContractFormats,
 } from "./common.js";
 import { CurrencySchema } from "./targets.js";
@@ -264,7 +264,7 @@ function contentHash(value: unknown): string {
 function containsSecret(value: unknown): boolean {
   if (Array.isArray(value)) return value.some(containsSecret);
   if (value !== null && typeof value === "object") {
-    return Object.entries(value).some(([key, child]) => SECRET_FIELD_PATTERN.test(key) || containsSecret(child));
+    return Object.entries(value).some(([key, child]) => isSecretBearingField(key, child) || containsSecret(child));
   }
   return typeof value === "string" && SECRET_VALUE_PATTERN.test(value);
 }

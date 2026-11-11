@@ -726,6 +726,35 @@ test("Terraform no-op labels cannot conceal foreign material changes", () => {
     ).valid,
     true,
   );
+  // Accepted AVM Terraform module roots own their module.<id>.* descendant resources, not sibling modules.
+  assert.equal(
+    coverage(
+      ["module.storage"],
+      [
+        {
+          resourceId: "module.storage.azurerm_storage_account.this",
+          action: "create",
+          material: true,
+        },
+      ],
+      "terraform",
+    ).valid,
+    true,
+  );
+  assert.equal(
+    coverage(
+      ["module.storage"],
+      [
+        {
+          resourceId: "module.storage_other.azurerm_storage_account.this",
+          action: "create",
+          material: true,
+        },
+      ],
+      "terraform",
+    ).valid,
+    false,
+  );
 });
 
 type PlanDryRun = {

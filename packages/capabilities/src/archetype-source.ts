@@ -4,11 +4,11 @@ import { lstat, realpath } from "node:fs/promises";
 import { extname, isAbsolute } from "node:path";
 import { promisify } from "node:util";
 import {
-  SECRET_FIELD_PATTERN,
   SECRET_VALUE_PATTERN,
   assertPolicyValidationJson,
   calculatePolicyValidationDigest,
   hasValidArchetypeSourceProposal,
+  isSecretBearingField,
   type ArchetypeSourceProposalV1,
 } from "@apexops/contracts";
 
@@ -291,7 +291,7 @@ function hasSecretObject(value: unknown): boolean {
   if (value !== null && typeof value === "object")
     return Object.entries(value).some(
       ([key, child]) =>
-        (SECRET_FIELD_PATTERN.test(key) && typeof child === "string" && child.length > 0) || hasSecretObject(child),
+        (isSecretBearingField(key, child) && typeof child === "string" && child.length > 0) || hasSecretObject(child),
     );
   return false;
 }

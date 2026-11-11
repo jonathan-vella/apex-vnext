@@ -95,7 +95,10 @@ export const NativeValidationReceiptV1Schema = Type.Object(
     securityBaseline: Type.Optional(
       Type.Object(
         {
-          coverage: Type.Literal("bicep-storage-only-baseline-v1"),
+          coverage: Type.Union([
+            Type.Literal("bicep-storage-only-baseline-v1"),
+            Type.Literal("terraform-source-baseline-v1"),
+          ]),
           sourceHash: Sha256Schema,
           inputHash: Sha256Schema,
           manifestHash: Sha256Schema,
@@ -118,7 +121,10 @@ export const NativeValidationReceiptV1Schema = Type.Object(
     resourceParity: Type.Optional(
       Type.Object(
         {
-          coverage: Type.Literal("bicep-symbolic-resource-parity-v1"),
+          coverage: Type.Union([
+            Type.Literal("bicep-symbolic-resource-parity-v1"),
+            Type.Literal("terraform-symbolic-resource-parity-v1"),
+          ]),
           sourceHash: Sha256Schema,
           manifestHash: Sha256Schema,
           bindingHash: Type.Optional(Sha256Schema),
@@ -243,9 +249,13 @@ export function hasValidNativeValidationReceipt(
       receipt.storageSecurity === undefined ? undefined : Object.values(receipt.storageSecurity)[0]?.inputHash;
     const parity = receipt.resourceParity;
     const baseline = receipt.securityBaseline;
+    const expectedBaselineCoverage =
+      receipt.track === "bicep" ? "bicep-storage-only-baseline-v1" : "terraform-source-baseline-v1";
+    const expectedParityCoverage =
+      receipt.track === "bicep" ? "bicep-symbolic-resource-parity-v1" : "terraform-symbolic-resource-parity-v1";
     if (
       baseline !== undefined &&
-      (receipt.track !== "bicep" ||
+      (baseline.coverage !== expectedBaselineCoverage ||
         parity === undefined ||
         baseline.sourceHash !== receipt.sourceHash ||
         baseline.inputHash !== parity.inputHash ||
@@ -289,7 +299,7 @@ export function hasValidNativeValidationReceipt(
     }
     if (
       parity !== undefined &&
-      (receipt.track !== "bicep" ||
+      (parity.coverage !== expectedParityCoverage ||
         parity.sourceHash !== receipt.sourceHash ||
         (storageInputHash !== undefined && parity.inputHash !== storageInputHash) ||
         (receipt.policyValidation !== undefined && parity.inputHash !== receipt.policyValidation.inputHash) ||

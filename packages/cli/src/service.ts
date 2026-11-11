@@ -58,6 +58,7 @@ import {
   hasValidLogicalResourceReferences,
   hasValidPolicyValidation,
   isGovernanceObservationCurrent,
+  isSecretBearingField,
   hasValidNativeValidationReceipt,
   NATIVE_VALIDATION_COMMANDS,
   calculatePolicyValidationDigest,
@@ -5120,17 +5121,18 @@ export class ApexService {
         inputHash: inputHash!,
       };
       const policyValidation = this.policyValidationInput(run.iacTool, policy, manifest, true);
-      const diagnosticsTargets = await this.storageDiagnosticsTargets(manifest, handoff);
+      const diagnosticsTargets = await this.storageDiagnosticsTargets(manifest, handoff, run.targetScope);
       const validationRequest: NativeValidationRequest = {
         ...binding,
         generatedSource: { rootPath, treeHash: handoff.treeHash },
         policyValidation: structuredClone(policyValidation),
+        resourceParityManifest: structuredClone(manifest),
+        resourceParityBinding: await this.objects.getJson<IacBindingV1>(handoff.bindingHash),
         ...(run.iacTool === "bicep"
           ? {
               storageSecurityBindings: this.storageSecurityBindings(manifest),
-              resourceParityManifest: structuredClone(manifest),
-              resourceParityBinding: await this.objects.getJson<IacBindingV1>(handoff.bindingHash),
               storageDiagnosticsTargets: diagnosticsTargets,
+              targetScope: run.targetScope,
             }
           : {}),
       };
@@ -7988,7 +7990,7 @@ export class ApexService {
             !this.hasBoundStorageDiagnostics(nativeReceipt, logicalManifest) ||
             !this.hasBoundStorageRouting(
               nativeReceipt,
-              await this.storageDiagnosticsTargets(logicalManifest, handoff),
+              await this.storageDiagnosticsTargets(logicalManifest, handoff, run.targetScope),
             ) ||
             !this.hasBoundResourceParity(nativeReceipt, logicalManifest, handoff.bindingHash)
           )
@@ -11345,7 +11347,7 @@ export class ApexService {
         );
       }
       for (const [name, input] of Object.entries(inputs.inputs)) {
-        if (input.kind === "value" && /secret|password|token|credential|api[-_]?key/i.test(name)) {
+        if (input.kind === "value" && isSecretBearingField(name, input.value)) {
           throw new ApexError(
             "APEX_VALIDATION",
             `Environment input '${name}' must use a secret-reference`,
@@ -11807,7 +11809,7 @@ export class ApexService {
     return (
       receipt.resourceParity === undefined ||
       (manifest !== undefined &&
-        receipt.track === "bicep" &&
+        (receipt.track === "bicep" || receipt.track === "terraform") &&
         receipt.resourceParity.manifestHash === calculatePolicyValidationDigest(manifest) &&
         receipt.resourceParity.bindingHash === bindingHash)
     );
@@ -11816,18 +11818,47 @@ export class ApexService {
   private async storageDiagnosticsTargets(
     manifest: LogicalResourceManifestV1 | undefined,
     handoff: IacHandoffV1,
+    targetScope?: string,
   ): Promise<NonNullable<NativeValidationRequest["storageDiagnosticsTargets"]>> {
     if (manifest?.track !== "bicep") return {};
     const binding = await this.objects.getJson<IacBindingV1>(handoff.bindingHash);
+    const sameRunWorkspaces = new Map<string, string>();
+    if (
+      typeof targetScope === "string" &&
+      /^\/subscriptions\/[a-f0-9-]{36}\/resourceGroups\/[^/]+$/i.test(targetScope)
+    ) {
+      for (const entry of manifest.resources) {
+        if (entry.type.toLowerCase() !== "microsoft.operationalinsights/workspaces") continue;
+        const wsName = binding.resourceBindings[entry.logicalId]?.parameters.name;
+        if (typeof wsName === "string" && wsName.length > 0) {
+          const fullId = `${targetScope}/providers/Microsoft.OperationalInsights/workspaces/${wsName}`;
+          sameRunWorkspaces.set(entry.logicalId, fullId);
+          if (entry.executionAddress !== undefined) sameRunWorkspaces.set(entry.executionAddress, fullId);
+          sameRunWorkspaces.set(`[resourceId('Microsoft.OperationalInsights/workspaces', '${wsName}')]`, fullId);
+        }
+      }
+    }
+    const resolveWorkspaceRef = (candidate: unknown): string | undefined => {
+      if (typeof candidate !== "string") return undefined;
+      if (
+        /^\/subscriptions\/[a-f0-9-]{36}\/resourceGroups\/[^/]+\/providers\/Microsoft\.OperationalInsights\/workspaces\/[^/]+$/i.test(
+          candidate,
+        )
+      ) {
+        return candidate;
+      }
+      return sameRunWorkspaces.get(candidate);
+    };
     const nativeWorkspaces = manifest.resources
       .filter(
         ({ type, ownership }) =>
           ownership === "managed" && type.toLowerCase() === "microsoft.insights/diagnosticsettings",
       )
-      .map(
-        ({ logicalId }) =>
+      .map(({ logicalId }) =>
+        resolveWorkspaceRef(
           (binding.resourceBindings[logicalId]?.parameters.properties as { workspaceId?: unknown } | undefined)
             ?.workspaceId,
+        ),
       );
     const targets: Record<string, { binding: { codeSymbol: string }; workspaceResourceId: string }> = {};
     for (const resource of manifest.resources) {
@@ -11840,21 +11871,11 @@ export class ApexService {
       const settings = binding.resourceBindings[resource.logicalId]?.parameters.diagnosticSettings;
       const workspaces =
         Array.isArray(settings) && settings.length > 0
-          ? settings.map(
-              (setting: unknown) => (setting as { workspaceResourceId?: unknown } | null)?.workspaceResourceId,
+          ? settings.map((setting: unknown) =>
+              resolveWorkspaceRef((setting as { workspaceResourceId?: unknown } | null)?.workspaceResourceId),
             )
           : nativeWorkspaces;
-      if (
-        workspaces.length === 0 ||
-        workspaces.some(
-          (value) =>
-            typeof value !== "string" ||
-            !/^\/subscriptions\/[a-f0-9-]{36}\/resourceGroups\/[^/]+\/providers\/Microsoft\.OperationalInsights\/workspaces\/[^/]+$/i.test(
-              value,
-            ),
-        )
-      )
-        continue;
+      if (workspaces.length === 0 || workspaces.some((value) => value === undefined)) continue;
       const ids = workspaces as string[];
       if (new Set(ids.map((value) => value.toLowerCase())).size !== 1) continue;
       targets[resource.logicalId] = {
@@ -12080,21 +12101,24 @@ export class ApexService {
         const diagnosticsTargets = await this.storageDiagnosticsTargets(
           artifacts["logical-resource-manifest"] as LogicalResourceManifestV1 | undefined,
           handoff,
+          run.targetScope,
         );
+        const validationManifest = artifacts["logical-resource-manifest"] as LogicalResourceManifestV1 | undefined;
         const validationRequest: NativeValidationRequest = {
           ...binding,
           generatedSource: { rootPath, treeHash: handoff.treeHash },
           policyValidation: structuredClone(policyValidation),
+          ...(validationManifest === undefined
+            ? {}
+            : {
+                resourceParityManifest: structuredClone(validationManifest),
+                resourceParityBinding: await this.objects.getJson<IacBindingV1>(handoff.bindingHash),
+              }),
           ...(run.iacTool === "bicep"
             ? {
-                storageSecurityBindings: this.storageSecurityBindings(
-                  artifacts["logical-resource-manifest"] as LogicalResourceManifestV1 | undefined,
-                ),
-                resourceParityManifest: structuredClone(
-                  artifacts["logical-resource-manifest"] as LogicalResourceManifestV1,
-                ),
-                resourceParityBinding: await this.objects.getJson<IacBindingV1>(handoff.bindingHash),
+                storageSecurityBindings: this.storageSecurityBindings(validationManifest),
                 storageDiagnosticsTargets: diagnosticsTargets,
+                targetScope: run.targetScope,
               }
             : {}),
         };

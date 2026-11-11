@@ -6,11 +6,11 @@ import {
   PolicyPropertyMapV1Schema,
   RequirementsV1Schema,
   WorkloadDecisionManifestV1Schema,
-  SECRET_FIELD_PATTERN,
   SECRET_VALUE_PATTERN,
   hasValidCostArithmetic,
   hasValidCostPricingSources,
   isGovernanceObservationCurrent,
+  isSecretBearingField,
   type ApprovalEvidenceV1,
   type ArchitectureAvailabilityV1,
   type ArchitectureV1,
@@ -251,10 +251,14 @@ export function resolveNativeBicepResourceOwnership(context: {
       continue;
     }
     const scopeId = resourceBinding.scopeLogicalId;
+    const validScopedExtension =
+      (resource.type.toLowerCase() === "microsoft.insights/diagnosticsettings" &&
+        resourceBinding.implementation.startsWith("native:Microsoft.Insights/diagnosticSettings@")) ||
+      (resource.type.toLowerCase() === "microsoft.authorization/roleassignments" &&
+        resourceBinding.implementation.startsWith("native:Microsoft.Authorization/roleAssignments@"));
     if (
       scopeId !== undefined &&
-      (resource.type.toLowerCase() !== "microsoft.insights/diagnosticsettings" ||
-        !resourceBinding.implementation.startsWith("native:Microsoft.Insights/diagnosticSettings@") ||
+      (!validScopedExtension ||
         !resource.dependsOn.includes(scopeId) ||
         scopeId === resource.id ||
         binding.resourceBindings[scopeId]?.scopeLogicalId !== undefined ||
@@ -382,7 +386,7 @@ function secretIssues(value: unknown, path = ""): ValidationIssue[] {
     return Object.entries(value)
       .sort(([left], [right]) => left.localeCompare(right))
       .flatMap(([key, item]) => [
-        ...(SECRET_FIELD_PATTERN.test(key)
+        ...(isSecretBearingField(key, item)
           ? [{ path: `${path}/${key}`, message: "Secret-bearing field is not allowed" }]
           : []),
         ...secretIssues(item, `${path}/${key}`),
@@ -1056,9 +1060,14 @@ function previewCoverage(value: unknown): ValidationIssue[] {
   }
   if (context.provider === "terraform") {
     const managedAddresses = new Set(context.expectedResourceIds);
+    const modulePrefixes = [...managedAddresses]
+      .filter((address) => address.startsWith("module."))
+      .map((address) => `${address}.`);
+    const isOwnedAddress = (resourceId: string): boolean =>
+      managedAddresses.has(resourceId) || modulePrefixes.some((prefix) => resourceId.startsWith(prefix));
     if (
       changes.some(
-        ({ resourceId, action, material }) => (action !== "no-op" || material) && !managedAddresses.has(resourceId),
+        ({ resourceId, action, material }) => (action !== "no-op" || material) && !isOwnedAddress(resourceId),
       )
     ) {
       issues.push({
