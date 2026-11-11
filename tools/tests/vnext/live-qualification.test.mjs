@@ -11,7 +11,8 @@ import {
   SECRET_VALUE_PATTERN,
   hasValidLiveQualification,
 } from "../../../packages/contracts/dist/index.js";
-import { APEX_VERSION, ApexService } from "../../../packages/cli/dist/index.js";
+import { ApexService } from "../../../packages/cli/dist/index.js";
+import { APEX_VERSION } from "../../../packages/cli/dist/version.js";
 import { EventJournal, ObjectStore, sha256Json } from "../../../packages/kernel/dist/index.js";
 import {
   assertCleanGitStatus,
