@@ -17,7 +17,6 @@ export * from "./iac-generation.js";
 export * from "./iac-normalizers.js";
 export * from "./local-plan-transport.js";
 export * from "./native-iac-providers.js";
-export * from "./operations-placeholders.js";
 export * from "./pack-manager.js";
 export * from "./packs.js";
 export * from "./policy-validation.js";

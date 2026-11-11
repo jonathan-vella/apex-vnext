@@ -12,6 +12,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0-next.12] — Preview
+
+This release resolves end-to-end worktree, provider handoff, Bicep AVM/generator, and native Terraform validation gaps
+across the kernel, capabilities, CLI/MCP facade, and managed `APEX` guidance, and adds single-command version
+synchronization (`npm run version:sync`).
+
+### Changed
+
+- Unify linked Git worktree `.apex/` state resolution across CLI and MCP, add `apex release-writer` /
+  `apex/releaseWriter`, mirror `agent-output/` into active worktrees with per-mirror base hashes, dynamically reload
+  `.apex/provider-config.json` with active-run `iac-handoff` defaults, supply zero-config offline `validateSource`
+  providers for `validateTask` and `completeTask`, block runtime downgrades in `update` and `doctor --fix`, and include
+  `.apex/work/<runId>/<taskId>/code/...` IaC files in state transfer bundles.
+- Support inner-resource AVM Bicep module evaluation and `targetScope`-bound Log Analytics resolution in parity, policy
+  mappings, and storage baseline checks; harden `isSecretBearingField` allowlists; fix Bicep string/interpolation
+  escaping, subscription-only RG emission, declared outputs, and `roleAssignments` `scopeLogicalId`; and add complete
+  root-module HCL parity/baseline validation and `rawOutput` plan JSON reading for native Terraform.
+- Add `tools/scripts/sync-version.mjs` (`npm run version:sync`), expand `validate-version-sync.mjs`, remove unused
+  `operations-placeholders`, trim duplicated `APEX` coordinator prose, and refresh documentation for `0.11.0-next.12`.
+
 ## [0.11.0-next.11] — Preview
 
 This release codifies the canonical 9-tag resource-group contract from `jonathan-vella/azure-landing-zones`

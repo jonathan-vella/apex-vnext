@@ -14,7 +14,25 @@ const VERSION_FILE = "VERSION.md";
 const SEMVER_PATTERN = "[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z][0-9A-Za-z.-]*)?";
 const FILES_TO_CHECK = [
   { path: "package.json", pattern: new RegExp(`"version":\\s*"(${SEMVER_PATTERN})"`) },
+  { path: "packages/contracts/package.json", pattern: new RegExp(`"version":\\s*"(${SEMVER_PATTERN})"`) },
+  { path: "packages/kernel/package.json", pattern: new RegExp(`"version":\\s*"(${SEMVER_PATTERN})"`) },
+  { path: "packages/capabilities/package.json", pattern: new RegExp(`"version":\\s*"(${SEMVER_PATTERN})"`) },
+  { path: "packages/renderers/package.json", pattern: new RegExp(`"version":\\s*"(${SEMVER_PATTERN})"`) },
+  { path: "packages/testkit/package.json", pattern: new RegExp(`"version":\\s*"(${SEMVER_PATTERN})"`) },
+  { path: "packages/cli/package.json", pattern: new RegExp(`"version":\\s*"(${SEMVER_PATTERN})"`) },
+  { path: "packages/cli/src/version.ts", pattern: new RegExp(`APEX_VERSION\\s*=\\s*"(${SEMVER_PATTERN})"`) },
+  { path: "customizations/manifest.json", pattern: new RegExp(`"version":\\s*"(${SEMVER_PATTERN})"`) },
+  { path: "config/runtime-bundle.v1.json", pattern: new RegExp(`"bundleVersion":\\s*"(${SEMVER_PATTERN})"`) },
   { path: "CHANGELOG.md", pattern: new RegExp(`##\\s*\\[?v?(${SEMVER_PATTERN})\\]?`, "i") },
+  { path: "plugin/CHANGELOG.md", pattern: new RegExp(`##\\s*\\[?v?(${SEMVER_PATTERN})\\]?`, "i") },
+  { path: "README.md", pattern: new RegExp(`The current release is \`(${SEMVER_PATTERN})\``) },
+  { path: "docs/tutorials/first-run.md", pattern: new RegExp(`Preview \`(${SEMVER_PATTERN})\` is\\s+published`) },
+  {
+    path: "docs/vnext/PROJECT.md",
+    pattern: new RegExp(
+      `- \\*\\*Product status:\\*\\* Preview published \\(\`apex@apex-plugins\` \`(${SEMVER_PATTERN})\`\\)`,
+    ),
+  },
 ];
 
 const r = new Reporter("Version Sync Validator");

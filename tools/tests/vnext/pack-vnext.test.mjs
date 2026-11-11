@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { cp, mkdir, mkdtemp, readFile, readdir, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -14,6 +15,7 @@ import {
 } from "../../../packages/cli/scripts/prepare-assets.mjs";
 
 const root = resolve(import.meta.dirname, "../../..");
+const repoVersion = JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version;
 const resistantProcessTree = join(import.meta.dirname, "fixtures", "resistant-process-tree.mjs");
 const packScript = join(root, "tools", "scripts", "pack-vnext.mjs");
 const defaultRunTimeoutMs = 120_000;
@@ -131,7 +133,7 @@ const delay = (milliseconds) => new Promise((resolvePromise) => setTimeout(resol
 test("npm pack results accept array and workspace-keyed formats", () => {
   const entry = {
     name: "@apexops/contracts",
-    filename: "apexops-contracts-0.11.0-next.11.tgz",
+    filename: `apexops-contracts-${repoVersion}.tgz`,
     files: [{ path: "package.json" }],
   };
   for (const result of [[entry], { [entry.name]: entry }]) {
@@ -555,7 +557,7 @@ test("packs and clean-installs the vNext runtime reproducibly", { timeout: 240_0
   const version = JSON.parse((await runInTest(apexBin, ["version", "--json"], project)).stdout);
   assert.deepEqual(version, {
     ok: true,
-    result: { version: "0.11.0-next.11", bundleVersion: "0.11.0-next.11", configVersion: "1.0.0" },
+    result: { version: repoVersion, bundleVersion: repoVersion, configVersion: "1.0.0" },
   });
   await runInTest("git", ["init", "--initial-branch", "qualification"], project);
   await runInTest(

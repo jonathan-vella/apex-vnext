@@ -10,6 +10,7 @@ import {
   verifyBundledAssetManifest,
   type BundledAssetManifest,
 } from "../assets.js";
+import { APEX_VERSION } from "../version.js";
 import { tempRoot } from "./helpers.js";
 
 async function fixture(): Promise<{ root: string; manifest: BundledAssetManifest }> {
@@ -25,7 +26,7 @@ async function fixture(): Promise<{ root: string; manifest: BundledAssetManifest
   await writeFile(join(root, "config", "example.json"), bytes);
   const customizationBytes = Buffer.from(
     `${JSON.stringify({
-      version: "0.11.0-next.11",
+      version: APEX_VERSION,
       bundle: {
         id: "apex-managed-workspace",
         authority: "npm:@apexops/cli",
@@ -62,10 +63,10 @@ async function fixture(): Promise<{ root: string; manifest: BundledAssetManifest
   const runtimeBytes = Buffer.from(
     `${JSON.stringify({
       schemaVersion: "1.0.0",
-      bundleVersion: "0.11.0-next.11",
+      bundleVersion: APEX_VERSION,
       components: {
         customizationBundle: {
-          version: "0.11.0-next.11",
+          version: APEX_VERSION,
           manifest: "@apexops/cli/assets/customizations/manifest.json",
           assetManifest: "@apexops/cli/assets/manifest.json",
           compositionId: "apex-managed-workspace",
@@ -81,7 +82,7 @@ async function fixture(): Promise<{ root: string; manifest: BundledAssetManifest
   await writeFile(join(projectionRoot, ".github", "copilot", "settings.json"), settingsBytes);
   await writeFile(join(projectionRoot, "README.md"), sharedBytes);
   await writeFile(join(root, "config", "runtime-bundle.v1.json"), runtimeBytes);
-  const sources = { customizations: "0.11.0-next.11", config: "1.0.0" };
+  const sources = { customizations: APEX_VERSION, config: "1.0.0" };
   const composition = {
     authority: "npm:@apexops/cli" as const,
     generator: "packages/cli/scripts/prepare-assets.mjs" as const,

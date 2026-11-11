@@ -7,7 +7,7 @@ release authority.
 
 This source-build tutorial is for local candidate evaluation. Normal consumers install released packages without a
 devcontainer or source clone: the [Windows 11 first run](windows-11-first-run.md) for VS Code or the GitHub Copilot app,
-and the [Copilot CLI on WSL2 runbook](wsl2-vscode-consumer-runbook.md) for Copilot CLI. Preview `0.11.0-next.5` is
+and the [Copilot CLI on WSL2 runbook](wsl2-vscode-consumer-runbook.md) for Copilot CLI. Preview `0.11.0-next.12` is
 published; this tutorial instead installs a source-built plugin. Use the
 [human-run qualification kit](../how-to/qualify-live-clients.md) to distinguish candidate bytes from a published release
 with the same version number.
@@ -138,16 +138,17 @@ This writes `.github/copilot/settings.json`, the instructions, the governance wo
 settings file enables the `apex` plugin from the `apex-plugins` marketplace, which carries the APEX agent, skills and MCP
 servers; trust the folder when Copilot asks. To select Terraform, replace `--iac bicep` with `--iac terraform`.
 
-The marketplace has no release yet, so install the plugin you built, once per machine:
+To evaluate this local source build instead of the published marketplace release, install the plugin directory you
+built:
 
 ```bash
 copilot plugin install /path/to/apex-vnext/dist/apex-plugin
 copilot plugin list
 ```
 
-Copilot CLI warns that direct installs are deprecated. Run `copilot plugin uninstall apex` before you install a
-marketplace release. In VS Code on Windows, run **Developer: Restart Local Agent Host** after the install;
-[Manage installation](../how-to/manage-installation.md) covers update and reset for each host.
+Copilot CLI warns that direct installs are deprecated. Run `copilot plugin uninstall apex` before switching back to a
+marketplace release (`apex@apex-plugins`). In VS Code on Windows, run **Developer: Restart Local Agent Host** after the
+install; [Manage installation](../how-to/manage-installation.md) covers update and reset for each host.
 
 ## Check Readiness
 

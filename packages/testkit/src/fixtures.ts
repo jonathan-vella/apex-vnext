@@ -11,9 +11,15 @@ import type {
   RuntimeBundleLockV1,
   TaskEnvelopeV1,
 } from "@apexops/contracts";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { CONTRACT_VERSION } from "@apexops/contracts";
 import { sha256 } from "@apexops/capabilities";
 import { sha256Text } from "@apexops/kernel";
+
+const REPO_VERSION = (
+  JSON.parse(readFileSync(resolve(import.meta.dirname, "../package.json"), "utf8")) as { version: string }
+).version;
 
 export const FIXTURE_TIME = "2026-01-01T00:00:00.000Z";
 export const FIXTURE_EXPIRY = "2026-01-01T01:00:00.000Z";
@@ -25,8 +31,8 @@ export function fixtureHash(label: string): string {
 export function runtimeLockFixture(overrides: Partial<RuntimeBundleLockV1> = {}): RuntimeBundleLockV1 {
   return {
     schemaVersion: CONTRACT_VERSION,
-    cliVersion: "0.11.0-next.11",
-    customizationVersion: "0.11.0-next.11",
+    cliVersion: REPO_VERSION,
+    customizationVersion: REPO_VERSION,
     workflowHash: fixtureHash("workflow"),
     defaultsHash: fixtureHash("defaults"),
     validatorHash: fixtureHash("validator"),
