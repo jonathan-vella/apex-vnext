@@ -16,8 +16,8 @@ inventory, diagnosis, reconciliation or quality work.
 
 - `apex/status` identifies the selected run.
 - Task context is required only when the kernel issues a task-backed operation.
-- Governance import requires an explicit request and a local path to a reviewed baseline; never load baseline bytes
-  into model context.
+- Governance import uses either the shipped ALZ Corp reference baseline (`reference: true`) or a local path to a
+  reviewed baseline; never load baseline bytes into model context.
 
 ## Workflow
 
@@ -25,14 +25,22 @@ inventory, diagnosis, reconciliation or quality work.
    operations, call `apex/nextTask` only after status returns runnable work.
 2. For `needs_input` or `needs_review`, route by `apex-next` and do not poll or read task context. Only `status=task`
    supplies `task.taskId`; read `apex/taskContext` with that exact ID before the matching operation.
-3. For governance candidate selection, call `apex/governanceSelect` with only the reviewed local path. Present the
-   returned governance question in chat and submit the exact user answer with `apex/recordInput`. Never choose on the
-   user's behalf. Remembered choices return selected state; do not ask again. Use `reopen: true` only when the user
-   explicitly asks to reconsider a pending refresh.
-4. For a `local` target, or a user-chosen pre-sales start without a subscription baseline, call
-   `apex/governanceImport` with the shipped reference baseline. For a subscription target with a reviewed baseline,
-   import only the local path. Return the service's `outputHash` and `summary`, never baseline bytes. Import does not
-   perform live discovery, map policies, authorize planning or approve a gate.
+3. For governance candidate selection, call `apex/governanceSelect` with only the reviewed local path when one exists.
+   Present the returned governance question in chat and submit the exact user answer with `apex/recordInput`. Never
+   choose on the user's behalf. Remembered choices return selected state; do not ask again. Use `reopen: true` only
+   when the user explicitly asks to reconsider a pending refresh.
+4. For `governance-discovery`:
+   - On a `local` target, call `apex/governanceImport` (`reference: true`) immediately.
+   - On a subscription target with an existing reviewed local baseline path (for example
+     `.apex/governance/baseline.json`), select and import only that local path.
+   - On a subscription target when no local baseline file exists in the workspace, do not run `apex-azure/policy` to
+     substitute for a baseline and do not stop silently: use `ask_user` to offer **Import the shipped ALZ Corp reference
+     baseline now so Architecture starts immediately (Recommended for design/pilot)** versus **Collect and import a live
+     subscription baseline file first** (via `tools/scripts/collect-governance-baseline.ps1`). If the user selects the
+     reference baseline, call `apex/governanceImport` (`reference: true`) and continue directly into Architecture
+     (noting that a reviewed subscription baseline is only required at `governance-refresh` before Gate 3 / deployment).
+   Return the service's `outputHash` and `summary`, never baseline bytes. Import does not perform live discovery, map
+   policies, authorize planning or approve a gate.
 5. If policy content changed, explain invalidation scope and direct the user to the trusted CLI governance revision
    ceremony. Never infer revision confirmation or use deployment reconciliation for governance revision.
 6. Use `apex/preview` only to read the current preview and explain recorded semantic changes, target, expiry,
@@ -80,6 +88,7 @@ For the active task's domain reasoning, use `apex-azure-reliability` for recover
 
 | State or request | Required response |
 | --- | --- |
+| Subscription run at `governance-discovery` with no local baseline file | Ask via `ask_user` whether to import the shipped ALZ Corp reference baseline (`reference: true`) now for Architecture or collect/provide a local baseline file first |
 | Reviewed baseline path on a subscription run | Import the path only; do not load the management-group baseline into model context |
 | Kernel shows pending Gate 4 | Explain the exact immutable preview/context and trusted terminal ceremony, then stop |
 | Provider outcome is indeterminate | Report the recorded operation and authorized reconciliation path; do not blind-retry apply |
