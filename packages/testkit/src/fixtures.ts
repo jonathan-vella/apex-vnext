@@ -18,7 +18,7 @@ import { sha256 } from "@apexops/capabilities";
 import { sha256Text } from "@apexops/kernel";
 
 const REPO_VERSION = (
-  JSON.parse(readFileSync(resolve(import.meta.dirname, "../../../package.json"), "utf8")) as { version: string }
+  JSON.parse(readFileSync(resolve(import.meta.dirname, "../package.json"), "utf8")) as { version: string }
 ).version;
 
 export const FIXTURE_TIME = "2026-01-01T00:00:00.000Z";

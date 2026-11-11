@@ -17,9 +17,10 @@ apex task next --json
 ```
 
 When working across linked Git worktrees, both CLI commands and MCP tools resolve `.apex/` at the shared main checkout
-while mirroring `agent-output/` into the active worktree. If switching between worktrees or clients leaves a stale
-writer lease (`WRITER_AUTHORITY_CONFLICT`), release and claim it explicitly with `apex release-writer --yes --json` (or
-MCP `apex/releaseWriter` with `confirm: true`).
+while mirroring `agent-output/` into the active worktree. If switching between worktrees or clients hits a live writer
+lease (`APEX_WRITER_CONFLICT`), release it from the owning worktree with `apex release-writer --json` (or MCP
+`apex/releaseWriter` with `workspace` set to that owning worktree), then resume from the destination worktree to
+acquire its lease.
 
 ## Add A Project
 
