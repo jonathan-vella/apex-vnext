@@ -1,6 +1,6 @@
 {
   "name": "@apexops/cli",
-  "version": "0.11.0-next.12",
+  "version": "0.11.0-next.13",
   "description": "Portable no-shell CLI and MCP facade for APEX",
   "license": "MIT",
   "repository": {
@@ -32,10 +32,10 @@
     "assets"
   ],
   "dependencies": {
-    "@apexops/capabilities": "0.11.0-next.12",
-    "@apexops/contracts": "0.11.0-next.12",
-    "@apexops/kernel": "0.11.0-next.12",
-    "@apexops/renderers": "0.11.0-next.12",
+    "@apexops/capabilities": "0.11.0-next.13",
+    "@apexops/contracts": "0.11.0-next.13",
+    "@apexops/kernel": "0.11.0-next.13",
+    "@apexops/renderers": "0.11.0-next.13",
     "@modelcontextprotocol/server": "2.4.0",
     "@sinclair/typebox": "0.34.52",
     "ajv": "8.20.0",

@@ -164,7 +164,7 @@ jobs:
         uses: ./.github/actions/setup-python-validation
 
       - name: Install bats
-        run: sudo apt-get install -y bats
+        run: sudo apt-get install -y bats || npm install --global --ignore-scripts bats@1.13.0
 
       - name: Lint Markdown
         run: npm run lint:md

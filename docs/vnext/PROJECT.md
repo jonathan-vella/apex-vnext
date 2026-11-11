@@ -3,8 +3,8 @@
 - **Updated:** 2026-11-11
 - **Repository:** `jonathan-vella/apex-vnext`
 - **Integration branch:** `main`
-- **Product status:** Preview published (`apex@apex-plugins` `0.11.0-next.12`)
-- **Release candidate:** `0.11.0-next.12` (`771aa9c2`)
+- **Product status:** Preview published (`apex@apex-plugins` `0.11.0-next.13`)
+- **Release candidate:** `0.11.0-next.13` (`771aa9c2`)
 
 ## Current State
 
