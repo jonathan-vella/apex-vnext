@@ -25,20 +25,29 @@ inventory, diagnosis, reconciliation or quality work.
    operations, call `apex/nextTask` only after status returns runnable work.
 2. For `needs_input` or `needs_review`, route by `apex-next` and do not poll or read task context. Only `status=task`
    supplies `task.taskId`; read `apex/taskContext` with that exact ID before the matching operation.
-3. For governance candidate selection, call `apex/governanceSelect` with only the reviewed local path when one exists.
-   Present the returned governance question in chat and submit the exact user answer with `apex/recordInput`. Never
-   choose on the user's behalf. Remembered choices return selected state; do not ask again. Use `reopen: true` only
-   when the user explicitly asks to reconsider a pending refresh.
-4. For `governance-discovery`:
-   - On a `local` target, call `apex/governanceImport` (`reference: true`) immediately.
-   - On a subscription target with an existing reviewed local baseline path (for example
-     `.apex/governance/baseline.json`), select and import only that local path.
-   - On a subscription target when no local baseline file exists in the workspace, do not run `apex-azure/policy` to
-     substitute for a baseline and do not stop silently: use `ask_user` to offer **Import the shipped ALZ Corp reference
-     baseline now so Architecture starts immediately (Recommended for design/pilot)** versus **Collect and import a live
-     subscription baseline file first** (via `tools/scripts/collect-governance-baseline.ps1`). If the user selects the
-     reference baseline, call `apex/governanceImport` (`reference: true`) and continue directly into Architecture
-     (noting that a reviewed subscription baseline is only required at `governance-refresh` before Gate 3 / deployment).
+3. For governance candidate selection, call `apex/governanceSelect` with only the reviewed local path when a reviewed
+   local baseline is available. Present the returned governance question in chat and submit the exact user answer with
+   `apex/recordInput`. Never choose on the user's behalf or treat file existence alone as proof of review. Remembered
+   choices return selected state; do not ask again. Use `reopen: true` only when the user explicitly asks to reconsider
+   a pending refresh.
+4. For `governance-discovery` and `governance-refresh`:
+   - On a `local` target at `governance-discovery`, call `apex/governanceImport` (`reference: true`) immediately.
+   - On a subscription target when a reviewed local baseline path is available, select and import only that local path.
+   - On a subscription target at `governance-discovery` when no reviewed local baseline is available (whether the file
+     is absent or still awaiting human review), do not run `apex-azure/policy` to substitute for a baseline and do not
+     stop silently: use `ask_user` to offer **Import the shipped ALZ Corp reference baseline assumption now so
+     Architecture starts immediately (Recommended for design/pilot)** versus **Run the consumer governance collection
+     workflow (`.github/workflows/governance-policy-baseline.yml`, which includes descendant scopes) and complete human
+     review of the local baseline file first**. Explain both consequences when presenting the choice: the reference
+     baseline is a design assumption, a reviewed subscription baseline is required at `governance-refresh` before
+     planning (`plan`), and blocked controls found during `policy-refresh` can reopen Architecture and Gate 2. If the
+     user selects the reference baseline, call `apex/governanceImport` (`reference: true`) and continue directly into
+     Architecture.
+   - At `governance-refresh` (after Gate 2 when Architecture used the reference baseline), if no reviewed subscription
+     baseline path is available yet, direct the user to run the consumer governance collection workflow
+     (`.github/workflows/governance-policy-baseline.yml`), complete human review, and provide the reviewed local path
+     via `ask_user`, then call `apex/governanceSelect` and `apex/governanceImport` with that path before continuing to
+     `policy-refresh` and planning.
    Return the service's `outputHash` and `summary`, never baseline bytes. Import does not perform live discovery, map
    policies, authorize planning or approve a gate.
 5. If policy content changed, explain invalidation scope and direct the user to the trusted CLI governance revision
@@ -88,7 +97,7 @@ For the active task's domain reasoning, use `apex-azure-reliability` for recover
 
 | State or request | Required response |
 | --- | --- |
-| Subscription run at `governance-discovery` with no local baseline file | Ask via `ask_user` whether to import the shipped ALZ Corp reference baseline (`reference: true`) now for Architecture or collect/provide a local baseline file first |
+| Subscription run at `governance-discovery` with no reviewed local baseline | Ask via `ask_user` whether to import the shipped ALZ Corp reference baseline assumption (`reference: true`) now for Architecture or run the consumer governance collection workflow and review the baseline file first |
 | Reviewed baseline path on a subscription run | Import the path only; do not load the management-group baseline into model context |
 | Kernel shows pending Gate 4 | Explain the exact immutable preview/context and trusted terminal ceremony, then stop |
 | Provider outcome is indeterminate | Report the recorded operation and authorized reconciliation path; do not blind-retry apply |
