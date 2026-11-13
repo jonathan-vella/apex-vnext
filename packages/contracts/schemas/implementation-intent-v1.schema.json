@@ -18,6 +18,10 @@
       "items": {
         "additionalProperties": false,
         "properties": {
+          "componentId": {
+            "minLength": 1,
+            "type": "string"
+          },
           "controls": {
             "items": {
               "minLength": 1,

@@ -3845,15 +3845,35 @@ test("plan rejects wrong track and secret literals", async () => {
           /IaC binding cannot be generated/.test(error.message) &&
           message.test(error.message),
       );
-    // A Bicep AVM module without its physical resource map is refused before the plan is accepted.
-    await assert.rejects(
-      isolated.completeTaskOutputs(
-        planTask,
-        withImplementation("avm:br/public:avm/res/storage/storage-account@0.31.0", "0.31.0"),
-      ),
-      (error: unknown) =>
-        error instanceof ApexError && error.code === "APEX_VALIDATION" && /physical resource map/.test(error.message),
-    );
+    // On a local or subscription scope, an AVM binding without an RG physical resource map is accepted at plan time.
+    const rgTargetScope = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-test";
+    const rgIsolated = new ApexService(await tempRoot());
+    const rgRun = await rgIsolated.init({
+      projectId: "demo",
+      riskOwner: "partner",
+      iacTool: "bicep",
+      targetScope: rgTargetScope,
+    });
+    await reachCodegen(rgIsolated, rgRun.runId, "bicep", async (rgPlan) => {
+      const rgPlanTask = await task(rgIsolated, "plan");
+      const rgSourceHashes = (rgPlan[0]!.value as ImplementationIntentV1).sourceHashes;
+      const bundle = planBundle(rgRun.runId, "bicep", {}, rgSourceHashes);
+      const rgBinding = bundle[1]!.value as IacBindingV1;
+      rgBinding.resourceBindings.api = {
+        ...rgBinding.resourceBindings.api!,
+        implementation: "avm:br/public:avm/res/storage/storage-account@0.31.0",
+        version: "0.31.0",
+      };
+      await assert.rejects(
+        rgIsolated.completeTaskOutputs(rgPlanTask, bundle),
+        (error: unknown) =>
+          error instanceof ApexError && error.code === "APEX_VALIDATION" && /physical resource map/.test(error.message),
+      );
+      configureNativeBicepPlan(rgPlan);
+      const acceptedBinding = rgPlan[1]!.value as IacBindingV1;
+      acceptedBinding.resourceBindings.api!.parameters.parentId = rgTargetScope;
+      acceptedBinding.intentHash = sha256Json(rgPlan[0]!.value);
+    });
     assert.equal((await isolated.status()).head, before.head);
   });
 });

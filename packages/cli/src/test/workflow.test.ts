@@ -2659,11 +2659,6 @@ async function planTaskContextScenario(pngAvailable: boolean): Promise<void> {
     environment: "dev",
     inputs: {
       location: { kind: "value", value: "REGION" },
-      credential: {
-        kind: "secret-reference",
-        provider: "azure-key-vault",
-        reference: "KEY_VAULT_SECRET_REFERENCE",
-      },
     },
   });
 

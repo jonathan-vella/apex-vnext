@@ -50,7 +50,9 @@ import {
   ReviewFindingsV1Schema,
   RuntimeBundleLockV1Schema,
   RunIdSchema,
+  SECRET_VALUE_PATTERN,
   WorkloadDecisionManifestV1Schema,
+  deferredEnvironmentInputNames,
   hasOnlyTypedSecretReferences,
   hasValidInputRequestQuestions,
   hasValidCostArithmetic,
@@ -124,6 +126,9 @@ import {
   CapabilityPackManager,
   FakeIaCProvider,
   ProcessRunner,
+  ProcessRunnerError,
+  buildLogicalResourceManifest,
+  computeVirtualTree,
   generateBicepTree,
   generateTerraformTree,
   importGovernanceBaseline,
@@ -4823,19 +4828,45 @@ export class ApexService {
       throw new ApexError("APEX_VALIDATION", "Staged path escapes the code root", EXIT_CODES.validation);
     await this.assertNoSymlinkPath(codeRoot, path);
     const bytes = typeof content === "string" ? Buffer.from(content, "utf8") : Buffer.from(content);
+    if (SECRET_VALUE_PATTERN.test(bytes.toString("utf8")))
+      throw new ApexError(
+        "APEX_VALIDATION",
+        "Staged file contains a secret-bearing value; use @secure() parameters or sensitive variables",
+        EXIT_CODES.validation,
+      );
     const hash = sha256Bytes(bytes);
-    if (expectedSha !== undefined && expectedSha !== hash)
-      throw new ApexError("APEX_STALE", "Staged content hash does not match expected SHA", EXIT_CODES.stale);
     await this.acquireRunWriterLease(run);
     let idempotent = false;
     if (await this.exists(path)) {
       const entry = await lstat(path);
       if (!entry.isFile() || entry.isSymbolicLink())
         throw new ApexError("APEX_VALIDATION", "Staged destination must be a regular file", EXIT_CODES.validation);
-      if (sha256Bytes(await readFile(path)) !== hash)
-        throw new ApexError("APEX_CONFLICT", `Refusing to overwrite staged file: ${normalized}`, EXIT_CODES.conflict);
-      idempotent = true;
+      const currentBytes = await readFile(path);
+      const currentHash = sha256Bytes(currentBytes);
+      if (currentHash === hash) {
+        idempotent = true;
+      } else if (expectedSha !== undefined && expectedSha === currentHash) {
+        const used = await this.directoryBytes(codeRoot);
+        if (used - currentBytes.byteLength + bytes.byteLength > task.maxOutputBytes)
+          throw new ApexError(
+            "APEX_VALIDATION",
+            "Task output exceeds its cumulative size limit",
+            EXIT_CODES.validation,
+          );
+        await atomicWriteBytes(path, bytes);
+        this.repeatWrites.getStore()?.file(path, hash);
+        await this.append(run, "file.staged", { taskId, path: normalized, hash, bytes: bytes.byteLength });
+        await this.refreshTaskHead(run, task);
+      } else {
+        throw new ApexError(
+          "APEX_CONFLICT",
+          `Refusing to overwrite staged file: ${normalized}; pass expectedSha "${currentHash}" to replace`,
+          EXIT_CODES.conflict,
+        );
+      }
     } else {
+      if (expectedSha !== undefined && expectedSha !== hash)
+        throw new ApexError("APEX_STALE", "Staged content hash does not match expected SHA", EXIT_CODES.stale);
       const used = await this.directoryBytes(codeRoot);
       if (used + bytes.byteLength > task.maxOutputBytes)
         throw new ApexError("APEX_VALIDATION", "Task output exceeds its cumulative size limit", EXIT_CODES.validation);
@@ -4890,23 +4921,44 @@ export class ApexService {
   }
 
   /**
-   * Fail fast at plan time: dry-run the selected track's generator on the submitted plan, so a binding the generator
-   * rejects is refused here instead of after the review gates. For Bicep, ownership is also resolved when the run
-   * targets an exact resource group; without one, only AVM bindings with no physical resource map are refused here.
+   * Fail fast at plan time: validate binding pins, logical IDs, and dependencies without requiring literal generator
+   * parameters or exact RG physical-ID maps on local/subscription scopes. When the run already targets an exact
+   * resource group, Bicep AVM physical resource maps are checked here.
    */
   private assertPlanGeneratable(
     run: RunConfigV1,
     intent: ImplementationIntentV1,
     binding: IacBindingV1,
-    options: { riskOwner?: string; liveGovernanceOverride?: boolean } = {},
+    _options: { riskOwner?: string; liveGovernanceOverride?: boolean } = {},
   ): void {
-    const tree = this.generateIacTree(run, intent, binding, options);
-    if (run.iacTool !== "bicep") return;
-    const issues = bicepResourceGroupScopePattern.test(run.targetScope)
+    let logicalManifest: LogicalResourceManifestV1;
+    try {
+      logicalManifest = buildLogicalResourceManifest(
+        intent,
+        binding,
+        run.iacTool === "bicep" ? "infra/main.bicep" : "main.tf",
+      );
+    } catch (error) {
+      if (error instanceof ApexError) throw error;
+      throw new ApexError(
+        "APEX_VALIDATION",
+        `IaC binding cannot be generated: ${error instanceof Error ? error.message : String(error)}`,
+        EXIT_CODES.validation,
+      );
+    }
+    if (run.iacTool !== "bicep" || !bicepResourceGroupScopePattern.test(run.targetScope)) return;
+    const allNativeParameterized = intent.resources.every(({ id }) => {
+      const entry = binding.resourceBindings[id]!;
+      return (
+        entry.implementation.startsWith("avm:") ||
+        (typeof entry.parameters.name === "string" && typeof entry.parameters.parentId === "string")
+      );
+    });
+    const issues = allNativeParameterized
       ? resolveNativeBicepResourceOwnership({
           intent,
           binding,
-          manifest: tree.logicalManifest,
+          manifest: logicalManifest,
           targetScope: run.targetScope,
         }).issues
       : Object.entries(binding.resourceBindings)
@@ -4962,6 +5014,12 @@ export class ApexService {
     const governanceHash = this.artifactHash(events, "governance-constraints");
     const governance =
       governanceHash === undefined ? undefined : await this.objects.getJson<GovernanceConstraintsV1>(governanceHash);
+    const taskRoot = resolve(this.root, ".apex", "work", run.runId, taskId, "code");
+    const entrypoint = run.iacTool === "bicep" ? "infra/main.bicep" : "main.tf";
+    const hasStagedEntrypoint = await this.exists(join(taskRoot, entrypoint));
+    if (hasStagedEntrypoint) {
+      return this.sealStagedIac(run, task, taskId, taskRoot, entrypoint, intent, binding, environmentInputs, options);
+    }
     const tree = this.generateIacTree(run, intent, binding, {
       ...options,
       riskOwner: project.riskOwner,
@@ -5027,6 +5085,261 @@ export class ApexService {
       intentHash,
       bindingHash,
       environmentInputsHash,
+      logicalResourceManifestHash: sha256Json(tree.logicalManifest),
+      requiredToolVersions: options.requiredToolVersions ?? { [run.iacTool]: "system" },
+      generatedAt: this.clock().toISOString(),
+    };
+    const completed = await this.completeTaskOutputs(taskId, [
+      { kind: "logical-resource-manifest", value: tree.logicalManifest },
+      { kind: "iac-handoff", value: handoff },
+    ]);
+    return { files, outputHashes: completed.outputHashes, treeHash: tree.treeHash };
+  }
+
+  private async collectStagedVirtualFiles(
+    rootDir: string,
+    currentDir = rootDir,
+  ): Promise<Array<{ path: string; content: string }>> {
+    const entries = await readdir(currentDir, { withFileTypes: true });
+    const collected: Array<{ path: string; content: string }> = [];
+    for (const entry of entries) {
+      const fullPath = join(currentDir, entry.name);
+      if (entry.isSymbolicLink()) {
+        throw new ApexError("APEX_VALIDATION", "Staged source must not contain symbolic links", EXIT_CODES.validation);
+      }
+      if (entry.isDirectory()) {
+        if (entry.name === ".terraform") continue;
+        collected.push(...(await this.collectStagedVirtualFiles(rootDir, fullPath)));
+        continue;
+      }
+      if (!entry.isFile()) continue;
+      const bytes = await readFile(fullPath);
+      const content = bytes.toString("utf8");
+      if (SECRET_VALUE_PATTERN.test(content)) {
+        throw new ApexError(
+          "APEX_VALIDATION",
+          `Staged file '${relative(rootDir, fullPath).replaceAll("\\", "/")}' contains a secret-bearing value`,
+          EXIT_CODES.validation,
+        );
+      }
+      collected.push({ path: relative(rootDir, fullPath).replaceAll("\\", "/"), content });
+    }
+    return collected.sort((left, right) => left.path.localeCompare(right.path));
+  }
+
+  private sanitizeCompilerDiagnostics(raw: string, rootDir: string): string {
+    const escapedRoot = rootDir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const slashRoot = rootDir.replaceAll("\\", "/").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return raw
+      .replace(new RegExp(`${escapedRoot}[\\\\/]?`, "giu"), "")
+      .replace(new RegExp(`${slashRoot}/?`, "giu"), "")
+      .replace(/(?:\bBearer\s+\S+|(?:AccountKey|SharedAccessSignature|ClientSecret)\s*=\s*\S+)/giu, "[REDACTED]")
+      .trim()
+      .slice(0, 2000);
+  }
+
+  private async sealStagedIac(
+    run: RunConfigV1,
+    task: TaskEnvelopeV1,
+    taskId: string,
+    taskRoot: string,
+    entrypoint: string,
+    intent: ImplementationIntentV1,
+    binding: IacBindingV1,
+    environmentInputs: EnvironmentInputsV1,
+    options: GenerateIacOptions,
+  ): Promise<{
+    files: StagedFile[];
+    outputHashes: Partial<Record<ArtifactKind, string>>;
+    treeHash: string;
+  }> {
+    let logicalManifest: LogicalResourceManifestV1;
+    try {
+      logicalManifest = buildLogicalResourceManifest(intent, binding, entrypoint, options.existingResources);
+    } catch (error) {
+      if (error instanceof ApexError) throw error;
+      throw new ApexError(
+        "APEX_VALIDATION",
+        `IaC binding cannot be generated: ${error instanceof Error ? error.message : String(error)}`,
+        EXIT_CODES.validation,
+      );
+    }
+    if (run.iacTool === "bicep") {
+      if (!(await this.exists(join(taskRoot, "azure.yaml")))) {
+        await this.stageFile(
+          taskId,
+          "azure.yaml",
+          `name: ${intent.projectId}\ninfra:\n  provider: bicep\n  path: infra\n  module: main\n`,
+        );
+      }
+      if (!(await this.exists(join(taskRoot, "infra/bicepconfig.json")))) {
+        await this.stageFile(
+          taskId,
+          "infra/bicepconfig.json",
+          `${JSON.stringify({ experimentalFeaturesEnabled: { symbolicNameCodegen: true } }, null, 2)}\n`,
+        );
+      }
+    }
+    const beforeFormat = new Map(
+      (await this.collectStagedVirtualFiles(taskRoot)).map(({ path, content }) => [
+        path,
+        sha256Bytes(Buffer.from(content, "utf8")),
+      ]),
+    );
+    if (run.iacTool === "bicep" && resolveExecutable("bicep") !== undefined) {
+      await this.whileExternalProcessRuns(async () => {
+        try {
+          const buildResult = await this.processRunner.run({
+            executable: "bicep",
+            args: ["build", entrypoint, "--stdout"],
+            cwd: taskRoot,
+            timeoutMs: 120_000,
+            maxOutputBytes: 16 * 1024 * 1024,
+          });
+          if (buildResult.exitCode !== 0 || buildResult.signal !== null || buildResult.timedOut) {
+            throw new ProcessRunnerError("PROCESS_EXIT_NONZERO", "bicep build failed", buildResult);
+          }
+        } catch (error) {
+          const result = error instanceof ProcessRunnerError ? error.result : undefined;
+          const detail = this.sanitizeCompilerDiagnostics(
+            result === undefined ? String(error) : `${result.stderr}\n${result.stdout}`,
+            taskRoot,
+          );
+          throw new ApexError(
+            "APEX_VALIDATION",
+            `Staged Bicep failed bicep build${detail.length === 0 ? "" : `: ${detail}`}`,
+            EXIT_CODES.validation,
+          );
+        }
+        try {
+          const lintResult = await this.processRunner.run({
+            executable: "bicep",
+            args: ["lint", "--pattern", "**/*.bicep", "--no-restore"],
+            cwd: taskRoot,
+            timeoutMs: 120_000,
+            maxOutputBytes: 512 * 1024,
+          });
+          if (lintResult.exitCode !== 0 || lintResult.signal !== null || lintResult.timedOut) {
+            throw new ProcessRunnerError("PROCESS_EXIT_NONZERO", "bicep lint failed", lintResult);
+          }
+        } catch (error) {
+          const result = error instanceof ProcessRunnerError ? error.result : undefined;
+          const detail = this.sanitizeCompilerDiagnostics(
+            result === undefined ? String(error) : `${result.stderr}\n${result.stdout}`,
+            taskRoot,
+          );
+          throw new ApexError(
+            "APEX_VALIDATION",
+            `Staged Bicep failed bicep lint${detail.length === 0 ? "" : `: ${detail}`}`,
+            EXIT_CODES.validation,
+          );
+        }
+        try {
+          const fmtResult = await this.processRunner.run({
+            executable: "bicep",
+            args: ["format", "--pattern", "**/*.bicep"],
+            cwd: taskRoot,
+            timeoutMs: 60_000,
+            maxOutputBytes: 256 * 1024,
+          });
+          if (fmtResult.exitCode !== 0 || fmtResult.signal !== null || fmtResult.timedOut) {
+            throw new ProcessRunnerError("PROCESS_EXIT_NONZERO", "bicep format failed", fmtResult);
+          }
+        } catch (error) {
+          const result = error instanceof ProcessRunnerError ? error.result : undefined;
+          const detail = this.sanitizeCompilerDiagnostics(
+            result === undefined ? String(error) : `${result.stderr}\n${result.stdout}`,
+            taskRoot,
+          );
+          throw new ApexError(
+            "APEX_VALIDATION",
+            `Staged Bicep failed bicep format${detail.length === 0 ? "" : `: ${detail}`}`,
+            EXIT_CODES.validation,
+          );
+        }
+      });
+    } else if (run.iacTool === "terraform" && resolveExecutable("terraform") !== undefined) {
+      await this.whileExternalProcessRuns(async () => {
+        try {
+          for (const [label, args] of [
+            ["terraform init", ["init", "-backend=false", "-input=false", "-no-color"]],
+            ["terraform validate", ["validate", "-no-color"]],
+            ["terraform fmt", ["fmt", "-recursive"]],
+          ] as const) {
+            try {
+              const tfResult = await this.processRunner.run({
+                executable: "terraform",
+                args: [...args],
+                cwd: taskRoot,
+                timeoutMs: 120_000,
+                maxOutputBytes: 512 * 1024,
+              });
+              if (tfResult.exitCode !== 0 || tfResult.signal !== null || tfResult.timedOut) {
+                throw new ProcessRunnerError("PROCESS_EXIT_NONZERO", `${label} failed`, tfResult);
+              }
+            } catch (error) {
+              const result = error instanceof ProcessRunnerError ? error.result : undefined;
+              const detail = this.sanitizeCompilerDiagnostics(
+                result === undefined ? String(error) : `${result.stderr}\n${result.stdout}`,
+                taskRoot,
+              );
+              throw new ApexError(
+                "APEX_VALIDATION",
+                `Staged Terraform failed ${label}${detail.length === 0 ? "" : `: ${detail}`}`,
+                EXIT_CODES.validation,
+              );
+            }
+          }
+        } finally {
+          await rm(join(taskRoot, ".terraform"), { recursive: true, force: true });
+        }
+      });
+    }
+    const virtualFiles = await this.collectStagedVirtualFiles(taskRoot);
+    await this.acquireRunWriterLease(run);
+    let formattedCount = 0;
+    for (const file of virtualFiles) {
+      const bytes = Buffer.from(file.content, "utf8");
+      const hash = sha256Bytes(bytes);
+      if (beforeFormat.get(file.path) !== hash) {
+        const fullPath = join(taskRoot, file.path);
+        this.repeatWrites.getStore()?.file(fullPath, hash);
+        await this.append(run, "file.staged", { taskId, path: file.path, hash, bytes: bytes.byteLength });
+        formattedCount += 1;
+      }
+    }
+    if (formattedCount > 0) await this.refreshTaskHead(run, task);
+    const tree = computeVirtualTree(virtualFiles, logicalManifest);
+    try {
+      await assertGeneratedSourceUnchanged({ rootPath: taskRoot, treeHash: tree.treeHash });
+    } catch {
+      throw new ApexError(
+        "APEX_CONFLICT",
+        "Generated source differs from the expected tree; preserve and resolve staged-file conflicts before retrying",
+        EXIT_CODES.conflict,
+      );
+    }
+    const files: StagedFile[] = tree.files.map((file) => {
+      const bytes = Buffer.from(file.content, "utf8");
+      return {
+        taskId,
+        path: join(taskRoot, file.path),
+        bytes: bytes.byteLength,
+        hash: sha256Bytes(bytes),
+        idempotent: true,
+      };
+    });
+    const handoff: IacHandoffV1 = {
+      schemaVersion: CONTRACT_VERSION,
+      projectId: run.projectId,
+      runId: run.runId,
+      track: run.iacTool,
+      authoringMode: "staged",
+      rootPath: relative(this.root, taskRoot),
+      treeHash: tree.treeHash,
+      intentHash: sha256Json(intent),
+      bindingHash: sha256Json(binding),
+      environmentInputsHash: sha256Json(environmentInputs),
       logicalResourceManifestHash: sha256Json(tree.logicalManifest),
       requiredToolVersions: options.requiredToolVersions ?? { [run.iacTool]: "system" },
       generatedAt: this.clock().toISOString(),
@@ -5143,6 +5456,7 @@ export class ApexService {
         policyValidation: structuredClone(policyValidation),
         resourceParityManifest: structuredClone(manifest),
         resourceParityBinding: await this.objects.getJson<IacBindingV1>(handoff.bindingHash),
+        ...(handoff.authoringMode === "staged" ? { stagedSource: true } : {}),
         ...(run.iacTool === "bicep"
           ? {
               storageSecurityBindings: this.storageSecurityBindings(manifest),
@@ -5155,7 +5469,7 @@ export class ApexService {
       const receipt = await this.whileExternalProcessRuns(() => validateSource(validationRequest));
       if (
         !hasValidNativeValidationReceipt(receipt, binding) ||
-        !this.hasRequiredNativePolicyEvidence(receipt, policyValidation) ||
+        !this.hasRequiredNativePolicyEvidence(receipt, policyValidation, true) ||
         !this.hasBoundResourceParity(receipt, manifest, handoff.bindingHash) ||
         !this.hasBoundStorageDiagnostics(receipt, manifest) ||
         !this.hasBoundStorageRouting(receipt, diagnosticsTargets)
@@ -7173,8 +7487,14 @@ export class ApexService {
     ]);
     const inputRows = Object.entries(inputs.inputs).map(([name, value]) => [
       this.reviewMarkdownText(name),
-      value.kind === "value" ? "value" : "secret-reference",
-      this.reviewMarkdownText(value.kind === "value" ? String(value.value) : `${value.provider}:${value.reference}`),
+      value.kind,
+      this.reviewMarkdownText(
+        value.kind === "value"
+          ? String(value.value)
+          : value.kind === "deferred"
+            ? `deferred (${value.owner}${value.reason === undefined ? "" : `: ${value.reason}`})`
+            : `${value.provider}:${value.reference}`,
+      ),
     ]);
     await mkdir(directory, { recursive: true });
     await Promise.all([
@@ -8182,6 +8502,7 @@ export class ApexService {
                 (policyMap !== undefined && !hasActionablePolicyMappings(policyMap)
                   ? this.policyValidationInput(run.iacTool, policyMap, logicalManifest, true)
                   : undefined),
+              true,
             ) ||
             !this.hasBoundStorageDiagnostics(nativeReceipt, logicalManifest) ||
             !this.hasBoundStorageRouting(
@@ -10995,11 +11316,6 @@ export class ApexService {
         environment: run.environment,
         inputs: {
           location: { kind: "value", value: "REGION" },
-          credential: {
-            kind: "secret-reference",
-            provider: "azure-key-vault",
-            reference: "KEY_VAULT_SECRET_REFERENCE",
-          },
         },
       };
     }
@@ -11524,6 +11840,20 @@ export class ApexService {
         [blocker],
       );
     }
+    const envInputsHash = this.artifactHash(events, "environment-inputs");
+    if (envInputsHash !== undefined) {
+      const envInputs = await this.objects.getJson<EnvironmentInputsV1>(envInputsHash);
+      const deferred = deferredEnvironmentInputNames(envInputs);
+      if (deferred.length > 0) {
+        const blocker = `Environment inputs remain deferred before deployment preview: ${deferred.join(", ")}`;
+        throw new ApexError(
+          "APEX_VALIDATION",
+          `Workflow is not ready for preview-${run.iacTool}: ${blocker}`,
+          EXIT_CODES.validation,
+          [blocker],
+        );
+      }
+    }
     const completedNodes = [
       ...this.completedNodeIds(events),
       ...run.gates.flatMap((gate) => (this.gateSatisfied(run, gate.gate, events) ? [`gate-${gate.gate}`] : [])),
@@ -11763,6 +12093,7 @@ export class ApexService {
   private hasRequiredNativePolicyEvidence(
     receipt: NativeValidationReceiptV1,
     input: PreviewRequest["policyValidation"],
+    allowSourceStageDeferred = false,
   ): boolean {
     if (input === undefined) return receipt.policyApplicability === undefined;
     if (!hasActionablePolicyMappings(input.policyMap))
@@ -11770,6 +12101,20 @@ export class ApexService {
     if (receipt.policyApplicability !== undefined) return false;
     if (receipt.track !== "bicep") return true;
     const policy = receipt.policyValidation;
+    const deferredReasons = new Set([
+      "unsupported-expression",
+      "missing-expected-value",
+      "resource-not-found",
+      "resource-not-bound",
+      "ambiguous-resource",
+      "unsupported-resource",
+    ]);
+    const acceptableOutcome =
+      policy !== undefined &&
+      (policy.outcome === "pass" ||
+        (allowSourceStageDeferred &&
+          policy.outcome === "unsupported" &&
+          policy.results.every(({ outcome, reason }) => outcome === "pass" || deferredReasons.has(reason))));
     return (
       policy !== undefined &&
       hasValidPolicyValidation(policy, {
@@ -11780,7 +12125,7 @@ export class ApexService {
         logicalResourceManifestHash: calculatePolicyValidationDigest(input.logicalResourceManifest),
         inputHash: policy.inputHash,
       }) &&
-      policy.outcome === "pass" &&
+      acceptableOutcome &&
       policy.projectId === receipt.projectId &&
       policy.runId === receipt.runId &&
       policy.results.length === input.policyMap.mappings.length &&
@@ -11806,7 +12151,9 @@ export class ApexService {
           (Object.hasOwn(mapping, "expectedValue")
             ? result.expectedValueDigest === calculatePolicyValidationDigest(mapping.expectedValue)
             : result.expectedValueDigest === undefined &&
-              (result.reason === "not-applicable" || result.reason === "platform-remediated"))
+              (result.reason === "not-applicable" ||
+                result.reason === "platform-remediated" ||
+                result.reason === "missing-expected-value"))
         );
       })
     );
@@ -12086,17 +12433,30 @@ export class ApexService {
     includeEmpty = false,
   ): PreviewRequest["policyValidation"] {
     if (policyMap === undefined || (!includeEmpty && !hasActionablePolicyMappings(policyMap))) return undefined;
-    return {
-      policyMap,
-      logicalResourceManifest: Object.fromEntries(
-        (manifest?.resources ?? [])
-          .filter(({ ownership, executionAddress }) => ownership === "managed" && executionAddress !== undefined)
-          .map(({ logicalId, executionAddress }) => [
-            logicalId,
-            track === "bicep" ? { codeSymbol: executionAddress! } : { terraformAddress: executionAddress! },
-          ]),
-      ),
-    };
+    const managed = (manifest?.resources ?? []).filter(
+      ({ ownership, executionAddress }) => ownership === "managed" && executionAddress !== undefined,
+    );
+    const byComponent = new Map<string, string[]>();
+    for (const resource of managed) {
+      if (resource.componentId === undefined) continue;
+      const list = byComponent.get(resource.componentId) ?? [];
+      list.push(resource.executionAddress!);
+      byComponent.set(resource.componentId, list);
+    }
+    const entries: NonNullable<PreviewRequest["policyValidation"]>["logicalResourceManifest"] = {};
+    for (const { logicalId, executionAddress } of managed) {
+      entries[logicalId] =
+        track === "bicep" ? { codeSymbol: executionAddress! } : { terraformAddress: executionAddress! };
+    }
+    for (const [componentId, symbols] of byComponent.entries()) {
+      if (Object.hasOwn(entries, componentId) || symbols.length === 0) continue;
+      const sorted = [...symbols].sort();
+      entries[componentId] = {
+        ...(track === "bicep" ? { codeSymbol: sorted[0]! } : { terraformAddress: sorted[0]! }),
+        ...(sorted.length > 1 ? { componentSymbols: sorted } : {}),
+      };
+    }
+    return { policyMap, logicalResourceManifest: entries };
   }
 
   private hasBoundResourceParity(
@@ -12412,6 +12772,7 @@ export class ApexService {
                 resourceParityManifest: structuredClone(validationManifest),
                 resourceParityBinding: await this.objects.getJson<IacBindingV1>(handoff.bindingHash),
               }),
+          ...(handoff.authoringMode === "staged" ? { stagedSource: true } : {}),
           ...(run.iacTool === "bicep"
             ? {
                 storageSecurityBindings: this.storageSecurityBindings(validationManifest),
@@ -12434,7 +12795,7 @@ export class ApexService {
             "Native diagnostic routing does not match accepted targets",
             EXIT_CODES.validation,
           );
-        if (!this.hasRequiredNativePolicyEvidence(receipt, policyValidation))
+        if (!this.hasRequiredNativePolicyEvidence(receipt, policyValidation, true))
           throw new ApexError(
             "APEX_VALIDATION",
             "Native validation requires passing source-bound policy evidence for every mapping",

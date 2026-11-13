@@ -665,9 +665,11 @@ function planSourceCoverage(value: unknown): ValidationIssue[] {
   if (context.artifactHashes["policy-property-map"] !== undefined && policy === undefined) {
     issues.push({ path: "/artifacts/policy-property-map", message: "Accepted policy mappings are required" });
   }
-  const resources = new Set(intent.resources.map(({ id }) => id));
+  const coveredIds = new Set(
+    intent.resources.flatMap(({ id, componentId }) => (componentId === undefined ? [id] : [id, componentId])),
+  );
   for (const mapping of policy?.mappings ?? []) {
-    if (mapping.disposition !== "not-applicable" && !resources.has(mapping.logicalResourceId))
+    if (mapping.disposition !== "not-applicable" && !coveredIds.has(mapping.logicalResourceId))
       issues.push({
         path: "/outputs/implementation-intent/resources",
         message: "Policy mapping references a resource absent from the plan",
@@ -705,31 +707,70 @@ function bindingTrackMatch(value: unknown): ValidationIssue[] {
         message: "Exact physical resource maps and diagnostic scope references are supported only for Bicep bindings",
       });
     } else if (issues.length === 0) {
-      issues.push(
-        ...resolveNativeBicepResourceOwnership({
-          intent,
-          binding,
-          targetScope: context.targetScope,
-          manifest: {
-            schemaVersion: "1.0.0",
-            projectId: intent.projectId,
-            runId: intent.runId,
-            track: "bicep",
-            resources: intent.resources.map((resource) => ({
-              logicalId: resource.id,
-              type: resource.type,
-              implementationAddress: binding.resourceBindings[resource.id]!.implementation,
-              implementationKind: binding.resourceBindings[resource.id]!.implementation.startsWith("avm:")
-                ? "module"
-                : "resource",
-              ownership: "managed",
-              dependsOn: resource.dependsOn,
-              generatedDependencies: [],
-              sourcePath: "infra/main.bicep",
-            })),
-          },
-        }).issues,
-      );
+      if (!bicepResourceGroupScopePattern.test(context.targetScope)) {
+        for (const resource of intent.resources) {
+          const entry = binding.resourceBindings[resource.id]!;
+          const path = `/binding/resourceBindings/${resource.id}`;
+          if (entry.physicalResources !== undefined) {
+            issues.push({ path, message: "AVM ownership requires an exact resource-group scope" });
+          }
+          if (
+            entry.scopeLogicalId !== undefined &&
+            (!resourceIds.has(entry.scopeLogicalId) ||
+              entry.scopeLogicalId === resource.id ||
+              !resource.dependsOn.includes(entry.scopeLogicalId) ||
+              binding.resourceBindings[entry.scopeLogicalId]?.scopeLogicalId !== undefined)
+          ) {
+            issues.push({ path, message: "Scoped Bicep binding requires an explicit unchained dependency" });
+          }
+        }
+      } else {
+        const allNativeResolved = intent.resources.every(({ id }) => {
+          const entry = binding.resourceBindings[id]!;
+          return (
+            entry.implementation.startsWith("avm:") ||
+            (typeof entry.parameters.name === "string" && typeof entry.parameters.parentId === "string")
+          );
+        });
+        if (allNativeResolved) {
+          issues.push(
+            ...resolveNativeBicepResourceOwnership({
+              intent,
+              binding,
+              targetScope: context.targetScope,
+              manifest: {
+                schemaVersion: "1.0.0",
+                projectId: intent.projectId,
+                runId: intent.runId,
+                track: "bicep",
+                resources: intent.resources.map((resource) => ({
+                  logicalId: resource.id,
+                  type: resource.type,
+                  implementationAddress: binding.resourceBindings[resource.id]!.implementation,
+                  implementationKind: binding.resourceBindings[resource.id]!.implementation.startsWith("avm:")
+                    ? "module"
+                    : "resource",
+                  ownership: "managed",
+                  dependsOn: resource.dependsOn,
+                  generatedDependencies: [],
+                  sourcePath: "infra/main.bicep",
+                })),
+              },
+            }).issues,
+          );
+        } else {
+          const physicalIds = new Set<string>();
+          for (const resource of intent.resources) {
+            const entry = binding.resourceBindings[resource.id]!;
+            const path = `/binding/resourceBindings/${resource.id}`;
+            if (entry.implementation.startsWith("avm:")) {
+              issues.push(...bicepPhysicalResourceIssues(entry, resource.type, context.targetScope, path, physicalIds));
+            } else if (entry.physicalResources !== undefined) {
+              issues.push({ path, message: "Physical resource maps are not supported on native Bicep declarations" });
+            }
+          }
+        }
+      }
     }
   }
   return issues;

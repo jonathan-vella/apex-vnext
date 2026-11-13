@@ -11,6 +11,10 @@
       "items": {
         "additionalProperties": false,
         "properties": {
+          "componentId": {
+            "minLength": 1,
+            "type": "string"
+          },
           "dependsOn": {
             "items": {
               "minLength": 1,

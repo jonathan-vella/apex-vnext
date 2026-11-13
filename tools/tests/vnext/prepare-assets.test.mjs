@@ -348,7 +348,11 @@ test("managed role projections retain required tools and exclude unrelated grant
       const apexTools = requiredApex[role.id].map((tool) => `apex/${tool}`);
       const azureRegistry = JSON.parse(await readFile(join(root, "tools/registry/azure-mcp.v1.json"), "utf8"));
       const azureTools =
-        role.id === "coordinator" ? Object.keys(azureRegistry.namespaces).map((tool) => `apex-azure/${tool}`) : [];
+        role.id === "coordinator"
+          ? Object.keys(azureRegistry.namespaces).map((tool) => `apex-azure/${tool}`)
+          : role.id === "code-generation"
+            ? ["apex-azure/azureterraform", "apex-azure/bicepschema"]
+            : [];
       assert.deepEqual(metadata.tools.filter((tool) => tool.startsWith("apex/")).sort(), apexTools.sort(), label);
       assert.ok(!metadata.tools.some((tool) => tool.startsWith("apex-azure-cost/")), `${label}: retired cost tools`);
       assert.deepEqual(
