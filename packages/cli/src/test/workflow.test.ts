@@ -1949,6 +1949,16 @@ test("requirements task context includes recorded input and stageable output tem
   );
   assert.ok(!template.requirements.some(({ source }) => source === "intake:retained-services"));
   assert.deepEqual(
+    template.requirements.find(({ source }) => source === "intake:recovery"),
+    {
+      id: `REQ-${String(template.requirements.length - 1).padStart(3, "0")}`,
+      statement: "Recovery targets: RTO 60 minutes, RPO 15 minutes",
+      priority: "must",
+      status: "confirmed",
+      source: "intake:recovery",
+    },
+  );
+  assert.deepEqual(
     template.requirements.find(({ source }) => source === "intake:workload-profile"),
     {
       id: `REQ-${String(template.requirements.length).padStart(3, "0")}`,
@@ -1964,7 +1974,7 @@ test("requirements task context includes recorded input and stageable output tem
   assert.match(template.successCriteria!, /Validate performance and scale later/);
   assert.equal(
     template.nonFunctionalRequirements,
-    "availability-zones, automated-backups, point-in-time-restore\n\nPerformance and scale goals: 100 concurrent users (validated at a later stage)",
+    "availability-zones, automated-backups, point-in-time-restore; RTO 60 minutes, RPO 15 minutes\n\nPerformance and scale goals: 100 concurrent users (validated at a later stage)",
   );
   assert.equal(
     template.securityAndCompliance,
@@ -1989,9 +1999,21 @@ test("requirements task context includes recorded input and stageable output tem
     join(root, "agent-output", "demo", initialized.runId, "01-requirements", "requirements.md"),
     "utf8",
   );
+  assert.match(document, /^# Requirements\n/u);
+  assert.doesNotMatch(document, /<br><br>/u);
   assert.match(document, /Validate performance and scale later/);
   assert.match(document, /ingress and DNS/);
   assert.match(document, /proposed, not confirmed/);
+  const serviceRecs = await readFile(
+    join(root, "agent-output", "demo", initialized.runId, "01-requirements", "service-recommendations.md"),
+    "utf8",
+  );
+  assert.match(serviceRecs, /- key-vault/u);
+  const skuPrefs = await readFile(
+    join(root, "agent-output", "demo", initialized.runId, "01-requirements", "sku-preferences.md"),
+    "utf8",
+  );
+  assert.match(skuPrefs, /- Budget posture: 500 USD monthly$/mu);
 });
 
 test("requirements recommendations document GDPR planning without confirmed obligations", async () => {

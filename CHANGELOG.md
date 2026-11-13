@@ -12,6 +12,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0-next.15] — Preview
+
+This release fixes pilot workflow, pricing, review-artifact, and diagram issues uncovered during the EU partner webhook
+gateway pilot audit.
+
+### Fixed
+
+- Allow `lab` runs in pre-sales/offline mode (without live Azure subscription access yet) to confirm continuing on the
+  ALZ Corp reference baseline at `governance-refresh` through Planning, CodeGen, and IaC validation, while blocking
+  live Azure `preview` and `deploy` until `apex governance revise` imports a reviewed subscription baseline.
+- Preserve intake `recovery` (`RTO`/`RPO`) answers in `RequirementsV1` templates (`REQ-*` and
+  `nonFunctionalRequirements`), include `key-vault` in candidate service recommendations when required by security
+  controls, clean up `sku-preferences.md` budget posture, and eliminate raw `<br><br>` and oversized H1 headings in
+  rendered `requirements.md`.
+- Re-render `challenger-findings.md` and stage `README.md` review status whenever `resolveReview` / `reviewDecide`
+  records finding dispositions, and sync existing stage review packages into linked git worktrees during index refresh.
+- Separate `Messaging & events` (`[[...]]`) from `Data & storage` cylinders in `03-des-diagram.mmd`, add `actors` and
+  `flows` to the Architecture task template and guidance, wrap WAF pillar summaries across two lines with Title Case
+  headers in `02-waf-assessment`, and render explicit empty-state callouts instead of blank canvases in
+  `03-des-cost-breakdown` and `03-des-cost-uncertainty` when line items are unpriced.
+- Update `retail-pricing.md` and `apex-architecture` so `@azure/mcp` `pricing_get` queries tier- and meter-billed
+  services (`armSkuName == ""`) via OData `filter` with verified catalog meter mappings, enforce at most one `ask_user`
+  call per turn, and restrict silent Gate 2 auto-dismissal strictly to `info`/`low` stage-excluded noise.
+
 ## [0.11.0-next.14] — Preview
 
 This release replaces bundled multi-finding review prompts with a scannable Markdown overview table followed by

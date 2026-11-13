@@ -94,7 +94,7 @@ test("architecture Mermaid is deterministic, escaped, grouped by tier and draws 
   assert.match(first, /^%% API #lt;platform#gt;\nflowchart TB\n/u);
   assert.doesNotMatch(first.replace(/^ {2}acc.*$/gmu, ""), /<platform>/u);
   assert.match(first, /subgraph lane_application\["Application #amp; compute"\]/u);
-  assert.match(first, /subgraph lane_data\["Data #amp; messaging"\]/u);
+  assert.match(first, /subgraph lane_data\["Data #amp; storage"\]/u);
   assert.ok(first.indexOf("lane_application[") < first.indexOf("lane_data["));
   assert.match(first, /n_data\[\("🗄️ <b>Azure SQL<\/b><br\/><i>data<\/i>"\)\]/u);
   assert.match(first, /n_api\["⚙️ <b>App Service<\/b><br\/><i>api<\/i>"\]/u);
@@ -209,7 +209,7 @@ test("WAF and cost diagrams preserve qualitative and partial pricing semantics",
   const waf = renderWafAssessmentDiagram(architecture);
   const breakdown = renderCostBreakdownDiagram(cost);
   const uncertainty = renderCostUncertaintyDiagram(cost);
-  assert.match(waf.svg, /operational excellence/u);
+  assert.match(waf.svg, /Operational Excellence/u);
   assert.match(breakdown.svg, /Unpriced: Azure SQL \/ GP/u);
   assert.match(breakdown.svg, /100\.00 USD/u);
   assert.match(uncertainty.svg, /90\.00 \/ 100\.00 \/ 120\.00 USD/u);
@@ -217,6 +217,29 @@ test("WAF and cost diagrams preserve qualitative and partial pricing semantics",
     assert.match(output.python, /Editable source/u);
     assert.ok(rasterizeDiagram(output.svg).byteLength > 100);
   }
+
+  const unpricedOnly = { ...cost, lineItems: [], totalMonthlyCost: 0 };
+  const emptyBreakdown = renderCostBreakdownDiagram(unpricedOnly);
+  const emptyUncertainty = renderCostUncertaintyDiagram(unpricedOnly);
+  assert.match(emptyBreakdown.svg, /No priced line items returned/u);
+  assert.match(emptyUncertainty.svg, /Uncertainty bands unavailable: 0 priced line items/u);
+
+  const messagingMermaid = renderArchitectureMermaid({
+    ...architecture,
+    components: [
+      {
+        id: "events",
+        service: "Azure Event Grid",
+        resourceTypes: ["Microsoft.EventGrid/systemTopics"],
+        purpose: "Near-expiry events",
+        requirementIds: ["REQ-1"],
+        dependsOn: [],
+      },
+    ],
+  });
+  assert.match(messagingMermaid, /subgraph lane_messaging\["Messaging #amp; events"\]/u);
+  assert.match(messagingMermaid, /n_events\[\["📨 <b>Azure Event Grid<\/b><br\/><i>events<\/i>"\]\]/u);
+  assert.doesNotMatch(messagingMermaid, /🗄️/u);
 });
 
 test("cost diagram renderers reject NaN, Infinity, and negative cost values", () => {

@@ -55,6 +55,36 @@ function short(value: string, length = 64): string {
   return normalized.length <= length ? normalized : `${normalized.slice(0, length - 3)}...`;
 }
 
+function wrapLines(value: string, maxChars: number, maxLines: number): string[] {
+  const words = value.replace(/\s+/gu, " ").trim().split(" ").filter(Boolean);
+  if (words.length === 0) return [""];
+  const lines: string[] = [];
+  let current = "";
+  for (let index = 0; index < words.length; index += 1) {
+    const word = words[index]!;
+    const candidate = current === "" ? word : `${current} ${word}`;
+    if (candidate.length <= maxChars || current === "") {
+      current = candidate;
+    } else if (lines.length + 1 < maxLines) {
+      lines.push(current);
+      current = word;
+    } else {
+      const remaining = `${current} ${words.slice(index).join(" ")}`;
+      lines.push(short(remaining, maxChars));
+      return lines;
+    }
+  }
+  if (current !== "") lines.push(short(current, maxChars));
+  return lines;
+}
+
+function titleCasePillar(pillar: string): string {
+  return pillar
+    .split("-")
+    .map((part) => (part.length === 0 ? part : `${part[0]!.toUpperCase()}${part.slice(1)}`))
+    .join(" ");
+}
+
 function document(title: string, height: number, body: string, description: string): string {
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${height}" viewBox="0 0 ${WIDTH} ${height}" role="img" aria-labelledby="title description">`,
@@ -124,15 +154,21 @@ export function renderWafAssessmentDiagram(architecture: ArchitectureV1): Diagra
     .sort((left, right) => (order.get(left.id) ?? 99) - (order.get(right.id) ?? 99));
   const body = rows
     .map((row, index) => {
-      const y = 86 + index * 74;
+      const y = 84 + index * 86;
       const color = STATUS_COLORS[row.status ?? ""] ?? MUTED;
-      return `<g><rect x="40" y="${y}" width="880" height="56" rx="6" fill="#ffffff" stroke="#d7e0e8"/><rect x="40" y="${y}" width="12" height="56" rx="6" fill="${color}"/><text x="70" y="${y + 23}" fill="${INK}" font-family="Arial, sans-serif" font-size="15" font-weight="700">${xml(row.label.replaceAll("-", " "))}</text><text x="260" y="${y + 23}" fill="${color}" font-family="Arial, sans-serif" font-size="13" font-weight="700">${xml(row.status)}</text><text x="70" y="${y + 44}" fill="${MUTED}" font-family="Arial, sans-serif" font-size="12">${xml(short(row.detail ?? "", 110))}</text></g>`;
+      const detailLines = wrapLines(row.detail ?? "", 115, 2)
+        .map(
+          (line, lineIndex) =>
+            `<text x="70" y="${y + 43 + lineIndex * 18}" fill="${MUTED}" font-family="Arial, sans-serif" font-size="12">${xml(line)}</text>`,
+        )
+        .join("");
+      return `<g><rect x="40" y="${y}" width="880" height="72" rx="6" fill="#ffffff" stroke="#d7e0e8"/><rect x="40" y="${y}" width="12" height="72" rx="6" fill="${color}"/><text x="70" y="${y + 23}" fill="${INK}" font-family="Arial, sans-serif" font-size="15" font-weight="700">${xml(titleCasePillar(row.label))}</text><text x="275" y="${y + 23}" fill="${color}" font-family="Arial, sans-serif" font-size="13" font-weight="700">${xml(row.status)}</text>${detailLines}</g>`;
     })
     .join("\n");
   const spec: DiagramSpec = { kind: "waf", title: "Azure Well-Architected Assessment", rows };
   return source(
     spec,
-    document(spec.title, 480, body, "Qualitative status for the five Azure Well-Architected pillars"),
+    document(spec.title, 530, body, "Qualitative status for the five Azure Well-Architected pillars"),
   );
 }
 
@@ -146,7 +182,12 @@ export function renderCostBreakdownDiagram(cost: CostEstimateV1): DiagramSource 
     .sort((left, right) => compare(left.id, right.id));
   const maximum = Math.max(1, ...rows.map(({ value }) => value ?? 0));
   const notes = (cost.unpricedItems ?? []).map(({ service, sku }) => `Unpriced: ${service} / ${sku}`).sort(compare);
-  const height = Math.max(260, 120 + rows.length * 52 + notes.length * 20);
+  const emptyBannerHeight = rows.length === 0 ? 58 : 0;
+  const height = Math.max(260, 120 + emptyBannerHeight + rows.length * 52 + notes.length * 20);
+  const emptyBanner =
+    rows.length === 0
+      ? `<g><rect x="40" y="84" width="880" height="44" rx="6" fill="#ffffff" stroke="#d7e0e8"/><text x="60" y="111" fill="${MUTED}" font-family="Arial, sans-serif" font-size="13">${xml(`No priced line items returned (${notes.length} unpriced component(s)); see cost-estimate.md for query reasons.`)}</text></g>`
+      : "";
   const bars = rows
     .map((row, index) => {
       const y = 88 + index * 52;
@@ -157,13 +198,18 @@ export function renderCostBreakdownDiagram(cost: CostEstimateV1): DiagramSource 
   const noteSvg = notes
     .map(
       (note, index) =>
-        `<text x="40" y="${112 + rows.length * 52 + index * 20}" fill="#a4262c" font-family="Arial, sans-serif" font-size="12">${xml(note)}</text>`,
+        `<text x="40" y="${112 + emptyBannerHeight + rows.length * 52 + index * 20}" fill="#a4262c" font-family="Arial, sans-serif" font-size="12">${xml(note)}</text>`,
     )
     .join("\n");
   const spec: DiagramSpec = { kind: "cost-breakdown", title: "Monthly Cost Breakdown", rows, notes };
   return source(
     spec,
-    document(spec.title, height, `${bars}\n${noteSvg}`, "Priced monthly costs; unpriced items are excluded"),
+    document(
+      spec.title,
+      height,
+      `${emptyBanner}${bars}\n${noteSvg}`,
+      "Priced monthly costs; unpriced items are excluded",
+    ),
   );
 }
 
@@ -178,16 +224,19 @@ export function renderCostUncertaintyDiagram(cost: CostEstimateV1): DiagramSourc
     }))
     .sort((left, right) => compare(left.id, right.id));
   const maximum = Math.max(1, ...rows.map(({ upper }) => upper));
-  const height = Math.max(260, 120 + rows.length * 58);
-  const ranges = rows
-    .map((row, index) => {
-      const y = 96 + index * 58;
-      const lower = 350 + (row.lower / maximum) * 500;
-      const upper = 350 + (row.upper / maximum) * 500;
-      const base = 350 + ((row.value ?? 0) / maximum) * 500;
-      return `<g><text x="40" y="${y + 5}" fill="${INK}" font-family="Arial, sans-serif" font-size="13">${xml(short(row.label, 42))}</text><line x1="${lower.toFixed(2)}" y1="${y}" x2="${upper.toFixed(2)}" y2="${y}" stroke="#8a9bad" stroke-width="8" stroke-linecap="round"/><circle cx="${base.toFixed(2)}" cy="${y}" r="7" fill="${ACCENT}"/><text x="350" y="${y + 24}" fill="${MUTED}" font-family="Arial, sans-serif" font-size="11">${xml(`${row.lower.toFixed(2)} / ${(row.value ?? 0).toFixed(2)} / ${row.upper.toFixed(2)} ${cost.currency}`)}</text></g>`;
-    })
-    .join("\n");
+  const height = Math.max(200, 120 + rows.length * 58);
+  const ranges =
+    rows.length === 0
+      ? `<g><rect x="40" y="84" width="880" height="52" rx="6" fill="#ffffff" stroke="#d7e0e8"/><text x="60" y="115" fill="${MUTED}" font-family="Arial, sans-serif" font-size="13">${xml(`Uncertainty bands unavailable: 0 priced line items (${(cost.unpricedItems ?? []).length} unpriced component(s); see cost-estimate.md).`)}</text></g>`
+      : rows
+          .map((row, index) => {
+            const y = 96 + index * 58;
+            const lower = 350 + (row.lower / maximum) * 500;
+            const upper = 350 + (row.upper / maximum) * 500;
+            const base = 350 + ((row.value ?? 0) / maximum) * 500;
+            return `<g><text x="40" y="${y + 5}" fill="${INK}" font-family="Arial, sans-serif" font-size="13">${xml(short(row.label, 42))}</text><line x1="${lower.toFixed(2)}" y1="${y}" x2="${upper.toFixed(2)}" y2="${y}" stroke="#8a9bad" stroke-width="8" stroke-linecap="round"/><circle cx="${base.toFixed(2)}" cy="${y}" r="7" fill="${ACCENT}"/><text x="350" y="${y + 24}" fill="${MUTED}" font-family="Arial, sans-serif" font-size="11">${xml(`${row.lower.toFixed(2)} / ${(row.value ?? 0).toFixed(2)} / ${row.upper.toFixed(2)} ${cost.currency}`)}</text></g>`;
+          })
+          .join("\n");
   const spec: DiagramSpec = { kind: "cost-uncertainty", title: "Monthly Cost Uncertainty", rows };
   return source(spec, document(spec.title, height, ranges, "Lower, base, and upper monthly cost by priced line item"));
 }

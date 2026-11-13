@@ -1,5 +1,5 @@
 import type { RequirementsV1 } from "@apexops/contracts";
-import { escapeMarkdown, markdownTable } from "./markdown.js";
+import { escapeMarkdown, escapeMarkdownBlock, markdownTable } from "./markdown.js";
 
 export const REQUIREMENTS_TEMPLATE_SLOTS = [
   "workload",
@@ -172,30 +172,31 @@ export function renderRequirementsDocument(
           .sort((left, right) => left.localeCompare(right))
           .map((item) => `- ${escapeMarkdown(item)}`)
           .join("\n");
+  const listBlock = (value: string): string => escapeMarkdownBlock(value).replace(/\n/gu, "\n  ");
   const replacements: Record<RequirementsTemplateSlot, string> = {
-    workload: escapeMarkdown(requirements.workload),
+    workload: listBlock(requirements.workload),
     "artifact-hash": artifactHash,
     "template-hash": templateHash,
     environment: escapeMarkdown(requirements.environment),
     "artifact-status": "accepted",
     "business-context": escapeMarkdown(requirements.businessContext ?? unavailable("business context")),
-    "success-criteria": escapeMarkdown(requirements.successCriteria ?? unavailable("success criteria")),
+    "success-criteria": listBlock(requirements.successCriteria ?? unavailable("success criteria")),
     "requirements-table": markdownTable(["ID", "Priority", "Status", "Statement", "Source"], requirementsRows),
-    "nfr-table": escapeMarkdown(
+    "nfr-table": escapeMarkdownBlock(
       requirements.nonFunctionalRequirements ?? unavailable("non-functional requirement classifications"),
     ),
-    "security-and-compliance-table": escapeMarkdown(
+    "security-and-compliance-table": escapeMarkdownBlock(
       requirements.securityAndCompliance ?? unavailable("security or compliance classifications"),
     ),
-    "budget-and-operations": escapeMarkdown(
+    "budget-and-operations": escapeMarkdownBlock(
       requirements.budgetAndOperations ?? unavailable("budget or operations data"),
     ),
-    "regional-constraints": escapeMarkdown(
+    "regional-constraints": escapeMarkdownBlock(
       requirements.regionalConstraints ?? unavailable("regional or residency constraints"),
     ),
     "assumptions-list": list(requirements.assumptions),
     "unknowns-list": list(requirements.unknowns),
-    "architecture-handoff": escapeMarkdown(
+    "architecture-handoff": escapeMarkdownBlock(
       requirements.architectureHandoff ?? "Architecture must validate candidate services against current evidence.",
     ),
   };

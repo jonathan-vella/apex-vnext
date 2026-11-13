@@ -414,6 +414,14 @@ test("dispositions resolve every finding but cannot add or edit findings, and th
   );
   assert.deepEqual(await new ObjectStore(root).getJson(reviewHash), stored, "dispositions never edit findings");
   const status = await service.status();
+  const reqDir = join(root, "agent-output", "demo", status.run.runId, "01-requirements");
+  const renderedFindings = await readFile(join(reqDir, "challenger-findings.md"), "utf8");
+  assert.doesNotMatch(renderedFindings, /- Disposition: open/u);
+  assert.match(renderedFindings, /- Disposition: dismissed\n[\s\S]*?- Resolution: Restore drills are owned/u);
+  assert.match(
+    await readFile(join(reqDir, "README.md"), "utf8"),
+    /- Review status: resolved \(2 finding\(s\) dispositioned\)/u,
+  );
   assert.notEqual(status.run.gates[0]!.state, "approved", "a resolved review does not approve the gate");
   await service.decideGateNumber(1, "approved", "tester");
   assert.equal((await service.status()).run.gates[0]!.state, "approved");

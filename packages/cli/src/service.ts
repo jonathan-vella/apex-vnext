@@ -4729,44 +4729,59 @@ export class ApexService {
       run,
       new WriterTransferStore(this.projects.runDirectory(run.projectId, run.runId), this.clock),
     );
-    if (this.acceptedArtifactHashes(events)["governance-constraints"] !== undefined)
+    const existingHash = this.acceptedArtifactHashes(events)["governance-constraints"];
+    const existingGovernance =
+      existingHash === undefined ? undefined : await this.objects.getJson<GovernanceConstraintsV1>(existingHash);
+    const route = await this.route(run, events);
+    const refreshingPreSales =
+      existingGovernance?.source === "reference" && run.purpose === "lab" && route.task?.id === "governance-refresh";
+    if (existingHash !== undefined && !refreshingPreSales)
       throw new ApexError(
         "APEX_CONFLICT",
         "Governance is already accepted; use apex governance revise to replace it",
         EXIT_CODES.conflict,
       );
-    const route = await this.route(run, events);
-    if (route.task?.id !== "governance-discovery" || route.blockers.length > 0)
+    const expectedTask = refreshingPreSales ? "governance-refresh" : "governance-discovery";
+    if (route.task?.id !== expectedTask || route.blockers.length > 0)
       throw new ApexError(
         "APEX_AUTHORIZATION",
         "Governance import requires the active discovery task",
         EXIT_CODES.authorization,
       );
-    let selection: GovernanceBaselineSelection;
-    try {
-      selection = importGovernanceReference(await this.bundledGovernanceReference(), {
-        targetScope: run.targetScope,
-        now: this.clock().toISOString(),
-      });
-    } catch (error) {
-      if (error instanceof GovernanceBaselineError) throw governanceBaselineApexError(error, "reference");
-      throw error;
-    }
     await this.acquireRunWriterLease(run);
-    const digest = await this.objects.putJson({ ...selection.snapshot, projectId: run.projectId, runId: run.runId });
-    const constraints = {
-      ...selection.constraints,
-      source: "reference" as const,
-      projectId: run.projectId,
-      runId: run.runId,
-      targetScope: run.targetScope,
-      constraintsRef: {
-        mediaType: "application/json",
-        uri: `apex-object:${digest}`,
-        digest,
-        bytes: (await this.objects.getBytes(digest)).byteLength,
-      },
-    };
+    let constraints: GovernanceConstraintsV1;
+    if (
+      refreshingPreSales &&
+      existingGovernance !== undefined &&
+      isGovernanceObservationCurrent(existingGovernance.discoveredAt, this.clock().toISOString())
+    ) {
+      constraints = existingGovernance;
+    } else {
+      let selection: GovernanceBaselineSelection;
+      try {
+        selection = importGovernanceReference(await this.bundledGovernanceReference(), {
+          targetScope: run.targetScope,
+          now: this.clock().toISOString(),
+        });
+      } catch (error) {
+        if (error instanceof GovernanceBaselineError) throw governanceBaselineApexError(error, "reference");
+        throw error;
+      }
+      const digest = await this.objects.putJson({ ...selection.snapshot, projectId: run.projectId, runId: run.runId });
+      constraints = {
+        ...selection.constraints,
+        source: "reference" as const,
+        projectId: run.projectId,
+        runId: run.runId,
+        targetScope: run.targetScope,
+        constraintsRef: {
+          mediaType: "application/json",
+          uri: `apex-object:${digest}`,
+          digest,
+          bytes: (await this.objects.getBytes(digest)).byteLength,
+        },
+      };
+    }
     const task = await this.issueTask(run, route.task, await this.inputRefs(run, events, route.task));
     const completed = await this.acceptTaskOutputs(task.taskId, [
       { kind: "governance-constraints", value: constraints },
@@ -6602,9 +6617,24 @@ export class ApexService {
     const sections: string[] = [];
     for (const [title, summary, files] of stages) {
       const present: string[] = [];
-      for (const [path, description] of files)
-        if ((await this.readOptional(join(root, path))) !== undefined) present.push(`- [${description}](${path})`);
+      for (const [path, description] of files) {
+        const existing = await this.readOptional(join(root, path));
+        if (existing !== undefined) {
+          await this.writeGeneratedReview(join(root, path), existing);
+          present.push(`- [${description}](${path})`);
+        }
+      }
       sections.push(`## ${title}\n\n${summary}\n\n${present.length === 0 ? "Not generated yet." : present.join("\n")}`);
+    }
+    for (const diagramName of ["02-waf-assessment", "03-des-cost-breakdown", "03-des-cost-uncertainty"]) {
+      for (const rel of [
+        `${STAGE_FOLDERS.architecture}/${diagramName}.svg`,
+        `${STAGE_FOLDERS.architecture}/${diagramName}.png`,
+        `${STAGE_FOLDERS.architecture}/sources/${diagramName}.py`,
+      ]) {
+        const existing = await this.readOptional(join(root, rel));
+        if (existing !== undefined) await this.writeGeneratedReview(join(root, rel), existing);
+      }
     }
     const text = [
       "# Run index",
@@ -6722,6 +6752,14 @@ export class ApexService {
       if (!Array.isArray(value) || value.length === 0) return "- None recorded.";
       return value.map((item) => `- ${this.reviewMarkdownText(item)}`).join("\n");
     };
+    const candidateServices = [
+      ...new Set([
+        ...(Array.isArray(input["service-preferences"]) ? input["service-preferences"] : []),
+        ...(Array.isArray(input["security-controls"]) && input["security-controls"].includes("key-vault")
+          ? ["key-vault"]
+          : []),
+      ]),
+    ];
     await mkdir(directory, { recursive: true });
     await Promise.all([
       this.writeGeneratedReview(join(directory, "requirements.md"), Buffer.from(document.content, "utf8")),
@@ -6735,14 +6773,14 @@ export class ApexService {
       this.writeGeneratedReview(
         join(directory, "service-recommendations.md"),
         Buffer.from(
-          `# Service Recommendations\n\nThese are user-reviewed candidate services, not Architecture decisions.\n\n## Candidate Services\n${list(input["service-preferences"])}\n\n## Recommendation Rationale\n${this.reviewMarkdownText(requirements.architectureHandoff ?? "Architecture must evaluate the candidate services against approved requirements and current evidence.")}\n\n## Constraints\n- Retained services: ${text(input["retained-services"])}\n- Prohibited services: ${text(input["prohibited-services"])}\n- Environment overrides: ${text(input["environment-overrides"])}\n\nArchitecture must validate candidates against approved requirements, governance, and current evidence.\n`,
+          `# Service Recommendations\n\nThese are user-reviewed candidate services, not Architecture decisions.\n\n## Candidate Services\n${list(candidateServices)}\n\n## Recommendation Rationale\n${this.reviewMarkdownText(requirements.architectureHandoff ?? "Architecture must evaluate the candidate services against approved requirements and current evidence.")}\n\n## Constraints\n- Retained services: ${text(input["retained-services"])}\n- Prohibited services: ${text(input["prohibited-services"])}\n- Environment overrides: ${text(input["environment-overrides"])}\n\nArchitecture must validate candidates against approved requirements, governance, and current evidence.\n`,
           "utf8",
         ),
       ),
       this.writeGeneratedReview(
         join(directory, "sku-preferences.md"),
         Buffer.from(
-          `# SKU Preferences\n\nUser constraints only. Architecture owns SKU selection.\n\n- Preference: ${text(input["sku-preferences"])}\n- Budget posture: ${requirements.budgetAndOperations === undefined ? text(input.budget) : this.reviewMarkdownText(requirements.budgetAndOperations)}\n- Scale: ${text(input.scale)}\n`,
+          `# SKU Preferences\n\nUser constraints only. Architecture owns SKU selection.\n\n- Preference: ${text(input["sku-preferences"])}\n- Budget posture: ${input.budget !== undefined ? text(input.budget) : requirements.budgetAndOperations === undefined ? "Deferred" : this.reviewMarkdownText(requirements.budgetAndOperations)}\n- Scale: ${text(input.scale)}\n`,
           "utf8",
         ),
       ),
@@ -6770,11 +6808,71 @@ export class ApexService {
     return `- Reviewed artifact kind: ${this.reviewMarkdownText(review.subjectKind)}\n- Review subject hash: ${review.subjectHash}\n- Reviewed at: ${this.reviewMarkdownText(review.reviewedAt)}\n\n${findings}`;
   }
 
+  private effectiveReviewFindings(review: ReviewFindingsV1, events: EventV1[], reviewHash: string): ReviewFindingsV1 {
+    const resolutions = new Map<string, ReviewResolution>();
+    for (const event of events) {
+      if (event.type !== "review.resolved") continue;
+      const resolution = (event.payload as { resolution?: ReviewResolution }).resolution;
+      if (resolution?.reviewHash !== reviewHash) continue;
+      if (resolution.expiresAt !== undefined && Date.parse(resolution.expiresAt) <= this.clock().getTime()) continue;
+      resolutions.set(resolution.findingId, resolution);
+    }
+    if (resolutions.size === 0) return review;
+    return {
+      ...review,
+      findings: review.findings.map((finding) => {
+        const resolved = resolutions.get(finding.id);
+        if (resolved === undefined) return finding;
+        const mappedDisposition: ReviewFindingsV1["findings"][number]["disposition"] =
+          resolved.disposition === "dismissed"
+            ? "dismissed"
+            : resolved.disposition === "fixed"
+              ? "remediated"
+              : "accepted";
+        const suffix = [
+          resolved.disposition === "accepted-risk" || resolved.disposition === "acknowledged"
+            ? resolved.disposition
+            : undefined,
+          resolved.owner === undefined ? undefined : `owner: ${resolved.owner}`,
+          resolved.expiresAt === undefined ? undefined : `expires: ${resolved.expiresAt}`,
+        ]
+          .filter(Boolean)
+          .join(", ");
+        return {
+          ...finding,
+          disposition: mappedDisposition,
+          resolution: suffix === "" ? resolved.rationale : `${resolved.rationale} (${suffix})`,
+        };
+      }),
+    };
+  }
+
+  private reviewStatusSummary(review: ReviewFindingsV1): string {
+    if (review.findings.length === 0) return "passed (no findings)";
+    const openCount = review.findings.filter(({ disposition }) => disposition === "open").length;
+    return openCount === 0
+      ? `resolved (${review.findings.length} finding(s) dispositioned)`
+      : `open (${openCount} of ${review.findings.length} finding(s) awaiting disposition)`;
+  }
+
+  private async updateStageReadmeReviewStatus(directory: string, statusSummary: string): Promise<void> {
+    const readmePath = join(directory, "README.md");
+    const current = await this.readOptional(readmePath);
+    if (current === undefined) return;
+    const updated = current
+      .toString("utf8")
+      .replace(/^- Review status: .*$/mu, `- Review status: ${this.reviewMarkdownText(statusSummary)}`);
+    await this.writeGeneratedReview(readmePath, Buffer.from(updated, "utf8"));
+  }
+
   private async materializeRequirementsChallengeFindings(run: RunConfigV1, review: ReviewFindingsV1): Promise<void> {
+    const directory = this.requirementsReviewDirectory(run);
+    await mkdir(directory, { recursive: true });
     await this.writeGeneratedReview(
-      join(this.requirementsReviewDirectory(run), "challenger-findings.md"),
+      join(directory, "challenger-findings.md"),
       Buffer.from(`# Challenger Findings\n\n${this.reviewFindingsMarkdown(review)}\n`, "utf8"),
     );
+    await this.updateStageReadmeReviewStatus(directory, this.reviewStatusSummary(review));
   }
 
   private architectureReviewDirectory(run: RunConfigV1): string {
@@ -6996,13 +7094,16 @@ export class ApexService {
               this.reviewMarkdownText(criterion.rationale),
             ]),
           );
+    const directory = this.architectureReviewDirectory(run);
+    await mkdir(directory, { recursive: true });
     await this.writeGeneratedReview(
-      join(this.architectureReviewDirectory(run), "challenger-findings.md"),
+      join(directory, "challenger-findings.md"),
       Buffer.from(
         `# Challenger Findings\n\n## Well-Architected Criteria\n\n${criteria}\n\n${this.reviewFindingsMarkdown(review)}\n`,
         "utf8",
       ),
     );
+    await this.updateStageReadmeReviewStatus(directory, this.reviewStatusSummary(review));
   }
 
   private planReviewDirectory(run: RunConfigV1): string {
@@ -7080,10 +7181,13 @@ export class ApexService {
   }
 
   private async materializePlanChallengeFindings(run: RunConfigV1, review: ReviewFindingsV1): Promise<void> {
+    const directory = this.planReviewDirectory(run);
+    await mkdir(directory, { recursive: true });
     await this.writeGeneratedReview(
-      join(this.planReviewDirectory(run), "challenger-findings.md"),
+      join(directory, "challenger-findings.md"),
       Buffer.from(`# Challenger Findings\n\n${this.reviewFindingsMarkdown(review)}\n`, "utf8"),
     );
+    await this.updateStageReadmeReviewStatus(directory, this.reviewStatusSummary(review));
   }
 
   private async materializeValidationReport(
@@ -7245,6 +7349,14 @@ export class ApexService {
     await this.append(run, "review.resolved", { resolution: resolution as unknown as JsonValue });
     const updatedEvents = await this.journal(run).replay();
     const nodeId = reviewPayload.nodeId;
+    const effective = this.effectiveReviewFindings(review, updatedEvents, resolution.reviewHash);
+    if (nodeId === "requirements-review") {
+      await this.materializeRequirementsChallengeFindings(run, effective);
+    } else if (nodeId === "architecture-review") {
+      await this.materializeArchitectureChallengeFindings(run, effective);
+    } else if (nodeId === "plan-review") {
+      await this.materializePlanChallengeFindings(run, effective);
+    }
     const descriptor = typeof nodeId === "string" ? TASKS.find(({ id }) => id === nodeId) : undefined;
     if (descriptor?.gate !== undefined && this.reviewBlockers(updatedEvents, descriptor.id).length === 0) {
       const current = await this.currentRun();
@@ -9680,7 +9792,11 @@ export class ApexService {
     descriptor: WorkflowTaskDescriptor,
     inputRefs: string[] = [],
   ): Promise<TaskEnvelopeV1> {
-    if (descriptor.id === "plan") await this.assertImportedGovernanceCurrent(run, await this.journal(run).replay());
+    if (descriptor.id === "plan") {
+      await this.assertImportedGovernanceCurrent(run, await this.journal(run).replay(), {
+        allowLabReferenceAfterRefresh: true,
+      });
+    }
     const head = await this.journal(run).head();
     if (head === null)
       throw new ApexError("APEX_STALE", "Cannot issue a task before run initialization", EXIT_CODES.stale);
@@ -10362,7 +10478,9 @@ export class ApexService {
     descriptor: WorkflowTaskDescriptor,
   ): Promise<string[]> {
     events = this.governanceWorkflowEvents(events);
-    if (descriptor.id === "plan") await this.assertImportedGovernanceCurrent(run, events);
+    if (descriptor.id === "plan") {
+      await this.assertImportedGovernanceCurrent(run, events, { allowLabReferenceAfterRefresh: true });
+    }
     const manifest = (await this.lockedWorkflowEngine(run)).manifest;
     const node = manifest.nodes.find(({ id }) => id === (descriptor.reviewSubject ?? descriptor.id));
     if (node === undefined)
@@ -10418,6 +10536,7 @@ export class ApexService {
   private async assertImportedGovernanceCurrent(
     run: RunConfigV1,
     events: Awaited<ReturnType<EventJournal["replay"]>>,
+    options: { allowLabReferenceAfterRefresh?: boolean } = {},
   ): Promise<void> {
     const selection = await this.governanceInputState(run, events);
     if (selection !== undefined && !selection.fulfilled) {
@@ -10436,9 +10555,23 @@ export class ApexService {
     const governance = await this.objects.getJson<GovernanceConstraintsV1>(hash);
     if (governance.source === "reference") {
       if (!/^\/subscriptions\/[0-9a-f-]{36}(?:\/|$)/iu.test(run.targetScope)) return;
+      if (
+        options.allowLabReferenceAfterRefresh === true &&
+        run.purpose === "lab" &&
+        this.completedNodeIds(events).has("governance-refresh")
+      ) {
+        if (!isGovernanceObservationCurrent(governance.discoveredAt, this.clock().toISOString())) {
+          throw new ApexError(
+            "APEX_STALE",
+            "Governance snapshot requires refresh: reference observation is future-dated or at least 30 days old",
+            EXIT_CODES.stale,
+          );
+        }
+        return;
+      }
       throw new ApexError(
         "APEX_AUTHORIZATION",
-        "The ALZ Corp reference baseline cannot authorize planning for a subscription target; import the reviewed subscription baseline with apex governance revise",
+        "Reviewed subscription governance baseline is required before deployment preview (run uses the ALZ reference assumption; run apex governance revise with a collected baseline)",
         EXIT_CODES.authorization,
       );
     }
@@ -10559,6 +10692,14 @@ export class ApexService {
         title: "Architecture title",
         summary: "Architecture summary and key trade-offs",
         sourceHashes: { requirements: this.artifactHash(events, "requirements") ?? "0".repeat(64) },
+        actors: [
+          {
+            id: "external-caller",
+            label: "External client or partner",
+            targetIds: ["INGRESS_COMPONENT_ID"],
+            edgeLabel: "HTTPS",
+          },
+        ],
         components: [
           {
             id: "COMPONENT_ID",
@@ -10567,6 +10708,14 @@ export class ApexService {
             purpose: "Component purpose",
             requirementIds: ["REQUIREMENT_ID"],
             dependsOn: [],
+            subnet: "snet-workload",
+          },
+        ],
+        flows: [
+          {
+            from: "INGRESS_COMPONENT_ID",
+            to: "BACKEND_COMPONENT_ID",
+            label: "Internal HTTPS / Private Link",
           },
         ],
         decisions: ["Describe one decision, rationale, alternatives, and consequences."],
@@ -10833,6 +10982,7 @@ export class ApexService {
       { id: "workload-pattern", label: "Workload pattern", priority: "should" },
       { id: "delivery-scenario", label: "Delivery scenario", priority: "should" },
       { id: "region", label: "Region", priority: "should" },
+      { id: "recovery", label: "Recovery targets", priority: "must" },
       { id: "workload-profile", label: "Workload profile", priority: "must" },
     ];
     const answered = fields.flatMap((field) => {
@@ -10886,7 +11036,7 @@ export class ApexService {
         text("scale") ?? "Performance and scale goals are intentionally deferred for later validation.",
         "Validate performance and scale later with defined measurement boundaries, normal and peak load, percentiles, error rate, and test duration. Treat stated numbers as goals, not acceptance gates.",
       ),
-      nonFunctionalRequirements: [text("availability-recovery") ?? text("recovery"), performanceScale]
+      nonFunctionalRequirements: [joinValues("availability-recovery", "recovery"), performanceScale]
         .filter((value): value is string => value !== undefined)
         .join("\n\n"),
       securityAndCompliance: gdpr
@@ -11041,6 +11191,13 @@ export class ApexService {
           return { blockers: ["Deployment executed but requires reconciliation"] };
         }
         const preview = this.latestPayloadHash(events, "preview.created", "previewHash");
+        if (preview === undefined && (await this.referenceGovernanceNeedsRefresh(run, events))) {
+          return {
+            blockers: [
+              "Reviewed subscription governance baseline is required before deployment preview (run uses the ALZ reference assumption; run apex governance revise with a collected baseline)",
+            ],
+          };
+        }
         if (preview === undefined) return { blockers: ["Deployment preview is required"] };
         if (!this.gateSatisfied(run, 4, events)) {
           if (run.gates.find(({ gate }) => gate === 4)?.state === "rejected") {
@@ -11297,6 +11454,16 @@ export class ApexService {
         artifacts[payload.nodeId] = true;
       }
     }
+    if (await this.referenceGovernanceNeedsRefresh(run, events)) {
+      const blocker =
+        "Reviewed subscription governance baseline is required before deployment preview (run uses the ALZ reference assumption; run apex governance revise with a collected baseline)";
+      throw new ApexError(
+        "APEX_AUTHORIZATION",
+        `Workflow is not ready for preview-${run.iacTool}: ${blocker}`,
+        EXIT_CODES.authorization,
+        [blocker],
+      );
+    }
     const completedNodes = [
       ...this.completedNodeIds(events),
       ...run.gates.flatMap((gate) => (this.gateSatisfied(run, gate.gate, events) ? [`gate-${gate.gate}`] : [])),
@@ -11433,7 +11600,7 @@ export class ApexService {
     }
     if (descriptor.id === "plan") {
       const intent = byKind["implementation-intent"] as ImplementationIntentV1;
-      await this.assertImportedGovernanceCurrent(run, events);
+      await this.assertImportedGovernanceCurrent(run, events, { allowLabReferenceAfterRefresh: true });
       const binding = byKind["iac-binding"] as IacBindingV1;
       const resourceIds = new Set(intent.resources.map(({ id }) => id));
       const bindingIds = Object.keys(binding.resourceBindings);
@@ -11489,7 +11656,11 @@ export class ApexService {
           "Governance discovery accepts only an imported baseline or the shipped ALZ Corp reference",
           EXIT_CODES.validation,
         );
-      if (descriptor.id === "governance-refresh" && governance.source !== "collected")
+      if (
+        descriptor.id === "governance-refresh" &&
+        governance.source !== "collected" &&
+        !(run.purpose === "lab" && governance.source === "reference")
+      )
         throw new ApexError(
           "APEX_VALIDATION",
           "Governance refresh requires the reviewed subscription baseline",

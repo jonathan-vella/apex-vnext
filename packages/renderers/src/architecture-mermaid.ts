@@ -1,6 +1,6 @@
 import type { ArchitectureV1 } from "@apexops/contracts";
 
-type TierId = "edge" | "application" | "data" | "network" | "security" | "operations" | "other";
+type TierId = "edge" | "application" | "messaging" | "data" | "network" | "security" | "operations" | "other";
 
 interface Tier {
   readonly id: TierId;
@@ -13,7 +13,8 @@ interface Tier {
 const TIERS: readonly Tier[] = [
   { id: "edge", title: "Edge & ingress", icon: "🌐", fill: "#e8f3fc", stroke: "#0f6cbd" },
   { id: "application", title: "Application & compute", icon: "⚙️", fill: "#e9f6e8", stroke: "#107c10" },
-  { id: "data", title: "Data & messaging", icon: "🗄️", fill: "#fdf3e3", stroke: "#b45f06" },
+  { id: "messaging", title: "Messaging & events", icon: "📨", fill: "#fef7e6", stroke: "#c45100" },
+  { id: "data", title: "Data & storage", icon: "🗄️", fill: "#fdf3e3", stroke: "#b45f06" },
   { id: "network", title: "Network & private access", icon: "🔌", fill: "#efeaf8", stroke: "#6b4ea8" },
   { id: "security", title: "Security & identity", icon: "🔑", fill: "#fbeaea", stroke: "#a4262c" },
   { id: "operations", title: "Monitoring & operations", icon: "📊", fill: "#e6f2f3", stroke: "#0b6a6f" },
@@ -35,15 +36,15 @@ const TIER_RULES: readonly (readonly [string, TierId])[] = [
   ["microsoft.containerregistry/", "application"],
   ["microsoft.compute/", "application"],
   ["microsoft.logic/", "application"],
+  ["microsoft.servicebus/", "messaging"],
+  ["microsoft.eventhub/", "messaging"],
+  ["microsoft.eventgrid/", "messaging"],
   ["microsoft.sql/", "data"],
   ["microsoft.storage/", "data"],
   ["microsoft.documentdb/", "data"],
   ["microsoft.dbforpostgresql/", "data"],
   ["microsoft.dbformysql/", "data"],
   ["microsoft.cache/", "data"],
-  ["microsoft.servicebus/", "data"],
-  ["microsoft.eventhub/", "data"],
-  ["microsoft.eventgrid/", "data"],
   ["microsoft.search/", "data"],
   ["microsoft.keyvault/", "security"],
   ["microsoft.managedidentity/", "security"],
@@ -116,6 +117,8 @@ function nodeText(tier: Tier, service: string, id: string): string {
 
 function shape(tier: TierId, text: string): string {
   switch (tier) {
+    case "messaging":
+      return `[["${text}"]]`;
     case "data":
       return `[("${text}")]`;
     case "edge":
@@ -302,7 +305,7 @@ export function renderArchitectureMermaid(architecture: ArchitectureV1): string 
   lines.push(
     `  subgraph legend["Legend"]`,
     "    direction LR",
-    `    legend_key["([Ingress / Actor]) • [Compute / Network] • [(Data)] • {{Security}}"]`,
+    `    legend_key["([Ingress / Actor]) • [Compute / Network] • [[Messaging]] • [(Data)] • {{Security}}"]`,
     "  end",
   );
   if (actors.length > 0) {
