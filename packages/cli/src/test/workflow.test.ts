@@ -1952,7 +1952,7 @@ test("requirements task context includes recorded input and stageable output tem
     template.requirements.find(({ source }) => source === "intake:recovery"),
     {
       id: `REQ-${String(template.requirements.length - 1).padStart(3, "0")}`,
-      statement: "Recovery targets: RTO 60 minutes, RPO 15 minutes",
+      statement: "Recovery targets: RTO 60 minutes; RPO 15 minutes",
       priority: "must",
       status: "confirmed",
       source: "intake:recovery",
@@ -1974,7 +1974,7 @@ test("requirements task context includes recorded input and stageable output tem
   assert.match(template.successCriteria!, /Validate performance and scale later/);
   assert.equal(
     template.nonFunctionalRequirements,
-    "availability-zones, automated-backups, point-in-time-restore; RTO 60 minutes, RPO 15 minutes\n\nPerformance and scale goals: 100 concurrent users (validated at a later stage)",
+    "availability-zones, automated-backups, point-in-time-restore; RTO 60 minutes; RPO 15 minutes\n\nPerformance and scale goals: 100 concurrent users (validated at a later stage)",
   );
   assert.equal(
     template.securityAndCompliance,
