@@ -18,8 +18,12 @@ import {
   validateBicepResourceParity,
   validateBicepStorageDiagnostics,
   validateBicepStorageBaseline,
+  validateStagedBicepParity,
+  validateStagedBicepBaseline,
   validateTerraformResourceParity,
   validateTerraformStorageBaseline,
+  validateStagedTerraformParity,
+  validateStagedTerraformBaseline,
   validateStorageSecurityProperties,
   validateStorageSecurityBindings,
   type PolicyValidationInput,
@@ -1846,5 +1850,211 @@ describe("bounded policy property validation", () => {
     });
     assert.equal(validated.outcome, "pass");
     assert.ok(validated.results.every(({ outcome }) => outcome === "pass"));
+
+    const conflictingSiblings = validatePolicyProperties({
+      track: "bicep",
+      sourceHash: hash,
+      policyMapHash: hash,
+      policyMap: {
+        ...map,
+        mappings: [map.mappings[0]!],
+      },
+      logicalResourceManifest: {
+        "container-platform": {
+          codeSymbol: "st_a",
+          componentSymbols: ["st_a", "st_b"],
+        },
+      },
+      json: JSON.stringify({
+        resources: {
+          st_a: {
+            type: "Microsoft.Storage/storageAccounts",
+            properties: { publicNetworkAccess: "Disabled" },
+          },
+          st_b: {
+            type: "Microsoft.Storage/storageAccounts",
+            properties: { publicNetworkAccess: "Enabled" },
+          },
+        },
+      }),
+    });
+    assert.equal(conflictingSiblings.outcome, "fail");
+    assert.equal(conflictingSiblings.results[0]!.reason, "value-mismatch");
+  });
+
+  it("enforces staged Bicep and Terraform module pins, secure parameter references, and service security controls", () => {
+    const hash = "b".repeat(64);
+    const bicepManifest: LogicalResourceManifestV1 = {
+      schemaVersion: "1.0.0",
+      projectId: "demo",
+      runId: "dev-run",
+      track: "bicep",
+      resources: [
+        {
+          logicalId: "registry",
+          type: "Microsoft.ContainerRegistry/registries",
+          implementationAddress: "avm:br/public:avm/res/container-registry/registry@0.13.0",
+          executionAddress: "registry",
+          implementationKind: "module",
+          ownership: "managed",
+          dependsOn: [],
+          generatedDependencies: [],
+          sourcePath: "infra/main.bicep",
+        },
+        {
+          logicalId: "sql",
+          type: "Microsoft.Sql/servers",
+          implementationAddress: "native:Microsoft.Sql/servers@2023-08-01-preview",
+          executionAddress: "sql",
+          implementationKind: "resource",
+          ownership: "managed",
+          dependsOn: ["registry"],
+          generatedDependencies: ["registry"],
+          sourcePath: "infra/main.bicep",
+        },
+      ],
+    };
+    const bicepBinding: IacBindingV1 = {
+      schemaVersion: "1.0.0",
+      projectId: "demo",
+      runId: "dev-run",
+      track: "bicep",
+      intentHash: hash,
+      resourceBindings: {
+        registry: {
+          implementation: "avm:br/public:avm/res/container-registry/registry@0.13.0",
+          version: "0.13.0",
+          parameters: {},
+        },
+        sql: {
+          implementation: "native:Microsoft.Sql/servers@2023-08-01-preview",
+          version: "2023-08-01-preview",
+          parameters: {},
+        },
+      },
+    };
+    const validArm = JSON.stringify({
+      parameters: { adminPassword: { type: "securestring" } },
+      resources: {
+        registry: {
+          type: "Microsoft.Resources/deployments",
+          apiVersion: "2022-09-01",
+          properties: { parameters: { acrAdminUserEnabled: { value: false } } },
+        },
+        sql: {
+          type: "Microsoft.Sql/servers",
+          apiVersion: "2023-08-01-preview",
+          dependsOn: ["registry"],
+          properties: {
+            administratorLoginPassword: "[parameters('adminPassword')]",
+            minimalTlsVersion: "1.2",
+            administrators: { azureADOnlyAuthentication: true },
+          },
+        },
+      },
+    });
+    assert.equal(
+      validateStagedBicepBaseline({
+        sourceHash: hash,
+        manifest: bicepManifest,
+        binding: bicepBinding,
+        json: validArm,
+        sourceFiles: {
+          "infra/main.bicep": "module registry 'br/public:avm/res/container-registry/registry:0.13.0' = {}\n",
+        },
+      }).outcome,
+      "pass",
+    );
+    assert.equal(
+      validateStagedBicepParity({
+        sourceHash: hash,
+        manifest: bicepManifest,
+        binding: bicepBinding,
+        json: validArm,
+        sourceFiles: {
+          "infra/main.bicep": "module registry 'br/public:avm/res/container-registry/registry:0.12.0' = {}\n",
+        },
+      }).outcome,
+      "fail",
+    );
+    assert.equal(
+      validateStagedBicepBaseline({
+        sourceHash: hash,
+        manifest: bicepManifest,
+        binding: bicepBinding,
+        json: validArm.replace('"acrAdminUserEnabled":{"value":false}', '"acrAdminUserEnabled":{"value":true}'),
+        sourceFiles: {
+          "infra/main.bicep": "module registry 'br/public:avm/res/container-registry/registry:0.13.0' = {}\n",
+        },
+      }).outcome,
+      "fail",
+    );
+
+    const tfManifest: LogicalResourceManifestV1 = {
+      schemaVersion: "1.0.0",
+      projectId: "demo",
+      runId: "dev-run",
+      track: "terraform",
+      resources: [
+        {
+          logicalId: "storage",
+          type: "Microsoft.Storage/storageAccounts",
+          implementationAddress: "native:Microsoft.Storage/storageAccounts@2023-05-01",
+          executionAddress: "azapi_resource.storage",
+          implementationKind: "resource",
+          ownership: "managed",
+          dependsOn: [],
+          generatedDependencies: [],
+          sourcePath: "main.tf",
+        },
+      ],
+    };
+    const tfBinding: IacBindingV1 = {
+      schemaVersion: "1.0.0",
+      projectId: "demo",
+      runId: "dev-run",
+      track: "terraform",
+      intentHash: hash,
+      resourceBindings: {
+        storage: {
+          implementation: "native:Microsoft.Storage/storageAccounts@2023-05-01",
+          version: "2023-05-01",
+          parameters: {},
+        },
+      },
+    };
+    assert.equal(
+      validateStagedTerraformParity({
+        sourceHash: hash,
+        manifest: tfManifest,
+        binding: tfBinding,
+        files: { "main.tf": 'resource "terraform_data" "storage" {}\n' },
+      }).outcome,
+      "fail",
+    );
+    assert.equal(
+      validateStagedTerraformBaseline({
+        sourceHash: hash,
+        manifest: tfManifest,
+        binding: tfBinding,
+        files: {
+          "main.tf":
+            'resource "azapi_resource" "storage" {\n  type = "Microsoft.Storage/storageAccounts@2023-05-01"\n  body = {\n    properties = {\n      allowSharedKeyAccess = true\n      minimumTlsVersion = "TLS1_0"\n    }\n  }\n}\n',
+        },
+      }).outcome,
+      "fail",
+    );
+    assert.equal(
+      validateStagedTerraformBaseline({
+        sourceHash: hash,
+        manifest: tfManifest,
+        binding: tfBinding,
+        files: {
+          "main.tf":
+            'resource "azapi_resource" "storage" {\n  type = "Microsoft.Storage/storageAccounts@2023-05-01"\n}\nlocals {\n  administrator_login_password = "PlaintextPassword1!"\n}\n',
+        },
+      }).reason,
+      "credential-content",
+    );
   });
 });

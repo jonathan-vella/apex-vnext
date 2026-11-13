@@ -3846,12 +3846,13 @@ test("plan rejects wrong track and secret literals", async () => {
           message.test(error.message),
       );
     // On a local or subscription scope, an AVM binding without an RG physical resource map is accepted at plan time.
+    const rgTargetScope = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-test";
     const rgIsolated = new ApexService(await tempRoot());
     const rgRun = await rgIsolated.init({
       projectId: "demo",
       riskOwner: "partner",
       iacTool: "bicep",
-      targetScope: "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-test",
+      targetScope: rgTargetScope,
     });
     await reachCodegen(rgIsolated, rgRun.runId, "bicep", async (rgPlan) => {
       const rgPlanTask = await task(rgIsolated, "plan");
@@ -3868,6 +3869,10 @@ test("plan rejects wrong track and secret literals", async () => {
         (error: unknown) =>
           error instanceof ApexError && error.code === "APEX_VALIDATION" && /physical resource map/.test(error.message),
       );
+      configureNativeBicepPlan(rgPlan);
+      const acceptedBinding = rgPlan[1]!.value as IacBindingV1;
+      acceptedBinding.resourceBindings.api!.parameters.parentId = rgTargetScope;
+      acceptedBinding.intentHash = sha256Json(rgPlan[0]!.value);
     });
     assert.equal((await isolated.status()).head, before.head);
   });

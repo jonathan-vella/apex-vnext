@@ -682,12 +682,10 @@ abstract class NativeProviderBase {
           await verify();
         }
       }
-      const terraformFiles =
-        track === "terraform"
-          ? Object.fromEntries(
-              [...source.paths].sort().map((path) => [path, source.fileContents.get(path)?.toString("utf8") ?? ""]),
-            )
-          : {};
+      const sourceFiles = Object.fromEntries(
+        [...source.paths].sort().map((path) => [path, source.fileContents.get(path)?.toString("utf8") ?? ""]),
+      );
+      const terraformFiles = track === "terraform" ? sourceFiles : {};
       if (parityManifest !== undefined) {
         receipt.resourceParity =
           track === "bicep"
@@ -697,6 +695,7 @@ abstract class NativeProviderBase {
                   manifest: parityManifest,
                   ...(parityBinding === undefined ? {} : { binding: parityBinding }),
                   json: compiledTemplate ?? "",
+                  sourceFiles,
                 })
               : validateBicepResourceParity({
                   sourceHash: receipt.sourceHash,
@@ -730,6 +729,7 @@ abstract class NativeProviderBase {
                   manifest: parityManifest,
                   binding: parityBinding,
                   json: compiledTemplate ?? "",
+                  sourceFiles,
                 })
               : validateBicepStorageBaseline({
                   sourceHash: receipt.sourceHash,
@@ -790,8 +790,10 @@ abstract class NativeProviderBase {
             json: compiledTemplate ?? "",
           });
           rejected =
-            policyValidation.outcome === "fail" ||
-            policyValidation.results.some(({ reason }) => unsafePolicyReasons.has(reason));
+            request.stagedSource === true
+              ? policyValidation.outcome === "fail" ||
+                policyValidation.results.some(({ reason }) => unsafePolicyReasons.has(reason))
+              : policyValidation.outcome !== "pass";
           if (rejected) failure += `: ${policyFailureSummary(policyValidation)}`;
         } catch {
           policyValidation = undefined;

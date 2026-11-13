@@ -267,6 +267,33 @@ function observeBoundProperty(
   const physicalId = text(own(binding, "physicalId"));
   if (Object.hasOwn(binding, "physicalId") && physicalId === undefined)
     return { outcome: "unsupported", reason: "unsupported-resource" };
+  const rawSiblings = own(binding, "componentSymbols");
+  if (Array.isArray(rawSiblings) && rawSiblings.length > 0 && physicalId === undefined) {
+    const symbols = rawSiblings.filter((sym): sym is string => typeof sym === "string" && sym.length > 0);
+    if (symbols.length === 0) return { outcome: "unsupported", reason: "resource-not-bound" };
+    const outcomes = symbols.map((sym) =>
+      observeBoundProperty(
+        mapping,
+        {
+          track: request.track,
+          logicalResourceManifest: {
+            [mapping.logicalResourceId]:
+              request.track === "terraform" ? { terraformAddress: sym } : { codeSymbol: sym },
+          },
+        },
+        resources,
+      ),
+    );
+    const applicable = outcomes.filter(
+      (candidate) => !(candidate.outcome === "fail" && candidate.reason === "missing-property"),
+    );
+    if (applicable.length === 0) return { outcome: "fail", reason: "missing-property" };
+    const failed = applicable.find((candidate) => candidate.outcome === "fail");
+    if (failed !== undefined) return failed;
+    const unsupported = applicable.find((candidate) => candidate.outcome === "unsupported");
+    if (unsupported !== undefined) return unsupported;
+    return applicable[0]!;
+  }
   const codeSymbol =
     request.track === "terraform"
       ? (text(own(binding, "terraformAddress")) ?? text(own(binding, "codeSymbol")))
@@ -383,30 +410,6 @@ function observeBoundProperty(
   if (walked.expressionHit || hasUnknown(walked.unknown) || expression(walked.observed, request.track))
     return { outcome: "unsupported", reason: "unsupported-expression" };
   if (walked.observed === undefined) {
-    const rawSiblings = own(binding, "componentSymbols");
-    if (Array.isArray(rawSiblings) && rawSiblings.length > 0 && physicalId === undefined) {
-      const siblingOutcomes = rawSiblings
-        .filter((sym): sym is string => typeof sym === "string" && sym.length > 0 && sym !== codeSymbol)
-        .map((sym) =>
-          observeBoundProperty(
-            mapping,
-            {
-              track: request.track,
-              logicalResourceManifest: {
-                [mapping.logicalResourceId]:
-                  request.track === "terraform" ? { terraformAddress: sym } : { codeSymbol: sym },
-              },
-            },
-            resources,
-          ),
-        )
-        .filter((candidate) => !(candidate.outcome === "fail" && candidate.reason === "missing-property"));
-      if (siblingOutcomes.length === 1) return siblingOutcomes[0]!;
-      if (siblingOutcomes.some((candidate) => candidate.outcome === "fail")) {
-        return siblingOutcomes.find((candidate) => candidate.outcome === "fail")!;
-      }
-      if (siblingOutcomes.length > 1) return { outcome: "unsupported", reason: "ambiguous-resource" };
-    }
     return { outcome: "fail", reason: "missing-property" };
   }
   const expectedValueDigest = calculatePolicyValidationDigest(mapping.expectedValue);
@@ -648,6 +651,7 @@ export function validateStagedBicepParity(request: {
   readonly manifest: LogicalResourceManifestV1;
   readonly binding?: IacBindingV1;
   readonly json: string;
+  readonly sourceFiles?: Readonly<Record<string, string>>;
 }): NonNullable<NativeValidationReceiptV1["resourceParity"]> {
   const inputHash = createHash("sha256").update(request.json).digest("hex");
   const result = (
@@ -668,6 +672,20 @@ export function validateStagedBicepParity(request: {
     outcome,
     reason,
   });
+  const planned = request.manifest.resources;
+  const byId = new Map(planned.map((entry) => [entry.logicalId, entry]));
+  if (
+    byId.size !== planned.length ||
+    new Set(planned.map(({ executionAddress }) => executionAddress)).size !== planned.length ||
+    planned.some(
+      (entry) =>
+        entry.executionAddress === undefined ||
+        entry.executionAddress.length === 0 ||
+        entry.dependsOn.some((dep) => !byId.has(dep)),
+    )
+  ) {
+    return result("unsupported", "unsupported-resource");
+  }
   let allObserved: readonly Resource[];
   try {
     allObserved = resourcesFromJson(request.json, "bicep");
@@ -675,31 +693,62 @@ export function validateStagedBicepParity(request: {
     return result("unsupported", "invalid-source");
   }
   const topLevel = allObserved.filter((resource) => !resource.codeSymbol?.includes("::"));
-  for (const expected of request.manifest.resources) {
-    if (expected.ownership === "existing") continue;
-    const bySymbol = topLevel.find(({ codeSymbol }) => codeSymbol === expected.executionAddress);
-    if (bySymbol !== undefined) {
-      if (expected.implementationKind === "module") {
-        if (bySymbol.resourceType?.toLowerCase() !== "microsoft.resources/deployments") {
-          return result("fail", "type-mismatch");
-        }
-      } else if (
-        /^Microsoft\.[A-Za-z0-9.]+(?:\/[A-Za-z][A-Za-z0-9]*)+$/i.test(expected.type) &&
-        bySymbol.resourceType?.toLowerCase() !== expected.type.toLowerCase()
+  const mainBicep = request.sourceFiles?.["infra/main.bicep"];
+  for (const expected of planned) {
+    const matches = topLevel.filter(({ codeSymbol }) => codeSymbol === expected.executionAddress);
+    if (matches.length !== 1) return result("fail", "coverage-mismatch");
+    const bySymbol = matches[0]!;
+    if ((bySymbol.existing === true) !== (expected.ownership === "existing")) {
+      return result("fail", "type-mismatch");
+    }
+    const bound = request.binding?.resourceBindings[expected.logicalId];
+    if (bound !== undefined && bound.implementation !== expected.implementationAddress) {
+      return result("fail", "type-mismatch");
+    }
+    if (expected.implementationKind === "module") {
+      if (bySymbol.resourceType?.toLowerCase() !== "microsoft.resources/deployments") {
+        return result("fail", "type-mismatch");
+      }
+      const avmMatch = /^avm:([^@\s]+)@([^@\s]+)$/u.exec(expected.implementationAddress);
+      if (avmMatch === null) return result("unsupported", "unsupported-resource");
+      if (bound !== undefined && bound.version !== avmMatch[2]) return result("fail", "type-mismatch");
+      if (mainBicep !== undefined) {
+        const escapedSymbol = expected.executionAddress!.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+        const escapedTarget = `${avmMatch[1]!}:${avmMatch[2]!}`.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+        const modulePattern = new RegExp(`\\bmodule\\s+${escapedSymbol}\\s+'${escapedTarget}'`, "u");
+        if (!modulePattern.test(mainBicep)) return result("fail", "type-mismatch");
+      }
+    } else {
+      const nativeMatch = /^native:(Microsoft\.[A-Za-z0-9.]+(?:\/[A-Za-z][A-Za-z0-9]*)+)@([^@\s]+)$/iu.exec(
+        expected.implementationAddress,
+      );
+      if (nativeMatch === null) return result("unsupported", "unsupported-resource");
+      if (
+        bySymbol.resourceType?.toLowerCase() !== nativeMatch[1]!.toLowerCase() ||
+        text(bySymbol.value.apiVersion)?.toLowerCase() !== nativeMatch[2]!.toLowerCase() ||
+        (bound !== undefined && bound.version !== nativeMatch[2]) ||
+        (/^Microsoft\.[A-Za-z0-9.]+(?:\/[A-Za-z][A-Za-z0-9]*)+$/iu.test(expected.type) &&
+          bySymbol.resourceType?.toLowerCase() !== expected.type.toLowerCase())
       ) {
         return result("fail", "type-mismatch");
       }
-      continue;
     }
-    const nativeMatch = /^native:(Microsoft\.[A-Za-z0-9.]+(?:\/[A-Za-z][A-Za-z0-9]*)+)@/i.exec(
-      expected.implementationAddress,
-    );
-    const hasMatchingResource =
-      expected.implementationKind === "module"
-        ? topLevel.some(({ resourceType }) => resourceType?.toLowerCase() === "microsoft.resources/deployments")
-        : nativeMatch !== null &&
-          allObserved.some(({ resourceType }) => resourceType?.toLowerCase() === nativeMatch[1]!.toLowerCase());
-    if (!hasMatchingResource) return result("fail", "coverage-mismatch");
+    if (expected.ownership !== "existing" && expected.dependsOn.length > 0) {
+      const rawDeps = Array.isArray(bySymbol.value.dependsOn) ? bySymbol.value.dependsOn : [];
+      const observedDeps = new Set(rawDeps.filter((dep): dep is string => typeof dep === "string"));
+      const serialized = JSON.stringify(bySymbol.value);
+      for (const depId of expected.dependsOn) {
+        const depSymbol = byId.get(depId)?.executionAddress;
+        if (
+          depSymbol === undefined ||
+          (!observedDeps.has(depSymbol) &&
+            !serialized.includes(`'${depSymbol}'`) &&
+            !serialized.includes(`"${depSymbol}"`))
+        ) {
+          return result("fail", "dependency-mismatch");
+        }
+      }
+    }
   }
   return result("pass", "matched");
 }
@@ -709,6 +758,7 @@ export function validateStagedBicepBaseline(request: {
   readonly manifest: LogicalResourceManifestV1;
   readonly binding: IacBindingV1;
   readonly json: string;
+  readonly sourceFiles?: Readonly<Record<string, string>>;
 }): NonNullable<NativeValidationReceiptV1["securityBaseline"]> {
   const parity = validateStagedBicepParity(request);
   const result = (
@@ -738,28 +788,76 @@ export function validateStagedBicepBaseline(request: {
   } catch {
     return result("unsupported", "resource-parity");
   }
+  const legacyTls = new Set(["1.0", "1.1", "TLS1_0", "TLS1_1"]);
   for (const resource of allObserved) {
+    if (resource.existing === true) continue;
     const type = resource.resourceType?.toLowerCase();
     const props = object(resource.value.properties);
-    if (type === "microsoft.storage/storageaccounts" && resource.existing !== true && props !== undefined) {
+    if (type === "microsoft.storage/storageaccounts" && props !== undefined) {
       if (
         props.allowBlobPublicAccess === true ||
         props.allowSharedKeyAccess === true ||
         props.supportsHttpsTrafficOnly === false ||
-        props.minimumTlsVersion === "TLS1_0" ||
-        props.minimumTlsVersion === "TLS1_1"
+        (typeof props.minimumTlsVersion === "string" && legacyTls.has(props.minimumTlsVersion))
       ) {
         return result("fail", "storage-controls");
       }
-    }
-    if (type === "microsoft.resources/deployments" && props !== undefined) {
-      const params = object(props.parameters);
+    } else if (type === "microsoft.web/sites" && props !== undefined) {
+      const siteConfig = object(props.siteConfig);
       if (
-        own(params?.allowBlobPublicAccess, "value") === true ||
-        own(params?.allowSharedKeyAccess, "value") === true ||
-        own(params?.supportsHttpsTrafficOnly, "value") === false ||
-        own(params?.minimumTlsVersion, "value") === "TLS1_0" ||
-        own(params?.minimumTlsVersion, "value") === "TLS1_1"
+        props.httpsOnly === false ||
+        siteConfig?.http20Enabled === false ||
+        siteConfig?.ftpsState === "AllAllowed" ||
+        (typeof siteConfig?.minTlsVersion === "string" && legacyTls.has(siteConfig.minTlsVersion))
+      ) {
+        return result("fail", "storage-controls");
+      }
+    } else if (type === "microsoft.containerregistry/registries" && props !== undefined) {
+      if (props.adminUserEnabled === true) return result("fail", "storage-controls");
+    } else if (type === "microsoft.keyvault/vaults" && props !== undefined) {
+      if (props.enableRbacAuthorization === false || props.enableSoftDelete === false) {
+        return result("fail", "storage-controls");
+      }
+    } else if (type === "microsoft.sql/servers" && props !== undefined) {
+      const admins = object(props.administrators);
+      if (
+        (typeof props.minimalTlsVersion === "string" && legacyTls.has(props.minimalTlsVersion)) ||
+        admins?.azureADOnlyAuthentication === false
+      ) {
+        return result("fail", "storage-controls");
+      }
+    } else if (
+      (type === "microsoft.dbforpostgresql/flexibleservers" || type === "microsoft.dbformysql/flexibleservers") &&
+      props !== undefined
+    ) {
+      if (props.sslEnforcement === "Disabled") return result("fail", "storage-controls");
+    } else if (
+      (type === "microsoft.servicebus/namespaces" ||
+        type === "microsoft.eventhub/namespaces" ||
+        type === "microsoft.cache/redis") &&
+      props !== undefined
+    ) {
+      if (
+        props.enableNonSslPort === true ||
+        (typeof props.minimumTlsVersion === "string" && legacyTls.has(props.minimumTlsVersion))
+      ) {
+        return result("fail", "storage-controls");
+      }
+    } else if (type === "microsoft.resources/deployments" && props !== undefined) {
+      const params = object(props.parameters);
+      const paramVal = (name: string): unknown => own(params?.[name], "value");
+      const tlsParam = paramVal("minimumTlsVersion") ?? paramVal("minTlsVersion") ?? paramVal("minimalTlsVersion");
+      if (
+        paramVal("allowBlobPublicAccess") === true ||
+        paramVal("allowSharedKeyAccess") === true ||
+        paramVal("supportsHttpsTrafficOnly") === false ||
+        paramVal("httpsOnly") === false ||
+        paramVal("adminUserEnabled") === true ||
+        paramVal("acrAdminUserEnabled") === true ||
+        paramVal("enableRbacAuthorization") === false ||
+        paramVal("enableSoftDelete") === false ||
+        paramVal("enableNonSslPort") === true ||
+        (typeof tlsParam === "string" && legacyTls.has(tlsParam))
       ) {
         return result("fail", "storage-controls");
       }
@@ -795,20 +893,79 @@ export function validateStagedTerraformParity(request: {
     outcome,
     reason,
   });
-  const tfEntries = Object.entries(request.files).filter(([path]) => path.endsWith(".tf"));
+  const expected = request.manifest.resources;
+  const byId = new Map(expected.map((entry) => [entry.logicalId, entry]));
+  if (
+    byId.size !== expected.length ||
+    new Set(expected.map(({ executionAddress }) => executionAddress)).size !== expected.length ||
+    expected.some(
+      (entry) =>
+        entry.executionAddress === undefined ||
+        entry.executionAddress.length === 0 ||
+        entry.dependsOn.some((dep) => !byId.has(dep)),
+    )
+  ) {
+    return result("unsupported", "unsupported-resource");
+  }
+  const tfEntries = Object.entries(request.files)
+    .filter(([path]) => path.endsWith(".tf"))
+    .sort(([a], [b]) => a.localeCompare(b));
   if (tfEntries.length === 0) return result("fail", "coverage-mismatch");
-  const combined = tfEntries.map(([, content]) => stripHclComments(content)).join("\n");
-  for (const expected of request.manifest.resources) {
-    if (expected.ownership === "existing") continue;
-    const symbol = (expected.executionAddress ?? expected.logicalId.replaceAll("-", "_")).split(".").at(-1)!;
-    const hasSymbol =
-      expected.implementationKind === "module"
-        ? new RegExp(`\\bmodule\\s+"${symbol.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")}"\\s*\\{`, "u").test(combined)
-        : new RegExp(
-            `\\bresource\\s+"[^"]+"\\s+"${symbol.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")}"\\s*\\{`,
-            "u",
-          ).test(combined);
-    if (!hasSymbol) return result("fail", "coverage-mismatch");
+  const blocks = parseTerraformBlocks(tfEntries.map(([, content]) => content).join("\n\n"));
+  if (blocks === undefined) return result("unsupported", "invalid-source");
+  for (const resource of expected) {
+    const matches = blocks.filter(({ address }) => address === resource.executionAddress);
+    if (matches.length !== 1) return result("fail", "coverage-mismatch");
+    const block = matches[0]!;
+    const expectedKind =
+      resource.ownership === "existing" ? "data" : resource.implementationKind === "module" ? "module" : "resource";
+    if (block.kind !== expectedKind) return result("fail", "type-mismatch");
+    const attrs = parseTopLevelHclAttributes(block.body);
+    if (attrs === undefined) return result("unsupported", "unsupported-resource");
+    const bound = request.binding?.resourceBindings[resource.logicalId];
+    if (bound !== undefined && bound.implementation !== resource.implementationAddress) {
+      return result("fail", "type-mismatch");
+    }
+    if (block.kind === "module") {
+      const avmMatch = /^avm:([^@\s]+)@([^@\s]+)$/u.exec(resource.implementationAddress);
+      if (avmMatch === null) return result("unsupported", "unsupported-resource");
+      const sourceAttr = parseHclStringLiteral(attrs.get("source"));
+      const versionAttr = parseHclStringLiteral(attrs.get("version"));
+      if (sourceAttr === undefined || versionAttr === undefined) return result("unsupported", "unsupported-resource");
+      if (
+        sourceAttr !== avmMatch[1] ||
+        versionAttr.replace(/^=\s*/u, "") !== avmMatch[2]!.replace(/^=\s*/u, "") ||
+        (bound !== undefined && bound.version !== avmMatch[2])
+      ) {
+        return result("fail", "type-mismatch");
+      }
+    } else if (block.blockType === "azapi_resource") {
+      const nativeMatch = /^native:([^@\s]+)@([^@\s]+)$/u.exec(resource.implementationAddress);
+      if (nativeMatch === null) return result("unsupported", "unsupported-resource");
+      const typeAttr = parseHclStringLiteral(attrs.get("type"));
+      if (typeAttr === undefined) return result("unsupported", "unsupported-resource");
+      if (
+        typeAttr.toLowerCase() !== `${nativeMatch[1]!}@${nativeMatch[2]!}`.toLowerCase() ||
+        (bound !== undefined && bound.version !== nativeMatch[2]) ||
+        (/^Microsoft\.[A-Za-z0-9.]+(?:\/[A-Za-z][A-Za-z0-9]*)+$/iu.test(resource.type) &&
+          nativeMatch[1]!.toLowerCase() !== resource.type.toLowerCase())
+      ) {
+        return result("fail", "type-mismatch");
+      }
+    } else {
+      return result("fail", "type-mismatch");
+    }
+    if (resource.ownership !== "existing" && resource.dependsOn.length > 0) {
+      for (const depId of resource.dependsOn) {
+        const depAddress = byId.get(depId)?.executionAddress;
+        if (depAddress === undefined) return result("fail", "dependency-mismatch");
+        const escapedAddr = depAddress.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+        const referencedInBody = new RegExp(`\\b${escapedAddr}\\b`, "u").test(block.body);
+        if (!block.dependsOn.includes(depAddress) && !referencedInBody) {
+          return result("fail", "dependency-mismatch");
+        }
+      }
+    }
   }
   return result("pass", "matched");
 }
@@ -838,14 +995,35 @@ export function validateStagedTerraformBaseline(request: {
     outcome,
     reason,
   });
-  for (const content of Object.values(request.files)) {
+  for (const [path, content] of Object.entries(request.files)) {
+    if (path === ".terraform.lock.hcl") continue;
     if (SECRET_VALUE_PATTERN.test(content)) return result("fail", "credential-content");
     const clean = stripHclComments(content);
+    for (const rawLine of clean.split(/\r?\n/u)) {
+      const line = rawLine.trim();
+      if (line.length === 0) continue;
+      const match = /^"?([A-Za-z_][A-Za-z0-9_-]*)"?\s*[:=]\s*"([^"]+)"\s*,?$/u.exec(line);
+      if (match !== null && !match[2]!.includes("${") && isSecretBearingField(match[1]!, match[2]!)) {
+        return result("fail", "credential-content");
+      }
+    }
     if (
       /\ballow_nested_items_to_be_public\s*=\s*true\b/u.test(clean) ||
       /\bshared_access_key_enabled\s*=\s*true\b/u.test(clean) ||
       /\bhttps_traffic_only_enabled\s*=\s*false\b/u.test(clean) ||
-      /\bmin_tls_version\s*=\s*"TLS1_[01]"\b/u.test(clean)
+      /\ballowBlobPublicAccess"?\s*[:=]\s*true\b/u.test(clean) ||
+      /\ballowSharedKeyAccess"?\s*[:=]\s*true\b/u.test(clean) ||
+      /\bsupportsHttpsTrafficOnly"?\s*[:=]\s*false\b/u.test(clean) ||
+      /\b(?:https_only|httpsOnly|http2_enabled|http20Enabled)"?\s*[:=]\s*false\b/u.test(clean) ||
+      /\b(?:admin_enabled|adminUserEnabled|acrAdminUserEnabled|non_ssl_port_enabled|enableNonSslPort)"?\s*[:=]\s*true\b/u.test(
+        clean,
+      ) ||
+      /\b(?:enable_rbac_authorization|rbac_authorization_enabled|enableRbacAuthorization|enableSoftDelete)"?\s*[:=]\s*false\b/u.test(
+        clean,
+      ) ||
+      /\b(?:min_tls_version|minimum_tls_version|minimumTlsVersion|minTlsVersion|minimalTlsVersion)"?\s*[:=]\s*"(?:TLS1_[01]|1\.[01])"/u.test(
+        clean,
+      )
     ) {
       return result("fail", "storage-controls");
     }
@@ -1064,6 +1242,19 @@ export function validateBicepStorageBaseline(request: {
     !hasSecretValue(value, true) &&
     !/\bconcat\s*\(/iu.test(value) &&
     /^\[(?:parameters|tryGet|if|subscriptionResourceId|resourceId|reference)\(/u.test(value);
+  const topLevelParams = object(object(parsed)?.parameters);
+  const secureParameterNames = new Set(
+    Object.entries(topLevelParams ?? {})
+      .filter(([, def]) => {
+        const paramType = text(object(def)?.type)?.toLowerCase();
+        return paramType === "securestring" || paramType === "secureobject";
+      })
+      .map(([name]) => name),
+  );
+  const isVerifiedSecureParameterReference = (value: string): boolean => {
+    const match = /^\[parameters\('([A-Za-z_][A-Za-z0-9_]*)'\)\]$/u.exec(value.trim());
+    return match !== null && secureParameterNames.has(match[1]!);
+  };
   const hasCredential = (value: unknown, insideModuleTemplate = false, inDeploymentProperties = false): boolean => {
     if (typeof value === "string") {
       return hasSecretValue(value, insideModuleTemplate);
@@ -1083,7 +1274,8 @@ export function validateBicepStorageBaseline(request: {
         if (
           candidate !== undefined &&
           candidate.length > 0 &&
-          !(insideModuleTemplate && isSafeModuleFieldExpression(candidate))
+          !(insideModuleTemplate && isSafeModuleFieldExpression(candidate)) &&
+          !(!insideModuleTemplate && isVerifiedSecureParameterReference(candidate))
         ) {
           return true;
         }

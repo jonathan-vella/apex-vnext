@@ -4809,16 +4809,7 @@ export class ApexService {
       throw new ApexError("APEX_AUTHORIZATION", "Only code generation tasks may stage files", EXIT_CODES.authorization);
     await this.assertPreviousGeneratedSourceUnmodified(await this.journal(run).replay());
     const normalized = relativePath.replaceAll("\\", "/");
-    const suffixes = [
-      ".terraform.lock.hcl",
-      ".tfvars.example",
-      ".bicepparam",
-      ".bicep",
-      ".json",
-      ".tf",
-      ".md",
-      ".yaml",
-    ];
+    const suffixes = [".terraform.lock.hcl", ".tfvars.example", ".bicep", ".json", ".tf", ".md", ".yaml"];
     if (
       isAbsolute(relativePath) ||
       normalized.length === 0 ||
@@ -5198,26 +5189,6 @@ export class ApexService {
     if (run.iacTool === "bicep" && resolveExecutable("bicep") !== undefined) {
       await this.whileExternalProcessRuns(async () => {
         try {
-          await this.processRunner.run({
-            executable: "bicep",
-            args: ["format", "--pattern", "**/*.bicep"],
-            cwd: taskRoot,
-            timeoutMs: 60_000,
-            maxOutputBytes: 256 * 1024,
-          });
-        } catch (error) {
-          const result = error instanceof ProcessRunnerError ? error.result : undefined;
-          const detail = this.sanitizeCompilerDiagnostics(
-            result === undefined ? String(error) : `${result.stderr}\n${result.stdout}`,
-            taskRoot,
-          );
-          throw new ApexError(
-            "APEX_VALIDATION",
-            `Staged Bicep failed bicep format${detail.length === 0 ? "" : `: ${detail}`}`,
-            EXIT_CODES.validation,
-          );
-        }
-        try {
           const buildResult = await this.processRunner.run({
             executable: "bicep",
             args: ["build", entrypoint, "--stdout"],
@@ -5263,17 +5234,17 @@ export class ApexService {
             EXIT_CODES.validation,
           );
         }
-      });
-    } else if (run.iacTool === "terraform" && resolveExecutable("terraform") !== undefined) {
-      await this.whileExternalProcessRuns(async () => {
         try {
-          await this.processRunner.run({
-            executable: "terraform",
-            args: ["fmt", "-recursive"],
+          const fmtResult = await this.processRunner.run({
+            executable: "bicep",
+            args: ["format", "--pattern", "**/*.bicep"],
             cwd: taskRoot,
             timeoutMs: 60_000,
             maxOutputBytes: 256 * 1024,
           });
+          if (fmtResult.exitCode !== 0 || fmtResult.signal !== null || fmtResult.timedOut) {
+            throw new ProcessRunnerError("PROCESS_EXIT_NONZERO", "bicep format failed", fmtResult);
+          }
         } catch (error) {
           const result = error instanceof ProcessRunnerError ? error.result : undefined;
           const detail = this.sanitizeCompilerDiagnostics(
@@ -5282,9 +5253,45 @@ export class ApexService {
           );
           throw new ApexError(
             "APEX_VALIDATION",
-            `Staged Terraform failed terraform fmt${detail.length === 0 ? "" : `: ${detail}`}`,
+            `Staged Bicep failed bicep format${detail.length === 0 ? "" : `: ${detail}`}`,
             EXIT_CODES.validation,
           );
+        }
+      });
+    } else if (run.iacTool === "terraform" && resolveExecutable("terraform") !== undefined) {
+      await this.whileExternalProcessRuns(async () => {
+        try {
+          for (const [label, args] of [
+            ["terraform init", ["init", "-backend=false", "-input=false", "-no-color"]],
+            ["terraform validate", ["validate", "-no-color"]],
+            ["terraform fmt", ["fmt", "-recursive"]],
+          ] as const) {
+            try {
+              const tfResult = await this.processRunner.run({
+                executable: "terraform",
+                args: [...args],
+                cwd: taskRoot,
+                timeoutMs: 120_000,
+                maxOutputBytes: 512 * 1024,
+              });
+              if (tfResult.exitCode !== 0 || tfResult.signal !== null || tfResult.timedOut) {
+                throw new ProcessRunnerError("PROCESS_EXIT_NONZERO", `${label} failed`, tfResult);
+              }
+            } catch (error) {
+              const result = error instanceof ProcessRunnerError ? error.result : undefined;
+              const detail = this.sanitizeCompilerDiagnostics(
+                result === undefined ? String(error) : `${result.stderr}\n${result.stdout}`,
+                taskRoot,
+              );
+              throw new ApexError(
+                "APEX_VALIDATION",
+                `Staged Terraform failed ${label}${detail.length === 0 ? "" : `: ${detail}`}`,
+                EXIT_CODES.validation,
+              );
+            }
+          }
+        } finally {
+          await rm(join(taskRoot, ".terraform"), { recursive: true, force: true });
         }
       });
     }
@@ -12437,13 +12444,9 @@ export class ApexService {
       byComponent.set(resource.componentId, list);
     }
     const entries: NonNullable<PreviewRequest["policyValidation"]>["logicalResourceManifest"] = {};
-    for (const { logicalId, componentId, executionAddress } of managed) {
-      const siblings = componentId === undefined ? byComponent.get(logicalId) : byComponent.get(componentId);
-      const sortedSiblings = siblings !== undefined && siblings.length > 1 ? [...siblings].sort() : undefined;
-      entries[logicalId] = {
-        ...(track === "bicep" ? { codeSymbol: executionAddress! } : { terraformAddress: executionAddress! }),
-        ...(sortedSiblings === undefined ? {} : { componentSymbols: sortedSiblings }),
-      };
+    for (const { logicalId, executionAddress } of managed) {
+      entries[logicalId] =
+        track === "bicep" ? { codeSymbol: executionAddress! } : { terraformAddress: executionAddress! };
     }
     for (const [componentId, symbols] of byComponent.entries()) {
       if (Object.hasOwn(entries, componentId) || symbols.length === 0) continue;
