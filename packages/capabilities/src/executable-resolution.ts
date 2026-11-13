@@ -1,4 +1,5 @@
 import { accessSync, constants, statSync } from "node:fs";
+import { homedir } from "node:os";
 import { posix, win32 } from "node:path";
 
 export interface ExecutableResolutionOptions {
@@ -68,6 +69,18 @@ export function resolveExecutable(executable: string, options: ExecutableResolut
       isExecutableFile(candidate, platform),
     );
     if (found !== undefined) return found;
+  }
+  const baseName = path.basename(executable, path.extname(executable)).toLowerCase();
+  if (baseName === "bicep") {
+    const home =
+      environmentValue(env, "USERPROFILE", platform) ??
+      environmentValue(env, "HOME", platform) ??
+      (options.env === undefined ? homedir() : undefined);
+    if (home !== undefined && home.length > 0) {
+      const azureBin = path.join(home, ".azure", "bin", executable);
+      const found = candidatesFor(azureBin).find((candidate) => isExecutableFile(candidate, platform));
+      if (found !== undefined) return found;
+    }
   }
   return undefined;
 }

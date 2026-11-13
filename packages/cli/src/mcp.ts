@@ -932,7 +932,7 @@ export function createMcpServerFactory(
     "governanceImport",
     {
       description:
-        "Import governance for the active discovery task: a reviewed local subscription baseline path or reference: true for the shipped ALZ Corp reference baseline.",
+        "Import governance for an active discovery or refresh task: a reviewed local baseline path, or reference: true for the ALZ Corp reference baseline.",
       inputSchema: { path: z.string().min(1).optional(), reference: z.literal(true).optional() },
     },
     async ({ path, reference }) => {

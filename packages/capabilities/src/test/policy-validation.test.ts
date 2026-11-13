@@ -1780,4 +1780,71 @@ describe("bounded policy property validation", () => {
       "unsupported",
     );
   });
+
+  it("resolves 1-to-many componentSymbols and ARM status-wrapper objects in policy mappings", () => {
+    const map: PolicyPropertyMapV1 = {
+      schemaVersion: "1.0.0",
+      projectId: "demo",
+      runId: "run",
+      governanceHash: hash,
+      mappings: [
+        {
+          policyAssignmentId: "/providers/Microsoft.Authorization/policyAssignments/env-pna",
+          effect: "deny",
+          logicalResourceId: "container-platform",
+          propertyPath: "properties.publicNetworkAccess",
+          expectedValue: "Disabled",
+          disposition: "satisfied",
+        },
+        {
+          policyAssignmentId: "/providers/Microsoft.Authorization/policyAssignments/app-ingress",
+          effect: "deny",
+          logicalResourceId: "container-platform",
+          propertyPath: "properties.configuration.ingress.external",
+          expectedValue: false,
+          disposition: "satisfied",
+        },
+        {
+          policyAssignmentId: "/providers/Microsoft.Authorization/policyAssignments/acr-token",
+          effect: "modify",
+          logicalResourceId: "registry",
+          propertyPath: "properties.azureADAuthenticationAsArmPolicy",
+          expectedValue: "disabled",
+          disposition: "satisfied",
+        },
+      ],
+    };
+    const json = JSON.stringify({
+      resources: {
+        container_env: {
+          type: "Microsoft.App/managedEnvironments",
+          properties: { publicNetworkAccess: "Disabled" },
+        },
+        container_app: {
+          type: "Microsoft.App/containerApps",
+          properties: { configuration: { ingress: { external: false } } },
+        },
+        registry: {
+          type: "Microsoft.ContainerRegistry/registries",
+          properties: { azureADAuthenticationAsArmPolicy: { status: "disabled" } },
+        },
+      },
+    });
+    const validated = validatePolicyProperties({
+      track: "bicep",
+      sourceHash: hash,
+      policyMapHash: hash,
+      policyMap: map,
+      logicalResourceManifest: {
+        "container-platform": {
+          codeSymbol: "container_env",
+          componentSymbols: ["container_env", "container_app"],
+        },
+        registry: { codeSymbol: "registry" },
+      },
+      json,
+    });
+    assert.equal(validated.outcome, "pass");
+    assert.ok(validated.results.every(({ outcome }) => outcome === "pass"));
+  });
 });

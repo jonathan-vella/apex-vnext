@@ -31,6 +31,15 @@ test("Windows resolution applies PATHEXT, a mixed-case Path key and quoted PATH 
   assert.equal(resolveExecutable("C:\\Tools\\terraform", windows)?.toLowerCase(), "c:\\tools\\terraform.exe");
   assert.equal(resolveExecutable("bicep", windows), undefined);
   assert.equal(
+    resolveExecutable("bicep", {
+      ...windows,
+      env: { ...windows.env, USERPROFILE: "C:\\Users\\demo" },
+      isExecutableFile: (path) =>
+        windowsFiles.has(path.toLowerCase()) || path.toLowerCase() === "c:\\users\\demo\\.azure\\bin\\bicep.exe",
+    })?.toLowerCase(),
+    "c:\\users\\demo\\.azure\\bin\\bicep.exe",
+  );
+  assert.equal(
     resolveExecutable("az", { ...windows, env: { ...windows.env, PATHEXT: undefined } })?.toLowerCase(),
     "c:\\program files\\microsoft sdks\\azure\\cli2\\wbin\\az.cmd",
   );

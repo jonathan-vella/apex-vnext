@@ -12,6 +12,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0-next.16] — Preview
+
+This release simplifies Planning, CodeGen, and IaC Validation so pre-sales and multi-resource workloads author and
+validate real AVM Bicep and Terraform instead of blocking on static literal generator and storage-only AST gates.
+
+### Changed
+
+- Add `{ kind: "deferred", owner, reason? }` to `EnvironmentInputsV1Schema` (blocking only before live `preview`),
+  remove the placeholder `credential` secret reference from the `environment-inputs` template, add optional
+  `componentId` on `LogicalResourceV1Schema` for 1-to-many Architecture component splits, and stop requiring exact
+  resource-group `physicalResources` maps at `planComplete` on `local` and subscription-scoped runs.
+- Enable `APEX CodeGen` to stage real, idiomatic AVM Bicep and Terraform (`param`s, `variable`s, and cross-resource
+  symbolic outputs) via `apex/stageFile` (with `expectedSha` compare-and-swap replacement) and seal/compile-check via
+  `apex/generateIac`, surfacing sanitized compiler/linter diagnostics directly during CodeGen.
+- Resolve `bicep` from `~/.azure/bin` when installed via `az bicep install`, validate staged IaC with the native Bicep
+  and Terraform toolchains plus universal secret/baseline checks, and support 1-to-many `componentSymbols`, ARM
+  `{ status }` wrappers, and source-stage deferred policy expressions during offline validation.
+
 ## [0.11.0-next.15] — Preview
 
 This release fixes pilot workflow, pricing, review-artifact, and diagram issues uncovered during the EU partner webhook

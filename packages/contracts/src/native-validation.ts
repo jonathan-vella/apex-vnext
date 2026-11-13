@@ -364,7 +364,11 @@ export function hasValidNativeValidationReceipt(
       policy !== undefined &&
       (policy.projectId !== receipt.projectId ||
         policy.runId !== receipt.runId ||
-        policy.outcome !== "pass" ||
+        policy.outcome === "fail" ||
+        (policy.outcome === "unsupported" &&
+          policy.results.some(({ reason }) =>
+            ["unverified-exemption", "invalid-source", "unsupported-path", "unsupported-effect"].includes(reason),
+          )) ||
         !hasValidPolicyValidation(policy, {
           track: receipt.track,
           sourceHash: receipt.sourceHash,

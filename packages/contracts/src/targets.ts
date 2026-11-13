@@ -516,6 +516,15 @@ export const SecretReferenceV1Schema = Type.Object(
   { additionalProperties: false },
 );
 
+export const DeferredEnvironmentInputV1Schema = Type.Object(
+  {
+    kind: Type.Literal("deferred"),
+    owner: NonEmptyStringSchema,
+    reason: Type.Optional(NonEmptyStringSchema),
+  },
+  { additionalProperties: false },
+);
+
 export const EnvironmentInputsV1Schema = Type.Object(
   {
     schemaVersion: ContractVersionSchema,
@@ -533,6 +542,7 @@ export const EnvironmentInputsV1Schema = Type.Object(
           { additionalProperties: false },
         ),
         SecretReferenceV1Schema,
+        DeferredEnvironmentInputV1Schema,
       ]),
     ),
   },
@@ -549,6 +559,7 @@ export const LogicalResourceManifestV1Schema = Type.Object(
       Type.Object(
         {
           logicalId: NonEmptyStringSchema,
+          componentId: Type.Optional(NonEmptyStringSchema),
           type: NonEmptyStringSchema,
           implementationAddress: NonEmptyStringSchema,
           executionAddress: Type.Optional(NonEmptyStringSchema),
@@ -577,6 +588,7 @@ export const IacHandoffV1Schema = Type.Object(
     projectId: ProjectIdSchema,
     runId: RunIdSchema,
     track: IacToolSchema,
+    authoringMode: Type.Optional(Type.Union([Type.Literal("staged"), Type.Literal("generated")])),
     rootPath: NonEmptyStringSchema,
     treeHash: Sha256Schema,
     intentHash: Sha256Schema,
@@ -877,8 +889,18 @@ export function hasValidCostPricingSources(estimate: CostEstimateV1): boolean {
 
 export function hasOnlyTypedSecretReferences(inputs: EnvironmentInputsV1): boolean {
   return Object.values(inputs.inputs).every(
-    (input) => input.kind === "value" || (input.kind === "secret-reference" && input.reference.length > 0),
+    (input) =>
+      input.kind === "value" ||
+      (input.kind === "deferred" && input.owner.trim().length > 0) ||
+      (input.kind === "secret-reference" && input.reference.length > 0),
   );
+}
+
+export function deferredEnvironmentInputNames(inputs: EnvironmentInputsV1): string[] {
+  return Object.entries(inputs.inputs)
+    .filter(([, input]) => input.kind === "deferred")
+    .map(([name]) => name)
+    .sort();
 }
 
 export function hasValidLogicalResourceReferences(manifest: LogicalResourceManifestV1): boolean {

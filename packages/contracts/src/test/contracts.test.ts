@@ -67,6 +67,7 @@ import {
   WorkloadDecisionManifestV1Schema,
   contractMetadata,
   contractSchemas,
+  deferredEnvironmentInputNames,
   hasCompleteContractMetadata,
   hasOnlyTypedSecretReferences,
   hasValidLiveQualification,
@@ -1890,18 +1891,29 @@ describe("target family contracts", () => {
     assert.equal(hasValidCostArithmetic({ ...estimate, totalMonthlyCost: 145 }), false);
   });
 
-  it("permits secret references but rejects secret literal fields", () => {
+  it("permits secret references and deferred inputs while rejecting secret literal fields", () => {
     const inputs = fixtures[6][1] as EnvironmentInputsV1;
     assert.equal(hasOnlyTypedSecretReferences(inputs), true);
-    assert.equal(
-      Value.Check(EnvironmentInputsV1Schema, {
-        ...inputs,
-        inputs: {
-          deploymentToken: { kind: "secret-reference", provider: "environment", reference: "TOKEN", value: "secret" },
-        },
-      }),
-      false,
-    );
+    assert.deepEqual(deferredEnvironmentInputNames(inputs), []);
+    const withDeferred: EnvironmentInputsV1 = {
+      ...inputs,
+      inputs: {
+        ...inputs.inputs,
+        publicHostname: { kind: "deferred", owner: "partner-team", reason: "Allocated before preview" },
+        tlsCertRef: { kind: "deferred", owner: "partner-team" },
+      },
+    };
+    assert.equal(Value.Check(EnvironmentInputsV1Schema, withDeferred), true);
+    assert.equal(hasOnlyTypedSecretReferences(withDeferred), true);
+    assert.deepEqual(deferredEnvironmentInputNames(withDeferred), ["publicHostname", "tlsCertRef"]);
+    for (const invalid of [
+      { kind: "secret-reference", provider: "environment", reference: "TOKEN", value: "secret" },
+      { kind: "deferred" },
+      { kind: "deferred", owner: "" },
+      { kind: "deferred", owner: "partner", value: "secret" },
+    ]) {
+      assert.equal(Value.Check(EnvironmentInputsV1Schema, { ...inputs, inputs: { deploymentToken: invalid } }), false);
+    }
   });
 
   it("accepts optional non-empty execution addresses without changing binding descriptors", () => {

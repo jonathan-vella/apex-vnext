@@ -7,7 +7,7 @@ constraints, Bicep or Terraform, validation evidence and a deployment preview. Y
 A deterministic runtime, not the model, owns the state, the gates and the evidence.
 
 > [!WARNING]
-> **Preview software.** The current release is `0.11.0-next.15`, published in the `apex-plugins` marketplace. It targets
+> **Preview software.** The current release is `0.11.0-next.16`, published in the `apex-plugins` marketplace. It targets
 > **non-production** use: labs, demos and learning. Production deployment is blocked by design until its own approval
 > and execution model ships. See [Project status](#project-status).
 
@@ -108,7 +108,7 @@ governance collection uses. Deployments to Azure always go through an approved p
 
 | Area                           | State                                                                                          |
 | ------------------------------ | ---------------------------------------------------------------------------------------------- |
-| Runtime, CLI and agent plugin  | Preview `0.11.0-next.15`, published in the `apex-plugins` marketplace (`apex@apex-plugins`)     |
+| Runtime, CLI and agent plugin  | Preview `0.11.0-next.16`, published in the `apex-plugins` marketplace (`apex@apex-plugins`)     |
 | Lab approval flow              | Implemented: one intent confirmation, kernel readiness checkpoints, final preview approval     |
 | Bicep and Terraform tracks     | Implemented: Bicep runs through `azd` with AVM and native validation (`CP-26`, `CP-30`, `CP-33`); Terraform uses native CLI with HCL parity and baseline validation |
 | Supported-client qualification | Qualified across WSL2 Copilot CLI (full Bicep E2E) and Windows 11 Copilot app/VS Code (`CP-37`)|

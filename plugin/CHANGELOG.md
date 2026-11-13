@@ -10,6 +10,21 @@ When you prepare a release, rename `## [Unreleased]` to the new version.
 
 ## [Unreleased]
 
+## [0.11.0-next.16] - 2026-11-13
+
+This release simplifies Planning, CodeGen, and IaC Validation so pre-sales and multi-resource workloads author and
+validate real AVM Bicep and Terraform instead of blocking on static literal generator and storage-only AST gates.
+
+### Changed
+
+- Support `kind: "deferred"` in `environment-inputs` (blocked only before live `preview`), `componentId` 1-to-many
+  Architecture component splits in `implementation-intent`, and AVM bindings without RG `physicalResources` maps on
+  `local` and subscription-scoped runs.
+- Update `APEX CodeGen` and `apex/generateIac` to stage, format, compile-check, and seal real AVM Bicep and Terraform
+  with `param`s/`variable`s and symbolic module wiring, with `expectedSha` file replacement on compiler feedback.
+- Resolve `bicep` from `~/.azure/bin` when absent from `PATH` and validate staged trees with native `bicep`/`terraform`
+  toolchains, universal credential/baseline checks, and multi-resource/parameter-aware source policy validation.
+
 ## [0.11.0-next.15] - 2026-11-13
 
 This release fixes pilot workflow, pricing, review-artifact, and diagram issues uncovered during the EU partner webhook

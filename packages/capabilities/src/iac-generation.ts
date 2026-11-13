@@ -133,6 +133,10 @@ function parseBinding(implementation: string, declaredVersion: string): ParsedBi
   return parsed;
 }
 
+export function validateBindingImplementationPin(implementation: string, declaredVersion: string): ParsedBinding {
+  return parseBinding(implementation, declaredVersion);
+}
+
 function resourceContexts(intent: ImplementationIntentV1, binding: IacBindingV1): ResourceContext[] {
   if (intent.projectId !== binding.projectId || intent.runId !== binding.runId) {
     throw new TypeError("Intent and binding identities do not match");
@@ -445,6 +449,76 @@ function virtualTree(
   return { files: normalized, logicalManifest, treeHash: sha256(normalized) };
 }
 
+export function computeVirtualTree(
+  files: readonly VirtualTreeFile[],
+  logicalManifest: LogicalResourceManifestV1,
+): GeneratedVirtualTree {
+  return virtualTree(files, logicalManifest);
+}
+
+export function buildLogicalResourceManifest(
+  intent: ImplementationIntentV1,
+  binding: IacBindingV1,
+  sourcePath: string,
+  existingResources: readonly string[] = [],
+): LogicalResourceManifestV1 {
+  if (intent.projectId !== binding.projectId || intent.runId !== binding.runId) {
+    throw new TypeError("Intent and binding identities do not match");
+  }
+  const intentIds = new Set(intent.resources.map(({ id }) => id));
+  const bindingIds = Object.keys(binding.resourceBindings);
+  if (bindingIds.length !== intentIds.size || bindingIds.some((id) => !intentIds.has(id))) {
+    throw new TypeError("Binding must cover every logical resource exactly once");
+  }
+  const existing = new Set(existingResources);
+  for (const logicalId of existing) {
+    assertLogicalId(logicalId, "Existing resource id");
+    if (!intentIds.has(logicalId)) {
+      throw new TypeError(`Existing resource '${logicalId}' is not present in the intent`);
+    }
+  }
+  const symbols = new Map<string, string>();
+  const contexts = [...intent.resources]
+    .sort((left, right) => left.id.localeCompare(right.id))
+    .map((resource) => {
+      assertLogicalId(resource.id, "Logical resource id");
+      const declaration = symbolicName(resource.id);
+      const previous = symbols.get(declaration);
+      if (previous !== undefined) {
+        throw new TypeError(
+          `Logical resource ids '${previous}' and '${resource.id}' map to the same IaC symbolic name '${declaration}'`,
+        );
+      }
+      symbols.set(declaration, resource.id);
+      for (const dependency of resource.dependsOn) {
+        assertLogicalId(dependency, "Dependency id");
+        if (!intentIds.has(dependency)) {
+          throw new TypeError(`Resource '${resource.id}' has unknown dependency '${dependency}'`);
+        }
+      }
+      const resourceBinding = binding.resourceBindings[resource.id]!;
+      if (resourceBinding.scopeLogicalId !== undefined) {
+        const target = binding.resourceBindings[resourceBinding.scopeLogicalId];
+        if (
+          binding.track !== "bicep" ||
+          target === undefined ||
+          target.scopeLogicalId !== undefined ||
+          resourceBinding.scopeLogicalId === resource.id ||
+          !resource.dependsOn.includes(resourceBinding.scopeLogicalId)
+        ) {
+          throw new TypeError("Scoped Bicep binding requires an explicit unchained dependency");
+        }
+      }
+      return {
+        resource,
+        binding: resourceBinding,
+        declaration,
+        parsed: parseBinding(resourceBinding.implementation, resourceBinding.version),
+      };
+    });
+  return manifest(intent, binding, contexts, sourcePath, existing);
+}
+
 function manifest(
   intent: ImplementationIntentV1,
   binding: IacBindingV1,
@@ -459,6 +533,7 @@ function manifest(
     track: binding.track,
     resources: contexts.map(({ resource, declaration, parsed }) => ({
       logicalId: resource.id,
+      ...(resource.componentId === undefined ? {} : { componentId: resource.componentId }),
       type: resource.type,
       implementationAddress: binding.resourceBindings[resource.id]!.implementation,
       executionAddress:

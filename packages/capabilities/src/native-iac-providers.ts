@@ -73,6 +73,10 @@ import {
   validateBicepResourceParity,
   validateBicepStorageDiagnostics,
   validateBicepStorageBaseline,
+  validateStagedBicepParity,
+  validateStagedBicepBaseline,
+  validateStagedTerraformParity,
+  validateStagedTerraformBaseline,
   validateTerraformResourceParity,
   validateTerraformStorageBaseline,
 } from "./policy-validation.js";
@@ -687,18 +691,32 @@ abstract class NativeProviderBase {
       if (parityManifest !== undefined) {
         receipt.resourceParity =
           track === "bicep"
-            ? validateBicepResourceParity({
-                sourceHash: receipt.sourceHash,
-                manifest: parityManifest,
-                ...(parityBinding === undefined ? {} : { binding: parityBinding }),
-                json: compiledTemplate ?? "",
-              })
-            : validateTerraformResourceParity({
-                sourceHash: receipt.sourceHash,
-                manifest: parityManifest,
-                ...(parityBinding === undefined ? {} : { binding: parityBinding }),
-                files: terraformFiles,
-              });
+            ? request.stagedSource === true
+              ? validateStagedBicepParity({
+                  sourceHash: receipt.sourceHash,
+                  manifest: parityManifest,
+                  ...(parityBinding === undefined ? {} : { binding: parityBinding }),
+                  json: compiledTemplate ?? "",
+                })
+              : validateBicepResourceParity({
+                  sourceHash: receipt.sourceHash,
+                  manifest: parityManifest,
+                  ...(parityBinding === undefined ? {} : { binding: parityBinding }),
+                  json: compiledTemplate ?? "",
+                })
+            : request.stagedSource === true
+              ? validateStagedTerraformParity({
+                  sourceHash: receipt.sourceHash,
+                  manifest: parityManifest,
+                  ...(parityBinding === undefined ? {} : { binding: parityBinding }),
+                  files: terraformFiles,
+                })
+              : validateTerraformResourceParity({
+                  sourceHash: receipt.sourceHash,
+                  manifest: parityManifest,
+                  ...(parityBinding === undefined ? {} : { binding: parityBinding }),
+                  files: terraformFiles,
+                });
         const { receiptHash: previousHash, ...updated } = receipt;
         if (!previousHash) throw sourceBindingError();
         receipt.receiptHash = calculateNativeValidationReceiptHash(updated);
@@ -706,19 +724,33 @@ abstract class NativeProviderBase {
       if (parityManifest !== undefined && parityBinding !== undefined) {
         receipt.securityBaseline =
           track === "bicep"
-            ? validateBicepStorageBaseline({
-                sourceHash: receipt.sourceHash,
-                manifest: parityManifest,
-                binding: parityBinding,
-                json: compiledTemplate ?? "",
-                ...(request.targetScope === undefined ? {} : { targetScope: request.targetScope }),
-              })
-            : validateTerraformStorageBaseline({
-                sourceHash: receipt.sourceHash,
-                manifest: parityManifest,
-                binding: parityBinding,
-                files: terraformFiles,
-              });
+            ? request.stagedSource === true
+              ? validateStagedBicepBaseline({
+                  sourceHash: receipt.sourceHash,
+                  manifest: parityManifest,
+                  binding: parityBinding,
+                  json: compiledTemplate ?? "",
+                })
+              : validateBicepStorageBaseline({
+                  sourceHash: receipt.sourceHash,
+                  manifest: parityManifest,
+                  binding: parityBinding,
+                  json: compiledTemplate ?? "",
+                  ...(request.targetScope === undefined ? {} : { targetScope: request.targetScope }),
+                })
+            : request.stagedSource === true
+              ? validateStagedTerraformBaseline({
+                  sourceHash: receipt.sourceHash,
+                  manifest: parityManifest,
+                  binding: parityBinding,
+                  files: terraformFiles,
+                })
+              : validateTerraformStorageBaseline({
+                  sourceHash: receipt.sourceHash,
+                  manifest: parityManifest,
+                  binding: parityBinding,
+                  files: terraformFiles,
+                });
         const { receiptHash: previousHash, ...updated } = receipt;
         if (!previousHash) throw sourceBindingError();
         receipt.receiptHash = calculateNativeValidationReceiptHash(updated);
@@ -740,8 +772,15 @@ abstract class NativeProviderBase {
         receipt.receiptHash = calculateNativeValidationReceiptHash(updated);
       }
       if (track === "bicep" && policyInput !== undefined && hasActionablePolicyMappings(policyInput.policyMap)) {
+        const unsafePolicyReasons = new Set([
+          "unverified-exemption",
+          "invalid-source",
+          "unsupported-path",
+          "unsupported-effect",
+        ]);
         let policyValidation: PolicyValidationV1 | undefined;
         let failure = "Native policy property validation failed";
+        let rejected = false;
         try {
           policyValidation = validatePolicyProperties({
             ...policyInput,
@@ -750,14 +789,17 @@ abstract class NativeProviderBase {
             policyMapHash: receipt.policyHash,
             json: compiledTemplate ?? "",
           });
-          if (policyValidation.outcome !== "pass") failure += `: ${policyFailureSummary(policyValidation)}`;
+          rejected =
+            policyValidation.outcome === "fail" ||
+            policyValidation.results.some(({ reason }) => unsafePolicyReasons.has(reason));
+          if (rejected) failure += `: ${policyFailureSummary(policyValidation)}`;
         } catch {
           policyValidation = undefined;
+          rejected = true;
         } finally {
           await verify();
         }
-        if (policyValidation === undefined || policyValidation.outcome !== "pass")
-          throw new IacProviderError("NATIVE_VALIDATION_FAILED", failure);
+        if (policyValidation === undefined || rejected) throw new IacProviderError("NATIVE_VALIDATION_FAILED", failure);
         receipt.policyValidation = policyValidation;
         const { receiptHash, ...updated } = receipt;
         if (!receiptHash)

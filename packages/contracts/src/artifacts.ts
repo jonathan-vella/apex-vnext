@@ -107,6 +107,7 @@ export type RequirementsChangeProposalV1 = Static<typeof RequirementsChangePropo
 export const LogicalResourceV1Schema = Type.Object(
   {
     id: NonEmptyStringSchema,
+    componentId: Type.Optional(NonEmptyStringSchema),
     type: NonEmptyStringSchema,
     purpose: NonEmptyStringSchema,
     dependsOn: Type.Array(NonEmptyStringSchema, { uniqueItems: true }),

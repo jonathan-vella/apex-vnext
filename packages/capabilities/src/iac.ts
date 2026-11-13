@@ -91,6 +91,7 @@ export interface NativeValidationRequest {
     Record<string, { readonly binding: PolicyResourceBinding; readonly workspaceResourceId: string }>
   >;
   readonly targetScope?: string;
+  readonly stagedSource?: boolean;
 }
 
 export interface CurrentDeploymentAuthority {

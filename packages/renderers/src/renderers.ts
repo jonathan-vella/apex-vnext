@@ -170,8 +170,12 @@ export function renderDeploymentGuide(input: {
       configurations.map(([name, value]) => [
         name,
         value.kind,
-        value.kind === "value" ? "Not a secret reference" : `${value.provider}:${value.reference}`,
-        value.kind === "value" ? "Not applicable" : (value.version ?? "Not pinned"),
+        value.kind === "value"
+          ? "Not a secret reference"
+          : value.kind === "deferred"
+            ? `Deferred (${value.owner}${value.reason === undefined ? "" : `: ${value.reason}`})`
+            : `${value.provider}:${value.reference}`,
+        value.kind === "secret-reference" ? (value.version ?? "Not pinned") : "Not applicable",
       ]),
     ),
     "",

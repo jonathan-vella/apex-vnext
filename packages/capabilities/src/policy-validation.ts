@@ -25,6 +25,7 @@ export interface PolicyResourceBinding {
   readonly physicalId?: string;
   readonly codeSymbol?: string;
   readonly terraformAddress?: string;
+  readonly componentSymbols?: readonly string[];
 }
 
 export interface PolicyValidationInput {
@@ -381,9 +382,50 @@ function observeBoundProperty(
   }
   if (walked.expressionHit || hasUnknown(walked.unknown) || expression(walked.observed, request.track))
     return { outcome: "unsupported", reason: "unsupported-expression" };
-  if (walked.observed === undefined) return { outcome: "fail", reason: "missing-property" };
-  const observedValueDigest = calculatePolicyValidationDigest(walked.observed);
-  const matched = observedValueDigest === calculatePolicyValidationDigest(mapping.expectedValue);
+  if (walked.observed === undefined) {
+    const rawSiblings = own(binding, "componentSymbols");
+    if (Array.isArray(rawSiblings) && rawSiblings.length > 0 && physicalId === undefined) {
+      const siblingOutcomes = rawSiblings
+        .filter((sym): sym is string => typeof sym === "string" && sym.length > 0 && sym !== codeSymbol)
+        .map((sym) =>
+          observeBoundProperty(
+            mapping,
+            {
+              track: request.track,
+              logicalResourceManifest: {
+                [mapping.logicalResourceId]:
+                  request.track === "terraform" ? { terraformAddress: sym } : { codeSymbol: sym },
+              },
+            },
+            resources,
+          ),
+        )
+        .filter((candidate) => !(candidate.outcome === "fail" && candidate.reason === "missing-property"));
+      if (siblingOutcomes.length === 1) return siblingOutcomes[0]!;
+      if (siblingOutcomes.some((candidate) => candidate.outcome === "fail")) {
+        return siblingOutcomes.find((candidate) => candidate.outcome === "fail")!;
+      }
+      if (siblingOutcomes.length > 1) return { outcome: "unsupported", reason: "ambiguous-resource" };
+    }
+    return { outcome: "fail", reason: "missing-property" };
+  }
+  const expectedValueDigest = calculatePolicyValidationDigest(mapping.expectedValue);
+  let observedValueDigest = calculatePolicyValidationDigest(walked.observed);
+  let matched = observedValueDigest === expectedValueDigest;
+  if (!matched) {
+    const statusWrapper = object(walked.observed);
+    if (
+      statusWrapper !== undefined &&
+      Object.keys(statusWrapper).length === 1 &&
+      Object.hasOwn(statusWrapper, "status")
+    ) {
+      const statusDigest = calculatePolicyValidationDigest(own(statusWrapper, "status"));
+      if (statusDigest === expectedValueDigest) {
+        observedValueDigest = statusDigest;
+        matched = true;
+      }
+    }
+  }
   return { outcome: matched ? "pass" : "fail", reason: matched ? "matched" : "value-mismatch", observedValueDigest };
 }
 
@@ -601,6 +643,217 @@ export function validateBicepStorageDiagnostics(request: {
   return result("pass", "matched");
 }
 
+export function validateStagedBicepParity(request: {
+  readonly sourceHash: string;
+  readonly manifest: LogicalResourceManifestV1;
+  readonly binding?: IacBindingV1;
+  readonly json: string;
+}): NonNullable<NativeValidationReceiptV1["resourceParity"]> {
+  const inputHash = createHash("sha256").update(request.json).digest("hex");
+  const result = (
+    outcome: "pass" | "fail" | "unsupported",
+    reason:
+      | "matched"
+      | "coverage-mismatch"
+      | "type-mismatch"
+      | "dependency-mismatch"
+      | "unsupported-resource"
+      | "invalid-source",
+  ) => ({
+    coverage: "bicep-symbolic-resource-parity-v1" as const,
+    sourceHash: request.sourceHash,
+    manifestHash: calculatePolicyValidationDigest(request.manifest),
+    ...(request.binding === undefined ? {} : { bindingHash: calculatePolicyValidationDigest(request.binding) }),
+    inputHash,
+    outcome,
+    reason,
+  });
+  let allObserved: readonly Resource[];
+  try {
+    allObserved = resourcesFromJson(request.json, "bicep");
+  } catch {
+    return result("unsupported", "invalid-source");
+  }
+  const topLevel = allObserved.filter((resource) => !resource.codeSymbol?.includes("::"));
+  for (const expected of request.manifest.resources) {
+    if (expected.ownership === "existing") continue;
+    const bySymbol = topLevel.find(({ codeSymbol }) => codeSymbol === expected.executionAddress);
+    if (bySymbol !== undefined) {
+      if (expected.implementationKind === "module") {
+        if (bySymbol.resourceType?.toLowerCase() !== "microsoft.resources/deployments") {
+          return result("fail", "type-mismatch");
+        }
+      } else if (
+        /^Microsoft\.[A-Za-z0-9.]+(?:\/[A-Za-z][A-Za-z0-9]*)+$/i.test(expected.type) &&
+        bySymbol.resourceType?.toLowerCase() !== expected.type.toLowerCase()
+      ) {
+        return result("fail", "type-mismatch");
+      }
+      continue;
+    }
+    const nativeMatch = /^native:(Microsoft\.[A-Za-z0-9.]+(?:\/[A-Za-z][A-Za-z0-9]*)+)@/i.exec(
+      expected.implementationAddress,
+    );
+    const hasMatchingResource =
+      expected.implementationKind === "module"
+        ? topLevel.some(({ resourceType }) => resourceType?.toLowerCase() === "microsoft.resources/deployments")
+        : nativeMatch !== null &&
+          allObserved.some(({ resourceType }) => resourceType?.toLowerCase() === nativeMatch[1]!.toLowerCase());
+    if (!hasMatchingResource) return result("fail", "coverage-mismatch");
+  }
+  return result("pass", "matched");
+}
+
+export function validateStagedBicepBaseline(request: {
+  readonly sourceHash: string;
+  readonly manifest: LogicalResourceManifestV1;
+  readonly binding: IacBindingV1;
+  readonly json: string;
+}): NonNullable<NativeValidationReceiptV1["securityBaseline"]> {
+  const parity = validateStagedBicepParity(request);
+  const result = (
+    outcome: "pass" | "fail" | "unsupported",
+    reason:
+      | "matched"
+      | "resource-parity"
+      | "unsupported-resource"
+      | "credential-content"
+      | "storage-controls"
+      | "diagnostic-routing",
+  ) => ({
+    coverage: "bicep-storage-only-baseline-v1" as const,
+    sourceHash: request.sourceHash,
+    inputHash: parity.inputHash,
+    manifestHash: parity.manifestHash,
+    bindingHash: calculatePolicyValidationDigest(request.binding),
+    outcome,
+    reason,
+  });
+  const strict = validateBicepStorageBaseline(request);
+  if (strict.outcome === "fail" && strict.reason === "credential-content") return strict;
+  if (parity.outcome !== "pass") return result(parity.outcome, "resource-parity");
+  let allObserved: readonly Resource[];
+  try {
+    allObserved = resourcesFromJson(request.json, "bicep");
+  } catch {
+    return result("unsupported", "resource-parity");
+  }
+  for (const resource of allObserved) {
+    const type = resource.resourceType?.toLowerCase();
+    const props = object(resource.value.properties);
+    if (type === "microsoft.storage/storageaccounts" && resource.existing !== true && props !== undefined) {
+      if (
+        props.allowBlobPublicAccess === true ||
+        props.allowSharedKeyAccess === true ||
+        props.supportsHttpsTrafficOnly === false ||
+        props.minimumTlsVersion === "TLS1_0" ||
+        props.minimumTlsVersion === "TLS1_1"
+      ) {
+        return result("fail", "storage-controls");
+      }
+    }
+    if (type === "microsoft.resources/deployments" && props !== undefined) {
+      const params = object(props.parameters);
+      if (
+        own(params?.allowBlobPublicAccess, "value") === true ||
+        own(params?.allowSharedKeyAccess, "value") === true ||
+        own(params?.supportsHttpsTrafficOnly, "value") === false ||
+        own(params?.minimumTlsVersion, "value") === "TLS1_0" ||
+        own(params?.minimumTlsVersion, "value") === "TLS1_1"
+      ) {
+        return result("fail", "storage-controls");
+      }
+    }
+  }
+  return result("pass", "matched");
+}
+
+export function validateStagedTerraformParity(request: {
+  readonly sourceHash: string;
+  readonly manifest: LogicalResourceManifestV1;
+  readonly binding?: IacBindingV1;
+  readonly files: Readonly<Record<string, string>>;
+}): NonNullable<NativeValidationReceiptV1["resourceParity"]> {
+  const inputHash = calculatePolicyValidationDigest(
+    Object.fromEntries(Object.entries(request.files).sort(([a], [b]) => a.localeCompare(b))),
+  );
+  const result = (
+    outcome: "pass" | "fail" | "unsupported",
+    reason:
+      | "matched"
+      | "coverage-mismatch"
+      | "type-mismatch"
+      | "dependency-mismatch"
+      | "unsupported-resource"
+      | "invalid-source",
+  ) => ({
+    coverage: "terraform-symbolic-resource-parity-v1" as const,
+    sourceHash: request.sourceHash,
+    manifestHash: calculatePolicyValidationDigest(request.manifest),
+    ...(request.binding === undefined ? {} : { bindingHash: calculatePolicyValidationDigest(request.binding) }),
+    inputHash,
+    outcome,
+    reason,
+  });
+  const tfEntries = Object.entries(request.files).filter(([path]) => path.endsWith(".tf"));
+  if (tfEntries.length === 0) return result("fail", "coverage-mismatch");
+  const combined = tfEntries.map(([, content]) => stripHclComments(content)).join("\n");
+  for (const expected of request.manifest.resources) {
+    if (expected.ownership === "existing") continue;
+    const symbol = (expected.executionAddress ?? expected.logicalId.replaceAll("-", "_")).split(".").at(-1)!;
+    const hasSymbol =
+      expected.implementationKind === "module"
+        ? new RegExp(`\\bmodule\\s+"${symbol.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")}"\\s*\\{`, "u").test(combined)
+        : new RegExp(
+            `\\bresource\\s+"[^"]+"\\s+"${symbol.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")}"\\s*\\{`,
+            "u",
+          ).test(combined);
+    if (!hasSymbol) return result("fail", "coverage-mismatch");
+  }
+  return result("pass", "matched");
+}
+
+export function validateStagedTerraformBaseline(request: {
+  readonly sourceHash: string;
+  readonly manifest: LogicalResourceManifestV1;
+  readonly binding: IacBindingV1;
+  readonly files: Readonly<Record<string, string>>;
+}): NonNullable<NativeValidationReceiptV1["securityBaseline"]> {
+  const parity = validateStagedTerraformParity(request);
+  const result = (
+    outcome: "pass" | "fail" | "unsupported",
+    reason:
+      | "matched"
+      | "resource-parity"
+      | "unsupported-resource"
+      | "credential-content"
+      | "storage-controls"
+      | "diagnostic-routing",
+  ) => ({
+    coverage: "terraform-source-baseline-v1" as const,
+    sourceHash: request.sourceHash,
+    inputHash: parity.inputHash,
+    manifestHash: parity.manifestHash,
+    bindingHash: calculatePolicyValidationDigest(request.binding),
+    outcome,
+    reason,
+  });
+  for (const content of Object.values(request.files)) {
+    if (SECRET_VALUE_PATTERN.test(content)) return result("fail", "credential-content");
+    const clean = stripHclComments(content);
+    if (
+      /\ballow_nested_items_to_be_public\s*=\s*true\b/u.test(clean) ||
+      /\bshared_access_key_enabled\s*=\s*true\b/u.test(clean) ||
+      /\bhttps_traffic_only_enabled\s*=\s*false\b/u.test(clean) ||
+      /\bmin_tls_version\s*=\s*"TLS1_[01]"\b/u.test(clean)
+    ) {
+      return result("fail", "storage-controls");
+    }
+  }
+  if (parity.outcome !== "pass") return result(parity.outcome, "resource-parity");
+  return result("pass", "matched");
+}
+
 export function validateBicepResourceParity(request: {
   readonly sourceHash: string;
   readonly manifest: LogicalResourceManifestV1;
@@ -793,8 +1046,12 @@ export function validateBicepStorageBaseline(request: {
     outcome,
     reason,
   });
-  if (parity.outcome !== "pass") return result(parity.outcome, "resource-parity");
-  const parsed: unknown = JSON.parse(request.json);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(request.json);
+  } catch {
+    return result(parity.outcome, "resource-parity");
+  }
   const isArmExpression = (value: string): boolean =>
     value.startsWith("[") && !value.startsWith("[[") && value.endsWith("]");
   const hasSecretValue = (value: string, insideModuleTemplate: boolean): boolean => {
@@ -835,6 +1092,7 @@ export function validateBicepStorageBaseline(request: {
     });
   };
   if (hasCredential(parsed)) return result("fail", "credential-content");
+  if (parity.outcome !== "pass") return result(parity.outcome, "resource-parity");
   const onlyKeys = (value: unknown, keys: readonly string[]): boolean =>
     object(value) !== undefined && Object.keys(value as object).every((key) => keys.includes(key));
   const template = object(parsed)!;
