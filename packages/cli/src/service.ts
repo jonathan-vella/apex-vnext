@@ -6521,7 +6521,7 @@ export class ApexService {
       ]);
     if (descriptor.reviewSubject !== undefined) {
       const stage = descriptor.reviewSubject as keyof typeof STAGE_FOLDERS;
-      files.push(...inStage(stage, ["challenger-findings.md"]));
+      files.push(...inStage(stage, ["challenger-findings.md", "README.md"]));
     }
     for (const name of ["00-index.md", ...new Set(files)]) await this.assertGeneratedReviewUnmodified(join(root, name));
   }
@@ -6620,7 +6620,7 @@ export class ApexService {
       for (const [path, description] of files) {
         const existing = await this.readOptional(join(root, path));
         if (existing !== undefined) {
-          await this.writeGeneratedReview(join(root, path), existing);
+          await this.mirrorUntamperedGeneratedReview(join(root, path), existing);
           present.push(`- [${description}](${path})`);
         }
       }
@@ -6633,7 +6633,7 @@ export class ApexService {
         `${STAGE_FOLDERS.architecture}/sources/${diagramName}.py`,
       ]) {
         const existing = await this.readOptional(join(root, rel));
-        if (existing !== undefined) await this.writeGeneratedReview(join(root, rel), existing);
+        if (existing !== undefined) await this.mirrorUntamperedGeneratedReview(join(root, rel), existing);
       }
     }
     const text = [
@@ -6653,6 +6653,23 @@ export class ApexService {
     ].join("\n");
     await mkdir(root, { recursive: true });
     await this.writeGeneratedReview(join(root, "00-index.md"), Buffer.from(text, "utf8"));
+  }
+
+  private async mirrorUntamperedGeneratedReview(path: string, content: Buffer): Promise<void> {
+    const mirror = await this.workspaceMirrorPath(path);
+    if (mirror === undefined) return;
+    await this.assertSafeDestination(this.root, path);
+    const basePath = this.generatedReviewBase(path);
+    await this.assertSafeDestination(this.root, basePath);
+    const base = await this.readOptional(basePath);
+    if (base === undefined || !content.equals(base)) return;
+    const mirrorCurrent = await this.readOptional(mirror);
+    if (mirrorCurrent !== undefined) return;
+    await mkdir(dirname(mirror), { recursive: true });
+    await atomicWriteBytes(mirror, content, { refuseOverwrite: true });
+    const mirrorBasePath = this.generatedReviewMirrorBase(mirror);
+    await this.assertSafeDestination(this.root, mirrorBasePath);
+    await atomicWriteBytes(mirrorBasePath, content);
   }
 
   private async writeGeneratedReview(path: string, content: Buffer): Promise<void> {
@@ -6780,7 +6797,14 @@ export class ApexService {
       this.writeGeneratedReview(
         join(directory, "sku-preferences.md"),
         Buffer.from(
-          `# SKU Preferences\n\nUser constraints only. Architecture owns SKU selection.\n\n- Preference: ${text(input["sku-preferences"])}\n- Budget posture: ${input.budget !== undefined ? text(input.budget) : requirements.budgetAndOperations === undefined ? "Deferred" : this.reviewMarkdownText(requirements.budgetAndOperations)}\n- Scale: ${text(input.scale)}\n`,
+          `# SKU Preferences\n\nUser constraints only. Architecture owns SKU selection.\n\n- Preference: ${text(input["sku-preferences"])}\n- Budget posture: ${
+            requirements.budgetAndOperations === undefined
+              ? text(input.budget)
+              : input.budget !== undefined &&
+                  requirements.budgetAndOperations === this.requirementsTemplateFromIntake(input).budgetAndOperations
+                ? text(input.budget)
+                : this.reviewMarkdownText(requirements.budgetAndOperations)
+          }\n- Scale: ${text(input.scale)}\n`,
           "utf8",
         ),
       ),
@@ -6808,13 +6832,26 @@ export class ApexService {
     return `- Reviewed artifact kind: ${this.reviewMarkdownText(review.subjectKind)}\n- Review subject hash: ${review.subjectHash}\n- Reviewed at: ${this.reviewMarkdownText(review.reviewedAt)}\n\n${findings}`;
   }
 
-  private effectiveReviewFindings(review: ReviewFindingsV1, events: EventV1[], reviewHash: string): ReviewFindingsV1 {
+  private effectiveReviewFindings(
+    review: ReviewFindingsV1,
+    events: EventV1[],
+    reviewHash: string,
+    subjectHash?: unknown,
+    dependencyHash?: unknown,
+  ): ReviewFindingsV1 {
     const resolutions = new Map<string, ReviewResolution>();
     for (const event of events) {
       if (event.type !== "review.resolved") continue;
       const resolution = (event.payload as { resolution?: ReviewResolution }).resolution;
       if (resolution?.reviewHash !== reviewHash) continue;
-      if (resolution.expiresAt !== undefined && Date.parse(resolution.expiresAt) <= this.clock().getTime()) continue;
+      if (subjectHash !== undefined && resolution.subjectHash !== subjectHash) continue;
+      if (dependencyHash !== undefined && resolution.dependencyHash !== dependencyHash) continue;
+      const active =
+        resolution.disposition === "fixed" ||
+        resolution.disposition === "acknowledged" ||
+        resolution.disposition === "dismissed" ||
+        (resolution.expiresAt !== undefined && Date.parse(resolution.expiresAt) > this.clock().getTime());
+      if (!active) continue;
       resolutions.set(resolution.findingId, resolution);
     }
     if (resolutions.size === 0) return review;
@@ -7337,19 +7374,42 @@ export class ApexService {
       const prior = (event.payload as { resolution?: ReviewResolution }).resolution;
       return prior?.reviewHash === resolution.reviewHash && prior.findingId === resolution.findingId ? [prior] : [];
     });
-    if (priorResolutions.some((prior) => sha256Json(prior) === sha256Json(resolution))) return;
-    const hasCurrentResolution = priorResolutions.some(
-      (prior) =>
-        prior.disposition === "fixed" ||
-        prior.disposition === "dismissed" ||
-        (prior.expiresAt !== undefined && Date.parse(prior.expiresAt) > this.clock().getTime()),
-    );
-    if (hasCurrentResolution)
-      throw new ApexError("APEX_CONFLICT", "Finding already has a conflicting resolution", EXIT_CODES.conflict);
-    await this.append(run, "review.resolved", { resolution: resolution as unknown as JsonValue });
-    const updatedEvents = await this.journal(run).replay();
+    const alreadyCommitted = priorResolutions.some((prior) => sha256Json(prior) === sha256Json(resolution));
+    if (!alreadyCommitted) {
+      const hasCurrentResolution = priorResolutions.some(
+        (prior) =>
+          prior.disposition === "fixed" ||
+          prior.disposition === "acknowledged" ||
+          prior.disposition === "dismissed" ||
+          (prior.expiresAt !== undefined && Date.parse(prior.expiresAt) > this.clock().getTime()),
+      );
+      if (hasCurrentResolution)
+        throw new ApexError("APEX_CONFLICT", "Finding already has a conflicting resolution", EXIT_CODES.conflict);
+    }
     const nodeId = reviewPayload.nodeId;
-    const effective = this.effectiveReviewFindings(review, updatedEvents, resolution.reviewHash);
+    const stageDirectory =
+      nodeId === "requirements-review"
+        ? this.requirementsReviewDirectory(run)
+        : nodeId === "architecture-review"
+          ? this.architectureReviewDirectory(run)
+          : nodeId === "plan-review"
+            ? this.planReviewDirectory(run)
+            : undefined;
+    if (stageDirectory !== undefined) {
+      await this.assertGeneratedReviewUnmodified(join(stageDirectory, "challenger-findings.md"));
+      await this.assertGeneratedReviewUnmodified(join(stageDirectory, "README.md"));
+    }
+    if (!alreadyCommitted) {
+      await this.append(run, "review.resolved", { resolution: resolution as unknown as JsonValue });
+    }
+    const updatedEvents = alreadyCommitted ? events : await this.journal(run).replay();
+    const effective = this.effectiveReviewFindings(
+      review,
+      updatedEvents,
+      resolution.reviewHash,
+      reviewPayload.subjectHash,
+      reviewPayload.dependencyHash,
+    );
     if (nodeId === "requirements-review") {
       await this.materializeRequirementsChallengeFindings(run, effective);
     } else if (nodeId === "architecture-review") {
