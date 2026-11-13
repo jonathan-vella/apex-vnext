@@ -10,6 +10,16 @@ export function escapeMarkdown(value: unknown): string {
     .replace(/\|/g, "\\|");
 }
 
+export function escapeMarkdownBlock(value: unknown): string {
+  const text = value === null ? "null" : String(value);
+  return text
+    .replace(/\r\n?/g, "\n")
+    .replace(
+      /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g,
+      (character) => `\\u${character.charCodeAt(0).toString(16).padStart(4, "0")}`,
+    );
+}
+
 export function markdownTable(headers: readonly string[], rows: readonly (readonly unknown[])[]): string {
   const header = `| ${headers.map(escapeMarkdown).join(" | ")} |`;
   const separator = `| ${headers.map(() => "---").join(" | ")} |`;

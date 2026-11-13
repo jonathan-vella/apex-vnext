@@ -5964,6 +5964,54 @@ test("reference governance refreshes to the subscription baseline without reopen
   await task(service, "plan");
 });
 
+test("pre-sales lab run can defer subscription governance refresh until preview", async () => {
+  const root = await tempRoot();
+  const subscriptionId = "11111111-1111-1111-1111-111111111111";
+  const targetScope = `/subscriptions/${subscriptionId}`;
+  const service = new ApexService(root);
+  const { runId } = await service.init({ projectId: "demo", targetScope, riskOwner: "partner" });
+  const requirementHashes = await complete(service, "requirements", [{ kind: "requirements", value: requirements() }]);
+  await complete(service, "requirements-review", [
+    { kind: "review-findings", value: review(runId, "requirements", requirementHashes.requirements!) },
+  ]);
+  await service.decideGateNumber(1, "approved", "tester");
+  await acceptAvailabilityEvidence(service, runId);
+  await task(service, "governance-discovery");
+  const referenceHash = (await service.importGovernanceReference()).outputHash;
+  const architectureValue = architecture(runId);
+  const costValue = costEstimate(runId);
+  const architectureTask = await task(service, "architecture");
+  const findings = await governanceFindings(service, architectureTask, ["Microsoft.Web/sites"]);
+  const architectureHashes = await service.completeTaskOutputs(architectureTask, [
+    { kind: "architecture", value: architectureValue },
+    { kind: "cost-estimate", value: costValue },
+    {
+      kind: "workload-decision-manifest",
+      value: workloadDecisionManifest({
+        runId,
+        requirementsHash: requirementHashes.requirements!,
+        architectureHash: sha256Json(architectureValue),
+        costEstimateHash: sha256Json(costValue),
+      }),
+    },
+    { kind: "policy-property-map", value: policyMap(runId, referenceHash, findings) },
+  ]);
+  await complete(service, "architecture-review", [
+    { kind: "review-findings", value: review(runId, "architecture", architectureHashes.outputHashes.architecture!) },
+  ]);
+  await assertLabReadiness(service, 2);
+  await task(service, "governance-refresh");
+  // Pre-sales mode: no live subscription access yet; confirm continuing offline on the ALZ reference baseline.
+  const deferred = await service.importGovernanceReference();
+  assert.equal(deferred.outputHash, referenceHash);
+  // Policy map already matches referenceHash, so the run routes straight to plan.
+  await task(service, "plan");
+  await assert.rejects(
+    service.preview({ provider: "fake", operation: "apply" }),
+    /Reviewed subscription governance baseline is required before deployment preview/u,
+  );
+});
+
 test("a blocked control after governance refresh reopens Architecture and Gate 2", async () => {
   const scope = "/subscriptions/11111111-1111-1111-1111-111111111111";
   const { service, policyTask, template } = await approveOnReferenceGovernance([

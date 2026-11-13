@@ -2,7 +2,7 @@
 
 # Version Information
 
-**Current Version:** 0.11.0-next.14 (preview)
+**Current Version:** 0.11.0-next.15 (preview)
 
 **Status:** Preview - non-production marketplace plugin distribution (`apex@apex-plugins`)
 

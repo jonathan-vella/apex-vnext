@@ -10,6 +10,23 @@ When you prepare a release, rename `## [Unreleased]` to the new version.
 
 ## [Unreleased]
 
+## [0.11.0-next.15] - 2026-11-13
+
+This release fixes pilot workflow, pricing, review-artifact, and diagram issues uncovered during the EU partner webhook
+gateway pilot audit.
+
+### Fixed
+
+- Support pre-sales `lab` continuation on the ALZ Corp reference baseline at `governance-refresh` through Planning,
+  CodeGen, and IaC validation (blocking before live `preview`/`deploy` until `apex governance revise` imports a
+  reviewed subscription baseline).
+- Preserve `RTO`/`RPO` intake answers in `RequirementsV1` templates, re-render `challenger-findings.md` and stage
+  `README.md` status on review resolution, sync existing `agent-output` packages into linked git worktrees, and improve
+  `01-requirements`, `03-des-diagram.mmd`, WAF, and cost diagrams.
+- Update `retail-pricing.md` and `apex-architecture` to use OData `filter` queries for tier/meter-billed services in
+  `@azure/mcp` `pricing_get`, enforce one `ask_user` call per response, and restrict silent Gate 2 auto-dismissal to
+  `info`/`low` stage-excluded noise.
+
 ## [0.11.0-next.14] - 2026-11-11
 
 This release replaces bundled multi-finding review prompts with a scannable Markdown overview table followed by
