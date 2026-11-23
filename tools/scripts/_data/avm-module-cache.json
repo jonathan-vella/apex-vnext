@@ -388,8 +388,9 @@
       "lookup_timestamp": "2026-05-17T07:41:10.968Z"
     },
     "bicep::br/public:avm/res/web/serverfarm": {
-      "latest": "0.7.0",
+      "latest": "0.7.1",
       "known_versions": [
+        "0.7.1",
         "0.7.0",
         "0.6.0",
         "0.5.0",
@@ -405,7 +406,7 @@
         "0.1.0"
       ],
       "source": "mcr",
-      "lookup_timestamp": "2026-05-22T10:35:22.919Z"
+      "lookup_timestamp": "2026-11-23T17:45:08.043Z"
     },
     "bicep::br/public:avm/res/web/site": {
       "latest": "0.24.0",
@@ -475,10 +476,12 @@
         "0.2.3",
         "0.2.2",
         "0.2.1",
-        "0.2.0"
+        "0.2.0",
+        "0.1.1",
+        "0.1.0"
       ],
       "source": "mcr",
-      "lookup_timestamp": "2026-05-22T10:35:23.979Z"
+      "lookup_timestamp": "2026-11-23T17:45:07.221Z"
     },
     "bicep::br/public:avm/res/insights/metric-alert": {
       "latest": "0.4.1",
@@ -504,7 +507,7 @@
         "0.1.0"
       ],
       "source": "mcr",
-      "lookup_timestamp": "2026-05-16T15:59:37.541Z"
+      "lookup_timestamp": "2026-11-23T17:45:06.685Z"
     },
     "bicep::br/public:avm/res/api-management/service": {
       "latest": "0.14.4",
@@ -552,7 +555,7 @@
         "0.1.0"
       ],
       "source": "mcr",
-      "lookup_timestamp": "2026-05-20T15:41:05.796Z"
+      "lookup_timestamp": "2026-11-23T17:45:06.102Z"
     },
     "bicep::br/public:avm/res/app/container-app/auth-config": {
       "latest": "0.1.0",
@@ -613,8 +616,9 @@
       "lookup_timestamp": "2026-06-22T12:09:25.754Z"
     },
     "bicep::br/public:avm/res/cache/redis-enterprise": {
-      "latest": "0.5.1",
+      "latest": "0.5.2",
       "known_versions": [
+        "0.5.2",
         "0.5.1",
         "0.5.0",
         "0.4.0",
@@ -628,7 +632,7 @@
         "0.1.0"
       ],
       "source": "mcr",
-      "lookup_timestamp": "2026-05-17T07:34:54.311Z"
+      "lookup_timestamp": "2026-11-23T17:45:06.520Z"
     },
     "bicep::br/public:avm/res/cdn/profile/custom-domain": {
       "latest": "0.1.0",
@@ -845,12 +849,14 @@
       "lookup_timestamp": "2026-05-17T07:34:55.045Z"
     },
     "bicep::br/public:avm/res/key-vault/vault/key": {
-      "latest": "0.1.0",
+      "latest": "0.1.2",
       "known_versions": [
+        "0.1.2",
+        "0.1.1",
         "0.1.0"
       ],
       "source": "mcr",
-      "lookup_timestamp": "2026-05-20T15:41:07.448Z"
+      "lookup_timestamp": "2026-11-23T17:45:07.257Z"
     },
     "bicep::br/public:avm/res/kusto/cluster": {
       "latest": "0.10.0",
@@ -897,12 +903,13 @@
       "lookup_timestamp": "2026-05-20T15:41:07.533Z"
     },
     "bicep::br/public:avm/res/net-app/net-app-account/backup-policy": {
-      "latest": "0.1.0",
+      "latest": "0.1.1",
       "known_versions": [
+        "0.1.1",
         "0.1.0"
       ],
       "source": "mcr",
-      "lookup_timestamp": "2026-05-17T07:34:55.246Z"
+      "lookup_timestamp": "2026-11-23T17:45:07.402Z"
     },
     "bicep::br/public:avm/res/network/application-gateway-web-application-firewall-policy": {
       "latest": "0.3.0",
@@ -967,7 +974,7 @@
         "0.1.0"
       ],
       "source": "mcr",
-      "lookup_timestamp": "2026-05-20T15:41:07.753Z"
+      "lookup_timestamp": "2026-11-23T17:45:07.511Z"
     },
     "bicep::br/public:avm/res/network/private-dns-zone/a": {
       "latest": "0.1.0",
@@ -1015,7 +1022,7 @@
         "0.1.0"
       ],
       "source": "mcr",
-      "lookup_timestamp": "2026-05-17T07:34:55.667Z"
+      "lookup_timestamp": "2026-11-23T17:45:07.738Z"
     },
     "bicep::br/public:avm/res/resource-graph/query": {
       "latest": "0.3.2",
@@ -1062,7 +1069,7 @@
         "0.1.0"
       ],
       "source": "mcr",
-      "lookup_timestamp": "2026-07-27T09:59:56.328Z"
+      "lookup_timestamp": "2026-11-23T17:45:07.867Z"
     },
     "bicep::br/public:avm/res/service-networking/traffic-controller/security-policy": {
       "latest": "0.1.0",
@@ -1226,8 +1233,9 @@
       "lookup_timestamp": "2026-05-17T07:34:56.148Z"
     },
     "terraform::Azure/avm-res-network-natgateway/azurerm": {
-      "latest": "0.3.2",
+      "latest": "0.4.0",
       "known_versions": [
+        "0.4.0",
         "0.3.2",
         "0.3.1",
         "0.3.0",
@@ -1241,11 +1249,12 @@
         "0.1.0"
       ],
       "source": "terraform-registry",
-      "lookup_timestamp": "2026-06-01T11:40:34.209Z"
+      "lookup_timestamp": "2026-11-23T17:45:08.301Z"
     },
     "terraform::Azure/avm-res-network-networkwatcher/azurerm": {
-      "latest": "0.3.2",
+      "latest": "0.4.0",
       "known_versions": [
+        "0.4.0",
         "0.3.2",
         "0.3.1",
         "0.3.0",
@@ -1255,11 +1264,21 @@
         "0.1.0"
       ],
       "source": "terraform-registry",
-      "lookup_timestamp": "2026-05-20T15:41:09.511Z"
+      "lookup_timestamp": "2026-11-23T17:45:08.316Z"
     },
     "terraform::Azure/avm-res-network-virtualnetwork/azurerm": {
-      "latest": "0.17.1",
+      "latest": "0.23.0",
       "known_versions": [
+        "0.23.0",
+        "0.22.3",
+        "0.22.2",
+        "0.22.1",
+        "0.22.0",
+        "0.21.0",
+        "0.20.0",
+        "0.19.0",
+        "0.18.2",
+        "0.18.0",
         "0.17.1",
         "0.17.0",
         "0.16.0",
@@ -1297,7 +1316,7 @@
         "0.1.0"
       ],
       "source": "terraform-registry",
-      "lookup_timestamp": "2026-05-17T07:34:56.166Z"
+      "lookup_timestamp": "2026-11-23T17:45:08.335Z"
     },
     "terraform::Azure/avm-res-recoveryservices-vault/azurerm": {
       "latest": "1.1.9",
@@ -1367,7 +1386,7 @@
         "0.1.0"
       ],
       "source": "mcr",
-      "lookup_timestamp": "2026-05-17T07:41:10.384Z"
+      "lookup_timestamp": "2026-11-23T17:45:06.350Z"
     },
     "bicep::br/public:avm/res/automation/automation-account/credential": {
       "latest": "0.1.0",
@@ -1375,7 +1394,7 @@
         "0.1.0"
       ],
       "source": "mcr",
-      "lookup_timestamp": "2026-05-17T07:41:10.428Z"
+      "lookup_timestamp": "2026-11-23T17:45:06.435Z"
     },
     "bicep::br/public:avm/res/automation/automation-account/powershell72-module": {
       "latest": "0.1.0",
@@ -1747,7 +1766,7 @@
         "0.1.0"
       ],
       "source": "mcr",
-      "lookup_timestamp": "2026-05-17T07:41:11.980Z"
+      "lookup_timestamp": "2026-11-23T17:45:07.476Z"
     },
     "bicep::br/public:avm/res/network/dns-zone/mx": {
       "latest": "0.1.0",
@@ -1861,7 +1880,7 @@
         "0.1.0"
       ],
       "source": "mcr",
-      "lookup_timestamp": "2026-05-17T07:41:12.436Z"
+      "lookup_timestamp": "2026-11-23T17:45:07.719Z"
     },
     "bicep::br/public:avm/res/power-bi-dedicated/capacity": {
       "latest": "0.2.2",
@@ -1885,7 +1904,7 @@
         "0.1.0"
       ],
       "source": "mcr",
-      "lookup_timestamp": "2026-05-17T07:41:12.618Z"
+      "lookup_timestamp": "2026-11-23T17:45:07.885Z"
     },
     "bicep::br/public:avm/res/sql/managed-instance/encryption-protector": {
       "latest": "0.1.0",
@@ -1915,7 +1934,7 @@
         "0.1.0"
       ],
       "source": "mcr",
-      "lookup_timestamp": "2026-05-17T07:41:12.842Z"
+      "lookup_timestamp": "2026-11-23T17:45:08.118Z"
     },
     "terraform::Azure/avm-res-cache-redis/azurerm": {
       "latest": "0.4.0",
@@ -1933,14 +1952,17 @@
       "lookup_timestamp": "2026-05-17T07:41:12.865Z"
     },
     "terraform::Azure/avm-res-compute-hostgroup/azurerm": {
-      "latest": "0.1.2",
+      "latest": "0.3.0",
       "known_versions": [
+        "0.3.0",
+        "0.2.0",
+        "0.1.3",
         "0.1.2",
         "0.1.1",
         "0.1.0"
       ],
       "source": "terraform-registry",
-      "lookup_timestamp": "2026-06-01T11:40:34.130Z"
+      "lookup_timestamp": "2026-11-23T17:45:08.192Z"
     },
     "terraform::Azure/avm-res-containerinstance-containergroup/azurerm": {
       "latest": "0.2.0",
@@ -1952,8 +1974,10 @@
       "lookup_timestamp": "2026-05-17T07:41:12.878Z"
     },
     "terraform::Azure/avm-res-desktopvirtualization-hostpool/azurerm": {
-      "latest": "0.4.0",
+      "latest": "0.6.0",
       "known_versions": [
+        "0.6.0",
+        "0.5.0",
         "0.4.0",
         "0.3.0",
         "0.2.1",
@@ -1966,7 +1990,7 @@
         "0.1.0"
       ],
       "source": "terraform-registry",
-      "lookup_timestamp": "2026-06-22T12:09:28.558Z"
+      "lookup_timestamp": "2026-11-23T17:45:08.225Z"
     },
     "terraform::Azure/avm-res-devopsinfrastructure-pool/azurerm": {
       "latest": "0.3.1",
@@ -1987,12 +2011,13 @@
       "lookup_timestamp": "2026-05-17T07:41:12.903Z"
     },
     "terraform::Azure/avm-res-eventgrid-domain/azurerm": {
-      "latest": "0.1.0",
+      "latest": "0.2.0",
       "known_versions": [
+        "0.2.0",
         "0.1.0"
       ],
       "source": "terraform-registry",
-      "lookup_timestamp": "2026-07-27T09:59:56.948Z"
+      "lookup_timestamp": "2026-11-23T17:45:08.240Z"
     },
     "terraform::Azure/avm-res-features-feature/azurerm": {
       "latest": "0.1.0",
@@ -2397,8 +2422,9 @@
       "lookup_timestamp": "2026-06-22T12:09:28.236Z"
     },
     "bicep::br/public:avm/res/web/site/slot": {
-      "latest": "0.4.1",
+      "latest": "0.5.0",
       "known_versions": [
+        "0.5.0",
         "0.4.1",
         "0.4.0",
         "0.3.1",
@@ -2408,7 +2434,7 @@
         "0.1.0"
       ],
       "source": "mcr",
-      "lookup_timestamp": "2026-06-01T11:40:34.045Z"
+      "lookup_timestamp": "2026-11-23T17:45:08.061Z"
     },
     "terraform::Azure/avm-res-app-containerapp/azurerm": {
       "latest": "0.9.0",
@@ -2560,8 +2586,9 @@
       "lookup_timestamp": "2026-05-20T15:41:09.608Z"
     },
     "terraform::Azure/avm-res-resources-resourcegroup/azurerm": {
-      "latest": "0.4.0",
+      "latest": "0.5.0",
       "known_versions": [
+        "0.5.0",
         "0.4.0",
         "0.3.0",
         "0.2.2",
@@ -2570,7 +2597,7 @@
         "0.1.0"
       ],
       "source": "terraform-registry",
-      "lookup_timestamp": "2026-05-20T15:41:09.697Z"
+      "lookup_timestamp": "2026-11-23T17:45:08.372Z"
     },
     "terraform::Azure/avm-res-web-hostingenvironment/azurerm": {
       "latest": "2.0.1",
@@ -2616,7 +2643,7 @@
         "0.1.0"
       ],
       "source": "mcr",
-      "lookup_timestamp": "2026-06-01T11:40:32.221Z"
+      "lookup_timestamp": "2026-11-23T17:45:06.038Z"
     },
     "bicep::br/public:avm/res/api-management/service/policy": {
       "latest": "0.1.2",
@@ -2650,7 +2677,7 @@
         "0.1.0"
       ],
       "source": "mcr",
-      "lookup_timestamp": "2026-06-01T11:40:32.436Z"
+      "lookup_timestamp": "2026-11-23T17:45:06.213Z"
     },
     "bicep::br/public:avm/res/app/session-pool": {
       "latest": "0.3.0",
@@ -2765,8 +2792,9 @@
       "lookup_timestamp": "2026-07-27T09:59:55.140Z"
     },
     "bicep::br/public:avm/res/databricks/workspace": {
-      "latest": "0.12.0",
+      "latest": "0.12.1",
       "known_versions": [
+        "0.12.1",
         "0.12.0",
         "0.11.5",
         "0.11.4",
@@ -2796,7 +2824,7 @@
         "0.1.0"
       ],
       "source": "mcr",
-      "lookup_timestamp": "2026-06-01T11:40:32.925Z"
+      "lookup_timestamp": "2026-11-23T17:45:06.759Z"
     },
     "bicep::br/public:avm/res/dev-center/project": {
       "latest": "0.1.2",
@@ -2873,7 +2901,7 @@
         "0.1.0"
       ],
       "source": "mcr",
-      "lookup_timestamp": "2026-06-01T11:40:33.266Z"
+      "lookup_timestamp": "2026-11-23T17:45:07.112Z"
     },
     "bicep::br/public:avm/res/kubernetes-configuration/extension": {
       "latest": "0.3.8",
@@ -2930,11 +2958,12 @@
         "0.1.0"
       ],
       "source": "mcr",
-      "lookup_timestamp": "2026-07-27T09:59:55.826Z"
+      "lookup_timestamp": "2026-11-23T17:45:07.492Z"
     },
     "bicep::br/public:avm/res/network/nat-gateway": {
-      "latest": "2.1.0",
+      "latest": "2.1.1",
       "known_versions": [
+        "2.1.1",
         "2.1.0",
         "2.0.1",
         "2.0.0",
@@ -2951,11 +2980,12 @@
         "1.0.0"
       ],
       "source": "mcr",
-      "lookup_timestamp": "2026-06-01T11:40:33.657Z"
+      "lookup_timestamp": "2026-11-23T17:45:07.549Z"
     },
     "bicep::br/public:avm/res/network/public-ip-address": {
-      "latest": "0.12.0",
+      "latest": "0.13.0",
       "known_versions": [
+        "0.13.0",
         "0.12.0",
         "0.11.0",
         "0.10.0",
@@ -2977,10 +3007,11 @@
         "0.2.3",
         "0.2.2",
         "0.2.1",
-        "0.2.0"
+        "0.2.0",
+        "0.1.0"
       ],
       "source": "mcr",
-      "lookup_timestamp": "2026-06-01T11:40:33.692Z"
+      "lookup_timestamp": "2026-11-23T17:45:07.625Z"
     },
     "bicep::br/public:avm/res/network/virtual-network/subnet": {
       "latest": "0.2.0",
@@ -3009,12 +3040,13 @@
       "lookup_timestamp": "2026-06-01T11:40:33.795Z"
     },
     "bicep::br/public:avm/res/recovery-services/vault/replication-fabric": {
-      "latest": "0.1.0",
+      "latest": "0.2.0",
       "known_versions": [
+        "0.2.0",
         "0.1.0"
       ],
       "source": "mcr",
-      "lookup_timestamp": "2026-06-01T11:40:33.799Z"
+      "lookup_timestamp": "2026-11-23T17:45:07.783Z"
     },
     "bicep::br/public:avm/res/recovery-services/vault/replication-fabric/replication-protection-container": {
       "latest": "0.1.0",
@@ -3046,7 +3078,7 @@
         "0.1.0"
       ],
       "source": "mcr",
-      "lookup_timestamp": "2026-06-01T11:40:33.982Z"
+      "lookup_timestamp": "2026-11-23T17:45:07.925Z"
     },
     "terraform::Azure/avm-res-app-managedenvironment/azurerm": {
       "latest": "0.5.0",
@@ -3185,8 +3217,9 @@
       "lookup_timestamp": "2026-06-22T12:09:28.663Z"
     },
     "terraform::Azure/avm-res-web-staticsite/azurerm": {
-      "latest": "0.6.2",
+      "latest": "0.7.0",
       "known_versions": [
+        "0.7.0",
         "0.6.2",
         "0.6.1",
         "0.6.0",
@@ -3201,7 +3234,7 @@
         "0.1.0"
       ],
       "source": "terraform-registry",
-      "lookup_timestamp": "2026-06-01T11:40:34.261Z"
+      "lookup_timestamp": "2026-11-23T17:45:08.394Z"
     },
     "bicep::br/public:avm/res/api-management/service/api/policy": {
       "latest": "0.1.2",
@@ -3227,7 +3260,7 @@
         "0.1.0"
       ],
       "source": "mcr",
-      "lookup_timestamp": "2026-07-27T09:59:55.021Z"
+      "lookup_timestamp": "2026-11-23T17:45:06.272Z"
     },
     "bicep::br/public:avm/res/automation/automation-account/source-control": {
       "latest": "0.1.0",
@@ -3251,7 +3284,7 @@
         "0.1.0"
       ],
       "source": "mcr",
-      "lookup_timestamp": "2026-06-22T12:09:25.976Z"
+      "lookup_timestamp": "2026-11-23T17:45:06.557Z"
     },
     "bicep::br/public:avm/res/compute/disk-encryption-set": {
       "latest": "0.6.1",
@@ -3347,12 +3380,13 @@
       "lookup_timestamp": "2026-06-22T12:09:26.782Z"
     },
     "bicep::br/public:avm/res/elastic-san/elastic-san/volume-group/volume": {
-      "latest": "0.1.0",
+      "latest": "0.1.1",
       "known_versions": [
+        "0.1.1",
         "0.1.0"
       ],
       "source": "mcr",
-      "lookup_timestamp": "2026-06-22T12:09:26.826Z"
+      "lookup_timestamp": "2026-11-23T17:45:07.095Z"
     },
     "bicep::br/public:avm/res/event-grid/namespace/client": {
       "latest": "0.1.0",
@@ -3432,7 +3466,7 @@
         "0.1.0"
       ],
       "source": "mcr",
-      "lookup_timestamp": "2026-06-22T12:09:27.388Z"
+      "lookup_timestamp": "2026-11-23T17:45:07.454Z"
     },
     "bicep::br/public:avm/res/network/network-manager/connectivity-configuration": {
       "latest": "0.1.0",
@@ -3527,7 +3561,7 @@
         "0.1.0"
       ],
       "source": "mcr",
-      "lookup_timestamp": "2026-06-22T12:09:28.363Z"
+      "lookup_timestamp": "2026-11-23T17:45:07.977Z"
     },
     "bicep::br/public:avm/res/web/hosting-environment": {
       "latest": "0.5.0",
@@ -3564,13 +3598,14 @@
       "lookup_timestamp": "2026-06-22T12:09:28.482Z"
     },
     "terraform::Azure/avm-res-automation-automationaccount/azurerm": {
-      "latest": "0.2.0",
+      "latest": "0.3.0",
       "known_versions": [
+        "0.3.0",
         "0.2.0",
         "0.1.0"
       ],
       "source": "terraform-registry",
-      "lookup_timestamp": "2026-07-27T09:59:56.861Z"
+      "lookup_timestamp": "2026-11-23T17:45:08.155Z"
     },
     "terraform::Azure/avm-res-azurestackhci-virtualmachineinstance/azurerm": {
       "latest": "2.1.1",
@@ -3632,13 +3667,14 @@
       "lookup_timestamp": "2026-06-22T12:09:28.579Z"
     },
     "terraform::Azure/avm-res-network-applicationgatewaywebapplicationfirewallpolicy/azurerm": {
-      "latest": "0.2.0",
+      "latest": "0.3.0",
       "known_versions": [
+        "0.3.0",
         "0.2.0",
         "0.1.0"
       ],
       "source": "terraform-registry",
-      "lookup_timestamp": "2026-06-22T12:09:28.605Z"
+      "lookup_timestamp": "2026-11-23T17:45:08.279Z"
     },
     "terraform::Azure/avm-res-network-expressroutecircuit/azurerm": {
       "latest": "0.3.3",
@@ -3764,8 +3800,14 @@
       "lookup_timestamp": "2026-07-27T09:59:56.128Z"
     },
     "terraform::Azure/avm-res-storage-storageaccount/azurerm": {
-      "latest": "0.7.3",
+      "latest": "0.11.0",
       "known_versions": [
+        "0.11.0",
+        "0.10.0",
+        "0.9.0",
+        "0.8.1",
+        "0.8.0",
+        "0.7.4",
         "0.7.3",
         "0.7.2",
         "0.7.1",
@@ -3799,7 +3841,7 @@
         "0.1.0"
       ],
       "source": "terraform-registry",
-      "lookup_timestamp": "2026-07-15T18:56:05.146Z"
+      "lookup_timestamp": "2026-11-23T17:45:08.386Z"
     },
     "bicep::br/public:avm/res/aad/domain-service": {
       "latest": "0.7.0",
@@ -4221,11 +4263,12 @@
         "0.1.0"
       ],
       "source": "mcr",
-      "lookup_timestamp": "2026-07-27T09:59:56.319Z"
+      "lookup_timestamp": "2026-11-23T17:45:07.850Z"
     },
     "bicep::br/public:avm/res/sql/managed-instance": {
-      "latest": "0.5.0",
+      "latest": "0.5.1",
       "known_versions": [
+        "0.5.1",
         "0.5.0",
         "0.4.1",
         "0.4.0",
@@ -4234,7 +4277,7 @@
         "0.1.0"
       ],
       "source": "mcr",
-      "lookup_timestamp": "2026-07-27T09:59:56.335Z"
+      "lookup_timestamp": "2026-11-23T17:45:07.902Z"
     },
     "bicep::br/public:avm/res/sql/server/elastic-pool": {
       "latest": "0.1.0",
@@ -4242,7 +4285,7 @@
         "0.1.0"
       ],
       "source": "mcr",
-      "lookup_timestamp": "2026-07-27T09:59:56.354Z"
+      "lookup_timestamp": "2026-11-23T17:45:07.942Z"
     },
     "bicep::br/public:avm/res/sql/server/vulnerability-assessment": {
       "latest": "0.1.0",
@@ -4266,7 +4309,7 @@
         "0.1.0"
       ],
       "source": "mcr",
-      "lookup_timestamp": "2026-07-27T09:59:56.583Z"
+      "lookup_timestamp": "2026-11-23T17:45:08.021Z"
     },
     "bicep::br/public:avm/res/web/static-site/custom-domain": {
       "latest": "0.1.0",
@@ -4286,8 +4329,11 @@
       "lookup_timestamp": "2026-07-27T09:59:56.878Z"
     },
     "terraform::Azure/avm-res-containerregistry-registry/azurerm": {
-      "latest": "0.6.0",
+      "latest": "0.9.0",
       "known_versions": [
+        "0.9.0",
+        "0.8.0",
+        "0.7.0",
         "0.6.0",
         "0.5.1",
         "0.5.0",
@@ -4298,7 +4344,7 @@
         "0.1.0"
       ],
       "source": "terraform-registry",
-      "lookup_timestamp": "2026-07-27T09:59:56.911Z"
+      "lookup_timestamp": "2026-11-23T17:45:08.210Z"
     },
     "terraform::Azure/avm-res-desktopvirtualization-applicationgroup/azurerm": {
       "latest": "0.2.1",
@@ -4353,6 +4399,494 @@
       ],
       "source": "terraform-registry",
       "lookup_timestamp": "2026-07-27T09:59:57.092Z"
+    },
+    "bicep::br/public:avm/res/analysis-services/server": {
+      "latest": "0.4.0",
+      "known_versions": [
+        "0.4.0",
+        "0.3.5",
+        "0.3.4",
+        "0.3.3",
+        "0.3.2",
+        "0.3.1",
+        "0.3.0",
+        "0.2.0",
+        "0.1.2",
+        "0.1.1",
+        "0.1.0"
+      ],
+      "source": "mcr",
+      "lookup_timestamp": "2026-11-23T17:45:05.970Z"
+    },
+    "bicep::br/public:avm/res/api-management/service/workspace": {
+      "latest": "0.1.0",
+      "known_versions": [
+        "0.1.0"
+      ],
+      "source": "mcr",
+      "lookup_timestamp": "2026-11-23T17:45:06.157Z"
+    },
+    "bicep::br/public:avm/res/app/managed-environment/certificate": {
+      "latest": "0.2.0",
+      "known_versions": [
+        "0.2.0",
+        "0.1.0"
+      ],
+      "source": "mcr",
+      "lookup_timestamp": "2026-11-23T17:45:06.293Z"
+    },
+    "bicep::br/public:avm/res/azure-stack-hci/network-interface": {
+      "latest": "0.2.0",
+      "known_versions": [
+        "0.2.0",
+        "0.1.1",
+        "0.1.0"
+      ],
+      "source": "mcr",
+      "lookup_timestamp": "2026-11-23T17:45:06.455Z"
+    },
+    "bicep::br/public:avm/res/communication/email-service/domain/sender-username": {
+      "latest": "0.1.0",
+      "known_versions": [
+        "0.1.0"
+      ],
+      "source": "mcr",
+      "lookup_timestamp": "2026-11-23T17:45:06.627Z"
+    },
+    "bicep::br/public:avm/res/container-service/managed-cluster/maintenance-configuration": {
+      "latest": "0.1.0",
+      "known_versions": [
+        "0.1.0"
+      ],
+      "source": "mcr",
+      "lookup_timestamp": "2026-11-23T17:45:06.739Z"
+    },
+    "bicep::br/public:avm/res/db-for-my-sql/flexible-server/configuration": {
+      "latest": "0.1.0",
+      "known_versions": [
+        "0.1.0"
+      ],
+      "source": "mcr",
+      "lookup_timestamp": "2026-11-23T17:45:06.822Z"
+    },
+    "bicep::br/public:avm/res/desktop-virtualization/application-group": {
+      "latest": "0.4.2",
+      "known_versions": [
+        "0.4.2",
+        "0.4.1",
+        "0.4.0",
+        "0.3.3",
+        "0.3.2",
+        "0.3.1",
+        "0.3.0",
+        "0.2.0",
+        "0.1.3",
+        "0.1.2",
+        "0.1.1",
+        "0.1.0"
+      ],
+      "source": "mcr",
+      "lookup_timestamp": "2026-11-23T17:45:06.891Z"
+    },
+    "bicep::br/public:avm/res/dev-center/devcenter/project-policy": {
+      "latest": "0.1.0",
+      "known_versions": [
+        "0.1.0"
+      ],
+      "source": "mcr",
+      "lookup_timestamp": "2026-11-23T17:45:06.947Z"
+    },
+    "bicep::br/public:avm/res/document-db/database-account/cassandra-keyspace": {
+      "latest": "0.1.2",
+      "known_versions": [
+        "0.1.2",
+        "0.1.1",
+        "0.1.0"
+      ],
+      "source": "mcr",
+      "lookup_timestamp": "2026-11-23T17:45:06.994Z"
+    },
+    "bicep::br/public:avm/res/document-db/database-account/sql-role-assignment": {
+      "latest": "0.2.2",
+      "known_versions": [
+        "0.2.2",
+        "0.2.1",
+        "0.2.0",
+        "0.1.0"
+      ],
+      "source": "mcr",
+      "lookup_timestamp": "2026-11-23T17:45:07.016Z"
+    },
+    "bicep::br/public:avm/res/edge/site/rg-scope": {
+      "latest": "0.1.0",
+      "known_versions": [
+        "0.1.0"
+      ],
+      "source": "mcr",
+      "lookup_timestamp": "2026-11-23T17:45:07.044Z"
+    },
+    "bicep::br/public:avm/res/event-grid/topic": {
+      "latest": "0.10.0",
+      "known_versions": [
+        "0.10.0",
+        "0.9.3",
+        "0.9.2",
+        "0.9.1",
+        "0.9.0",
+        "0.8.1",
+        "0.8.0",
+        "0.7.1",
+        "0.7.0",
+        "0.6.1",
+        "0.6.0",
+        "0.5.0",
+        "0.4.0",
+        "0.3.2",
+        "0.3.1",
+        "0.3.0",
+        "0.2.1",
+        "0.2.0",
+        "0.1.5",
+        "0.1.4",
+        "0.1.3",
+        "0.1.2",
+        "0.1.1",
+        "0.1.0"
+      ],
+      "source": "mcr",
+      "lookup_timestamp": "2026-11-23T17:45:07.132Z"
+    },
+    "bicep::br/public:avm/res/event-hub/namespace/eventhub/authorization-rule": {
+      "latest": "0.1.0",
+      "known_versions": [
+        "0.1.0"
+      ],
+      "source": "mcr",
+      "lookup_timestamp": "2026-11-23T17:45:07.151Z"
+    },
+    "bicep::br/public:avm/res/healthcare-apis/workspace/fhirservice": {
+      "latest": "0.2.0",
+      "known_versions": [
+        "0.2.0",
+        "0.1.0"
+      ],
+      "source": "mcr",
+      "lookup_timestamp": "2026-11-23T17:45:07.173Z"
+    },
+    "bicep::br/public:avm/res/insights/webtest": {
+      "latest": "0.3.2",
+      "known_versions": [
+        "0.3.2",
+        "0.3.1",
+        "0.3.0",
+        "0.2.1",
+        "0.2.0",
+        "0.1.5",
+        "0.1.4",
+        "0.1.3",
+        "0.1.2",
+        "0.1.1",
+        "0.1.0"
+      ],
+      "source": "mcr",
+      "lookup_timestamp": "2026-11-23T17:45:07.238Z"
+    },
+    "bicep::br/public:avm/res/kubernetes/connected-cluster": {
+      "latest": "0.3.0",
+      "known_versions": [
+        "0.3.0",
+        "0.2.0",
+        "0.1.1",
+        "0.1.0"
+      ],
+      "source": "mcr",
+      "lookup_timestamp": "2026-11-23T17:45:07.327Z"
+    },
+    "bicep::br/public:avm/res/machine-learning-services/workspace/compute": {
+      "latest": "0.1.1",
+      "known_versions": [
+        "0.1.1",
+        "0.1.0"
+      ],
+      "source": "mcr",
+      "lookup_timestamp": "2026-11-23T17:45:07.385Z"
+    },
+    "bicep::br/public:avm/res/net-app/net-app-account/snapshot-policy": {
+      "latest": "0.1.1",
+      "known_versions": [
+        "0.1.1",
+        "0.1.0"
+      ],
+      "source": "mcr",
+      "lookup_timestamp": "2026-11-23T17:45:07.420Z"
+    },
+    "bicep::br/public:avm/res/network/application-security-group": {
+      "latest": "0.2.2",
+      "known_versions": [
+        "0.2.2",
+        "0.2.1",
+        "0.2.0",
+        "0.1.5",
+        "0.1.4",
+        "0.1.3",
+        "0.1.2",
+        "0.1.1",
+        "0.1.0"
+      ],
+      "source": "mcr",
+      "lookup_timestamp": "2026-11-23T17:45:07.437Z"
+    },
+    "bicep::br/public:avm/res/network/firewall-policy": {
+      "latest": "0.4.0",
+      "known_versions": [
+        "0.4.0",
+        "0.3.6",
+        "0.3.5",
+        "0.3.4",
+        "0.3.3",
+        "0.3.2",
+        "0.3.1",
+        "0.3.0",
+        "0.2.0",
+        "0.1.3",
+        "0.1.2",
+        "0.1.1",
+        "0.1.0"
+      ],
+      "source": "mcr",
+      "lookup_timestamp": "2026-11-23T17:45:07.532Z"
+    },
+    "bicep::br/public:avm/res/network/network-watcher/flow-log": {
+      "latest": "0.1.0",
+      "known_versions": [
+        "0.1.0"
+      ],
+      "source": "mcr",
+      "lookup_timestamp": "2026-11-23T17:45:07.579Z"
+    },
+    "bicep::br/public:avm/res/network/private-dns-zone/mx": {
+      "latest": "0.1.0",
+      "known_versions": [
+        "0.1.0"
+      ],
+      "source": "mcr",
+      "lookup_timestamp": "2026-11-23T17:45:07.606Z"
+    },
+    "bicep::br/public:avm/res/network/virtual-hub/hub-route-table": {
+      "latest": "0.1.1",
+      "known_versions": [
+        "0.1.1",
+        "0.1.0"
+      ],
+      "source": "mcr",
+      "lookup_timestamp": "2026-11-23T17:45:07.645Z"
+    },
+    "bicep::br/public:avm/res/network/virtual-network-gateway": {
+      "latest": "0.12.0",
+      "known_versions": [
+        "0.12.0",
+        "0.11.1",
+        "0.11.0",
+        "0.10.1",
+        "0.10.0",
+        "0.9.0",
+        "0.8.0",
+        "0.7.0",
+        "0.6.3",
+        "0.6.2",
+        "0.6.1",
+        "0.6.0",
+        "0.5.1",
+        "0.5.0",
+        "0.4.1",
+        "0.4.0",
+        "0.3.0",
+        "0.2.0",
+        "0.1.4",
+        "0.1.3",
+        "0.1.2",
+        "0.1.1",
+        "0.1.0"
+      ],
+      "source": "mcr",
+      "lookup_timestamp": "2026-11-23T17:45:07.698Z"
+    },
+    "bicep::br/public:avm/res/recovery-services/vault": {
+      "latest": "0.14.0",
+      "known_versions": [
+        "0.14.0",
+        "0.13.2",
+        "0.13.1",
+        "0.13.0",
+        "0.12.0",
+        "0.11.3",
+        "0.11.2",
+        "0.11.1",
+        "0.11.0",
+        "0.10.1",
+        "0.10.0",
+        "0.9.2",
+        "0.9.1",
+        "0.9.0",
+        "0.8.1",
+        "0.8.0",
+        "0.7.1",
+        "0.7.0",
+        "0.6.1",
+        "0.6.0",
+        "0.5.1",
+        "0.5.0",
+        "0.4.0",
+        "0.3.0",
+        "0.2.3",
+        "0.2.2",
+        "0.2.1",
+        "0.2.0",
+        "0.1.0"
+      ],
+      "source": "mcr",
+      "lookup_timestamp": "2026-11-23T17:45:07.756Z"
+    },
+    "bicep::br/public:avm/res/relay/namespace/hybrid-connection/authorization-rule": {
+      "latest": "0.1.0",
+      "known_versions": [
+        "0.1.0"
+      ],
+      "source": "mcr",
+      "lookup_timestamp": "2026-11-23T17:45:07.807Z"
+    },
+    "bicep::br/public:avm/res/search/search-service": {
+      "latest": "0.13.1",
+      "known_versions": [
+        "0.13.1",
+        "0.13.0",
+        "0.12.2",
+        "0.12.1",
+        "0.12.0",
+        "0.11.1",
+        "0.11.0",
+        "0.10.0",
+        "0.9.2",
+        "0.9.1",
+        "0.9.0",
+        "0.8.2",
+        "0.8.1",
+        "0.8.0",
+        "0.7.2",
+        "0.7.1",
+        "0.7.0",
+        "0.6.0",
+        "0.5.0",
+        "0.4.4",
+        "0.4.3",
+        "0.4.2",
+        "0.4.1",
+        "0.4.0",
+        "0.3.0",
+        "0.2.0",
+        "0.1.6",
+        "0.1.5",
+        "0.1.4",
+        "0.1.3",
+        "0.1.2",
+        "0.1.1",
+        "0.1.0"
+      ],
+      "source": "mcr",
+      "lookup_timestamp": "2026-11-23T17:45:07.825Z"
+    },
+    "bicep::br/public:avm/res/sql/server/virtual-network-rule": {
+      "latest": "0.1.0",
+      "known_versions": [
+        "0.1.0"
+      ],
+      "source": "mcr",
+      "lookup_timestamp": "2026-11-23T17:45:07.960Z"
+    },
+    "bicep::br/public:avm/res/storage/storage-account/table-service": {
+      "latest": "0.2.1",
+      "known_versions": [
+        "0.2.1",
+        "0.2.0",
+        "0.1.0"
+      ],
+      "source": "mcr",
+      "lookup_timestamp": "2026-11-23T17:45:08.000Z"
+    },
+    "terraform::Azure/avm-res-batch-batchaccount/azurerm": {
+      "latest": "0.3.0",
+      "known_versions": [
+        "0.3.0",
+        "0.2.0",
+        "0.1.0"
+      ],
+      "source": "terraform-registry",
+      "lookup_timestamp": "2026-11-23T17:45:08.169Z"
+    },
+    "terraform::Azure/avm-res-communication-emailservice/azurerm": {
+      "latest": "0.4.0",
+      "known_versions": [
+        "0.4.0",
+        "0.3.0",
+        "0.2.0",
+        "0.1.0"
+      ],
+      "source": "terraform-registry",
+      "lookup_timestamp": "2026-11-23T17:45:08.180Z"
+    },
+    "terraform::Azure/avm-res-insights-actiongroup/azurerm": {
+      "latest": "0.3.0",
+      "known_versions": [
+        "0.3.0",
+        "0.2.0",
+        "0.1.0"
+      ],
+      "source": "terraform-registry",
+      "lookup_timestamp": "2026-11-23T17:45:08.258Z"
+    },
+    "terraform::Azure/avm-res-machinelearningservices-workspace/azurerm": {
+      "latest": "0.10.0",
+      "known_versions": [
+        "0.10.0",
+        "0.9.1",
+        "0.9.0",
+        "0.8.0",
+        "0.7.0",
+        "0.6.0",
+        "0.5.0",
+        "0.4.1",
+        "0.4.0",
+        "0.3.11",
+        "0.3.10",
+        "0.3.9",
+        "0.3.8",
+        "0.3.7",
+        "0.3.6",
+        "0.3.5",
+        "0.3.4",
+        "0.3.3",
+        "0.3.2",
+        "0.3.1",
+        "0.3.0",
+        "0.2.1",
+        "0.2.0",
+        "0.1.2",
+        "0.1.1",
+        "0.1.0"
+      ],
+      "source": "terraform-registry",
+      "lookup_timestamp": "2026-11-23T17:45:08.268Z"
+    },
+    "terraform::Azure/avm-res-network-dnszone/azurerm": {
+      "latest": "0.3.0",
+      "known_versions": [
+        "0.3.0",
+        "0.2.1",
+        "0.2.0",
+        "0.1.0"
+      ],
+      "source": "terraform-registry",
+      "lookup_timestamp": "2026-11-23T17:45:08.293Z"
     }
   }
 }
