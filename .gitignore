@@ -5,9 +5,6 @@
 .azure/
 local.settings.json
 
-# Copilot session logs
-Copilot-Processing.md
-
 # Bicep
 *.bin
 
@@ -69,6 +66,8 @@ dist/
 build/
 packages/*/dist/
 packages/cli/assets/
+!plugins/*/server/dist/
+!plugins/*/server/dist/**
 
 # Node
 node_modules/
@@ -77,6 +76,7 @@ node_modules/
 # Python
 __pycache__/
 *.pyc
+*.egg-info/
 .venv/
 venv/
 .pytest_cache/
@@ -92,11 +92,6 @@ Copilot-Processing.md
 scratch/
 
 freshness-report.json
-
-# Baseline snapshots (local working data for context optimizer).
-# Use a contents-only ignore (rather than the directory itself) so
-# that single committed deliverables can be re-included with `!`.
-agent-output/_baselines/*
 
 # Generated development-instance evidence is not product source.
 .apex/
