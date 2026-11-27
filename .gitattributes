@@ -50,7 +50,8 @@
 *.so binary
 *.dylib binary
 
-# Phase 0A terminal transcripts are byte-for-byte evidence captures.
+# Preserve captured and review-bound artifact hashes through staging and checkout.
+agent-output/** -text
 
 # GitHub specific files
 .gitattributes text eol=lf
@@ -73,3 +74,6 @@ azure-pipelines*.yml text eol=lf
 .github/**/*.tgz binary
 .github/**/*.tar binary
 .github/**/*.zip binary
+
+# Plugin bundles and launchers must retain LF across all development hosts.
+plugins/**/server/dist/** text eol=lf
