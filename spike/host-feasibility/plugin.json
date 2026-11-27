@@ -1,0 +1,15 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "apex-host-feasibility",
+  "version": "0.0.1",
+  "description": "Throwaway Step 0 spike for APEX Agent Plugin host qualification.",
+  "author": {
+    "name": "Jonathan Vella",
+    "url": "https://github.com/jonathan-vella"
+  },
+  "repository": "https://github.com/jonathan-vella/apex-vnext",
+  "license": "MIT",
+  "extensions": {
+    "com.github.copilot": {}
+  }
+}
