@@ -127,9 +127,10 @@ plugins/
 Goal: Empirically verify every undocumented cross-host behavior on a tiny throwaway Agent Plugin 1.0.0 **before**
 refactoring APEX.
 
-- [ ] **S0.1 Build a minimal spike plugin** (`plugin.json` 1.0.0, `mcp.json` with a 2-tool `echo`/`write_probe` Node
+- [x] **S0.1 Build a minimal spike plugin** (`plugin.json` 1.0.0, `mcp.json` with a 2-tool `echo`/`write_probe` Node
   stdio server, 1 coordinator agent, 1 hidden read-only leaf agent with `user-invocable: false` and `tools: [read,
-  search]`, 1 `com.github.copilot/rules/probe.instructions.md` with `applyTo: "**/*.bicep"`).
+  search]`, 1 `com.github.copilot/rules/probe.instructions.md` with `applyTo: "**/*.bicep"`). Implemented in
+  `spike/host-feasibility/`; run the host matrix in `HOST-CHECKLIST.md`.
 - [ ] **S0.2 Run the spike across VS Code (Win/Linux), Copilot CLI (Linux/WSL2), and Copilot App (Win/macOS/Linux):**
   - Confirm named specialist delegation (`task`) works without Local-only `agents: [...]`.
   - **Negative permission test:** Confirm the read-only leaf agent is **actually denied** `write_probe` and file writes

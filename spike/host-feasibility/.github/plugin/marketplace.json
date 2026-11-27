@@ -1,0 +1,19 @@
+{
+  "name": "apex-host-feasibility-marketplace",
+  "metadata": {
+    "description": "Local throwaway marketplace for the APEX Step 0 host-feasibility spike.",
+    "version": "0.0.1"
+  },
+  "owner": {
+    "name": "Jonathan Vella",
+    "url": "https://github.com/jonathan-vella"
+  },
+  "plugins": [
+    {
+      "name": "apex-host-feasibility",
+      "description": "Agent Plugins 1.0.0 host-feasibility spike.",
+      "version": "0.0.1",
+      "source": "."
+    }
+  ]
+}
