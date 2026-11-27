@@ -1,0 +1,14 @@
+{
+  "features": {
+    "ghcr.io/devcontainers/features/node:2": {
+      "version": "2.1.2",
+      "resolved": "ghcr.io/devcontainers/features/node@sha256:20ac718cc67e7999a9d3fbb8387f1a3a5d53ecbd41fe7c075ebadb8e9b431b17",
+      "integrity": "sha256:20ac718cc67e7999a9d3fbb8387f1a3a5d53ecbd41fe7c075ebadb8e9b431b17"
+    },
+    "ghcr.io/devcontainers/features/powershell:2": {
+      "version": "2.0.4",
+      "resolved": "ghcr.io/devcontainers/features/powershell@sha256:34cd20ddd57ab8cc11cba8af7cc21314fbb28855d4dca50168f9a9bae2de51a7",
+      "integrity": "sha256:34cd20ddd57ab8cc11cba8af7cc21314fbb28855d4dca50168f9a9bae2de51a7"
+    }
+  }
+}

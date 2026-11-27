@@ -1,0 +1,350 @@
+#!/usr/bin/env node
+/**
+ * IaC Security Baseline Validator
+ *
+ * Validates that generated Bicep (.bicep) and Terraform (.tf) files
+ * comply with the MANDATORY security baseline from apex-azure-defaults skill
+ * and AGENTS.md:
+ *
+ * 1. TLS 1.2 minimum on all services
+ * 2. HTTPS-only traffic
+ * 3. No public blob access
+ * 4. Managed identity preferred (warning only — not all resources need it)
+ * 5. Azure AD-only SQL auth
+ * 6. No shared key access on storage
+ * 7. App Service HTTP/2 enabled
+ * 8. MySQL/PostgreSQL SSL enforcement
+ * 9. Container Registry admin user disabled
+ * 10. ALZ Corp Deny floor: Key Vault soft delete, purge protection and RBAC model,
+ *     no NIC IP forwarding, no hybrid-networking or classic resource types
+ *
+ * Enforces Golden Principle #10: Mechanical Enforcement Over Documentation.
+ *
+ * Limitation: Regex-based single-line matching. Nested or multi-line property
+ * assignments may not be caught. This is a known trade-off for speed.
+ *
+ * @example
+ * node tools/scripts/validate-iac-security-baseline.mjs
+ */
+
+import fs from "node:fs";
+import path from "node:path";
+import { parseArgs } from "node:util";
+import { Reporter } from "./_lib/reporter.mjs";
+import { walkFiles } from "./_lib/glob-helpers.mjs";
+import { findAllMatches } from "./_lib/regex-helpers.mjs";
+
+const ROOT = process.cwd();
+const r = new Reporter("IaC Security Baseline");
+const publicWebFiles = new Set();
+try {
+  const { values } = parseArgs({ options: { "public-web-app": { type: "string", multiple: true } } });
+  for (const file of values["public-web-app"] ?? []) {
+    const resolved = path.resolve(file);
+    if (!fs.statSync(resolved).isFile() || !/\.(bicep|tf)$/.test(file)) {
+      throw new Error(`Public web exception requires a Bicep or Terraform file: ${file}`);
+    }
+    publicWebFiles.add(resolved);
+  }
+} catch (error) {
+  r.error(`Invalid public web scope: ${error.message}`);
+}
+
+function isDedicatedWebApp(content, filePath) {
+  const declarations = content.match(/^\s*(?:resource|module)\s+[^\n]+/gm) ?? [];
+  if (declarations.length !== 1) return false;
+  const declaration = declarations[0];
+  if (filePath.endsWith(".bicep")) {
+    return (
+      /^\s*resource\s+\w+\s+'Microsoft\.Web\/sites@[^']+'\s*=/i.test(declaration) ||
+      /^\s*module\s+\w+\s+'br\/public:avm\/res\/web\/site:[^']+'\s*=/.test(declaration)
+    );
+  }
+  if (/^\s*resource\s+"azurerm_(linux|windows)_web_app"\s+"[^"]+"\s*\{/.test(declaration)) return true;
+  return (
+    /^\s*module\s+"[^"]+"\s*\{/.test(declaration) &&
+    /^\s*source\s*=\s*"Azure\/avm-res-web-site\/azurerm"\s*$/m.test(content)
+  );
+}
+
+// --- Bicep security anti-patterns ---
+// Each entry: [regex, description]
+const BICEP_VIOLATIONS = [
+  [/minimumTlsVersion\s*:\s*'TLS1_0'/i, "TLS 1.0 is NOT allowed — MUST be TLS1_2 or higher"],
+  [/minimumTlsVersion\s*:\s*'TLS1_1'/i, "TLS 1.1 is NOT allowed — MUST be TLS1_2 or higher"],
+  [/minTlsVersion\s*:\s*'TLS1_0'/i, "TLS 1.0 is NOT allowed — MUST be TLS1_2 or higher"],
+  [/minTlsVersion\s*:\s*'TLS1_1'/i, "TLS 1.1 is NOT allowed — MUST be TLS1_2 or higher"],
+  [/(?:minimumTlsVersion|minTlsVersion)\s*:\s*'1[._][01]'/i, "TLS 1.0/1.1 is NOT allowed — MUST be 1.2 or higher"],
+  [/minimalTlsVersion\s*:\s*'(?:TLS)?1[._][01]'/i, "TLS 1.0/1.1 is NOT allowed — MUST be 1.2 or higher"],
+  [/supportsHttpsTrafficOnly\s*:\s*false/i, "HTTPS-only traffic MUST be true"],
+  [/allowBlobPublicAccess\s*:\s*true/i, "Public blob access MUST be disabled (false)"],
+  [
+    /publicNetworkAccess\s*:\s*'Enabled'/i,
+    "Public network access MUST be disabled except for explicitly reviewed public-facing web applications",
+  ],
+  [/httpsOnly\s*:\s*false/i, "HTTPS-only MUST be enabled"],
+  // --- MUST-FAIL: SQL Entra-only auth ---
+  [/azureADOnlyAuthentication\s*:\s*false/i, "SQL Entra-only auth required (azureADOnlyAuthentication must be true)"],
+  // --- MUST-FAIL: Redis non-SSL port ---
+  [/enableNonSslPort\s*:\s*true/i, "Redis non-SSL port NOT allowed (enableNonSslPort must be false)"],
+  // --- MUST-FAIL: FTPS state ---
+  [/ftpsState\s*:\s*'AllAllowed'/i, "FTPS must be Disabled or FtpsOnly (AllAllowed not permitted)"],
+  // --- MUST-FAIL: Remote debugging ---
+  [/remoteDebuggingEnabled\s*:\s*true/i, "Remote debugging NOT allowed in production"],
+  // --- MUST-FAIL: Cosmos DB local auth ---
+  [/disableLocalAuth\s*:\s*false/i, "Cosmos DB local auth must be disabled (disableLocalAuth must be true)"],
+  // --- MUST-FAIL: MySQL/PostgreSQL SSL ---
+  [/sslEnforcement\s*:\s*'Disabled'/i, "MySQL/PostgreSQL SSL enforcement required (sslEnforcement must be Enabled)"],
+  // --- MUST-FAIL: Storage shared key access ---
+  [
+    /allowSharedKeyAccess\s*:\s*true/i,
+    "Storage shared key access must be disabled (allowSharedKeyAccess must be false) — use Entra ID auth",
+  ],
+  // --- MUST-FAIL: App Service HTTP/2 ---
+  [/http20Enabled\s*:\s*false/i, "App Service HTTP/2 should be enabled (http20Enabled must be true)"],
+  // --- MUST-FAIL: Container Registry admin user ---
+  [/adminUserEnabled\s*:\s*true/i, "Container Registry admin user must be disabled — use managed identity"],
+  // --- MUST-FAIL: ALZ Corp Deny floor ---
+  [/enableRbacAuthorization\s*:\s*false/i, "ALZ Corp: Key Vault must use the Azure RBAC permission model"],
+  [/enableSoftDelete\s*:\s*false/i, "ALZ Corp: Key Vault soft delete must be enabled"],
+  [/enablePurgeProtection\s*:\s*false/i, "ALZ Corp: Key Vault purge protection must be enabled"],
+  [/enableIPForwarding\s*:\s*true/i, "ALZ Corp: network interface IP forwarding must be disabled"],
+  [/Microsoft\.Classic(?:Compute|Network|Storage)\//i, "ALZ Corp: classic resource types are denied"],
+  [
+    /Microsoft\.Network\/(?:expressRoute(?:Circuits|Gateways|Ports)|virtualWans|virtualHubs|vpnGateways|p2svpnGateways|vpnSites|virtualNetworkGateways)\b/i,
+    "ALZ Corp: hybrid networking resource types are denied in the project",
+  ],
+  [
+    /avm\/res\/network\/(?:express-route-circuit|virtual-network-gateway|vpn-gateway|p2s-vpn-gateway|virtual-wan|virtual-hub)\b/i,
+    "ALZ Corp: hybrid networking resource types are denied in the project",
+  ],
+];
+
+// --- Bicep WARN-ONLY patterns (flag but don't block) ---
+const BICEP_WARNINGS = [
+  [
+    /networkAcls\s*:\s*\{[^}]*defaultAction\s*:\s*'Allow'/i,
+    "Key Vault network ACLs default action should be Deny, not Allow",
+  ],
+  [/allowedOrigins\s*:\s*\[\s*'\*'\s*\]/i, "Wildcard CORS origin (*) should be restricted to specific domains"],
+  [
+    /defaultToOAuthAuthentication\s*:\s*false/i,
+    "Storage should default to Entra ID auth (defaultToOAuthAuthentication should be true)",
+  ],
+];
+
+// --- Terraform security anti-patterns ---
+const TERRAFORM_VIOLATIONS = [
+  [/min_tls_version\s*=\s*"1\.0"/i, "TLS 1.0 is NOT allowed — MUST be 1.2 or higher"],
+  [/min_tls_version\s*=\s*"1\.1"/i, "TLS 1.1 is NOT allowed — MUST be 1.2 or higher"],
+  [/minimum_tls_version\s*=\s*"1\.0"/i, "TLS 1.0 is NOT allowed — MUST be 1.2 or higher"],
+  [/minimum_tls_version\s*=\s*"1\.1"/i, "TLS 1.1 is NOT allowed — MUST be 1.2 or higher"],
+  [
+    /(?:min_tls_version|minimum_tls_version|minimal_tls_version)\s*=\s*"TLS1_[01]"/i,
+    "TLS 1.0/1.1 is NOT allowed — MUST be TLS1_2 or higher",
+  ],
+  [/minimal_tls_version\s*=\s*"1\.[01]"/i, "TLS 1.0/1.1 is NOT allowed — MUST be 1.2 or higher"],
+  [/https_traffic_only_enabled\s*=\s*false/i, "HTTPS-only traffic MUST be true"],
+  [/enable_https_traffic_only\s*=\s*false/i, "HTTPS-only traffic MUST be true (legacy attribute)"],
+  [/allow_nested_items_to_be_public\s*=\s*true/i, "Public blob access MUST be disabled (false)"],
+  [
+    /public_network_access_enabled\s*=\s*true/i,
+    "Public network access MUST be disabled except for explicitly reviewed public-facing web applications",
+  ],
+  [/allow_blob_public_access\s*=\s*true/i, "Public blob access MUST be disabled (legacy attribute)"],
+  [/https_only\s*=\s*false/i, "HTTPS-only MUST be enabled"],
+  // --- MUST-FAIL: SQL Entra-only auth ---
+  [
+    /azuread_authentication_only\s*=\s*false/i,
+    "SQL Entra-only auth required (azuread_authentication_only must be true)",
+  ],
+  // --- MUST-FAIL: Redis non-SSL port ---
+  [/enable_non_ssl_port\s*=\s*true/i, "Redis non-SSL port NOT allowed (enable_non_ssl_port must be false)"],
+  // --- MUST-FAIL: FTPS state ---
+  [/ftps_state\s*=\s*"AllAllowed"/i, "FTPS must be Disabled or FtpsOnly (AllAllowed not permitted)"],
+  // --- MUST-FAIL: Remote debugging ---
+  [/remote_debugging_enabled\s*=\s*true/i, "Remote debugging NOT allowed in production"],
+  // --- MUST-FAIL: Cosmos DB local auth ---
+  [
+    /local_authentication_disabled\s*=\s*false/i,
+    "Cosmos DB local auth must be disabled (local_authentication_disabled must be true)",
+  ],
+  // --- MUST-FAIL: MySQL/PostgreSQL SSL ---
+  [
+    /ssl_enforcement_enabled\s*=\s*false/i,
+    "MySQL/PostgreSQL SSL enforcement required (ssl_enforcement_enabled must be true)",
+  ],
+  // --- MUST-FAIL: Storage shared key access ---
+  [/shared_access_key_enabled\s*=\s*true/i, "Storage shared key access must be disabled — use Entra ID auth"],
+  // --- MUST-FAIL: App Service HTTP/2 ---
+  [/http2_enabled\s*=\s*false/i, "App Service HTTP/2 should be enabled (http2_enabled must be true)"],
+  // --- MUST-FAIL: Container Registry admin user ---
+  [/admin_enabled\s*=\s*true/i, "Container Registry admin user must be disabled — use managed identity"],
+  // --- MUST-FAIL: ALZ Corp Deny floor ---
+  [
+    /(?:rbac_authorization_enabled|enable_rbac_authorization)\s*=\s*false/i,
+    "ALZ Corp: Key Vault must use the Azure RBAC permission model",
+  ],
+  [/purge_protection_enabled\s*=\s*false/i, "ALZ Corp: Key Vault purge protection must be enabled"],
+  [/ip_forwarding_enabled\s*=\s*true/i, "ALZ Corp: network interface IP forwarding must be disabled"],
+  [
+    /resource\s+"azurerm_(?:express_route_circuit|express_route_port|virtual_network_gateway|vpn_gateway|point_to_site_vpn_gateway|virtual_wan|virtual_hub)"/i,
+    "ALZ Corp: hybrid networking resource types are denied in the project",
+  ],
+  [
+    /Azure\/avm-res-network-(?:expressroutecircuit|virtualnetworkgateway|vpngateway|virtualwan|virtualhub)\//i,
+    "ALZ Corp: hybrid networking resource types are denied in the project",
+  ],
+];
+
+// --- Terraform WARN-ONLY patterns ---
+const TERRAFORM_WARNINGS = [
+  [/default_action\s*=\s*"Allow"/i, "Key Vault network ACLs default action should be Deny, not Allow"],
+  [/allowed_origins\s*=\s*\[\s*"\*"\s*\]/i, "Wildcard CORS origin (*) should be restricted to specific domains"],
+  [
+    /default_to_oauth_authentication\s*=\s*false/i,
+    "Storage should default to Entra ID auth (default_to_oauth_authentication should be true)",
+  ],
+];
+
+/**
+ * Scan a single file for security violations.
+ */
+function scanFile(filePath, violations, warningPatterns = []) {
+  const relPath = path.relative(ROOT, filePath);
+  const content = fs.readFileSync(filePath, "utf-8");
+  const lines = content.split("\n");
+  let fileHasViolation = false;
+  const publicWebRequested = publicWebFiles.delete(path.resolve(filePath));
+  const publicWebAllowed = publicWebRequested && isDedicatedWebApp(content, filePath);
+  if (publicWebRequested && !publicWebAllowed) {
+    r.error(
+      relPath,
+      "Public web exception requires a dedicated known Web App resource/module file; mixed or unknown files are blocked",
+    );
+    fileHasViolation = true;
+  }
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    for (const [pattern, message] of violations) {
+      if (pattern.test(line)) {
+        if (publicWebAllowed && message.startsWith("Public network access MUST")) continue;
+        r.error(`${relPath}:${i + 1}`, message);
+        fileHasViolation = true;
+      }
+    }
+    for (const [pattern, message] of warningPatterns) {
+      if (pattern.test(line)) {
+        r.warn(`${relPath}:${i + 1}`, message);
+      }
+    }
+  }
+
+  checkTagCasingDuplicates(relPath, content);
+
+  if (!fileHasViolation) {
+    r.ok(`${relPath} — no security baseline violations`);
+  }
+  r.tick();
+}
+
+/**
+ * Detect tag keys that differ only by casing (e.g. both Environment and environment).
+ * Azure Policy treats case-variant tag keys as ambiguous evaluation paths.
+ */
+function checkTagCasingDuplicates(relPath, content) {
+  const tagKeyPattern =
+    /['"]?(Environment|ManagedBy|Project|Owner|environment|managedby|managedBy|project|owner)['"]?\s*[:=]/gi;
+  const found = findAllMatches(tagKeyPattern, content).map((m) => m[1]);
+  const seen = new Map();
+  for (const key of found) {
+    const lower = key.toLowerCase();
+    if (seen.has(lower) && seen.get(lower) !== key) {
+      r.error(
+        relPath,
+        `Tag casing conflict: both '${seen.get(lower)}' and '${key}' found — Azure Policy treats case-variant tag keys as ambiguous (AmbiguousPolicyEvaluationPaths). Use lowercase only (APEX standard).`,
+      );
+    }
+    if (!seen.has(lower)) {
+      seen.set(lower, key);
+    }
+  }
+}
+
+/**
+ * Recursively find files matching an extension under a directory.
+ * @deprecated Use walkFiles from _lib/glob-helpers.mjs for new code.
+ */
+function _findFiles(dir, ext) {
+  const results = [];
+  if (!fs.existsSync(dir)) return results;
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      results.push(..._findFiles(fullPath, ext));
+    } else if (entry.name.endsWith(ext)) {
+      results.push(fullPath);
+    }
+  }
+  return results;
+}
+
+// Bicep parameter files assign with '=' instead of ':'.
+const BICEPPARAM_VIOLATIONS = BICEP_VIOLATIONS.map(([pattern, message]) => [
+  new RegExp(pattern.source.replaceAll("\\s*:\\s*", "\\s*=\\s*"), pattern.flags),
+  message,
+]);
+
+// --- Main ---
+r.header();
+
+// Files directly under infra/ (outside infra/bicep and infra/terraform) are scanned too.
+for (const [ext, patterns, warnings] of [
+  [".bicep", BICEP_VIOLATIONS, BICEP_WARNINGS],
+  [".tf", TERRAFORM_VIOLATIONS, TERRAFORM_WARNINGS],
+]) {
+  if (!fs.existsSync("infra")) break;
+  for (const entry of fs.readdirSync("infra", { withFileTypes: true })) {
+    if (entry.isFile() && entry.name.endsWith(ext)) scanFile(path.resolve("infra", entry.name), patterns, warnings);
+  }
+}
+
+for (const f of walkFiles("infra/bicep", ".bicepparam")) {
+  scanFile(path.resolve(f), BICEPPARAM_VIOLATIONS, []);
+}
+
+// Scan Bicep files
+const bicepFiles = walkFiles("infra/bicep", ".bicep");
+if (bicepFiles.length > 0) {
+  console.log(`📄 Scanning ${bicepFiles.length} Bicep file(s)...\n`);
+  for (const f of bicepFiles) {
+    scanFile(path.resolve(f), BICEP_VIOLATIONS, BICEP_WARNINGS);
+  }
+} else {
+  console.log("ℹ️  No Bicep files found in infra/bicep/\n");
+}
+
+// Scan Terraform files
+const tfFiles = walkFiles("infra/terraform", ".tf");
+if (tfFiles.length > 0) {
+  console.log(`\n📄 Scanning ${tfFiles.length} Terraform file(s)...\n`);
+  for (const f of tfFiles) {
+    scanFile(path.resolve(f), TERRAFORM_VIOLATIONS, TERRAFORM_WARNINGS);
+  }
+} else {
+  console.log("ℹ️  No Terraform files found in infra/terraform/\n");
+}
+
+// --- Summary ---
+for (const file of publicWebFiles)
+  r.error(file, "Public web exception file was not scanned under infra/bicep or infra/terraform");
+console.log(
+  "Source checks do not prove private endpoint coverage or DNS resolution. Verify the approved plan and connectivity evidence.",
+);
+r.summary("Security baseline");
+r.exitOnError(
+  "Security baseline validation passed.",
+  `${r.errors} security baseline violation(s) found. Fix violations; public web scope must come from the approved plan.`,
+);

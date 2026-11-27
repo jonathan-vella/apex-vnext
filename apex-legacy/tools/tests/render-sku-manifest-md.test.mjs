@@ -1,0 +1,257 @@
+// Renderer unit test for tools/scripts/render-sku-manifest-md.mjs
+//
+// Asserts:
+//  - Fixture JSON renders to expected MD (idempotent across two runs).
+//  - Revision mismatch self-check fails (we patch the rendered string).
+//  - Conditional sections only render when their data is non-empty.
+//
+// Phase G2 of the nordic-foods lessons plan.
+
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.resolve(HERE, "../..");
+const RENDERER = path.join(ROOT, "tools/scripts/render-sku-manifest-md.mjs");
+
+const { renderManifest } = await import(RENDERER);
+
+const BASE_FIXTURE = {
+  schema_version: "sku-manifest-v1",
+  project: "test-proj",
+  default_region: "swedencentral",
+  created_at: "2026-05-12T09:00:00Z",
+  updated_at: "2026-05-12T11:30:00Z",
+  current_revision: 2,
+  environments: ["dev", "prod"],
+  revisions: [
+    {
+      rev: 1,
+      created_at: "2026-05-12T09:00:00Z",
+      agent: "02-Requirements",
+      step: "1",
+      summary: "User pins",
+      changed_ids: ["app-plan-web"],
+    },
+    {
+      rev: 2,
+      created_at: "2026-05-12T11:30:00Z",
+      agent: "03-Architect",
+      step: "2",
+      summary: "Architect authoring",
+      changed_ids: ["sql-db-core"],
+    },
+  ],
+  services: [
+    {
+      id: "sql-db-core",
+      service: "SQL Database",
+      size: "GP_S_Gen5_2",
+      capacity: { mode: "fixed", default: 1 },
+      zonal: true,
+      regions: ["swedencentral"],
+      sla_target: "99.99%",
+      sla_achieved: "99.99%",
+      commitment: { type: "on-demand" },
+      requires: ["private-endpoints"],
+      source: "architect-derived",
+      source_step: "2",
+      last_modified_rev: 2,
+      cost_estimate_monthly_usd: 218.0,
+    },
+    {
+      id: "app-plan-web",
+      service: "App Service Plan",
+      size: "P1v3",
+      capacity: { mode: "autoscale", min: 2, max: 10, default: 2 },
+      zonal: true,
+      regions: ["swedencentral", "germanywestcentral"],
+      environment_overrides: { dev: { size: "B1", zonal: false } },
+      sla_target: "99.95%",
+      sla_achieved: "99.99%",
+      commitment: { type: "reserved-1yr", term_years: 1 },
+      requires: ["vnet-integration"],
+      source: "user-pin",
+      source_step: "1",
+      last_modified_rev: 2,
+      cost_estimate_monthly_usd: 142.5,
+    },
+  ],
+};
+
+describe("renderManifest", () => {
+  it("produces byte-equal output on repeat runs (idempotent)", () => {
+    const first = renderManifest(BASE_FIXTURE);
+    const second = renderManifest(BASE_FIXTURE);
+    assert.equal(first, second, "renderer must be idempotent");
+  });
+
+  it("sorts services by id lexicographically", () => {
+    const out = renderManifest(BASE_FIXTURE);
+    const appIdx = out.indexOf("| `app-plan-web` |");
+    const sqlIdx = out.indexOf("| `sql-db-core` |");
+    assert.ok(appIdx > 0 && sqlIdx > 0, "expected both service rows present");
+    assert.ok(appIdx < sqlIdx, "app-plan-web must precede sql-db-core (lexicographic id sort)");
+  });
+
+  it("emits Current revision cell matching JSON current_revision", () => {
+    const out = renderManifest(BASE_FIXTURE);
+    const m = out.match(/\|\s*Current revision\s*\|\s*`(\d+)`/);
+    assert.ok(m, "Current revision cell must be present");
+    assert.equal(Number(m[1]), BASE_FIXTURE.current_revision);
+  });
+
+  it("renders Per-environment overrides only for services that declare them", () => {
+    const out = renderManifest(BASE_FIXTURE);
+    assert.ok(out.includes("### Per-environment overrides"));
+    // app-plan-web has override row; sql-db-core does not
+    assert.ok(out.includes("| `app-plan-web` | `dev` |"));
+    assert.ok(!out.match(/\| `sql-db-core` \| `dev` \|/));
+  });
+
+  it("omits As-built actual SKUs section when no service has actual_sku", () => {
+    const out = renderManifest(BASE_FIXTURE);
+    assert.ok(!out.includes("### As-built actual SKUs"), "section must be absent without actual_sku data");
+  });
+
+  it("renders As-built section when actual_sku is present on any service", () => {
+    const withActual = JSON.parse(JSON.stringify(BASE_FIXTURE));
+    withActual.services[0].actual_sku = { prod: { swedencentral: "GP_S_Gen5_2" } };
+    const out = renderManifest(withActual);
+    assert.ok(out.includes("### As-built actual SKUs"));
+    assert.ok(out.includes("| `sql-db-core` | `prod` | `swedencentral` | `GP_S_Gen5_2` | `GP_S_Gen5_2` | ✅ match |"));
+    assert.ok(!out.includes("[object Object]"));
+  });
+
+  it("flags drift when actual_sku differs from planned size", () => {
+    const drifted = JSON.parse(JSON.stringify(BASE_FIXTURE));
+    drifted.services[1].actual_sku = { prod: { swedencentral: "S1" } }; // planned P1v3
+    const out = renderManifest(drifted);
+    assert.ok(out.includes("⚠️ drift"));
+  });
+
+  it("compares actual_sku against the environment override size, one row per env/region", () => {
+    const multi = JSON.parse(JSON.stringify(BASE_FIXTURE));
+    multi.services[1].actual_sku = {
+      dev: { swedencentral: "B1" },
+      prod: { swedencentral: "P1v3", germanywestcentral: "P1v3" },
+    };
+    const out = renderManifest(multi);
+    assert.ok(out.includes("| `app-plan-web` | `dev` | `swedencentral` | `B1` | `B1` | ✅ match |"));
+    assert.ok(out.includes("| `app-plan-web` | `prod` | `germanywestcentral` | `P1v3` | `P1v3` | ✅ match |"));
+    assert.ok(out.includes("| `app-plan-web` | `prod` | `swedencentral` | `P1v3` | `P1v3` | ✅ match |"));
+    assert.ok(!out.includes("⚠️ drift"));
+  });
+
+  it("rejects a non-map actual_sku", () => {
+    const legacy = JSON.parse(JSON.stringify(BASE_FIXTURE));
+    legacy.services[0].actual_sku = "GP_S_Gen5_2";
+    assert.throws(() => renderManifest(legacy), /environment → region → SKU map/);
+  });
+
+  it("renders 'None open' when open_substitutions is empty or absent", () => {
+    const out = renderManifest(BASE_FIXTURE);
+    assert.ok(out.includes("**None open**"), "empty substitutions must render 'None open' line");
+  });
+
+  it("ends with single trailing newline", () => {
+    const out = renderManifest(BASE_FIXTURE);
+    assert.ok(out.endsWith("\n"), "must end with newline");
+    assert.ok(!out.endsWith("\n\n"), "must not double-trail");
+  });
+
+  it("preserves the legacy service table without observed SKU or subscription metadata", () => {
+    const out = renderManifest(BASE_FIXTURE);
+    assert.ok(
+      out.includes(
+        "| `id` | Service | Size (base) | Capacity | Zonal | Regions | SLA target / achieved | Commitment | Source | Rev |",
+      ),
+    );
+    assert.ok(!out.includes("## Subscriptions"));
+    assert.ok(!out.includes("## Stamps"));
+    assert.ok(!out.includes("Observed SKU"));
+  });
+
+  it("renders sorted subscription/stamp context and observed vs recommended SKUs deterministically", () => {
+    const manifest = structuredClone(BASE_FIXTURE);
+    manifest.subscriptions = [
+      { id: "spoke", display_name: "Workload", role: "spoke" },
+      {
+        id: "hub",
+        display_name: "Shared | services",
+        subscription_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        role: "hub",
+      },
+    ];
+    manifest.services[0].observed_sku = "GP_S_Gen5_4";
+    manifest.stamps = [
+      { id: "tenant-zz", subscription: "spoke", regions: ["germanywestcentral"], environments: ["prod"] },
+      {
+        id: "tenant-aa",
+        label: "Primary",
+        subscription: "hub",
+        regions: ["swedencentral"],
+        service_overrides: { "sql-db-core": { size: "GP_S_Gen5_8" } },
+      },
+    ];
+    const before = JSON.stringify(manifest);
+    const out = renderManifest(manifest);
+    assert.equal(JSON.stringify(manifest), before, "rendering must not mutate evidence");
+    assert.equal(out, renderManifest(manifest));
+    assert.ok(out.includes("- [Subscriptions](#subscriptions)"));
+    assert.ok(out.includes("- [Stamps](#stamps)"));
+    assert.ok(out.indexOf("| `hub` |") < out.indexOf("| `spoke` |"));
+    assert.ok(out.indexOf("| `tenant-aa` |") < out.indexOf("| `tenant-zz` |"));
+    assert.ok(out.includes("| `hub` | Shared \\| services | `aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa` | hub |"));
+    assert.ok(out.includes("| `tenant-aa` | Primary | `hub` | `dev`, `prod` | `swedencentral` |"));
+    assert.ok(out.includes('`sql-db-core`: `{"size":"GP_S_Gen5_8"}`'));
+    assert.ok(out.includes("| `tenant-zz` | — | `spoke` | `prod` | `germanywestcentral` |"));
+    assert.ok(out.includes("| Size (base) | Observed SKU | Subscription |"));
+    assert.ok(
+      out.includes("| `sql-db-core` | SQL Database | `GP_S_Gen5_2` | `GP_S_Gen5_4` | Per stamp / unspecified |"),
+    );
+    assert.ok(out.includes("| `app-plan-web` | App Service Plan | `P1v3` | — | Per stamp / unspecified |"));
+  });
+
+  it("renders single-subscription attribution and legacy stamps without requiring observations", () => {
+    const manifest = structuredClone(BASE_FIXTURE);
+    manifest.services[0].subscription = "workload";
+    manifest.stamps = [{ id: "legacy-stamp", regions: ["swedencentral"] }];
+    const out = renderManifest(manifest);
+    assert.ok(out.includes("| Size (base) | Subscription | Capacity |"));
+    assert.ok(out.includes("| `sql-db-core` | SQL Database | `GP_S_Gen5_2` | `workload` |"));
+    assert.ok(out.includes("| `legacy-stamp` | — | Per service | `dev`, `prod` |"));
+    assert.ok(!out.includes("Observed SKU"));
+  });
+
+  it("keeps an empty service table aligned when subscriptions exist", () => {
+    const manifest = { ...BASE_FIXTURE, services: [], subscriptions: [{ id: "hub", display_name: "Hub" }] };
+    const out = renderManifest(manifest);
+    const header = out.split("\n").find((line) => line.startsWith("| `id` | Service |"));
+    const empty = out.split("\n").find((line) => line.startsWith("| _none_ |"));
+    assert.equal(empty.split("|").length, header.split("|").length);
+  });
+});
+
+describe("render-sku-manifest-md.mjs CLI", () => {
+  it("writes file and respects --in/--out", async () => {
+    const tmpDir = fs.mkdtempSync(path.join(HERE, ".sku-render-"));
+    const inPath = path.join(tmpDir, "in.json");
+    const outPath = path.join(tmpDir, "out.md");
+    fs.writeFileSync(inPath, JSON.stringify(BASE_FIXTURE), "utf-8");
+    const { spawnSync } = await import("node:child_process");
+    const r = spawnSync("node", [RENDERER, "--in", inPath, "--out", outPath], { encoding: "utf-8" });
+    assert.equal(r.status, 0, `renderer failed: ${r.stdout}\n${r.stderr}`);
+    assert.ok(fs.existsSync(outPath), "expected MD file to be written");
+    const written = fs.readFileSync(outPath, "utf-8");
+    assert.equal(written, renderManifest(BASE_FIXTURE), "CLI output must match library output");
+    // Second run on identical input should be a no-op (still exit 0, content unchanged)
+    const r2 = spawnSync("node", [RENDERER, "--in", inPath, "--out", outPath], { encoding: "utf-8" });
+    assert.equal(r2.status, 0);
+    assert.equal(fs.readFileSync(outPath, "utf-8"), written);
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+});

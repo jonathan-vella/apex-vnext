@@ -1,0 +1,114 @@
+# Dependabot configuration for automated dependency updates.
+#
+# Scope: dev container features and base image, GitHub Actions, root npm,
+# root requirements.txt and the apex-recall Python package.
+#
+# Update cadence is weekly to balance freshness with PR noise. Open PR limits
+# are conservative (3 per ecosystem; 5 for npm, whose grouped and security
+# updates otherwise queue behind the limit) to avoid review-queue overload.
+#
+# Reference: https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+version: 2
+updates:
+  # ─── Dev container features ───────────────────────────────────────────────
+  # Tracks ghcr.io/devcontainers/features/* digests in
+  # .devcontainer/devcontainer.json + regenerates devcontainer-lock.json.
+  - package-ecosystem: "devcontainers"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "chore(devcontainer)"
+    labels:
+      - "dependencies"
+      - "devcontainer"
+
+  # ─── Dev container base image ─────────────────────────────────────────────
+  # Tracks the FROM line in .devcontainer/Dockerfile.
+  - package-ecosystem: "docker"
+    directory: "/.devcontainer"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "chore(devcontainer)"
+    labels:
+      - "dependencies"
+      - "devcontainer"
+
+  # ─── GitHub Actions ────────────────────────────────────────────────────────
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "chore(ci)"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    groups:
+      # Bundle minor/patch bumps of first-party actions (actions/*) to keep
+      # PR volume manageable; security/major bumps still PR individually.
+      actions-minor:
+        patterns:
+          - "actions/*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # ─── npm: repo root (validators, lint tooling) ─────────────────────────────
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    labels:
+      - "dependencies"
+      - "npm"
+    groups:
+      dev-dependencies:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # ─── Python: apex-recall CLI ───────────────────────────────────────────────
+  - package-ecosystem: "pip"
+    directory: "/tools/apex-recall"
+    schedule:
+      interval: "weekly"
+      day: "wednesday"
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "chore(apex-recall)"
+    labels:
+      - "dependencies"
+      - "apex-recall"
+
+  # ─── Python: repository tooling (requirements.txt) ─────────────────────────
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "wednesday"
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "chore(deps)"
+    labels:
+      - "dependencies"
+      - "python"

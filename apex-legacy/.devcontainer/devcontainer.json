@@ -1,0 +1,151 @@
+{
+  "name": "APEX",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".",
+    "args": {
+      "APEX_NPM_REGISTRY_HOST_PATH": "${localEnv:APEX_NPM_REGISTRY_HOST_PATH:registry.npmjs.org/}",
+      "APEX_PIP_INDEX_HOST_PATH": "${localEnv:APEX_PIP_INDEX_HOST_PATH:pypi.org/simple/}"
+    }
+  },
+
+  "features": {
+    // Latest stable selections resolved on 2026-10-20; native AMD64 build and manual acceptance remain pending.
+    "./features/azure-cli": {
+      "version": "2.91.0"
+    },
+    "ghcr.io/devcontainers/features/powershell:2": {
+      "version": "7.6.7"
+    },
+    "./features/python": {
+      "version": "3.15.0",
+      "pipVersion": "26.2.1"
+    },
+    "ghcr.io/devcontainers/features/node:2": {
+      "version": "26.12.0",
+      "pnpmVersion": "none"
+    }
+  },
+  "overrideFeatureInstallOrder": ["./features/python", "./features/azure-cli"],
+
+  // Native tools and verified standalone CLIs are installed before features run.
+  "onCreateCommand": "az version --output none",
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "postStartCommand": "bash .devcontainer/post-start.sh",
+
+  // Environment variables for Python optimization
+  "containerEnv": {
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "PYTHONUNBUFFERED": "1",
+    // Public registries by default; Microsoft maintainers opt in to the CFS proxy (README: Package Sources).
+    "NPM_CONFIG_REGISTRY": "https://${localEnv:APEX_NPM_REGISTRY_HOST_PATH:registry.npmjs.org/}",
+    "UV_CACHE_DIR": "/home/vscode/.cache/uv",
+    "PIP_INDEX_URL": "https://${localEnv:APEX_PIP_INDEX_HOST_PATH:pypi.org/simple/}",
+    "UV_INDEX_URL": "https://${localEnv:APEX_PIP_INDEX_HOST_PATH:pypi.org/simple/}",
+    "APEX_POWERSHELL_REPOSITORY_URL": "${localEnv:APEX_POWERSHELL_REPOSITORY_URL}",
+    "TF_PLUGIN_CACHE_DIR": "/home/vscode/.terraform.d/plugin-cache"
+  },
+
+  "remoteEnv": {
+    "PATH": "/home/vscode/.local/bin:${containerEnv:PATH}",
+    "AZURE_DEFAULTS_LOCATION": "swedencentral",
+    // Forward GH_TOKEN from the host process environment inherited by VS Code.
+    // terminal.integrated.env.* configures terminals, not this localEnv substitution.
+    // If unset, gh can use credentials in its mounted config volume.
+    "GH_TOKEN": "${localEnv:GH_TOKEN}"
+  },
+
+  "customizations": {
+    "vscode": {
+      // Keep editor extensions limited to core APEX language and GitHub UX.
+      // Azure MCP runs from .mcp.json rather than an extension pack.
+      "extensions": [
+        "-ms-vscode.vscode-node-azure-pack",
+        "-ms-azuretools.vscode-azure-github-copilot",
+        "-ms-azuretools.vscode-azure-mcp-server",
+        "-ms-windows-ai-studio.windows-ai-studio",
+        "-teamsdevapp.vscode-ai-foundry",
+        "GitHub.copilot-chat",
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-azuretools.vscode-azureresourcegroups",
+        "ms-azuretools.vscode-bicep",
+        "ms-vscode.powershell",
+        "github.vscode-github-actions",
+        "github.vscode-pull-request-github",
+        "esbenp.prettier-vscode",
+        "redhat.vscode-yaml",
+        "HashiCorp.terraform"
+      ],
+      "settings": {
+        "chat.useAgentsMdFile": true,
+        "chat.useNestedAgentsMdFiles": true,
+        "chat.useClaudeMdFile": false,
+        "chat.customAgentInSubagent.enabled": true,
+        "chat.useAgentSkills": true,
+        "chat.mcp.workspaceRootConfig.enabled": true,
+        "github.copilot.chat.agentDebugLog.fileLogging.enabled": true,
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.rulers": [120],
+        "editor.wordWrap": "wordWrapColumn",
+        "editor.wordWrapColumn": 120,
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "files.eol": "\n",
+        "editor.tabSize": 2,
+        "[markdown]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode",
+          "editor.rulers": [120],
+          "editor.wordWrap": "wordWrapColumn",
+          "editor.wordWrapColumn": 120
+        },
+        "[bicep]": {
+          "editor.tabSize": 2
+        },
+        "[terraform]": {
+          "editor.tabSize": 2,
+          "editor.formatOnSave": true,
+          "editor.defaultFormatter": "hashicorp.terraform"
+        },
+        "[powershell]": {
+          "editor.tabSize": 4
+        },
+        "[python]": {
+          "editor.tabSize": 4
+        },
+        "python.defaultInterpreterPath": "/usr/local/python/current/bin/python3",
+        "python.analysis.typeCheckingMode": "basic"
+      }
+    }
+  },
+
+  // Mounts for credential/cache persistence across rebuilds
+  // - Azure CLI: Host's ~/.azure (Linux/macOS) or %USERPROFILE%\.azure (Windows)
+  // - GitHub CLI: Docker volume (Windows uses keyring, can't be mounted; Linux/macOS use files)
+  // - UV cache: Docker volume for Python package cache
+  // - Terraform providers: Docker volume for downloaded provider packages
+  "mounts": [
+    {
+      "source": "${localEnv:USERPROFILE}${localEnv:HOME}/.azure",
+      "target": "/home/vscode/.azure",
+      "type": "bind"
+    },
+    {
+      "source": "devcontainer-gh-config-${devcontainerId}",
+      "target": "/home/vscode/.config/gh",
+      "type": "volume"
+    },
+    {
+      "source": "devcontainer-uv-cache-${devcontainerId}",
+      "target": "/home/vscode/.cache/uv",
+      "type": "volume"
+    },
+    {
+      "source": "devcontainer-tf-cache-${devcontainerId}",
+      "target": "/home/vscode/.terraform.d/plugin-cache",
+      "type": "volume"
+    }
+  ],
+
+  "remoteUser": "vscode"
+}

@@ -1,0 +1,2117 @@
+#!/usr/bin/env node
+/**
+ * Agent Validators (consolidated)
+ *
+ * Combines three agent validation checks into one script:
+ * 1. Frontmatter validation (was validate-agent-frontmatter.mjs)
+ * 2. Agent structural checks — body size + language density (was lint-agent-checks.mjs)
+ * 3. Model-prompt alignment (was lint-model-alignment.mjs)
+ *
+ * @example
+ * node tools/scripts/validate-agents.mjs
+ */
+
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
+import { getAgents, getPromptFiles } from "./_lib/workspace-index.mjs";
+import { getBody, parseFrontmatter } from "./_lib/parse-frontmatter.mjs";
+import { DEFAULT_MODEL_CATALOG, modelLabels, catalogModelLabel } from "./_lib/model-helpers.mjs";
+import { Reporter } from "./_lib/reporter.mjs";
+import { MAX_BODY_LINES } from "./_lib/paths.mjs";
+import { STRUCTURED_REVIEWER } from "./validate-challenger-findings.mjs";
+import {
+  loadWorkflowGraph,
+  isVersionAtLeast22,
+  getAgentToStepMap,
+  forwardReachable,
+  findReturnEdge,
+  isCrossTrackJump,
+  normalizeTrackLabel,
+  normalizeTrackTarget,
+  buildSubagentInventory,
+  extractArtifactRefs,
+  collectAllProducedArtifacts,
+  isProducedArtifact,
+} from "./_lib/workflow-handoffs.mjs";
+
+let overallFailed = false;
+let suggestMode = false;
+/** Aggregated structured findings across all parts (used by --format=json). */
+const allFindings = [];
+
+function parseStructuredHandoffs(content) {
+  const handoffs = parseFrontmatter(content)?.handoffs;
+  return Array.isArray(handoffs) ? handoffs : [];
+}
+
+// ============================================================================
+// Part 1: Agent Frontmatter Validation (was validate-agent-frontmatter.mjs)
+// ============================================================================
+
+const MAIN_AGENT_REQUIRED = ["name", "description", "user-invocable", "tools"];
+const SUBAGENT_REQUIRED = ["name", "description", "user-invocable", "tools"];
+const RECOMMENDED_FIELDS = ["agents"];
+const BLOCK_SCALAR_PATTERN = /^description:\s*[>|][-\s]*$/m;
+// Description length cap: enforces concise routing-keyword-only descriptions.
+// See .github/instructions/agent-authoring.instructions.md#frontmatter-description-length.
+// Anti-scope language belongs in the body, not in the description field —
+// every char here ships with every model call (~10x compounding cost).
+const DESCRIPTION_MAX_LEN = 350;
+const DESCRIPTION_WARN_LEN = 300;
+const PRODUCTION_AGENTS_DIR = fileURLToPath(new URL("../../.github/agents/", import.meta.url));
+const BUILTIN_REVIEWERS = new Set(["rubber-duck"]);
+const MANUAL_ENTRY_AGENTS = new Set([
+  "01-Orchestrator",
+  "07b-Bicep Deploy",
+  "07t-Terraform Deploy",
+  "09-Diagnose",
+  "10-Challenger",
+]);
+const LEAF_WORKER_TOOL_PATTERN =
+  /^(?:\*|agent(?:\/|$)|todo(?:\/|$)|vscode$)|runSubagent|askQuestions|ask_user|askUser|manage.?todo/i;
+
+function productionAgentKind(agent) {
+  const directory = path.dirname(path.resolve(agent.path));
+  if (directory === path.resolve(PRODUCTION_AGENTS_DIR)) return "main";
+  if (directory === path.join(PRODUCTION_AGENTS_DIR, "_subagents")) return "worker";
+  return null;
+}
+
+export function validateProductionAgentPolicy(agent, agents = new Map()) {
+  const kind = productionAgentKind(agent);
+  if (!kind) return [];
+
+  const issues = [];
+  const frontmatter = agent.frontmatter ?? {};
+  if ("handoffs" in frontmatter) {
+    issues.push("Active production agents must omit UI handoffs; native tasks and human gates control routing");
+  }
+  if ("model" in frontmatter)
+    issues.push("Active production agents must omit model pins; select Auto in the runtime separately");
+  if ("reasoning-effort" in frontmatter) {
+    issues.push(
+      "Active production agents must omit reasoning-effort pins and use the operator-selected runtime policy",
+    );
+  }
+  const allowed = frontmatter.agents;
+  const tools = frontmatter.tools;
+  const orchestrator = kind === "main" && frontmatter.name === "01-Orchestrator";
+  const mainNames = new Set(
+    [...agents.values()]
+      .filter((candidate) => productionAgentKind(candidate) === "main")
+      .map((candidate) => candidate.frontmatter?.name),
+  );
+  if (Array.isArray(allowed)) {
+    for (const name of allowed) {
+      if (name === "*" || (mainNames.has(name) && !orchestrator)) {
+        issues.push(`Only Orchestrator may allowlist main agents; wildcards are forbidden (got: ${name})`);
+      }
+      if (orchestrator && ((!mainNames.has(name) && name !== STRUCTURED_REVIEWER) || name === "01-Orchestrator")) {
+        issues.push(
+          `Orchestrator may allowlist only other named main agents and the structured reviewer (got: ${name})`,
+        );
+      }
+    }
+  }
+  const invocationDisabled = frontmatter["disable-model-invocation"];
+  if (kind === "main") {
+    if (frontmatter["user-invocable"] !== true) issues.push("Production main agents require user-invocable: true");
+    if (!Array.isArray(tools) || !tools.includes("ask_user")) {
+      issues.push("Production main agents require the native ask_user tool for direct interaction");
+    }
+  }
+  if (kind === "main" && MANUAL_ENTRY_AGENTS.has(frontmatter.name) && invocationDisabled !== true) {
+    issues.push(`Production manual-entry agents require disable-model-invocation: true (${frontmatter.name})`);
+  } else if (kind === "main" && invocationDisabled !== undefined && typeof invocationDisabled !== "boolean") {
+    issues.push("Production main agents require disable-model-invocation: a boolean when specified");
+  }
+  if (orchestrator) {
+    if (!Array.isArray(allowed) || allowed.length === 0) {
+      issues.push("Production Orchestrator requires an explicit named main-agent allowlist");
+    }
+    if (!Array.isArray(tools) || !tools.includes("agent")) {
+      issues.push("Production Orchestrator requires the agent tool for native task dispatch");
+    }
+  }
+  if (kind === "worker") {
+    if (frontmatter["user-invocable"] !== false) issues.push("Production workers require user-invocable: false");
+    if (!Array.isArray(allowed) || allowed.length !== 0) issues.push("Production workers require agents: []");
+    if (Array.isArray(tools) && tools.some((tool) => LEAF_WORKER_TOOL_PATTERN.test(tool))) {
+      issues.push("Production workers cannot delegate, ask user questions, or manage parent todos");
+    }
+  }
+  return issues;
+}
+
+export function runFrontmatterValidation({ agents = getAgents() } = {}) {
+  const r = new Reporter("Agent Frontmatter Validator");
+  r.header();
+
+  let mainCount = 0;
+  let subCount = 0;
+
+  for (const [_file, agent] of agents) {
+    r.tick();
+    const { path: filePath, content, frontmatter, isSubagent } = agent;
+    const relativePath = filePath;
+
+    if (isSubagent) subCount++;
+    else mainCount++;
+
+    if (BLOCK_SCALAR_PATTERN.test(content)) {
+      r.error(relativePath, "description uses a YAML block scalar (>, >-, | or |-). Use a single-line inline string.");
+    }
+
+    if (frontmatter && typeof frontmatter.description === "string") {
+      const len = frontmatter.description.length;
+      if (len > DESCRIPTION_MAX_LEN) {
+        r.error(
+          relativePath,
+          `description is ${len} chars (max ${DESCRIPTION_MAX_LEN}). Trim USE FOR/INVOKES content into the body; keep WHEN keywords + a short anti-scope clause.`,
+        );
+      } else if (len > DESCRIPTION_WARN_LEN) {
+        r.warn(
+          relativePath,
+          `description is ${len} chars (recommend ≤ ${DESCRIPTION_WARN_LEN}). Drop redundant USE FOR / INVOKES lines.`,
+        );
+      }
+    }
+
+    if (!frontmatter) {
+      r.error(relativePath, "No frontmatter found");
+      continue;
+    }
+
+    const requiredFields = isSubagent ? SUBAGENT_REQUIRED : MAIN_AGENT_REQUIRED;
+
+    for (const field of requiredFields) {
+      if (!(field in frontmatter)) {
+        r.error(relativePath, `Missing required field '${field}'`);
+      }
+    }
+
+    if (isSubagent) {
+      const ui = frontmatter["user-invocable"];
+      if (ui !== "false" && ui !== "never" && ui !== false) {
+        r.error(relativePath, `Subagent must have user-invocable: false or never (got: ${ui})`);
+      }
+    } else {
+      const ui = frontmatter["user-invocable"];
+      if (ui !== "true" && ui !== "always" && ui !== true) {
+        r.warn(relativePath, `Main agent should have user-invocable: true (got: ${ui})`);
+      }
+    }
+
+    if (!isSubagent) {
+      for (const field of RECOMMENDED_FIELDS) {
+        if (!(field in frontmatter)) {
+          r.warn(relativePath, `Missing recommended 1.109 field '${field}'`);
+        }
+      }
+    }
+
+    if ("agents" in frontmatter && !Array.isArray(frontmatter.agents)) {
+      r.error(relativePath, `'agents' parsed as ${typeof frontmatter.agents}, expected array`);
+    }
+
+    for (const issue of validateAgentPermissions(frontmatter, { isSubagent, agents })) {
+      r.error(relativePath, issue);
+      r.record({ ruleId: "agent-permissions", severity: "error", file: relativePath, message: issue });
+    }
+
+    for (const issue of validateProductionAgentPolicy(agent, agents)) {
+      r.error(relativePath, issue);
+      r.record({ ruleId: "production-agent-policy", severity: "error", file: relativePath, message: issue });
+    }
+
+    for (const issue of validateProductionAgentBody(agent)) {
+      r.error(relativePath, issue);
+      r.record({ ruleId: "production-agent-body", severity: "error", file: relativePath, message: issue });
+    }
+
+    if (content.includes("handoffs:")) {
+      const handoffMatch = content.match(/handoffs:[\s\S]*?(?=\n[a-z-]+:|---|\n#|$)/i);
+      if (handoffMatch) {
+        const handoffSection = handoffMatch[0];
+        const labelCount = (handoffSection.match(/label:/g) || []).length;
+        const sendCount = (handoffSection.match(/send:/g) || []).length;
+        if (labelCount > 0 && sendCount === 0) {
+          r.warn(relativePath, "Handoffs missing 'send' property (1.109 feature)");
+        }
+      }
+    }
+
+    const fmEnd = content.indexOf("\n---", content.indexOf("---") + 3);
+    if (fmEnd !== -1) {
+      const body = content.substring(fmEnd + 4);
+      const bodyLines = body.split("\n").length;
+      if (bodyLines > MAX_BODY_LINES) {
+        r.error(
+          relativePath,
+          `Body is ${bodyLines} lines (>${MAX_BODY_LINES}). Extract to skill references/ or scripts/.`,
+        );
+      }
+    }
+  }
+
+  console.log(`\nFound ${mainCount} main agents and ${subCount} subagents`);
+
+  r.summary();
+  if (r.errors > 0) {
+    overallFailed = true;
+    console.log("❌ Agent frontmatter validation FAILED\n");
+  } else {
+    console.log("✅ All agents passed frontmatter validation\n");
+  }
+  allFindings.push(...r.findings);
+  return r;
+}
+
+export function validateAgentPermissions(frontmatter, { isSubagent = false, agents = new Map() } = {}) {
+  const issues = [];
+  const tools = frontmatter.tools;
+  const allowed = frontmatter.agents;
+  if (!Array.isArray(tools) || tools.some((tool) => typeof tool !== "string" || !tool.trim())) {
+    issues.push("tools must be an array of non-empty tool IDs");
+  }
+  const hasAgentTool = Array.isArray(tools) && tools.includes("agent");
+  if (Array.isArray(allowed)) {
+    if (allowed.some((name) => typeof name !== "string" || !name.trim())) {
+      issues.push("agents must contain non-empty names");
+    }
+    if (allowed.length > 0 && !hasAgentTool) issues.push("nonempty agents requires the agent tool");
+    const known = new Set([...agents.values()].map((agent) => agent.frontmatter?.name));
+    if (known.size > 0) {
+      for (const name of allowed) {
+        if (name !== "*" && !BUILTIN_REVIEWERS.has(name) && !known.has(name))
+          issues.push(`unknown allowed agent: ${name}`);
+      }
+    }
+  }
+  for (const field of ["user-invocable", "disable-model-invocation"]) {
+    if (field in frontmatter && typeof frontmatter[field] !== "boolean") issues.push(`${field} must be boolean`);
+  }
+  if (isSubagent) {
+    if (!Array.isArray(allowed) || allowed.length !== 0) issues.push("leaf workers require agents: []");
+    if (Array.isArray(tools) && tools.some((tool) => LEAF_WORKER_TOOL_PATTERN.test(tool))) {
+      issues.push("leaf workers cannot delegate, ask user questions, or manage parent todos");
+    }
+  }
+  return issues;
+}
+
+// ============================================================================
+// Part 2: Agent Structural Checks (was lint-agent-checks.mjs)
+// ============================================================================
+
+const KEYWORDS = ["MANDATORY", "NEVER", "CRITICAL", "MUST", "HARD"];
+const MAX_DENSITY_PER_100 = 5;
+
+const EXCLUDE_PATTERNS = [
+  /security baseline/i,
+  /approval gate/i,
+  /ONE-SHOT/,
+  /HARD RULE.*ONE-SHOT/,
+  /NEVER proceed past approval gates/i,
+  /NEVER ask about IaC tool/i,
+  /NEVER call `#runSubagent` for/i,
+  /MUST be delegated via/i,
+  /MUST include Challenger/i,
+];
+
+function stripCodeFences(text) {
+  return text.replace(/^```[\s\S]*?^```/gm, "");
+}
+
+function analyzeLanguage(body) {
+  const stripped = stripCodeFences(body);
+  const lines = stripped.split("\n");
+  const perKeyword = new Map(KEYWORDS.map((k) => [k, 0]));
+  let total = 0;
+
+  for (const line of lines) {
+    if (EXCLUDE_PATTERNS.some((pat) => pat.test(line))) continue;
+    for (const keyword of KEYWORDS) {
+      const regex = new RegExp(`\\b${keyword}\\b`, "g");
+      const matches = line.match(regex);
+      if (matches) {
+        perKeyword.set(keyword, perKeyword.get(keyword) + matches.length);
+        total += matches.length;
+      }
+    }
+  }
+
+  return { total, perKeyword, lines: lines.length };
+}
+
+function runAgentChecks() {
+  const r = new Reporter("Agent Structural Checks");
+  r.header();
+
+  const agents = getAgents();
+
+  // Build the set of known subagent names from files under _subagents/.
+  // Used by the body-vs-frontmatter declaration check below.
+  const knownSubagents = new Set(BUILTIN_REVIEWERS);
+  for (const [, agent] of agents) {
+    if (agent.isSubagent && agent.frontmatter?.name) {
+      knownSubagents.add(agent.frontmatter.name);
+    }
+  }
+
+  // Invocation verbs that imply a real subagent call (vs. a prose mention).
+  // Conservative on purpose — false negatives are preferable to false positives
+  // here; documentation references should not trigger errors.
+  const INVOCATION_VERB_RE =
+    /(?:invoke|delegate(?:\s+to)?|dispatch|call|run|hand[\s-]?off|@|#runSubagent|via\s+`?#runSubagent`?)/i;
+
+  for (const [file, agent] of agents) {
+    r.tick();
+    const { path: filePath, content, isSubagent } = agent;
+    const body = getBody(content);
+    const bodyLines = body.split("\n").length;
+
+    if (bodyLines > MAX_BODY_LINES) {
+      const totalLines = content.split("\n").length;
+      r.errorAnnotation(filePath, `${file} body is ${bodyLines} lines (>${MAX_BODY_LINES}; total: ${totalLines})`);
+      console.log(`  Fix: Extract verbose sections to skill references/ or scripts/.`);
+    }
+
+    const { total, perKeyword, lines } = analyzeLanguage(body);
+    const density = lines > 0 ? (total / lines) * 100 : 0;
+
+    if (density > MAX_DENSITY_PER_100) {
+      const breakdown = KEYWORDS.filter((k) => perKeyword.get(k) > 0)
+        .map((k) => `${k}=${perKeyword.get(k)}`)
+        .join(", ");
+      r.warnAnnotation(
+        filePath,
+        `${file}: ${total} absolute-language keywords in ${lines} lines (${density.toFixed(1)}/100 > ${MAX_DENSITY_PER_100}/100). Breakdown: ${breakdown}`,
+      );
+      console.log(`  Fix: Soften language or extract content to skill references.`);
+    }
+
+    // Subagent invocation vs. `agents:` declaration consistency check.
+    // VS Code's subagent discovery uses the `agents:` frontmatter array;
+    // a body that invokes a subagent not declared there falls back to the
+    // generic runSubagent runner ("not registered in this VS Code agent list").
+    if (!isSubagent) {
+      const declared = new Set(Array.isArray(agent.frontmatter?.agents) ? agent.frontmatter.agents : []);
+      const missing = new Set();
+      for (const subagentName of knownSubagents) {
+        if (declared.has(subagentName)) continue;
+        // Look for invocation patterns within ±60 chars of the name.
+        const escaped = subagentName.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
+        const proximityRe = new RegExp(`.{0,60}\`?${escaped}\`?.{0,60}`, "gi");
+        const matches = body.match(proximityRe) || [];
+        for (const m of matches) {
+          if (INVOCATION_VERB_RE.test(m)) {
+            missing.add(subagentName);
+            break;
+          }
+        }
+      }
+      for (const name of missing) {
+        r.errorAnnotation(
+          filePath,
+          `${file} invokes \`${name}\` in body but does not declare it in \`agents:\` frontmatter (VS Code subagent discovery will fail)`,
+        );
+        console.log(`  Fix: Add "${name}" to the \`agents:\` array in the frontmatter.`);
+      }
+    }
+
+    // No-direct-markdownlint-on-agent-output rule.
+    // Agents must not improvise `markdownlint-cli2 agent-output/...` in a tool
+    // span. The path is globally excluded from `lint:md` and the contract is
+    // owned by lefthook + 10-Challenger. See agent-authoring.instructions.md.
+    // Match the literal CLI invocation form only — prose references that
+    // *describe* the prohibition are fine because they don't contain the
+    // bare command followed by the path token.
+    const directMdLintRe = /markdownlint(?:-cli2)?\s+agent-output\//g;
+    const directMdLintMatches = body.match(directMdLintRe);
+    if (directMdLintMatches) {
+      r.errorAnnotation(
+        filePath,
+        `${file} contains forbidden direct markdownlint invocation against agent-output/ (${directMdLintMatches.length} occurrence${directMdLintMatches.length === 1 ? "" : "s"}). The path is already excluded from lint:md; pre-commit + 10-Challenger own the artifact contract.`,
+      );
+      console.log(
+        `  Fix: Remove the direct \`markdownlint-cli2 agent-output/...\` call. See agent-authoring.instructions.md "No-direct-markdownlint-on-agent-output rule".`,
+      );
+    }
+  }
+
+  r.summary();
+  if (r.errors > 0) {
+    overallFailed = true;
+    console.log("❌ Agent structural checks FAILED\n");
+  } else {
+    console.log("✅ Agent structural checks passed\n");
+  }
+}
+
+// ============================================================================
+// Part 3: Model-Prompt Alignment (was lint-model-alignment.mjs)
+// ============================================================================
+
+/**
+ * Build a Map<lowercase-agent-name, { model, path }> from getAgents().
+ * Shared by Check 1 (Prompt↔Agent model sync), Check 2 (handoff override
+ * redundancy), and the prompt-model-source rule in vendor-prompting.
+ */
+function buildAgentNameToModel(agents = getAgents()) {
+  const map = new Map();
+  for (const [, agent] of agents) {
+    if (agent.frontmatter?.name) {
+      map.set(agent.frontmatter.name.toLowerCase(), {
+        model: agent.frontmatter.model,
+        path: agent.path,
+      });
+    }
+  }
+  return map;
+}
+
+function classifyModel(modelStr) {
+  if (!modelStr) return "unknown";
+  const s = Array.isArray(modelStr) ? modelStr[0] : modelStr;
+  if (typeof s !== "string" || !s) return "unknown";
+  const lower = s.toLowerCase();
+  if (/claude opus 5\.5\b/.test(lower)) return "claude-opus-5.5";
+  if (/claude sonnet 5\.5\b/.test(lower)) return "claude-sonnet-5.5";
+  if (/gpt-6(\.1)?[- ]sol\b/.test(lower)) return "gpt-6-sol";
+  if (/gpt-6[- ]luna\b/.test(lower)) return "gpt-6-luna";
+  if (/gpt-5\.6[- ]terra\b/.test(lower)) return "gpt-5.6-terra";
+  if (lower.includes("mai-code") || lower.includes("mai code")) return "mai-code";
+  return "unknown";
+}
+
+const GPT_OUTCOME_FAMILIES = ["gpt-6-sol", "gpt-6-luna", "gpt-5.6-terra"];
+
+function isClaude(family) {
+  return family.startsWith("claude");
+}
+
+function isGptOutcomeFamily(family) {
+  return GPT_OUTCOME_FAMILIES.includes(family);
+}
+
+function isGptFamily(family) {
+  return family.startsWith("gpt-");
+}
+
+export { classifyModel, isClaude, isGptOutcomeFamily, isGptFamily };
+
+function normalizeModel(modelStr) {
+  if (!modelStr) return "";
+  const s = Array.isArray(modelStr) ? modelStr[0] : modelStr;
+  if (!s) return "";
+  return s
+    .replace(/\s*\(copilot\)/gi, "")
+    .replace(/[[\]"']/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function countBodyLines(content) {
+  return getBody(content).split("\n").length;
+}
+
+function runModelAlignment() {
+  const r = new Reporter("Model-Prompt Alignment");
+  r.header();
+
+  // Check 1: Prompt file model matches target agent
+  console.log("  Check 1: Prompt ↔ Agent model sync");
+  {
+    const agentModelMap = buildAgentNameToModel();
+    const prompts = getPromptFiles();
+
+    for (const [file, prompt] of prompts) {
+      const fm = prompt.frontmatter;
+      if (!fm) continue;
+
+      r.tick();
+      const promptModel = fm.model;
+      const targetAgent = fm.agent;
+
+      if (!targetAgent || !promptModel) continue;
+
+      const agentEntry = agentModelMap.get(targetAgent.toLowerCase());
+      if (!agentEntry) continue;
+
+      const promptNorm = normalizeModel(promptModel);
+      const agentNorm = normalizeModel(agentEntry.model);
+
+      if (promptNorm && agentNorm && promptNorm !== agentNorm) {
+        r.warn(file, `prompt model "${promptModel}" does not match agent "${targetAgent}" model "${agentEntry.model}"`);
+        r.record({
+          ruleId: "legacy-001",
+          severity: "warn",
+          file,
+          message: `prompt model "${promptModel}" does not match agent "${targetAgent}" model "${agentEntry.model}"`,
+          sourceUrl:
+            "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices#model-self-knowledge",
+        });
+      }
+    }
+  }
+
+  // Check 2: Handoff model override redundancy
+  console.log("  Check 2: Handoff model override redundancy");
+  {
+    const agents = getAgents();
+    const agentModelMap = new Map();
+    for (const [name, entry] of buildAgentNameToModel()) {
+      agentModelMap.set(name, entry.model);
+    }
+
+    for (const [_filename, agent] of agents) {
+      const handoffs = agent.frontmatter?.handoffs;
+      if (!Array.isArray(handoffs)) continue;
+
+      r.tick();
+      const relPath = path.relative(process.cwd(), agent.path);
+
+      for (const handoff of handoffs) {
+        if (!handoff.model || !handoff.agent) continue;
+
+        const targetModel = agentModelMap.get(handoff.agent.toLowerCase());
+        if (!targetModel) continue;
+
+        const handoffNorm = normalizeModel(handoff.model);
+        const targetNorm = normalizeModel(targetModel);
+
+        if (handoffNorm === targetNorm) {
+          r.warn(
+            relPath,
+            `handoff to "${handoff.agent}" has redundant model override "${handoff.model}" (matches agent's own model)`,
+          );
+          r.record({
+            ruleId: "legacy-002",
+            severity: "warn",
+            file: relPath,
+            message: `handoff to "${handoff.agent}" has redundant model override "${handoff.model}"`,
+          });
+        }
+      }
+    }
+  }
+
+  // Historical pinned prompts retain vendor-specific guidance; active agents inherit the runtime model.
+  console.log("  Check 3: Large-agent context_awareness");
+  {
+    const agents = getAgents();
+
+    for (const [_filename, agent] of agents) {
+      if (productionAgentKind(agent)) continue;
+      if (agent.isSubagent) continue;
+
+      const bodyLines = countBodyLines(agent.content);
+      if (bodyLines <= 350) continue;
+
+      r.tick();
+      const relPath = path.relative(process.cwd(), agent.path);
+      const body = getBody(agent.content);
+
+      if (!body.includes("<context_awareness>")) {
+        r.warn(
+          relPath,
+          `Agent has ${bodyLines} body lines but no <context_awareness> block (recommended for >350 lines)`,
+        );
+        r.record({
+          ruleId: "legacy-003",
+          severity: "warn",
+          file: relPath,
+          message: `Agent has ${bodyLines} body lines but no <context_awareness> block`,
+          sourceUrl:
+            "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices",
+        });
+      }
+    }
+  }
+
+  // Check 4: Research-oriented production agents missing the investigation block
+  const INVESTIGATE_AGENTS = [
+    "03-architect",
+    "04-design",
+    "04g-governance",
+    "05-iac-planner",
+    "06b-bicep-codegen",
+    "06t-terraform-codegen",
+    "07b-bicep-deploy",
+    "07t-terraform-deploy",
+    "08-as-built",
+    "09-diagnose",
+    "11-context-optimizer",
+  ];
+
+  console.log("  Check 4: Research-agent investigate_before_answering");
+  {
+    const agents = getAgents();
+
+    for (const [filename, agent] of agents) {
+      if (productionAgentKind(agent)) continue;
+      const matchesKnown = INVESTIGATE_AGENTS.some((prefix) => filename.startsWith(prefix));
+      if (!matchesKnown) continue;
+
+      r.tick();
+      const relPath = path.relative(process.cwd(), agent.path);
+      const body = getBody(agent.content);
+
+      if (!body.includes("<investigate_before_answering>")) {
+        r.warn(relPath, "Research agent missing <investigate_before_answering> block");
+        r.record({
+          ruleId: "legacy-004",
+          severity: "warn",
+          file: relPath,
+          message: "Research agent missing <investigate_before_answering> block",
+          sourceUrl:
+            "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices",
+        });
+      }
+    }
+  }
+
+  r.summary();
+  if (r.errors > 0) {
+    overallFailed = true;
+    console.log("❌ Model-prompt alignment check FAILED\n");
+  } else {
+    console.log("✅ Model-prompt alignment check passed\n");
+  }
+  allFindings.push(...r.findings);
+}
+
+// ============================================================================
+// Part 4: Vendor Prompting (new — checks 5-15)
+// ============================================================================
+
+/**
+ * Inline rule registry. Each entry mirrors a row in
+ * `.github/skills/apex-vendor-prompting/rules.json`. The validator does not load
+ * that file at runtime (avoids circularity); instead `--list-rules` dumps
+ * this catalog and cross-checks both directions.
+ *
+ * Severity here is the DEFAULT; family overrides are applied at emit time.
+ */
+const ANTHROPIC_BEST_PRACTICES =
+  "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices";
+const ANTHROPIC_OPUS_5_5 =
+  "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5-5";
+const OPENAI_GPT_5_6_GUIDANCE = "https://developers.openai.com/api/docs/guides/prompt-guidance-gpt-5p6";
+const OPENAI_GPT_5_6_MODEL = "https://developers.openai.com/api/docs/guides/latest-model/gpt-5.6";
+
+const VENDOR_RULES = [
+  {
+    id: "claude-oneshot-001",
+    severity: "warn",
+    appliesTo: "agent",
+    sourceUrl: `${ANTHROPIC_BEST_PRACTICES}#minimizing-hallucinations-in-agentic-coding`,
+  },
+  {
+    id: "gpt-outcome-contract-001",
+    severity: "warn",
+    appliesTo: "agent",
+    sourceUrl: `${OPENAI_GPT_5_6_GUIDANCE}#suggested-prompt-structure`,
+  },
+  {
+    id: "gpt-no-claude-xml-001",
+    severity: "warn",
+    appliesTo: "agent",
+    sourceUrl: `${OPENAI_GPT_5_6_GUIDANCE}#suggested-prompt-structure`,
+  },
+  {
+    id: "cross-language-density-001",
+    severity: "info",
+    appliesTo: "agent",
+    sourceUrl: `${OPENAI_GPT_5_6_GUIDANCE}#outcome-first-prompts-and-stopping-conditions`,
+  },
+  {
+    id: "model-deprecation-001",
+    severity: "warn",
+    appliesTo: "both",
+    sourceUrl: `${OPENAI_GPT_5_6_MODEL}#migration-quickstart`,
+  },
+  {
+    id: "claude-no-prefill-001",
+    severity: "warn",
+    appliesTo: "both",
+    sourceUrl: `${ANTHROPIC_BEST_PRACTICES}#migrating-away-from-prefilled-responses`,
+  },
+  {
+    id: "gpt-stop-rules-non-empty-001",
+    severity: "warn",
+    appliesTo: "agent",
+    sourceUrl: `${OPENAI_GPT_5_6_GUIDANCE}#outcome-first-prompts-and-stopping-conditions`,
+  },
+  {
+    id: "frontmatter-model-style-001",
+    severity: "error",
+    appliesTo: "both",
+    sourceUrl: "https://github.com/jonathan-vella/apex/blob/main/.github/instructions/agent-authoring.instructions.md",
+  },
+  {
+    id: "claude-output-contract-001",
+    severity: "warn",
+    appliesTo: "agent",
+    sourceUrl: `${ANTHROPIC_BEST_PRACTICES}#structure-prompts-with-xml-tags`,
+  },
+  {
+    id: "handoff-enrichment-001",
+    severity: "warn",
+    appliesTo: "agent",
+    sourceUrl: "https://github.com/jonathan-vella/apex/blob/main/.github/instructions/agent-authoring.instructions.md",
+  },
+  {
+    id: "personality-scoping-001",
+    severity: "info",
+    appliesTo: "agent",
+    sourceUrl: `${OPENAI_GPT_5_6_GUIDANCE}#personality-collaboration-and-response-length`,
+  },
+  {
+    id: "prompt-model-source-001",
+    severity: "error",
+    appliesTo: "prompt",
+    sourceUrl:
+      "https://github.com/jonathan-vella/apex/blob/main/.github/instructions/vendor-prompting.instructions.md#prompt-model-source",
+  },
+  {
+    id: "claude-reasoning-extraction-001",
+    severity: "warn",
+    appliesTo: "both",
+    sourceUrl: `${ANTHROPIC_OPUS_5_5}#prompts-written-for-thinking-disabled`,
+  },
+  {
+    id: "gpt-approval-repetition-001",
+    severity: "warn",
+    appliesTo: "agent",
+    sourceUrl: `${OPENAI_GPT_5_6_GUIDANCE}#define-autonomy-and-approval-boundaries`,
+  },
+];
+
+function ruleById(id) {
+  return VENDOR_RULES.find((rule) => rule.id === id);
+}
+
+export const FAMILY_STATUS = {
+  "claude-opus-5.5": "enforced",
+  "claude-sonnet-5.5": "enforced",
+  "gpt-6-sol": "enforced",
+  "gpt-6-luna": "enforced",
+  "gpt-5.6-terra": "enforced",
+  "mai-code": "reviewer-only",
+  unknown: "enforced",
+};
+
+/** Apply family-status downgrade to a rule's default severity. */
+function effectiveSeverity(rule, family) {
+  const base = rule.severity;
+  if (
+    base === "error" ||
+    rule.id === "model-deprecation-001" ||
+    ["gpt-outcome-contract-001", "gpt-stop-rules-non-empty-001"].includes(rule.id)
+  )
+    return base;
+  const status = FAMILY_STATUS[family] || "enforced";
+  if (status === "reviewer-only") return "info";
+  if (status === "deprecated") return "info";
+  if (status === "warn-only") {
+    if (base === "error") return "warn";
+    return base;
+  }
+  return base;
+}
+
+/**
+ * Names of agents whose contract is ONE-SHOT (single round, no investigate).
+ *
+ * Phase 12 (plan-simplifyChallengerReviews) — batch-mode resolution:
+ *
+ * `challenger-review-subagent` supports both single-lens mode (the
+ * orchestrated default) and batch mode (rotating-lens passes 2+3
+ * combined for deep reviews). Batch mode runs N lenses in ONE
+ * subagent invocation. The strict "one-shot" semantic was preserved
+ * via **Option A**: batch mode is implemented by the subagent
+ * **internally** — the parent dispatches a SINGLE \`#runSubagent\` call
+ * with `batch_lenses[]` and receives one `batch_results[]` response.
+ * From the dispatcher's perspective it is still one-shot (one call,
+ * one return). The subagent's internal lens sequencing is opaque to
+ * the dispatcher.
+ *
+ * Therefore: no `multi-shot batch` exception is needed; the existing
+ * one-shot rule continues to apply. If a future change ever exposes
+ * batch-mode as N separate sub-invocations from the parent, revisit
+ * this set or introduce a new `BATCH_ONE_SHOT_AGENT_NAMES` carve-out.
+ */
+const ONE_SHOT_AGENT_NAMES = new Set(["02-Requirements", "challenger-review-subagent"]);
+
+/** Legacy XML wrappers replaced by the APEX Markdown convention. */
+const CLAUDE_ONLY_XML = [
+  "<investigate_before_answering>",
+  "<context_awareness>",
+  "<scope_fencing>",
+  "<empty_result_recovery>",
+  "<subagent_budget>",
+  "<output_contract>",
+  "<stop_conditions>",
+];
+
+/** Structured blocks required by the legacy XML body contract. */
+const CLAUDE_CONTRACT_BLOCKS = ["scope_fencing", "output_contract", "stop_conditions"];
+
+const BODY_CONTRACT_SECTIONS = {
+  Role: ["role"],
+  Goal: ["goal"],
+  "Success criteria": ["success criteria"],
+  Constraints: ["constraints"],
+  Output: ["output", "outputs", "output contract", "output format"],
+  "Stop rules": ["stop rules"],
+};
+const markdownToolingRequire = createRequire(import.meta.resolve("markdownlint-cli2"));
+const MarkdownIt = markdownToolingRequire("markdown-it");
+const bodyMarkdown = new MarkdownIt({ html: true });
+
+export function getAgentBodyStructure(content) {
+  const tokens = bodyMarkdown.parse(getBody(content), {});
+  const headings = [];
+  const prose = [];
+  for (const [index, token] of tokens.entries()) {
+    if (token.type === "inline" && tokens[index - 1]?.type !== "heading_open") prose.push(inlineProse(token));
+    if (token.type !== "heading_open") continue;
+    const level = Number(token.tag.slice(1));
+    const paragraphs = [];
+    for (let cursor = index + 3; cursor < tokens.length; cursor++) {
+      const next = tokens[cursor];
+      if (next.type === "heading_open" && Number(next.tag.slice(1)) <= level) break;
+      if (next.type === "inline" && tokens[cursor - 1]?.type !== "heading_open") paragraphs.push(inlineProse(next));
+    }
+    headings.push({
+      level,
+      title: tokens[index + 1].content,
+      nested: token.level !== 0,
+      content: paragraphs.join("\n").trim(),
+    });
+  }
+  return { headings, prose: prose.join("\n") };
+}
+
+function inlineProse(token) {
+  return (token.children ?? [])
+    .filter((child) => child.type !== "html_inline")
+    .map((child) => child.content)
+    .join("");
+}
+
+function contractSections(structure, names, levels = [1, 2]) {
+  return structure.headings.filter(
+    (heading) => !heading.nested && levels.includes(heading.level) && names.includes(heading.title.toLowerCase()),
+  );
+}
+
+function modelFamilies(model) {
+  try {
+    return modelLabels(model).map((label) => classifyModel(label));
+  } catch {
+    return [];
+  }
+}
+
+// Retained for legacy pinned fixtures; active bodies are validated by structure.
+export function hasMixedBodyContractFamilies(model) {
+  const claude = modelFamilies(model).map((family) => isClaude(family));
+  return claude.includes(true) && claude.includes(false);
+}
+
+// Fenced examples and inline code spans must not satisfy a contract block.
+function stripCodeForXml(body) {
+  const kept = [];
+  let fence = null;
+  for (const line of body.split("\n")) {
+    const marker = line.match(/^ {0,3}(`{3,}|~{3,})/)?.[1];
+    if (fence) {
+      if (marker && marker[0] === fence[0] && marker.length >= fence.length) fence = null;
+      continue;
+    }
+    if (marker) {
+      fence = marker;
+      continue;
+    }
+    kept.push(line.replace(/`[^`\n]*`/g, ""));
+  }
+  return kept.join("\n");
+}
+
+// Commented-out blocks are not part of the prompt; an unterminated comment hides the rest.
+function stripHtmlComments(text) {
+  const kept = [];
+  let index = 0;
+  while (index < text.length) {
+    const start = text.indexOf("<!--", index);
+    if (start === -1) {
+      kept.push(text.slice(index));
+      break;
+    }
+    kept.push(text.slice(index, start));
+    const end = text.indexOf("-->", start + 4);
+    if (end === -1) break;
+    index = end + 3;
+  }
+  return kept.join("");
+}
+
+export function claudeContractBlockIssues(content) {
+  const text = stripHtmlComments(stripCodeForXml(getBody(content)));
+  const issues = [];
+  for (const tag of CLAUDE_CONTRACT_BLOCKS) {
+    const blocks = [...text.matchAll(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`, "g"))];
+    const empty = blocks.some((block) => !block[1].trim());
+    if (!blocks.length || empty) issues.push(`Claude production body requires a nonempty <${tag}> block`);
+  }
+  return issues;
+}
+
+export function validateProductionAgentBody(agent) {
+  const kind = productionAgentKind(agent);
+  if (!kind) return [];
+  const structure = getAgentBodyStructure(agent.content);
+  const titles = structure.headings.filter((heading) => heading.level === 1);
+  const issues = [];
+  if (titles.length !== 1 || titles[0].nested || titles[0].title !== agent.frontmatter?.name) {
+    issues.push("Production body requires exactly one H1 matching the frontmatter name");
+  }
+  const body = getBody(agent.content);
+  const retired = body.match(
+    /\b(?:APEX_WORKER_HANDSHAKE|WORKER_READY(?:_ACK)?|WORKER_EXECUTE|HANDSHAKE_VERIFIED|READY_VERIFIED)\b|verify-worker-ready\.mjs/g,
+  );
+  if (retired)
+    issues.push(`Production body contains retired worker preflight contracts: ${[...new Set(retired)].join(", ")}`);
+  const contracts =
+    kind === "main"
+      ? {
+          Role: BODY_CONTRACT_SECTIONS.Role,
+          Constraints: ["constraints", "scope", "scope and constraints"],
+          Output: BODY_CONTRACT_SECTIONS.Output,
+          "Stop rules": ["stop rules", "stop conditions"],
+        }
+      : {
+          Role: BODY_CONTRACT_SECTIONS.Role,
+          Inputs: ["inputs", "input contract"],
+          Constraints: ["constraints", "scope", "operating posture"],
+          Output: BODY_CONTRACT_SECTIONS.Output,
+        };
+  for (const [name, aliases] of Object.entries(contracts)) {
+    const sections = contractSections(structure, aliases, [2]);
+    if (!sections.length || sections.some((section) => !section.content)) {
+      issues.push(`Production body requires nonempty H2 ${name} sections`);
+    }
+  }
+  if (kind === "worker" && !/\b(stop|fail(?:ure|ed)?|return.*parent|blocked)\b/i.test(structure.prose)) {
+    issues.push("Production leaf body requires a bounded failure/return rule");
+  }
+  return issues;
+}
+
+/** Permitted absolute-language paragraph keywords (Check 8R). */
+const PERMITTED_ABSOLUTE_CONTEXTS = [/security baseline/i, /governance/i, /approval gate/i, /non-negotiable/i];
+
+const ABSOLUTE_WORDS = ["ALWAYS", "NEVER", "MUST", "HARD RULE"];
+const ABSOLUTE_DENSITY_THRESHOLD = 0.05;
+
+const PREFILL_PATTERNS = [
+  /\bprefill the assistant\b/i,
+  /\bassistant prefill\b/i,
+  /\bprefilled response\b/i,
+  /assistant\s*:\s*\{\s*content\s*:\s*"</i,
+];
+
+// Instructions that substitute visible reasoning for always-on thinking (Opus 5.5).
+const REASONING_EXTRACTION_PATTERNS = [
+  /\bthink (?:step[- ]by[- ]step|carefully|hard(?:er)?)\b/i,
+  /\b(?:show|write out|explain|output|include) (?:your|the) (?:full |complete |internal |step[- ]by[- ]step )?(?:reasoning|chain[- ]of[- ]thought|thought process)\b/i,
+];
+
+// Bare "approval gate" is excluded: it names required workflow gates rather than instructing a pause.
+const APPROVAL_PHRASE_PATTERN =
+  /\bask first\b|\bwait for (?:explicit |user |human )?(?:approval|confirmation)\b|\bask (?:the user )?for (?:explicit )?(?:approval|confirmation|permission)\b|\b(?:get|obtain|request) (?:explicit |user |human )?(?:approval|confirmation)\b|\bdo not mutate\b|\bwithout (?:explicit )?(?:user )?approval\b|\bdo not proceed until\b|\brequire[sd]? (?:explicit |separate )?(?:user |human )?approval\b|\bstop for (?:user |human )?approval\b/gi;
+const APPROVAL_PHRASE_THRESHOLD = 3;
+
+/** Check 5: claude-oneshot-001 */
+function checkClaudeOneShotNoInvestigate(r, agent, file, family) {
+  if (!isClaude(family)) return;
+  const name = agent.frontmatter?.name;
+  if (!ONE_SHOT_AGENT_NAMES.has(name)) return;
+  const body = getBody(agent.content);
+  if (!body.includes("<investigate_before_answering>")) return;
+  emit(
+    r,
+    "claude-oneshot-001",
+    family,
+    file,
+    `ONE-SHOT agent "${name}" must NOT include <investigate_before_answering>`,
+  );
+}
+
+/** Check 6: gpt-outcome-contract-001 */
+function checkGptOutcomeContract(r, agent, file, family) {
+  if (!isGptOutcomeFamily(family)) return;
+  const structure = getAgentBodyStructure(agent.content);
+  if (agent.isSubagent) {
+    const missing = [["inputs", "input contract"], BODY_CONTRACT_SECTIONS.Output].filter((names) => {
+      const sections = contractSections(structure, names, [1, 2, 3]);
+      return !sections.length || sections.some((section) => !section.content);
+    });
+    if (missing.length || !/\b(stop|fail(?:ure|ed)?|return.*parent|blocked)\b/i.test(structure.prose)) {
+      emit(
+        r,
+        "gpt-outcome-contract-001",
+        family,
+        file,
+        "Leaf role contract needs Inputs, Outputs, and a bounded failure/return rule",
+      );
+    }
+    return;
+  }
+  const missing = Object.entries(BODY_CONTRACT_SECTIONS)
+    .filter(([name, aliases]) => {
+      const sections = contractSections(structure, aliases);
+      if (!sections.length && name === "Role" && /^Role:[ \t]*\S.+/m.test(structure.prose)) return false;
+      return !sections.length || sections.some((section) => !section.content);
+    })
+    .map(([name]) => name);
+  if (missing.length > 0) {
+    emit(
+      r,
+      "gpt-outcome-contract-001",
+      family,
+      file,
+      `APEX outcome contract missing or empty sections: ${missing.join(", ")}`,
+    );
+  }
+  // Personality scoping (rule personality-scoping-001 piggybacked)
+  const ui = agent.frontmatter?.["user-invocable"];
+  const isUserFacing =
+    (ui === true || ui === "true" || ui === "always") && /Orchestrator/i.test(agent.frontmatter?.name || "");
+  const hasPersonality = contractSections(structure, ["personality"]).length > 0;
+  if (hasPersonality && !isUserFacing && !agent.isSubagent) {
+    emit(
+      r,
+      "personality-scoping-001",
+      family,
+      file,
+      `# Personality block on internal pipeline agent "${agent.frontmatter?.name}" — reserve for user-facing Orchestrators`,
+    );
+  }
+}
+
+/** Check 7: gpt-no-claude-xml-001 */
+function checkGptNoClaudeXml(r, agent, file, family) {
+  if (!isGptFamily(family)) return;
+  const body = getBody(agent.content);
+  for (const xml of CLAUDE_ONLY_XML) {
+    if (body.includes(xml)) {
+      emit(
+        r,
+        "gpt-no-claude-xml-001",
+        family,
+        file,
+        `APEX Markdown convention: replace ${xml} while preserving its content`,
+      );
+    }
+  }
+}
+
+/** Check 8R: cross-language-density-001 */
+function checkAbsoluteLanguageDensity(r, agent, file, family) {
+  const body = getBody(agent.content);
+  const lines = body.split("\n").filter((l) => l.trim());
+  if (lines.length === 0) return;
+  let count = 0;
+  for (const line of lines) {
+    if (PERMITTED_ABSOLUTE_CONTEXTS.some((re) => re.test(line))) continue;
+    for (const w of ABSOLUTE_WORDS) {
+      const m = line.match(new RegExp(`\\b${w}\\b`, "g"));
+      if (m) count += m.length;
+    }
+  }
+  const density = count / lines.length;
+  if (density > ABSOLUTE_DENSITY_THRESHOLD) {
+    emit(
+      r,
+      "cross-language-density-001",
+      family,
+      file,
+      `Absolute words density ${density.toFixed(3)} (count ${count} / ${lines.length} lines) exceeds ${ABSOLUTE_DENSITY_THRESHOLD} outside permitted contexts`,
+    );
+  }
+}
+
+/** Check 9: model-deprecation-001 — light cross-reference */
+function checkModelDeprecation(r, agent, file, family, deprecatedSet) {
+  const m = agent.frontmatter?.model;
+  if (!m) return;
+  const norm = m.toLowerCase();
+  for (const dep of deprecatedSet) {
+    if (norm === dep.toLowerCase()) {
+      emit(
+        r,
+        "model-deprecation-001",
+        family,
+        file,
+        `Model "${m}" matches deprecated label "${dep}" — see validate-models.mjs --only=deprecated`,
+      );
+      return;
+    }
+  }
+}
+
+/** Check 10R: claude-no-prefill-001 */
+function checkClaudeNoPrefill(r, item, file, family) {
+  if (!isClaude(family)) return;
+  const body = item.body || getBody(item.content);
+  for (const pat of PREFILL_PATTERNS) {
+    if (pat.test(body)) {
+      emit(
+        r,
+        "claude-no-prefill-001",
+        family,
+        file,
+        `Claude agent/prompt contains prefill instruction (matched ${pat.source}) — prefill is deprecated on Claude 4.6+`,
+      );
+      return;
+    }
+  }
+}
+
+/** Check 16: claude-reasoning-extraction-001 */
+function checkClaudeReasoningExtraction(r, item, file, family) {
+  if (family !== "claude-opus-5.5") return;
+  const body = item.body || getBody(item.content);
+  for (const pat of REASONING_EXTRACTION_PATTERNS) {
+    const match = body.match(pat);
+    if (match) {
+      emit(
+        r,
+        "claude-reasoning-extraction-001",
+        family,
+        file,
+        `"${match[0]}" asks for visible reasoning; Opus 5.5 thinks by default and may refuse reasoning extraction — use effort instead`,
+      );
+      return;
+    }
+  }
+}
+
+/** Check 17: gpt-approval-repetition-001 */
+function checkGptApprovalRepetition(r, agent, file, family) {
+  if (!isGptOutcomeFamily(family)) return;
+  const count = getBody(agent.content).match(APPROVAL_PHRASE_PATTERN)?.length ?? 0;
+  if (count > APPROVAL_PHRASE_THRESHOLD) {
+    emit(
+      r,
+      "gpt-approval-repetition-001",
+      family,
+      file,
+      `${count} approval phrases (ask first / wait for approval / get approval) — state the approval policy once`,
+    );
+  }
+}
+
+/** Check 11: gpt-stop-rules-non-empty-001 */
+function checkGptStopRulesNonEmpty(r, agent, file, family) {
+  if (!isGptOutcomeFamily(family) || agent.isSubagent) return;
+  const sections = contractSections(getAgentBodyStructure(agent.content), BODY_CONTRACT_SECTIONS["Stop rules"]);
+  if (sections.some((section) => !section.content)) {
+    emit(r, "gpt-stop-rules-non-empty-001", family, file, "Stop rules section is empty (header only)");
+  }
+}
+
+/** Check 12: frontmatter-model-style-001 */
+function checkFrontmatterModelStyle(r, item, file, family, fileType) {
+  const m = item.frontmatter?.model;
+  if (m === undefined || m === null) return;
+  if (fileType === "agent" && !Array.isArray(m)) {
+    emit(r, "frontmatter-model-style-001", family, file, `.agent.md model: must be array form, got ${typeof m}`);
+  } else if (fileType === "prompt" && typeof m !== "string") {
+    emit(r, "frontmatter-model-style-001", family, file, `.prompt.md model: must be string form, got ${typeof m}`);
+  }
+}
+
+/** Check 13: claude-output-contract-001 */
+function checkClaudeOutputContract(r, agent, file, family) {
+  if (!isClaude(family)) return;
+  const handoffs = parseStructuredHandoffs(agent.content);
+  const isArtifactProducer = handoffs.length > 0 && handoffs.some((h) => /agent-output\//.test(h?.prompt || ""));
+  if (!isArtifactProducer) return;
+  const body = getBody(agent.content);
+  if (body.includes("<output_contract>")) return;
+  emit(
+    r,
+    "claude-output-contract-001",
+    family,
+    file,
+    `Claude artifact-producing agent missing <output_contract> block`,
+  );
+}
+
+/** Check 14: handoff-enrichment-001 */
+function checkHandoffEnrichment(r, agent, file, family) {
+  const handoffs = parseStructuredHandoffs(agent.content);
+  if (handoffs.length === 0) return;
+  for (const [i, h] of handoffs.entries()) {
+    if (!h?.prompt || typeof h.prompt !== "string") continue;
+    const hasInput = /agent-output\/.+\.md/i.test(h.prompt) || /\bInput\b/i.test(h.prompt);
+    const hasOutput = /Output\s*:/i.test(h.prompt) || /agent-output\/.+\.md/i.test(h.prompt);
+    if (!hasInput || !hasOutput) {
+      const missing = [!hasInput && "input reference", !hasOutput && "output reference"].filter(Boolean).join(" and ");
+      emit(
+        r,
+        "handoff-enrichment-001",
+        family,
+        file,
+        `handoffs[${i}] (${h.label || h.agent || "?"}) missing ${missing}`,
+      );
+    }
+  }
+}
+
+/**
+ * Check 15: prompt-model-source-001
+ *
+ * Custom-agent prompts inherit their target; built-in prompts may inherit the picker.
+ *
+ * Runs only on prompts. `agentNameToModel` is the lowercase-agent-name →
+ * { model, path } map produced by `buildAgentNameToModel()`.
+ */
+function checkPromptModelSource(r, prompt, file, agentNameToModel) {
+  const fm = prompt.frontmatter;
+  if (!fm) return;
+  const agentField = fm.agent;
+  const modelField = fm.model;
+  const isGenericAgent =
+    agentField === undefined ||
+    (typeof agentField === "string" && ["agent", "ask", "edit", "plan"].includes(agentField.toLowerCase()));
+  if (isGenericAgent) return;
+
+  // Custom-agent target.
+  const targetKey = typeof agentField === "string" ? agentField.toLowerCase() : null;
+  const isKnownCustomAgent = targetKey !== null && agentNameToModel.has(targetKey);
+
+  if (!isKnownCustomAgent) {
+    emit(r, "prompt-model-source-001", "any", file, `unknown custom agent target "${agentField}"`);
+    return;
+  }
+
+  if (modelField !== undefined) {
+    emit(
+      r,
+      "prompt-model-source-001",
+      "any",
+      file,
+      `redundant \`model:\` on prompt targeting custom agent "${agentField}"; remove it and let the agent's \`model:\` apply`,
+    );
+  }
+}
+
+/**
+ * Resolve all effective model labels, retaining generic picker inheritance.
+ */
+function resolvePromptModels(prompt, agentNameToModel) {
+  const fm = prompt.frontmatter;
+  if (!fm) return undefined;
+  if (fm.model !== undefined) return fm.model;
+  const agentField = fm.agent;
+  return typeof agentField === "string" ? agentNameToModel.get(agentField.toLowerCase())?.model : undefined;
+}
+
+/**
+ * Emit a finding via the Reporter, applying family-severity overrides.
+ */
+function emit(r, ruleId, family, file, message) {
+  const rule = ruleById(ruleId);
+  if (!rule) {
+    r.warn(file, `[unregistered rule ${ruleId}] ${message}`);
+    return;
+  }
+  const sev = effectiveSeverity(rule, family);
+  if (sev === "error") r.error(file, `[${ruleId}] ${message}`);
+  else if (sev === "warn") r.warn(file, `[${ruleId}] ${message}`);
+  else r.info(file, `[${ruleId}] ${message}`);
+  r.record({
+    ruleId,
+    severity: sev,
+    file,
+    message,
+    sourceUrl: rule.sourceUrl,
+  });
+}
+
+export function runVendorPrompting({
+  agents = getAgents(),
+  prompts = getPromptFiles(),
+  catalog = DEFAULT_MODEL_CATALOG,
+} = {}) {
+  const r = new Reporter("Vendor Prompting Rules");
+  r.header();
+
+  const deprecated = new Set(
+    Object.entries(catalog.models)
+      .filter(([, metadata]) => metadata.deprecated)
+      .map(([label]) => label),
+  );
+  // lowercase-agent-name → { model, path }; used by the prompt loop to
+  // resolve effective family and enforce prompt-model-source-001.
+  const agentNameToModel = buildAgentNameToModel(agents);
+
+  function checkedLabels(raw, file, { inherited = false, handoff = false, optional = false } = {}) {
+    try {
+      const labels = modelLabels(raw);
+      if (!labels.length && !inherited && !optional) throw new TypeError("agent requires an explicit model label");
+      for (const label of labels) {
+        if (!Object.hasOwn(catalog.models, catalogModelLabel(label, { handoff, models: catalog.models }))) {
+          emit(
+            r,
+            "frontmatter-model-style-001",
+            "any",
+            file,
+            `model "${label}" is not an exact catalog label${handoff ? " or qualified handoff label" : ""}`,
+          );
+        }
+      }
+      return labels.map((label) => catalogModelLabel(label, { handoff, models: catalog.models }));
+    } catch (error) {
+      emit(r, "frontmatter-model-style-001", "any", file, error.message);
+      return [];
+    }
+  }
+
+  for (const [_file, agent] of agents) {
+    r.tick();
+    const relPath = path.relative(process.cwd(), agent.path);
+    const labels = checkedLabels(agent.frontmatter?.model, relPath, { optional: productionAgentKind(agent) !== null });
+    checkFrontmatterModelStyle(r, agent, relPath, "any", "agent");
+    checkAbsoluteLanguageDensity(r, agent, relPath, "any");
+    checkHandoffEnrichment(r, agent, relPath, "any");
+    for (const handoff of agent.frontmatter?.handoffs ?? []) {
+      if (handoff?.model !== undefined) {
+        const handoffLabels = checkedLabels(handoff.model, relPath, { handoff: true });
+        if (typeof handoff.model !== "string")
+          emit(r, "frontmatter-model-style-001", "any", relPath, "handoff model must be a string");
+        for (const label of handoffLabels)
+          checkModelDeprecation(r, { frontmatter: { model: label } }, relPath, classifyModel(label), deprecated);
+      }
+    }
+    for (const label of labels)
+      checkModelDeprecation(r, { frontmatter: { model: label } }, relPath, classifyModel(label), deprecated);
+    for (const family of new Set(labels.map(classifyModel))) {
+      checkClaudeOneShotNoInvestigate(r, agent, relPath, family);
+      checkGptOutcomeContract(r, agent, relPath, family);
+      checkGptNoClaudeXml(r, agent, relPath, family);
+      checkClaudeNoPrefill(r, agent, relPath, family);
+      checkClaudeReasoningExtraction(r, agent, relPath, family);
+      checkGptStopRulesNonEmpty(r, agent, relPath, family);
+      checkClaudeOutputContract(r, agent, relPath, family);
+      checkGptApprovalRepetition(r, agent, relPath, family);
+    }
+  }
+
+  for (const [_file, prompt] of prompts) {
+    r.tick();
+    const relPath = path.relative(process.cwd(), prompt.path);
+    // Resolve the prompt's effective family via its own `model:` first,
+    // then via the target custom agent's `model:`. This keeps per-prompt
+    // vendor checks active even when `model:` is intentionally omitted on
+    // prompts that target a custom agent (see prompt-model-source-001).
+    const labels = checkedLabels(resolvePromptModels(prompt, agentNameToModel), relPath, { inherited: true });
+    checkFrontmatterModelStyle(r, prompt, relPath, "any", "prompt");
+    for (const label of labels) {
+      const family = classifyModel(label);
+      checkClaudeNoPrefill(r, prompt, relPath, family);
+      checkClaudeReasoningExtraction(r, prompt, relPath, family);
+      checkModelDeprecation(r, { frontmatter: { model: label } }, relPath, family, deprecated);
+    }
+    checkPromptModelSource(r, prompt, relPath, agentNameToModel);
+  }
+
+  r.summary();
+  if (r.errors > 0) {
+    overallFailed = true;
+    console.log("❌ Vendor prompting check FAILED\n");
+  } else {
+    console.log("✅ Vendor prompting check passed\n");
+  }
+  allFindings.push(...r.findings);
+  return r;
+}
+
+// ============================================================================
+// Part 5: Workflow Handoff Validation (B0–B5, separate registry)
+// ============================================================================
+
+/**
+ * Workflow-handoff rule registry. Distinct from `VENDOR_RULES` so the
+ * `lint:vendor-prompting` cross-check against `apex-vendor-prompting/rules.json`
+ * stays scoped to vendor rules only (D-C5).
+ */
+const WORKFLOW_HANDOFF_RULES = [
+  {
+    id: "workflow-handoff-target-001",
+    severity: "warn",
+    appliesTo: "agent",
+    sourceUrl:
+      "https://github.com/jonathan-vella/apex/blob/main/.github/skills/apex-workflow-engine/references/handoff-validation-rules.md#b1a",
+  },
+  {
+    id: "workflow-handoff-artifact-sync-001",
+    severity: "warn",
+    appliesTo: "agent",
+    sourceUrl:
+      "https://github.com/jonathan-vella/apex/blob/main/.github/skills/apex-workflow-engine/references/handoff-validation-rules.md#b2",
+  },
+  {
+    id: "workflow-handoff-self-loop-bound-001",
+    severity: "warn",
+    appliesTo: "agent",
+    sourceUrl:
+      "https://github.com/jonathan-vella/apex/blob/main/.github/skills/apex-workflow-engine/references/handoff-validation-rules.md#b3",
+  },
+  {
+    id: "workflow-handoff-track-parity-001",
+    severity: "warn",
+    appliesTo: "agent",
+    sourceUrl:
+      "https://github.com/jonathan-vella/apex/blob/main/.github/skills/apex-workflow-engine/references/handoff-validation-rules.md#b4",
+  },
+  {
+    id: "workflow-handoff-subagent-dispatch-001",
+    severity: "warn",
+    appliesTo: "agent",
+    sourceUrl:
+      "https://github.com/jonathan-vella/apex/blob/main/.github/skills/apex-workflow-engine/references/handoff-validation-rules.md#b5",
+  },
+];
+
+/** B1a: agent names whose `handoffs[]` are skipped entirely as sources. */
+const HANDOFF_TARGET_EXCLUDED_SOURCES = new Set([
+  "01-Orchestrator",
+  "09-Diagnose",
+  "11-Context Optimizer",
+  "11-Context-Optimizer",
+  "10-Challenger",
+]);
+
+/** B5: agents allowed to declare `agents: ["*"]` even without `cross_cutting: true`. */
+const CROSS_CUTTING_ALLOWLIST = new Set(["11-Context Optimizer", "11-Context-Optimizer"]);
+
+/** Maximum self-loops per agent (B3). */
+const SELF_LOOP_MAX = 6;
+
+/** Steps that may dispatch `cost-estimate-subagent` (B5). */
+const COST_ESTIMATE_AUTHORITATIVE_AGENTS = new Set(["03-Architect", "08-As-Built"]);
+
+/** B5: top-level agent names recognized as artifact-producers for the
+ * challenger-review-subagent legality check. An agent qualifies when EITHER:
+ *   - it maps to a workflow node with non-empty `produces[]`, OR
+ *   - its `handoffs[]` reference any `agent-output/` path (existing
+ *     `isArtifactProducer` heuristic), OR
+ *   - it appears in `CHALLENGER_DISPATCHER_ALLOWLIST` (orchestrator-style
+ *     agents and the Challenger wrapper that legitimately delegate
+ *     Challenger across peer artifacts without producing their own).
+ *
+ * The union catches Orchestrator-style agents that dispatch Challenger
+ * over peer artifacts without authoring artifacts themselves. */
+function buildArtifactProducerSet(graph, agents) {
+  const producers = new Set(CHALLENGER_DISPATCHER_ALLOWLIST);
+  if (graph?.nodes) {
+    for (const node of Object.values(graph.nodes)) {
+      if (typeof node.agent === "string" && Array.isArray(node.produces) && node.produces.length > 0) {
+        producers.add(node.agent);
+      }
+    }
+  }
+  for (const [, agent] of agents) {
+    const name = agent.frontmatter?.name;
+    if (!name) continue;
+    const handoffs = parseStructuredHandoffs(agent.content);
+    if (handoffs.some((h) => /agent-output\//.test(h?.prompt || ""))) {
+      producers.add(name);
+    }
+  }
+  return producers;
+}
+
+/** Orchestrator-style agents that may dispatch the challenger-review subagent
+ *  even when they don't produce artifacts directly.
+ *
+ *  Per Phase 12 (plan-simplifyChallengerReviews), every entry below is
+ *  documented with the reason it is allowed to dispatch the challenger.
+ *  Keep this list minimal — every new entry expands the set of agents
+ *  that can run adversarial review without owning an output artifact.
+ */
+const CHALLENGER_DISPATCHER_ALLOWLIST = new Set([
+  // 01-Orchestrator is the workflow conductor; it presents the
+  // "Run Challenger Review" handoff button at gates and is responsible
+  // for surfacing review findings to the user. It doesn't own a primary
+  // artifact — it dispatches to step agents who do.
+  "01-Orchestrator",
+  // 10-Challenger is the standalone wrapper agent for ad-hoc adversarial
+  // reviews. Its entire purpose is to dispatch the challenger subagent.
+  // Retirement decision pending (see
+  // `tools/registry/challenger-effectiveness.md` + tracking issue per Phase 12).
+  "10-Challenger",
+]);
+
+/** Lookup helper for the workflow-handoff rule registry. */
+function workflowRuleById(id) {
+  return WORKFLOW_HANDOFF_RULES.find((rule) => rule.id === id);
+}
+
+/**
+ * Emit a workflow-handoff finding via the Reporter. Honors D2 graceful
+ * degradation: when `metadata.version < "2.2"`, every workflow-handoff
+ * finding downgrades to `info` (the rules still run, but the runtime
+ * has not opted in to the new fields).
+ *
+ * Also honors B1a's cross-track jump escalation: callers pass
+ * `escalateToError = true` to bypass the default severity.
+ */
+function emitWorkflowHandoff(r, ruleId, file, message, { escalateToError = false, isV22 = true } = {}) {
+  const rule = workflowRuleById(ruleId);
+  if (!rule) {
+    r.warn(file, `[unregistered rule ${ruleId}] ${message}`);
+    return;
+  }
+  let sev = rule.severity;
+  if (escalateToError) sev = "error";
+  if (!isV22) sev = "info"; // graceful degradation
+  if (sev === "error") r.error(file, `[${ruleId}] ${message}`);
+  else if (sev === "warn") r.warn(file, `[${ruleId}] ${message}`);
+  else r.info(file, `[${ruleId}] ${message}`);
+  r.record({
+    ruleId,
+    severity: sev,
+    file,
+    message,
+    sourceUrl: rule.sourceUrl,
+  });
+}
+
+/**
+ * Print a unified-diff-style comment for `--suggest`. Writes to stdout
+ * only; never modifies files. Format mimics `git diff -u` so the
+ * suggestion is copy-pasteable. Each suggestion is a tiny self-contained
+ * comment hint placed right before the offending handoff entry.
+ */
+function printSuggestion(file, label, message) {
+  if (!suggestMode) return;
+  console.log(`--- a/${file}`);
+  console.log(`+++ b/${file}`);
+  console.log(`@@ handoffs[*] (label: "${label || "?"}") @@`);
+  console.log(`+# SUGGESTION: ${message}`);
+}
+
+/** B1a: target legality. Returns `{ legal, escalate }`. */
+function evaluateHandoffTarget(graph, sourceAgent, sourceStep, handoff, agentToStep, sourceIsArtifactProducer) {
+  const target = handoff?.agent;
+  if (typeof target !== "string" || target === "") {
+    return { legal: false, escalate: false, reason: "missing handoff.agent" };
+  }
+  // 1. ui_pseudo_targets[]
+  if (Array.isArray(graph.ui_pseudo_targets) && graph.ui_pseudo_targets.includes(target)) {
+    return { legal: true, escalate: false };
+  }
+  // 2. Self-loop
+  if (target === sourceAgent) {
+    return { legal: true, escalate: false };
+  }
+  // 3. orchestrator_targets[]
+  if (Array.isArray(graph.orchestrator_targets) && graph.orchestrator_targets.includes(target)) {
+    return { legal: true, escalate: false };
+  }
+  // 4. challenger.wrapper_agent
+  if (graph.challenger?.wrapper_agent === target) {
+    // Only artifact-producing agents may dispatch the challenger wrapper UI.
+    // (Subagents and gates don't have a meaningful Challenger button.)
+    if (!sourceIsArtifactProducer) {
+      return { legal: false, escalate: false, reason: "non-artifact-producing source has Challenger button" };
+    }
+    return { legal: true, escalate: false };
+  }
+  // 5–6. forward / return edges (require both source and target to map to a step)
+  const targetStep = agentToStep.get(target);
+  if (!sourceStep || !targetStep) {
+    return { legal: false, escalate: false, reason: "no step mapping for source or target agent" };
+  }
+  // Cross-track first (always illegal at error severity)
+  if (isCrossTrackJump(sourceStep, targetStep)) {
+    return { legal: false, escalate: true, reason: `cross-track jump ${sourceStep} → ${targetStep}` };
+  }
+  if (forwardReachable(graph, sourceStep, targetStep)) {
+    return { legal: true, escalate: false };
+  }
+  if (findReturnEdge(graph, sourceStep, targetStep)) {
+    return { legal: true, escalate: false };
+  }
+  return { legal: false, escalate: false, reason: `no DAG edge from ${sourceStep} to ${targetStep}` };
+}
+
+/** B2: artifact-sync — verify Input/Output paths against source/target produces[]. */
+function evaluateArtifactSync(graph, sourceStep, handoff, agentToStep, allProduced) {
+  const refs = extractArtifactRefs(handoff?.prompt);
+  if (refs.length === 0) return [];
+  const issues = [];
+  const sourceNode = sourceStep ? graph.nodes?.[sourceStep] : null;
+  const sourceProduces = new Set(
+    (sourceNode?.produces || []).map((p) => p.replace(/.*\//, "")).filter((p) => p.endsWith(".md") || p.includes("*")),
+  );
+  const targetStep = agentToStep.get(handoff?.agent);
+  const targetNode = targetStep ? graph.nodes?.[targetStep] : null;
+  const targetProduces = new Set(
+    (targetNode?.produces || []).map((p) => p.replace(/.*\//, "")).filter((p) => p.endsWith(".md") || p.includes("*")),
+  );
+  const isSelf = handoff?.agent && sourceNode?.agent === handoff.agent;
+  for (const ref of refs) {
+    if (ref.role === "input") {
+      // Input must be produced by source step OR by any upstream step (i.e.
+      // somewhere in the graph). We use the union of all `produces[]`.
+      if (!isProducedArtifact(ref.path, allProduced)) {
+        issues.push(`Input "${ref.path}" not produced by any workflow step`);
+      }
+    } else if (ref.role === "output") {
+      const expected = isSelf ? sourceProduces : targetProduces;
+      if (expected.size === 0) {
+        // Target step has no produces[] — fall back to source's.
+        if (!isProducedArtifact(ref.path, sourceProduces)) {
+          issues.push(`Output "${ref.path}" not declared in source step's produces[]`);
+        }
+      } else if (!isProducedArtifact(ref.path, expected)) {
+        issues.push(
+          `Output "${ref.path}" not in ${isSelf ? "source" : "target"} step's produces[] (${[...expected].join(", ") || "none"})`,
+        );
+      }
+    }
+    // role="unknown" is allowed (some prompts mention paths in passing).
+  }
+  return issues;
+}
+
+/**
+ * B5: validate `agents:` dispatch list.
+ *
+ * Returns an array of `{ entry, message }` issues. Entries are either
+ * recognized top-level agent names or subagent names. The wildcard
+ * `"*"` is allowed for cross-cutting agents. `challenger-review-subagent`
+ * requires an artifact-producing source; `cost-estimate-subagent`
+ * requires source ∈ {03-Architect, 08-As-Built}.
+ */
+function evaluateSubagentDispatch(
+  sourceAgentName,
+  agentsField,
+  fmCrossCutting,
+  knownAgentNames,
+  knownSubagentNames,
+  artifactProducers,
+) {
+  if (!Array.isArray(agentsField)) return [];
+  const issues = [];
+  for (const entry of agentsField) {
+    if (entry === "*") {
+      const isAllowed =
+        fmCrossCutting === true || fmCrossCutting === "true" || CROSS_CUTTING_ALLOWLIST.has(sourceAgentName);
+      if (!isAllowed) {
+        issues.push({ entry, message: `agents: ["*"] requires cross_cutting: true or allowlist membership` });
+      }
+      continue;
+    }
+    if (typeof entry !== "string") {
+      issues.push({ entry: String(entry), message: "non-string agents[] entry" });
+      continue;
+    }
+    if (!knownAgentNames.has(entry) && !knownSubagentNames.has(entry) && !BUILTIN_REVIEWERS.has(entry)) {
+      issues.push({ entry, message: `unknown agent or subagent "${entry}"` });
+      continue;
+    }
+    if (
+      (entry === "challenger-review-subagent" || BUILTIN_REVIEWERS.has(entry)) &&
+      !artifactProducers.has(sourceAgentName)
+    ) {
+      issues.push({
+        entry,
+        message: `${entry} requires artifact-producing source (got "${sourceAgentName}")`,
+      });
+    }
+    if (entry === "cost-estimate-subagent" && !COST_ESTIMATE_AUTHORITATIVE_AGENTS.has(sourceAgentName)) {
+      issues.push({
+        entry,
+        message: `cost-estimate-subagent only valid from 03-Architect or 08-As-Built (got "${sourceAgentName}")`,
+      });
+    }
+  }
+  return issues;
+}
+
+/** Parse `cross_cutting:` from frontmatter. Accepts boolean or "true"/"false". */
+function getCrossCuttingFlag(fm) {
+  if (!fm) return undefined;
+  const v = fm.cross_cutting ?? fm["cross-cutting"];
+  return v;
+}
+
+/** Build set of all main agent names (frontmatter `name:` strings). */
+function buildAgentNameSet(agents) {
+  const out = new Set();
+  for (const [, agent] of agents) {
+    if (agent.frontmatter?.name) out.add(agent.frontmatter.name);
+  }
+  return out;
+}
+
+/**
+ * B4 helper — return a structural tuple list for one agent's handoffs.
+ * Each tuple is `{ label, target }` where `label` is normalized
+ * (Bicep/Terraform tokens stripped, What-If/Plan canonicalized to
+ * Preview) and `target` collapses 06b/06t and 07b/07t to their roles.
+ */
+function buildTrackTupleList(agentEntry) {
+  const handoffs = parseStructuredHandoffs(agentEntry.content);
+  return handoffs.map((h) => ({
+    label: normalizeTrackLabel(h?.label || ""),
+    target: normalizeTrackTarget(h?.agent || ""),
+  }));
+}
+
+/** Compare two tuple lists structurally. Returns array of mismatch reasons. */
+function diffTrackTuples(aList, bList, aName, bName) {
+  const issues = [];
+  if (aList.length !== bList.length) {
+    issues.push(`handoff count differs: ${aName}=${aList.length} vs ${bName}=${bList.length}`);
+  }
+  const aSet = new Map(aList.map((t) => [`${t.label}|${t.target}`, t]));
+  const bSet = new Map(bList.map((t) => [`${t.label}|${t.target}`, t]));
+  for (const key of aSet.keys()) {
+    if (!bSet.has(key)) issues.push(`${aName} has tuple [${key}] not present in ${bName}`);
+  }
+  for (const key of bSet.keys()) {
+    if (!aSet.has(key)) issues.push(`${bName} has tuple [${key}] not present in ${aName}`);
+  }
+  return issues;
+}
+
+function runWorkflowHandoffs() {
+  const r = new Reporter("Workflow Handoff Rules");
+  r.header();
+
+  const graph = loadWorkflowGraph();
+  if (!graph) {
+    r.warn(GRAPH_PATH_HUMAN, "workflow graph not found — workflow-handoff rules skipped");
+    r.summary();
+    allFindings.push(...r.findings);
+    return;
+  }
+  const isV22 = isVersionAtLeast22(graph);
+  if (!isV22) {
+    console.log(
+      "  ℹ️  workflow-graph metadata.version < 2.2 — running rules at info severity (D2 graceful degradation)\n",
+    );
+  }
+
+  const agents = getAgents();
+  const agentToStep = getAgentToStepMap(graph);
+  const knownAgentNames = buildAgentNameSet(agents);
+  const knownSubagentNames = buildSubagentInventory();
+  const artifactProducers = buildArtifactProducerSet(graph, agents);
+  const allProduced = collectAllProducedArtifacts(graph);
+
+  // ── per-agent rules: B1a, B1b, B2, B3, B5 ────────────────────────────
+  for (const [_filename, agent] of agents) {
+    r.tick();
+    const fm = agent.frontmatter;
+    const sourceAgent = fm?.name;
+    if (!sourceAgent) continue;
+    const relPath = path.relative(process.cwd(), agent.path);
+    const isExcluded = HANDOFF_TARGET_EXCLUDED_SOURCES.has(sourceAgent);
+    const sourceStep = agentToStep.get(sourceAgent);
+    const sourceIsArtifactProducer = artifactProducers.has(sourceAgent);
+    const handoffs = parseStructuredHandoffs(agent.content);
+
+    // ── B1a + B1b ────────────────────────────────────────────────────
+    if (!isExcluded && handoffs.length > 0) {
+      for (const [i, h] of handoffs.entries()) {
+        // B1a: target legality
+        const verdict = evaluateHandoffTarget(graph, sourceAgent, sourceStep, h, agentToStep, sourceIsArtifactProducer);
+        if (!verdict.legal) {
+          const msg = `handoffs[${i}] (${h?.label || "?"}) target "${h?.agent || "?"}" — ${verdict.reason}`;
+          emitWorkflowHandoff(r, "workflow-handoff-target-001", relPath, msg, {
+            escalateToError: verdict.escalate,
+            isV22,
+          });
+          printSuggestion(relPath, h?.label, `Update target to a legal forward/return/orchestrator/UI target.`);
+        }
+      }
+    }
+
+    // ── B2: artifact-sync ────────────────────────────────────────────
+    if (!isExcluded) {
+      for (const [i, h] of handoffs.entries()) {
+        const issues = evaluateArtifactSync(graph, sourceStep, h, agentToStep, allProduced);
+        for (const issue of issues) {
+          emitWorkflowHandoff(
+            r,
+            "workflow-handoff-artifact-sync-001",
+            relPath,
+            `handoffs[${i}] (${h?.label || "?"}) ${issue}`,
+            { isV22 },
+          );
+        }
+      }
+    }
+
+    // ── B3: self-loop bound + enrichment-aware ──────────────────────
+    const selfLoops = handoffs.map((h, i) => ({ h, i })).filter(({ h }) => h?.agent === sourceAgent);
+    if (selfLoops.length > SELF_LOOP_MAX) {
+      emitWorkflowHandoff(
+        r,
+        "workflow-handoff-self-loop-bound-001",
+        relPath,
+        `agent has ${selfLoops.length} self-loop handoffs (max ${SELF_LOOP_MAX})`,
+        { isV22 },
+      );
+    }
+    // Per-loop enrichment: same regex as `checkHandoffEnrichment`.
+    for (const { h, i } of selfLoops) {
+      if (typeof h?.prompt !== "string") continue;
+      const hasInput = /agent-output\/.+\.md/i.test(h.prompt) || /\bInput\b/i.test(h.prompt);
+      const hasOutput = /Output\s*:/i.test(h.prompt) || /agent-output\/.+\.md/i.test(h.prompt);
+      if (!hasInput || !hasOutput) {
+        const missing = [!hasInput && "input reference", !hasOutput && "output reference"]
+          .filter(Boolean)
+          .join(" and ");
+        emitWorkflowHandoff(
+          r,
+          "workflow-handoff-self-loop-bound-001",
+          relPath,
+          `self-loop handoffs[${i}] (${h?.label || "?"}) missing ${missing} — see also: handoff-enrichment-001`,
+          { isV22 },
+        );
+      }
+    }
+
+    // ── B5: agents[] dispatch list ──────────────────────────────────
+    const fmCrossCutting = getCrossCuttingFlag(fm);
+    const subagentIssues = evaluateSubagentDispatch(
+      sourceAgent,
+      fm?.agents,
+      fmCrossCutting,
+      knownAgentNames,
+      knownSubagentNames,
+      artifactProducers,
+    );
+    for (const { entry, message } of subagentIssues) {
+      emitWorkflowHandoff(
+        r,
+        "workflow-handoff-subagent-dispatch-001",
+        relPath,
+        `agents[] entry "${entry}" — ${message}`,
+        { isV22 },
+      );
+    }
+  }
+
+  // ── B4: track parity (cross-pair comparison) ────────────────────────
+  const TRACK_PAIRS = [
+    ["06b-Bicep CodeGen", "06t-Terraform CodeGen"],
+    ["07b-Bicep Deploy", "07t-Terraform Deploy"],
+  ];
+  // Test hook: extra pairs as JSON (e.g. '[["track-a","track-b"]]') to let
+  // synthetic fixtures exercise B4 in isolation. Production runs leave this unset.
+  if (process.env.WORKFLOW_HANDOFFS_TEST_TRACK_PAIRS) {
+    try {
+      const extra = JSON.parse(process.env.WORKFLOW_HANDOFFS_TEST_TRACK_PAIRS);
+      if (Array.isArray(extra)) for (const p of extra) if (Array.isArray(p) && p.length === 2) TRACK_PAIRS.push(p);
+    } catch {
+      /* ignore malformed JSON — fail-open */
+    }
+  }
+  // Re-index agents by name for the parity check.
+  const byName = new Map();
+  for (const [, agent] of agents) {
+    if (agent.frontmatter?.name) byName.set(agent.frontmatter.name, agent);
+  }
+  for (const [aName, bName] of TRACK_PAIRS) {
+    const a = byName.get(aName);
+    const b = byName.get(bName);
+    if (!a || !b) continue;
+    const aTuples = buildTrackTupleList(a);
+    const bTuples = buildTrackTupleList(b);
+    const diffs = diffTrackTuples(aTuples, bTuples, aName, bName);
+    if (diffs.length > 0) {
+      const aRel = path.relative(process.cwd(), a.path);
+      const bRel = path.relative(process.cwd(), b.path);
+      for (const d of diffs) {
+        emitWorkflowHandoff(r, "workflow-handoff-track-parity-001", `${aRel} ↔ ${bRel}`, d, { isV22 });
+      }
+    }
+  }
+
+  r.summary();
+  if (r.errors > 0) {
+    overallFailed = true;
+    console.log("❌ Workflow handoff check FAILED\n");
+  } else {
+    console.log("✅ Workflow handoff check passed\n");
+  }
+  allFindings.push(...r.findings);
+}
+
+const GRAPH_PATH_HUMAN = ".github/skills/apex-workflow-engine/templates/workflow-graph.json";
+
+// ============================================================================
+// Self-check: cross-reference VENDOR_RULES vs rules.json
+// ============================================================================
+
+function listRules() {
+  const rulesJsonPath = ".github/skills/apex-vendor-prompting/rules.json";
+  let registry = null;
+  if (fs.existsSync(rulesJsonPath)) {
+    try {
+      registry = JSON.parse(fs.readFileSync(rulesJsonPath, "utf-8"));
+    } catch (e) {
+      console.error(`Failed to parse ${rulesJsonPath}: ${e.message}`);
+      process.exit(2);
+    }
+  }
+  console.log("Inline rule catalog (validate-agents.mjs):\n");
+  console.log("  ── vendor-prompting ─────────────────────────");
+  for (const rule of VENDOR_RULES) {
+    console.log(`  ${rule.id.padEnd(36)} severity=${rule.severity.padEnd(5)} appliesTo=${rule.appliesTo}`);
+  }
+  console.log("\n  ── workflow-handoffs ────────────────────────");
+  for (const rule of WORKFLOW_HANDOFF_RULES) {
+    console.log(`  ${rule.id.padEnd(36)} severity=${rule.severity.padEnd(5)} appliesTo=${rule.appliesTo}`);
+  }
+  if (!registry) {
+    console.log("\n(no rules.json present to cross-check)");
+    return;
+  }
+  const inlineIds = new Set(VENDOR_RULES.map((r) => r.id));
+  const registryIds = new Set(registry.rules.map((r) => r.id));
+  const inlineOnly = [...inlineIds].filter((id) => !registryIds.has(id));
+  const registryOnly = registry.rules
+    .filter((r) => !inlineIds.has(r.id) && !r.id.startsWith("legacy-") && r.validator_check_id !== "reviewer-only")
+    .map((r) => r.id);
+  console.log("\nCross-check vs rules.json (vendor-prompting only — workflow-handoff rules intentionally separate):");
+  if (inlineOnly.length === 0 && registryOnly.length === 0) {
+    console.log("  ✅ inline catalog and rules.json are in sync (legacy-* and reviewer-only rules excluded)");
+  } else {
+    if (inlineOnly.length > 0) {
+      console.log(`  ❌ in inline catalog but missing from rules.json: ${inlineOnly.join(", ")}`);
+    }
+    if (registryOnly.length > 0) {
+      console.log(`  ❌ in rules.json but missing from inline catalog: ${registryOnly.join(", ")}`);
+    }
+    process.exit(1);
+  }
+}
+
+// ============================================================================
+// Main entry point
+// ============================================================================
+
+const PARTS = {
+  frontmatter: runFrontmatterValidation,
+  structural: runAgentChecks,
+  "model-alignment": runModelAlignment,
+  "vendor-prompting": runVendorPrompting,
+  "workflow-handoffs": runWorkflowHandoffs,
+};
+
+function parseArgs(argv) {
+  const opts = { only: null, format: "text", listRules: false, color: true, suggest: false };
+  for (const a of argv) {
+    if (a === "--list-rules") opts.listRules = true;
+    else if (a === "--no-color") opts.color = false;
+    else if (a === "--suggest") opts.suggest = true;
+    else if (a.startsWith("--only=")) {
+      opts.only = a
+        .slice(7)
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+    } else if (a.startsWith("--format=")) {
+      opts.format = a.slice(9);
+    }
+  }
+  return opts;
+}
+
+function main() {
+  const opts = parseArgs(process.argv.slice(2));
+
+  if (opts.listRules) {
+    listRules();
+    return;
+  }
+
+  suggestMode = opts.suggest === true;
+
+  const isJson = opts.format === "json";
+  const log = isJson ? () => {} : console.log;
+  const origLog = console.log;
+  const origErr = console.error;
+  const origWarn = console.warn;
+  if (isJson) {
+    // suppress text output during JSON mode (findings still accumulated)
+    console.log = () => {};
+    console.error = () => {};
+    console.warn = () => {};
+  }
+
+  log("🤖 Agent Validators (consolidated)\n");
+
+  const partsToRun = opts.only && opts.only.length > 0 ? opts.only.filter((p) => PARTS[p]) : Object.keys(PARTS);
+
+  if (opts.only && opts.only.some((p) => !PARTS[p])) {
+    const unknown = opts.only.filter((p) => !PARTS[p]);
+    if (!isJson) {
+      origErr(`Unknown --only parts: ${unknown.join(", ")}`);
+      origErr(`Valid: ${Object.keys(PARTS).join(", ")}`);
+    }
+    process.exit(2);
+  }
+
+  for (const part of partsToRun) {
+    log(`═══ Part: ${part} ═══`);
+    try {
+      PARTS[part]();
+    } catch (e) {
+      origErr(`Validator crashed in ${part}: ${e.message}`);
+      process.exit(2);
+    }
+  }
+
+  if (isJson) {
+    console.log = origLog;
+    console.error = origErr;
+    console.warn = origWarn;
+    const summary = {
+      errors: allFindings.filter((f) => f.severity === "error").length,
+      warns: allFindings.filter((f) => f.severity === "warn").length,
+      infos: allFindings.filter((f) => f.severity === "info").length,
+    };
+    console.log(JSON.stringify({ summary, findings: allFindings }, null, 2));
+    process.exit(summary.errors > 0 ? 1 : 0);
+  }
+
+  if (overallFailed) {
+    log("❌ Agent validation FAILED");
+    process.exit(1);
+  }
+  log("✅ All agent validations passed");
+}
+
+// Run main() only when invoked directly (not when imported by tests).
+const __filename = fileURLToPath(import.meta.url);
+if (process.argv[1] === __filename) {
+  main();
+}

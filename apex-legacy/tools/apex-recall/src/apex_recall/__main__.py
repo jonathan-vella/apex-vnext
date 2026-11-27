@@ -1,0 +1,406 @@
+"""CLI entry point for apex-recall."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+from . import __version__
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="apex-recall",
+        description="Progressive session recall CLI for APEX agent-output artifacts.",
+    )
+    parser.add_argument("--version", action="version", version=f"apex-recall {__version__}")
+
+    sub = parser.add_subparsers(dest="command", help="Available commands")
+
+    # files
+    p_files = sub.add_parser("files", help="List recently modified artifact files")
+    p_files.add_argument("--json", action="store_true", help="Output as JSON")
+    p_files.add_argument("--limit", type=int, default=10, help="Max results (default: 10)")
+    p_files.add_argument("--days", type=int, default=None, help="Only files modified within N days")
+
+    # sessions
+    p_sessions = sub.add_parser("sessions", help="List session states across projects")
+    p_sessions.add_argument("--json", action="store_true", help="Output as JSON")
+    p_sessions.add_argument("--limit", type=int, default=10, help="Max results (default: 10)")
+    p_sessions.add_argument("--days", type=int, default=None, help="Only sessions updated within N days")
+
+    # search
+    p_search = sub.add_parser("search", help="Full-text search across indexed content")
+    p_search.add_argument("term", help="Search term")
+    p_search.add_argument("--json", action="store_true", help="Output as JSON")
+    p_search.add_argument("--days", type=int, default=None, help="Only results within N days")
+    p_search.add_argument("--project", type=str, default=None, help="Filter by project name")
+
+    # show
+    p_show = sub.add_parser("show", help="Full context dump for one project")
+    p_show.add_argument("project", help="Project name")
+    p_show.add_argument("--json", action="store_true", help="Output as JSON")
+
+    # handoff
+    p_handoff = sub.add_parser(
+        "handoff",
+        help="Deterministic next-step handoff contract and copyable resume command",
+    )
+    p_handoff.add_argument("project", nargs="?", default=None, help="Project name (auto-selects when unambiguous)")
+    p_handoff.add_argument("--json", action="store_true", help="Output as JSON")
+
+    # decisions
+    p_decisions = sub.add_parser("decisions", help="Query decision logs across projects")
+    p_decisions.add_argument("--json", action="store_true", help="Output as JSON")
+    p_decisions.add_argument("--project", type=str, default=None, help="Filter by project name")
+
+    # reindex
+    p_reindex = sub.add_parser("reindex", help="Force rebuild of the index")
+    p_reindex.add_argument("--json", action="store_true", help="Output as JSON")
+
+    # health
+    p_health = sub.add_parser("health", help="Health dashboard for the index")
+    p_health.add_argument("--json", action="store_true", help="Output as JSON")
+
+    # ── Write commands ──────────────────────────────────────────────────────
+
+    # init
+    p_init = sub.add_parser("init", help="Create a fresh session-state for a project")
+    p_init.add_argument("project", help="Project name")
+    p_init.add_argument("--json", action="store_true", help="Output as JSON")
+    p_init.add_argument("--force", action="store_true", help="Overwrite existing session state")
+    p_init.add_argument(
+        "--layout",
+        type=int,
+        choices=(1, 2),
+        default=2,
+        help="Directory layout version (default: 2 with assets/, contracts/, reviews/, _meta/)",
+    )
+
+    # start-step
+    p_assessment = sub.add_parser("assessment", help="Standalone assessment lifecycle (not delivery steps)")
+    p_assessment.add_argument("project")
+    p_assessment.add_argument("--action", required=True, choices=("start", "advance", "accept", "adopt", "revise"))
+    p_assessment.add_argument(
+        "--request",
+        default="{}",
+        metavar="PATH_OR_JSON",
+        help="JSON request file (e.g. _meta/assessment-start.json); inline JSON also accepted",
+    )
+    p_assessment.add_argument("--phase", default=None, help="Current graph phase to complete")
+    p_assessment.add_argument("--dry-run", action="store_true")
+    p_assessment.add_argument("--json", action="store_true")
+
+    p_start = sub.add_parser("start-step", help="Mark a step as in_progress")
+    p_start.add_argument("project", help="Project name")
+    p_start.add_argument("step", help="Step key (1, 2, 3, 3_5, 4, 5, 6, 7)")
+    p_start.add_argument("--json", action="store_true", help="Output as JSON")
+    p_start.add_argument("--force", action="store_true", help="Re-start a completed step")
+
+    # checkpoint
+    p_cp = sub.add_parser("checkpoint", help="Record a sub-step checkpoint")
+    p_cp.add_argument("project", help="Project name")
+    p_cp.add_argument("step", help="Step key (1, 2, 3, 3_5, 4, 5, 6, 7)")
+    p_cp.add_argument("sub_step", help="Sub-step identifier")
+    p_cp.add_argument("--json", action="store_true", help="Output as JSON")
+    p_cp.add_argument("--artifact", type=str, default=None, help="Artifact path to append")
+    p_cp.add_argument("--sync-assessment", action="store_true", help="Regenerate authorized consumed-decision views")
+    p_cp.add_argument(
+        "--policy-feasibility", type=Path, help="Bind an offline-validated preliminary discovery snapshot"
+    )
+    # Telemetry (Wave 0 — measure-workflow-baseline.mjs consumes these)
+    p_cp.add_argument("--telemetry-step-start", type=str, default=None, help="ISO-8601 timestamp marking step start")
+    p_cp.add_argument("--telemetry-step-end", type=str, default=None, help="ISO-8601 timestamp marking step end")
+    p_cp.add_argument("--telemetry-elapsed-ms", type=int, default=None, help="Elapsed wall-clock ms for the step")
+    p_cp.add_argument("--telemetry-input-tokens", type=int, default=None, help="Input tokens consumed during the step")
+    p_cp.add_argument("--telemetry-output-tokens", type=int, default=None, help="Output tokens emitted during the step")
+    p_cp.add_argument("--telemetry-subagent-count", type=int, default=None, help="Number of subagent invocations")
+    p_cp.add_argument("--telemetry-validation-attempts", type=int, default=None, help="Validate-subagent retries (0+)")
+    p_cp.add_argument("--telemetry-cache-hits", type=int, default=None, help="Read-cache hits during the step")
+
+    # complete-step
+    p_complete = sub.add_parser("complete-step", help="Mark a step as complete")
+    p_complete.add_argument("project", help="Project name")
+    p_complete.add_argument("step", help="Step key (1, 2, 3, 3_5, 4, 5, 6, 7)")
+    p_complete.add_argument("--json", action="store_true", help="Output as JSON")
+    p_complete.add_argument(
+        "--allow-missing-challenger",
+        action="store_true",
+        help="Bypass the mandatory challenger-findings gate (audited).",
+    )
+    p_complete.add_argument(
+        "--challenger-skip-reason",
+        type=str,
+        default=None,
+        help="Required audit reason when --allow-missing-challenger is used.",
+    )
+
+    # decide
+    p_decide = sub.add_parser("decide", help="Record a decision or decision_log entry")
+    p_decide.add_argument("project", help="Project name")
+    p_decide.add_argument("--key", type=str, default=None, help="Decision key (Mode A: decisions object)")
+    p_decide.add_argument("--value", type=str, default=None, help="Decision value (Mode A)")
+    p_decide.add_argument("--decision", type=str, default=None, help="Decision text (Mode B: decision_log)")
+    p_decide.add_argument("--rationale", type=str, default=None, help="Rationale (Mode B)")
+    p_decide.add_argument("--step", type=str, default=None, help="Step reference (Mode B)")
+    p_decide.add_argument("--json", action="store_true", help="Output as JSON")
+    p_decide.add_argument(
+        "--input-record", type=Path, help="Scoped material input JSON; current authority plus history"
+    )
+    p_decide.add_argument("--phase-scope", type=Path, help="Explicit phase scope JSON, with --step")
+    p_decide.add_argument("--adopt-workflow", choices=["practical-v1"], help="Explicit owner-approved legacy adoption")
+    p_decide.add_argument("--dry-run", action="store_true", help="Read-only adoption assessment; grants no permission")
+    p_decide.add_argument(
+        "--review-extension", type=Path, help="Explicit bounded extension of an existing review cycle"
+    )
+
+    p_policy = sub.add_parser("policy-source", help="Capture an actual policy-source choice or private read scope")
+    p_policy.add_argument("project")
+    p_policy.add_argument("--assumed-corp", action="store_true", help="Record explicit Corp-assumption acceptance")
+    p_policy.add_argument("--tenant", help="Non-secret tenant ID from the actual native response")
+    p_policy.add_argument("--subscription", action="append", help="Explicit subscription ID; repeat for each target")
+    p_policy.add_argument("--authorize-policy-read", action="store_true", help="Record actual scoped read consent")
+    p_policy.add_argument("--owner")
+    p_policy.add_argument("--request-id")
+    p_policy.add_argument("--environment", action="append", choices=["dev", "test", "staging", "prod", "sandbox"])
+    p_policy.add_argument("--show-private-scope", action="store_true", help="Resolve existing private paths, not IDs")
+    p_policy.add_argument(
+        "--verify-tenant", action="store_true", help="Check current CLI tenant against captured scope"
+    )
+    p_policy.add_argument("--json", action="store_true")
+
+    # finding
+    p_finding = sub.add_parser("finding", help="Manage open_findings")
+    p_finding.add_argument("project", help="Project name")
+    p_finding.add_argument("--add", type=str, default=None, help="Add a finding")
+    p_finding.add_argument(
+        "--add-many",
+        dest="add_many",
+        type=str,
+        default=None,
+        metavar="SOURCE",
+        help="Bulk add: pass a file path containing a JSON array, or `-` for stdin. "
+        "Strings or {text: ...} objects accepted. Append-only — no dedup.",
+    )
+    p_finding.add_argument("--remove", type=str, default=None, help="Remove a finding")
+    p_finding.add_argument("--json", action="store_true", help="Output as JSON")
+
+    # review-audit
+    p_ra = sub.add_parser("review-audit", help="Manage review_audit entries")
+    p_ra.add_argument(
+        "--reconcile-events", type=Path, help="Read-only comparison with an explicitly scoped native capture"
+    )
+    p_ra.add_argument("project", help="Project name")
+    p_ra.add_argument("step", help="Step key (1, 2, 3, 3_5, 4, 5, 6, 7)")
+    p_ra.add_argument("--complexity", type=str, default=None, help="Complexity level")
+    p_ra.add_argument("--passes-planned", type=int, default=None, help="Passes planned")
+    p_ra.add_argument("--passes-executed", type=int, default=None, help="Passes executed")
+    p_ra.add_argument("--model", action="append", default=None, help="Model name (repeatable)")
+    p_ra.add_argument("--skip", action="append", default=None, help="Skip pass number (repeatable)")
+    p_ra.add_argument("--skip-reason", action="append", default=None, help="Skip reason (repeatable)")
+    p_ra.add_argument("--json", action="store_true", help="Output as JSON")
+    p_ra.add_argument("--attempt-id", default=None, help="Caller-assigned durable attempt identity")
+    p_ra.add_argument(
+        "--attempt-kind",
+        choices=["invocation", "repair", "empty-output-retry", "publication-retry"],
+        default=None,
+    )
+    p_ra.add_argument("--input-digest", default=None, help="SHA-256 of the frozen input set")
+    p_ra.add_argument(
+        "--attempt-input",
+        action="append",
+        default=None,
+        metavar="PATH",
+        help="Frozen input file or directory; the digest is computed from these (repeatable, instead of --input-digest)",
+    )
+    p_ra.add_argument("--attempt-outcome", choices=["started", "completed", "failed", "unknown"], default=None)
+    p_ra.add_argument(
+        "--review-output",
+        choices=["empty", "nonempty", "unknown"],
+        default=None,
+        help="Observed reviewer output, separate from the completed/failed native task outcome",
+    )
+    p_ra.add_argument("--retry-of", default=None, help="Original attempt ID for an identical-input empty-output retry")
+    p_ra.add_argument("--review-request", type=Path, help="Exact preflighted request; derives identity and cycle")
+    p_ra.add_argument("--closure-of", help="Initial attempt ID for a bounded closure; not a new cycle")
+    p_ra.add_argument("--review-result", type=Path, help="Published attributed result to select after validation")
+
+    # transition — composite checkpoint + decide + complete-step + start next
+    # (#425, Wave 4). Atomic across a single 00-session-state.json write.
+    p_tr = sub.add_parser(
+        "transition",
+        help="Atomic step transition: complete current, record decisions, start next",
+    )
+    p_tr.add_argument("project", help="Project name")
+    p_tr.add_argument("--from-step", dest="from_step", required=True, help="Step to leave")
+    p_tr.add_argument("--to-step", dest="to_step", required=True, help="Step to enter")
+    p_tr.add_argument(
+        "--decision",
+        action="append",
+        default=None,
+        metavar="KEY=VALUE",
+        help="Repeatable. Records into decisions{}. Use the legacy `decide` command for decision_log (Mode B) entries.",
+    )
+    p_tr.add_argument(
+        "--complete",
+        action="store_true",
+        help="Mark from-step complete (runs the challenger-findings gate first).",
+    )
+    p_tr.add_argument(
+        "--allow-missing-challenger",
+        action="store_true",
+        help="Bypass the mandatory challenger-findings gate (audited).",
+    )
+    p_tr.add_argument(
+        "--challenger-skip-reason",
+        type=str,
+        default=None,
+        help="Required audit reason when --allow-missing-challenger is used.",
+    )
+    p_tr.add_argument("--json", action="store_true", help="Output as JSON")
+
+    p_gate = sub.add_parser("check-gate", help="Read-only current Plan/CodeGen/lab deployment readiness")
+    p_gate.add_argument("project")
+    p_gate.add_argument(
+        "--action",
+        required=True,
+        choices=["plan-complete", "codegen", "code-complete", "deploy", "deployment-complete", "teardown-complete"],
+    )
+    p_gate.add_argument(
+        "--authorization-only",
+        action="store_true",
+        help="Evaluate authorization before separate human gate approval; grants no progression",
+    )
+    p_gate.add_argument("--json", action="store_true")
+
+    for order_parser in (p_complete, p_tr, p_start):
+        order_parser.add_argument(
+            "--allow-out-of-order",
+            default=None,
+            metavar="REASON",
+            help="Human override: proceed although the previous step is not complete; the reason is logged.",
+        )
+
+    for risk_parser in (p_complete, p_tr, p_start, p_gate):
+        risk_parser.add_argument("--risk-authorization", help="Explicit signed lab risk authorization envelope")
+        risk_parser.add_argument("--risk-approval", help="Separate signed human gate approval envelope")
+        risk_parser.add_argument(
+            "--deployment-context", help="Actual lab tenant/subscription/event/tree/input/phase context"
+        )
+
+    for completion_parser in (p_complete, p_tr):
+        completion_parser.add_argument(
+            "--plan-review",
+            default=None,
+            help="Explicit later comprehensive Plan review path; Step 4 default-mode completion only.",
+        )
+        completion_parser.add_argument(
+            "--plan-review-reason",
+            default=None,
+            help="Required audit reason for selecting an authorized Plan confirmation; not human approval.",
+        )
+        completion_parser.add_argument(
+            "--governance-review",
+            default=None,
+            help="Explicit later Governance review path (absolute or workspace-relative); Step 3.5 completion only.",
+        )
+        completion_parser.add_argument(
+            "--governance-review-reason",
+            default=None,
+            help="Required audit reason for selecting a separately authorized replacement review; not human approval.",
+        )
+
+    recovery = sub.add_parser("recover-state", help="Explicitly restore valid backup of corrupt/missing primary state")
+    recovery.add_argument("project")
+    recovery.add_argument("--reason", required=True, help="Audit reason; healthy state is never rolled back")
+    recovery.add_argument("--json", action="store_true")
+
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+
+    if args.command is None:
+        parser.print_help()
+        return 0
+
+    # Lazy imports to keep startup fast
+    if args.command == "files":
+        from .commands.files import run
+    elif args.command == "sessions":
+        from .commands.sessions import run
+    elif args.command == "search":
+        from .commands.search import run
+    elif args.command == "show":
+        from .commands.show import run
+    elif args.command == "handoff":
+        from .commands.handoff import run
+    elif args.command == "decisions":
+        from .commands.decisions import run
+    elif args.command == "reindex":
+        from .commands.reindex import run
+    elif args.command == "health":
+        from .commands.health import run
+    elif args.command == "init":
+        from .commands.init import run
+    elif args.command == "assessment":
+        from .commands.assessment import run
+    elif args.command == "start-step":
+        from .commands.start_step import run
+    elif args.command == "checkpoint":
+        from .commands.checkpoint import run
+    elif args.command == "complete-step":
+        from .commands.complete_step import run
+    elif args.command == "decide":
+        from .commands.decide import run
+    elif args.command == "policy-source":
+        from .policy_source import run
+    elif args.command == "finding":
+        from .commands.finding import run
+    elif args.command == "review-audit":
+        from .commands.review_audit import run
+    elif args.command == "transition":
+        from .commands.transition import run
+    elif args.command == "check-gate":
+        from .risk_gate import run
+    elif args.command == "recover-state":
+
+        def run(options):
+            from .state_writer import recover_state
+
+            if not options.reason.strip():
+                raise ValueError("Recovery requires a non-empty audit reason")
+            result = recover_state(options.project, options.reason.strip())
+            print(json.dumps(result) if options.json else f"Recovered {options.project}; revision {result['revision']}")
+            return 0
+    else:
+        parser.print_help()
+        return 1
+
+    try:
+        return run(args)
+    except Exception as e:
+        from .state_writer import IndexCommitError, StateConflict
+
+        if isinstance(e, IndexCommitError):
+            payload = {
+                "outcome": "committed_but_index_stale",
+                "revision": e.revision,
+                "error": str(e),
+                "recovery": "Run apex-recall reindex; do not repeat the completed mutation",
+            }
+            print(json.dumps(payload) if getattr(args, "json", False) else str(e))
+            return 3
+        if isinstance(e, StateConflict):
+            print(json.dumps({"outcome": "conflict", "error": str(e)}) if getattr(args, "json", False) else str(e))
+            return 2
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

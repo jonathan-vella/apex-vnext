@@ -1,0 +1,24 @@
+# APEX - Core Python Dependencies
+# Install with: pip install -r requirements.txt
+# Note: the Graphviz system package is installed by the devcontainer image.
+#
+# The independently packaged recall CLI declares its dependencies in tools/apex-recall/pyproject.toml.
+#
+# The devcontainer post-create.sh handles all installations automatically.
+
+# Diagram generation - https://github.com/mingrammer/diagrams
+diagrams==0.25.1
+
+# Image processing (required by diagrams and dlib SVG -> 4K PNG rasterization)
+cairosvg==2.9.1
+matplotlib==3.11.2
+pillow==13.0.0
+
+# Assessment Action Register workbook export
+openpyxl==3.1.5
+et-xmlfile==2.0.0
+
+# Repository test and lint tooling
+pytest==9.2.0
+ruff==0.17.5
+yamllint==1.38.0
