@@ -1,0 +1,671 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/jonathan-vella/apex/schemas/session-state.schema.json",
+  "title": "APEX Session State",
+  "$defs": {
+    "assessmentPath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?![^/]*:)(?!.*[\\\\*?\\[\\]\\u0000])(?!.*//)(?!.*(?:^|/)(?:\\.\\.?|assessment-step-[^/]*)(?:/|$))(?!.*00-session-state\\.json$).+$"
+    },
+    "assessmentReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owner", "request_id", "approved"],
+      "properties": {
+        "owner": { "type": "string", "minLength": 1 },
+        "request_id": { "type": "string", "minLength": 1 },
+        "approved": { "const": true }
+      }
+    },
+    "rgEntry": {
+      "type": "string",
+      "pattern": "^(?:/subscriptions/[a-fA-F0-9]{8}(?:-[a-fA-F0-9]{4}){3}-[a-fA-F0-9]{12}/resourceGroups/)?[A-Za-z0-9_.()-]{1,90}$"
+    },
+    "assessmentScope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["categories", "iac_paths", "azure_scopes"],
+      "properties": {
+        "categories": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["configuration", "topology", "utilization", "operations", "recovery", "billing", "policy"]
+          }
+        },
+        "iac_paths": { "type": "array", "items": { "$ref": "#/$defs/assessmentPath" } },
+        "azure_scopes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^/subscriptions/[a-fA-F0-9]{8}(-[a-fA-F0-9]{4}){3}-[a-fA-F0-9]{12}(/resourceGroups/[A-Za-z0-9_.()-]{1,90})?$"
+          }
+        },
+        "rg_attribution": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "workload_rgs": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/rgEntry" } },
+            "shared_rgs": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/rgEntry" } },
+            "excluded_rgs": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/rgEntry" } }
+          }
+        }
+      }
+    },
+    "assessmentReporting": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["as_of", "periods", "currency"],
+      "properties": {
+        "as_of": { "type": "string", "format": "date-time" },
+        "currency": { "type": ["string", "null"], "pattern": "^[A-Z]{3}$" },
+        "cost_type": { "enum": ["ActualCost", "AmortizedCost"] },
+        "metric": { "enum": ["PreTaxCost", "Cost"] },
+        "group_by": {
+          "type": "array",
+          "maxItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "ServiceName",
+              "ResourceId",
+              "ResourceGroupName",
+              "ResourceType",
+              "ResourceLocation",
+              "ChargeType",
+              "PricingModel",
+              "MeterCategory"
+            ]
+          }
+        },
+        "periods": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 12,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "from", "to"],
+            "properties": {
+              "id": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$" },
+              "kind": { "enum": ["closed_month", "month_to_date", "custom", "forecast"] },
+              "from": { "type": "string", "anyOf": [{ "format": "date" }, { "format": "date-time" }] },
+              "to": { "type": "string", "anyOf": [{ "format": "date" }, { "format": "date-time" }] }
+            }
+          }
+        }
+      }
+    },
+    "assessmentRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scenario", "source", "scope", "reporting", "receipt"],
+      "allOf": [
+        { "$ref": "#/$defs/assessmentSourceScopes" },
+        {
+          "if": { "properties": { "source": { "enum": ["azure", "combined"] } }, "required": ["source"] },
+          "then": { "properties": { "action_register": { "const": true } } }
+        }
+      ],
+      "properties": {
+        "scenario": { "enum": ["evidence_only", "requirements_led"] },
+        "source": { "enum": ["iac", "azure", "combined"] },
+        "scope": { "$ref": "#/$defs/assessmentScope" },
+        "reporting": { "$ref": "#/$defs/assessmentReporting" },
+        "receipt": { "$ref": "#/$defs/assessmentReceipt" },
+        "action_register": { "type": "boolean" },
+        "visual_charts": { "type": "boolean" },
+        "expected_revision": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "review_links": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "comprehensive": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "cost-feasibility": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+          }
+        }
+      }
+    },
+    "assessmentSourceScopes": {
+      "allOf": [
+        {
+          "if": { "properties": { "source": { "const": "iac" } }, "required": ["source"] },
+          "then": {
+            "properties": {
+              "scope": { "properties": { "iac_paths": { "minItems": 1 }, "azure_scopes": { "maxItems": 0 } } }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "source": { "const": "azure" } }, "required": ["source"] },
+          "then": {
+            "properties": {
+              "scope": { "properties": { "iac_paths": { "maxItems": 0 }, "azure_scopes": { "minItems": 1 } } }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "source": { "const": "combined" } }, "required": ["source"] },
+          "then": {
+            "properties": {
+              "scope": { "properties": { "iac_paths": { "minItems": 1 }, "azure_scopes": { "minItems": 1 } } }
+            }
+          }
+        }
+      ]
+    },
+    "assessmentRun": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "scenario",
+        "source",
+        "scope",
+        "reporting",
+        "receipt",
+        "phase",
+        "status",
+        "completed_phases",
+        "scope_digest",
+        "review_links",
+        "frozen_inputs",
+        "coverage",
+        "started_at"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        { "$ref": "#/$defs/assessmentSourceScopes" },
+        {
+          "if": {
+            "properties": {
+              "bundle_contract": { "enum": ["assessment-bundle-v2", "assessment-bundle-v3"] }
+            },
+            "required": ["bundle_contract"]
+          },
+          "then": {
+            "required": ["action_register"],
+            "allOf": [
+              {
+                "if": { "properties": { "source": { "enum": ["azure", "combined"] } }, "required": ["source"] },
+                "then": { "properties": { "action_register": { "const": true } } }
+              },
+              {
+                "if": { "properties": { "bundle_contract": { "const": "assessment-bundle-v3" } } },
+                "then": {
+                  "required": ["visual_charts"],
+                  "properties": { "visual_charts": { "const": true } }
+                }
+              }
+            ]
+          },
+          "else": { "properties": { "action_register": { "const": false } } }
+        },
+        {
+          "if": { "properties": { "status": { "const": "accepted" } }, "required": ["status"] },
+          "then": {
+            "required": ["acceptance", "accepted_at", "reviews"],
+            "properties": {
+              "phase": { "const": "terminal" },
+              "frozen_inputs": { "minProperties": 1 },
+              "completed_phases": {
+                "allOf": [
+                  { "contains": { "const": "diagram" } },
+                  { "contains": { "const": "review" } },
+                  { "contains": { "const": "acceptance" } }
+                ]
+              },
+              "reviews": {
+                "minItems": 2,
+                "maxItems": 2,
+                "allOf": [
+                  { "contains": { "properties": { "lens": { "const": "comprehensive" } }, "required": ["lens"] } },
+                  { "contains": { "properties": { "lens": { "const": "cost-feasibility" } }, "required": ["lens"] } }
+                ]
+              }
+            }
+          },
+          "else": { "properties": { "phase": { "not": { "const": "terminal" } } } }
+        }
+      ],
+      "properties": {
+        "schema_version": { "const": "assessment-run-v1" },
+        "bundle_contract": {
+          "enum": ["assessment-bundle-v1", "assessment-bundle-v2", "assessment-bundle-v3"]
+        },
+        "action_register": { "type": "boolean" },
+        "visual_charts": { "type": "boolean" },
+        "bundle_adoption_receipt": { "$ref": "#/$defs/assessmentReceipt" },
+        "scenario": { "enum": ["evidence_only", "requirements_led"] },
+        "source": { "enum": ["iac", "azure", "combined"] },
+        "scope": { "$ref": "#/$defs/assessmentScope" },
+        "reporting": { "$ref": "#/$defs/assessmentReporting" },
+        "receipt": { "$ref": "#/$defs/assessmentReceipt" },
+        "phase": {
+          "enum": ["scope", "requirements", "evidence", "analysis", "diagram", "review", "acceptance", "terminal"]
+        },
+        "status": { "enum": ["in_progress", "accepted"] },
+        "coverage": { "enum": ["complete", "partial", "not_assessed"] },
+        "scope_digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "started_at": { "type": "string", "format": "date-time" },
+        "accepted_at": { "type": "string", "format": "date-time" },
+        "acceptance": { "$ref": "#/$defs/assessmentReceipt" },
+        "completed_phases": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+        "frozen_inputs": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/assessmentPath" },
+          "additionalProperties": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+        },
+        "review_links": {
+          "type": "object",
+          "propertyNames": { "enum": ["comprehensive", "cost-feasibility"] },
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["cycle_id", "artifact", "original_artifact", "original_projection", "linked_at"],
+            "properties": {
+              "cycle_id": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "artifact": { "$ref": "#/$defs/assessmentPath" },
+              "original_artifact": { "type": "string", "minLength": 1 },
+              "original_projection": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "linked_at": { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        "reviews": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["lens", "cycle_id", "path", "sha256"],
+            "properties": {
+              "lens": { "enum": ["comprehensive", "cost-feasibility"] },
+              "cycle_id": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "path": { "$ref": "#/$defs/assessmentPath" },
+              "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+            }
+          }
+        }
+      }
+    },
+    "riskReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "id": { "type": "string", "minLength": 1 }
+      }
+    }
+  },
+  "description": "Shape of agent-output/{project}/00-session-state.json produced by the Orchestrator. Tracks workflow progress, decisions, and review audit. Enforced by scripts/validate-session-state.mjs.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "project",
+    "iac_tool",
+    "region",
+    "branch",
+    "updated",
+    "current_step",
+    "decisions",
+    "open_findings",
+    "steps"
+  ],
+  "additionalProperties": true,
+  "allOf": [
+    {
+      "if": {
+        "required": ["decisions"],
+        "properties": {
+          "decisions": { "required": ["workflow_mode"], "properties": { "workflow_mode": { "const": "assessment" } } }
+        }
+      },
+      "then": { "required": ["assessment_run"] }
+    },
+    {
+      "if": { "required": ["assessment_run"] },
+      "then": {
+        "properties": {
+          "decisions": { "required": ["workflow_mode"], "properties": { "workflow_mode": { "const": "assessment" } } }
+        }
+      }
+    },
+    {
+      "if": {
+        "anyOf": [
+          {
+            "required": ["decisions"],
+            "properties": {
+              "decisions": {
+                "required": ["plan_status"],
+                "properties": { "plan_status": { "const": "EXCEPTION_AUTHORIZED" } }
+              }
+            }
+          },
+          {
+            "required": ["decision_log"],
+            "properties": {
+              "decision_log": {
+                "contains": {
+                  "type": "object",
+                  "required": ["choice"],
+                  "properties": { "choice": { "const": "EXCEPTION_AUTHORIZED" } }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "then": { "required": ["risk_authorizations"], "properties": { "risk_authorizations": { "minProperties": 1 } } }
+    }
+  ],
+  "properties": {
+    "assessment_run": { "$ref": "#/$defs/assessmentRun" },
+    "risk_authorizations": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^(deployment-complete|teardown-complete)$": {
+          "required": ["execution"],
+          "properties": { "execution": { "allOf": [{ "$ref": "#/$defs/riskReference" }, { "required": ["id"] }] } }
+        },
+        "^(plan-complete|codegen|code-complete|deploy|deployment-complete|teardown-complete)$": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["schema_version", "authorization", "approval", "context"],
+          "properties": {
+            "schema_version": { "const": "risk-selection-v1" },
+            "authorization": { "$ref": "#/$defs/riskReference" },
+            "approval": { "$ref": "#/$defs/riskReference" },
+            "execution": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/riskReference" }] },
+            "context": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/riskReference" }] }
+          }
+        }
+      }
+    },
+    "review_selections": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^(3_5|4)$": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schema_version",
+            "path",
+            "sha256",
+            "pass_number",
+            "review_focus",
+            "input_coverage",
+            "selected_at"
+          ],
+          "properties": {
+            "schema_version": { "const": "review-selection-v1" },
+            "path": { "type": "string", "minLength": 1 },
+            "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "pass_number": { "type": "integer", "minimum": 2 },
+            "review_focus": { "enum": ["comprehensive", "governance-reconciliation"] },
+            "input_coverage": { "const": "primary-and-review-guidance" },
+            "selected_at": { "type": "string", "format": "date-time" }
+          }
+        }
+      }
+    },
+    "schema_version": {
+      "type": "string",
+      "enum": ["1.0", "2.0", "3.0"],
+      "description": "Schema version. New files must use 3.0."
+    },
+    "project": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Project folder name under agent-output/."
+    },
+    "iac_tool": {
+      "type": "string",
+      "enum": ["", "Bicep", "Terraform"],
+      "description": "Selected Infrastructure as Code tool. Empty until decided."
+    },
+    "region": {
+      "type": "string",
+      "description": "Primary Azure region for deployment."
+    },
+    "branch": {
+      "type": "string",
+      "description": "Git branch associated with this session."
+    },
+    "updated": {
+      "type": "string",
+      "description": "ISO 8601 timestamp of last update."
+    },
+    "current_step": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 7,
+      "description": "Current workflow step (0 = not started, 1-7 = active step)."
+    },
+    "decisions": {
+      "type": "object",
+      "required": ["region", "compliance", "budget", "architecture_pattern", "deployment_strategy"],
+      "additionalProperties": true,
+      "properties": {
+        "workflow_mode": { "enum": ["", "delivery", "assessment"] },
+        "workflow_contract": {
+          "type": "string",
+          "enum": ["", "practical-v1"],
+          "description": "New-project default; legacy projects require explicit owner-approved adoption."
+        },
+        "policy_evidence_contract": {
+          "const": "corp-policy-v1",
+          "description": "New delivery default; an explicit policy-source choice adopts it without changing historical gates."
+        },
+        "material_inputs": {
+          "type": "object",
+          "description": "Authoritative scoped human choices; domain policy/pricing facts remain in their evidence artifacts.",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["input_id", "value", "environments", "owner", "request_id", "recorded_at"],
+            "properties": {
+              "input_id": { "type": "string", "minLength": 1 },
+              "value": {},
+              "environments": {
+                "type": "array",
+                "minItems": 1,
+                "items": { "enum": ["dev", "test", "staging", "prod", "sandbox"] }
+              },
+              "owner": { "type": "string", "minLength": 1 },
+              "request_id": { "type": "string", "minLength": 1 },
+              "recorded_at": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "phase_scopes": {
+          "type": "object",
+          "description": "Explicit consumed-input/environment scope; never Azure or deployment authorization."
+        },
+        "review_cycles": {
+          "type": "object",
+          "description": "Actual artifact/lens initial/closure accounting, preserving exhausted history."
+        },
+        "assessment_views": {
+          "type": "object",
+          "description": "Derived view bindings; completion rechecks current consumed inputs."
+        },
+        "region": { "type": "string" },
+        "compliance": { "type": "string" },
+        "budget": { "type": "string" },
+        "architecture_pattern": { "type": "string" },
+        "deployment_strategy": { "type": "string" },
+        "complexity": {
+          "type": "string",
+          "enum": ["simple", "standard", "complex", ""],
+          "description": "Project complexity tier. Empty until assessed."
+        },
+        "sku_manifest_status": {
+          "type": "string",
+          "enum": ["", "draft", "reviewed", "locked", "deploying", "deployed", "drift"],
+          "description": "Lifecycle status of agent-output/{project}/sku-manifest.json. Empty until Step 1 creates rev 1."
+        },
+        "sku_manifest_revision": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Highest revisions[].rev currently persisted in sku-manifest.json. 0 = not yet created."
+        },
+        "sku_overrides": {
+          "type": "array",
+          "description": "Append-only log of SKU substitutions resolved at Step 6 (Deploy) for quota/region/capacity conflicts. Array — not dynamic keys.",
+          "items": {
+            "type": "object",
+            "required": ["id", "old_size", "new_size", "reason", "region", "env", "resolution"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string", "description": "services[].id from sku-manifest.json." },
+              "old_size": { "type": "string" },
+              "new_size": { "type": "string" },
+              "reason": { "type": "string", "minLength": 1 },
+              "region": { "type": "string" },
+              "env": {
+                "type": "string",
+                "enum": ["dev", "test", "stage", "prod"]
+              },
+              "resolution": {
+                "type": "string",
+                "enum": ["revert_to_plan", "accept_substitute", "change_region", "abort"]
+              },
+              "resolved_at": { "type": "string", "format": "date-time" },
+              "manifest_revision": { "type": "integer", "minimum": 1 }
+            }
+          }
+        },
+        "sku_conflict_resolution": {
+          "type": "string",
+          "enum": ["", "revert_to_plan", "accept_substitute", "change_region", "abort"],
+          "description": "Most recent Step 6 SKU conflict resolution (escalation enum). Empty when no active conflict."
+        }
+      }
+    },
+    "open_findings": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Unresolved findings carried forward between steps."
+    },
+    "decision_log": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "step": { "type": ["integer", "string"] },
+          "decision": { "type": "string" },
+          "rationale": { "type": "string" },
+          "timestamp": { "type": "string" }
+        }
+      },
+      "description": "Append-only log of key decisions made during the workflow."
+    },
+    "review_audit": {
+      "type": "object",
+      "description": "Per-step challenger review tracking.",
+      "patternProperties": {
+        "^step_[0-9_]+$": {
+          "type": "object",
+          "properties": {
+            "complexity": { "type": "string" },
+            "passes_planned": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "passes_executed": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "skipped": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "skip_reasons": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "models_used": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "steps": {
+      "type": "object",
+      "description": "Per-step execution state keyed by step number (1-7, 3_5).",
+      "patternProperties": {
+        "^[0-9_]+$": {
+          "type": "object",
+          "required": [
+            "name",
+            "agent",
+            "status",
+            "sub_step",
+            "started",
+            "completed",
+            "artifacts",
+            "context_files_used"
+          ],
+          "additionalProperties": true,
+          "properties": {
+            "name": {
+              "type": "string",
+              "enum": [
+                "Requirements",
+                "Architecture",
+                "Design",
+                "Governance",
+                "IaC Plan",
+                "IaC Code",
+                "Deploy",
+                "As-Built"
+              ]
+            },
+            "agent": { "type": "string" },
+            "status": {
+              "type": "string",
+              "enum": ["pending", "in_progress", "complete", "skipped", "stale"]
+            },
+            "sub_step": { "type": ["string", "null"] },
+            "started": { "type": ["string", "null"] },
+            "completed": { "type": ["string", "null"] },
+            "artifacts": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "context_files_used": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "telemetry": {
+              "type": "object",
+              "description": "Wave-0 telemetry merged in via `apex-recall checkpoint --telemetry-*` flags. Consumed by tools/scripts/measure-workflow-baseline.mjs to produce per-tier averages so subsequent waves' savings claims are falsifiable.",
+              "additionalProperties": false,
+              "properties": {
+                "step_start_iso": { "type": "string", "format": "date-time" },
+                "step_end_iso": { "type": "string", "format": "date-time" },
+                "elapsed_ms": { "type": "integer", "minimum": 0 },
+                "input_tokens": { "type": "integer", "minimum": 0 },
+                "output_tokens": { "type": "integer", "minimum": 0 },
+                "subagent_count": { "type": "integer", "minimum": 0 },
+                "validation_attempts": { "type": "integer", "minimum": 0 },
+                "cache_hits": { "type": "integer", "minimum": 0 }
+              }
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

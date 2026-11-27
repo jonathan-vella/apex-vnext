@@ -1,0 +1,147 @@
+#!/usr/bin/env bash
+# diff-based-push-check.sh
+# Categorizes changed files and runs only matching validators in parallel.
+# Called by lefthook pre-push hook.
+set -euo pipefail
+
+CHANGED_FILES=$(git diff --name-only origin/main...HEAD 2>/dev/null || git diff --name-only HEAD~1...HEAD 2>/dev/null || echo "")
+
+if [ -z "$CHANGED_FILES" ]; then
+  echo "ℹ️  No changed files detected — skipping validators"
+  exit 0
+fi
+
+BICEP_COUNT=0
+TF_COUNT=0
+MD_ARTIFACT_COUNT=0
+AGENT_COUNT=0
+INSTRUCTION_COUNT=0
+SKILL_COUNT=0
+JSON_COUNT=0
+PY_COUNT=0
+POWERSHELL_COUNT=0
+SKU_MANIFEST_COUNT=0
+SKU_COVERAGE_COUNT=0
+
+while IFS= read -r file; do
+  case "$file" in
+    *.bicep) BICEP_COUNT=$((BICEP_COUNT + 1)) ;;
+    *.tf) TF_COUNT=$((TF_COUNT + 1)) ;;
+    agent-output/*.md) MD_ARTIFACT_COUNT=$((MD_ARTIFACT_COUNT + 1)) ;;
+    *.agent.md) AGENT_COUNT=$((AGENT_COUNT + 1)) ;;
+    *.instructions.md) INSTRUCTION_COUNT=$((INSTRUCTION_COUNT + 1)) ;;
+    */SKILL.md) SKILL_COUNT=$((SKILL_COUNT + 1)) ;;
+    *.json) JSON_COUNT=$((JSON_COUNT + 1)) ;;
+    mcp/*.py|tools/scripts/*.py) PY_COUNT=$((PY_COUNT + 1)) ;;
+  esac
+  case "$file" in
+    tools/scripts/*.ps1|tools/scripts/*.psm1|tools/scripts/*.psd1|tools/powershell/*|.devcontainer/*.ps1|.github/skills/*/scripts/*.ps1|.github/skills/*/scripts/*.psm1|.github/skills/*/scripts/*.psd1|tools/tests/powershell-analysis.test.mjs|tools/tests/fixtures/powershell/*)
+      POWERSHELL_COUNT=$((POWERSHELL_COUNT + 1))
+      ;;
+  esac
+  case "$file" in
+    agent-output/*/sku-manifest.json|agent-output/*/contracts/sku-manifest.json)
+      SKU_MANIFEST_COUNT=$((SKU_MANIFEST_COUNT + 1))
+      SKU_COVERAGE_COUNT=$((SKU_COVERAGE_COUNT + 1))
+      ;;
+    infra/bicep/*|infra/terraform/*)
+      SKU_COVERAGE_COUNT=$((SKU_COVERAGE_COUNT + 1))
+      ;;
+  esac
+done <<< "$CHANGED_FILES"
+
+TOTAL=$((BICEP_COUNT + TF_COUNT + MD_ARTIFACT_COUNT + AGENT_COUNT + INSTRUCTION_COUNT + SKILL_COUNT + JSON_COUNT + PY_COUNT + POWERSHELL_COUNT + SKU_MANIFEST_COUNT + SKU_COVERAGE_COUNT))
+
+if [ "$TOTAL" -eq 0 ]; then
+  echo "ℹ️  No validatable files changed — skipping"
+  exit 0
+fi
+
+echo "🔄 Running diff-based push checks (parallel)..."
+echo ""
+
+# Temp dir for collecting per-check exit codes
+RESULTS_DIR=$(mktemp -d)
+trap 'rm -rf "$RESULTS_DIR"' EXIT
+
+run_check() {
+  local label="$1"
+  local count="$2"
+  local cmd="$3"
+  local slug="$4"
+
+  if [ "$count" -gt 0 ]; then
+    if eval "$cmd" > /dev/null 2>&1; then
+      echo "pass" > "$RESULTS_DIR/$slug"
+    else
+      echo "fail" > "$RESULTS_DIR/$slug"
+    fi
+  fi
+}
+
+check_tracked_bicep() {
+  local tracked file failed=0
+  tracked=$(git ls-files -- 'infra/bicep/*/main.bicep') || return 1
+  while IFS= read -r file; do
+    [[ -n "$file" ]] || continue
+    if ! bicep build "$file" --stdout > /dev/null; then
+      failed=1
+    elif ! bicep lint "$file"; then
+      failed=1
+    fi
+  done <<< "$tracked"
+  return "$failed"
+}
+
+# Launch all checks in background
+
+# ── Unconditional checks (migrated from post-commit) ──
+run_check "Version sync" "1" "npm run lint:version-sync" "version-sync" &
+run_check "Deprecated refs" "1" "npm run lint:deprecated-refs" "deprecated-refs" &
+run_check "Terminology" "1" "npm run validate:terminology" "terminology" &
+run_check "Safe shell (no interactive prompts)" "1" "npm run lint:safe-shell" "safe-shell" &
+
+# ── File-type-scoped checks ──
+run_check "Bicep lint" "$BICEP_COUNT" "check_tracked_bicep" "bicep" &
+run_check "Terraform fmt" "$TF_COUNT" "npm run lint:terraform-fmt" "tf-fmt" &
+run_check "Terraform validate" "$TF_COUNT" "npm run validate:terraform" "tf-validate" &
+run_check "Artifact templates" "$MD_ARTIFACT_COUNT" "npm run validate:artifacts" "artifacts" &
+run_check "Agent validation" "$AGENT_COUNT" "npm run validate:agents" "agents" &
+run_check "Instruction checks" "$INSTRUCTION_COUNT" "npm run validate:instruction-checks" "instructions" &
+run_check "Skills validation" "$SKILL_COUNT" "npm run validate:skills" "skills" &
+run_check "JSON syntax" "$JSON_COUNT" "npm run lint:json" "json" &
+run_check "Python lint" "$PY_COUNT" "npm run lint:python" "python" &
+run_check "PowerShell analysis and tests" "$POWERSHELL_COUNT" "npm run lint:powershell && npm run test:powershell" "powershell" &
+run_check "SKU manifest" "$SKU_MANIFEST_COUNT" "npm run validate:sku-manifest" "sku-manifest" &
+run_check "SKU ↔ IaC coverage" "$SKU_COVERAGE_COUNT" "npm run validate:sku-iac-coverage -- --diff-mode" "sku-iac-coverage" &
+
+wait
+
+# Collect results
+PASS=0
+FAIL=0
+for result_file in "$RESULTS_DIR"/*; do
+  [ -f "$result_file" ] || continue
+  slug=$(basename "$result_file")
+  status=$(cat "$result_file")
+  if [ "$status" = "pass" ]; then
+    echo "  ✅ $slug passed"
+    PASS=$((PASS + 1))
+  else
+    echo "  ❌ $slug failed"
+    FAIL=$((FAIL + 1))
+  fi
+done
+
+echo ""
+echo "📊 Checked: ${BICEP_COUNT} Bicep, ${TF_COUNT} Terraform, ${MD_ARTIFACT_COUNT} Artifact MD, ${AGENT_COUNT} Agent, ${INSTRUCTION_COUNT} Instruction, ${SKILL_COUNT} Skill, ${JSON_COUNT} JSON, ${PY_COUNT} Python, ${POWERSHELL_COUNT} PowerShell, ${SKU_MANIFEST_COUNT} SKU manifest, ${SKU_COVERAGE_COUNT} SKU coverage"
+echo "   Results: ${PASS} passed, ${FAIL} failed"
+
+if [ "$FAIL" -gt 0 ]; then
+  echo ""
+  echo "❌ Pre-push validation failed"
+  exit 1
+fi
+
+echo ""
+echo "✅ All pre-push checks passed"

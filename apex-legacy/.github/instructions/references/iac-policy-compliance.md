@@ -1,0 +1,139 @@
+# IaC Policy Compliance
+
+Shared policy compliance rules for Bicep and Terraform IaC generation.
+Referenced by the IaC best-practices instruction files.
+
+## Policy Compliance Mandate
+
+All IaC code generation cross-references `04-governance-constraints.md`
+and `04-governance-constraints.json` before writing templates. These
+artifacts contain discovered Azure Policy constraints for the target
+subscription.
+
+## Policy Source And Precedence
+
+Use effective policy discovered in the target tenant. When discovery is not used, the ALZ Corp default
+(`baseline_kind: alz-corp-default`) is assumed governance, never discovered policy; its floor is in the
+[security baseline](iac-security-baseline.md#alz-corp-inherited-policy-floor). Where the APEX baseline
+and ALZ differ, ALZ governs and the stricter APEX rule is reported to the owner. Do not present assumed
+governance as verified.
+
+## Dynamic Tag List
+
+Tags come from governance constraints, not hardcoded defaults. The greenfield fallback set
+is defined once in
+[Copilot instructions](../../copilot-instructions.md#required-tags-azure-policy-enforced)
+and [`tag-strategy.md`](../../skills/apex-azure-defaults/references/tag-strategy.md);
+discovered policies always win and may add or rename keys.
+
+### Example
+
+```text
+Greenfield fallback:              technical-contact (+ the other APEX-standard keys)
+Governance constraints discovered: tech-contact     ← policy key name
+Required in generated code:       tech-contact     (governance wins on key names)
+```
+
+## Policy Compliance Checklist
+
+For every policy in `04-governance-constraints.json`:
+
+### Deny Policies
+
+1. Read `required_value` and applicable property paths from JSON; these fields are conditional.
+   If the mapping or required value is missing/ambiguous, return to Governance/Planner for reconciliation.
+2. Translate to IaC-specific argument (Bicep or Terraform)
+3. Verify the generated code sets the property to the required value
+4. If the property is missing, add it
+5. If the property value conflicts, change it to match policy
+
+### Modify Policies
+
+1. Document expected auto-modifications in the implementation reference
+2. Do not set values that Modify policies auto-apply (avoid conflicts)
+
+### DeployIfNotExists Policies
+
+1. Verify effective assignment scope, parameters, identity permissions, deployment template and remediation behavior
+2. Document precisely which components policy owns; include expected resources in cost estimates
+3. Avoid duplicate provisioning only for verified ownership; check completion before claiming dependent connectivity
+
+For private DNS, follow the [canonical networking contract](iac-security-baseline.md#private-networking-and-dns).
+DINE assignment alone does not prove zones, records or VNet links exist. Existing noncompliance may need
+an explicitly authorized remediation task.
+
+### Audit Policies
+
+1. Document compliance expectations
+2. Set compliant values where feasible (best effort)
+
+## Bicep Implementation
+
+For Deny policies, prefer `azurePropertyPath` from JSON; fall back to
+`bicepPropertyPath` if absent. Translate by dropping the leading
+resource-type segment (e.g., `storageAccount.`) and using the remainder
+as the ARM property path.
+
+## Terraform Implementation
+
+### `azurePropertyPath` Translation
+
+For each Deny or Modify policy in `04-governance-constraints.json`,
+read the `azurePropertyPath` field when available and translate it to the corresponding
+`azurerm_*` resource argument:
+
+If discovery cannot map the policy, reconcile it with Governance/Planner rather than
+guessing a Terraform argument or treating the missing path as proof of compliance.
+
+1. Split `azurePropertyPath` on `.` → `[resourceType, "properties", ...rest]`
+2. Map `resourceType` to the corresponding `azurerm_*` resource using the table below
+3. Map the `properties.` path to the Terraform argument name (snake_case)
+
+### Resource Type Mapping
+
+| `azurePropertyPath` prefix | Terraform resource                                  |
+| -------------------------- | --------------------------------------------------- |
+| `storageAccount`           | `azurerm_storage_account`                           |
+| `keyVault`                 | `azurerm_key_vault`                                 |
+| `sqlServer`                | `azurerm_mssql_server`                              |
+| `sqlDatabase`              | `azurerm_mssql_database`                            |
+| `cosmosDbAccount`          | `azurerm_cosmosdb_account`                          |
+| `webApp`                   | `azurerm_linux_web_app` / `azurerm_windows_web_app` |
+| `appServicePlan`           | `azurerm_service_plan`                              |
+| `containerRegistry`        | `azurerm_container_registry`                        |
+| `aksCluster`               | `azurerm_kubernetes_cluster`                        |
+| `serviceBusNamespace`      | `azurerm_servicebus_namespace`                      |
+| `eventHubNamespace`        | `azurerm_eventhub_namespace`                        |
+| `logAnalyticsWorkspace`    | `azurerm_log_analytics_workspace`                   |
+
+### Property Path Mapping Examples
+
+| `azurePropertyPath`                                  | Terraform Argument                        |
+| ---------------------------------------------------- | ----------------------------------------- |
+| `storageAccount.properties.minimumTlsVersion`        | `min_tls_version`                         |
+| `storageAccount.properties.allowBlobPublicAccess`    | `allow_nested_items_to_be_public`         |
+| `storageAccount.properties.supportsHttpsTrafficOnly` | `https_traffic_only_enabled`              |
+| `sqlServer.properties.minimalTlsVersion`             | `minimum_tls_version`                     |
+| `sqlServer.properties.publicNetworkAccess`           | `public_network_access_enabled`           |
+| `keyVault.properties.enableSoftDelete`               | `soft_delete_retention_days` (> 0 = true) |
+| `keyVault.properties.enablePurgeProtection`          | `purge_protection_enabled`                |
+| `keyVault.properties.enableRbacAuthorization`        | `rbac_authorization_enabled`              |
+| `webApp.properties.publicNetworkAccess`              | `public_network_access_enabled`           |
+| `containerRegistry.properties.publicNetworkAccess`   | `public_network_access_enabled`           |
+| `webApp.properties.httpsOnly`                        | `https_only`                              |
+
+## Policy Anti-Patterns
+
+| Anti-Pattern                                       | Correct Approach                                        |
+| -------------------------------------------------- | ------------------------------------------------------- |
+| Assume 4 tags are sufficient                       | Read `04-governance-constraints.md` for actual tag list |
+| Ignore `publicNetworkAccess` constraints           | Check network policies in governance constraints        |
+| Skip governance constraints reading                | Always read and enforce governance constraints          |
+| Hardcode security settings without checking policy | Cross-reference `04-governance-constraints.json`        |
+| Use `bicepPropertyPath` for Terraform translation  | Use `azurePropertyPath` for Terraform argument mapping  |
+
+## Enforcement
+
+Azure Policy always wins. A governance compliance failure is a gate —
+the Code Generator does not proceed past Phase 1.5 with unresolved
+policy violations.

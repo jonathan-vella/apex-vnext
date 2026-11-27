@@ -1,0 +1,145 @@
+"""apex-recall decide — record decisions and decision_log entries."""
+
+from __future__ import annotations
+
+import json
+import sys
+
+from ..practical import CONTRACT, adoption_report, grant_phase, record_input
+from ..state_writer import (
+    _iso_now,
+    migrate_to_v3,
+    read_state,
+    session_state_path,
+    write_state,
+)
+
+
+def run(args) -> int:
+    project = args.project
+    as_json = getattr(args, "json", False)
+    key = getattr(args, "key", None)
+    value = getattr(args, "value", None)
+    decision_text = getattr(args, "decision", None)
+    rationale = getattr(args, "rationale", None)
+    step = getattr(args, "step", None)
+    special = [
+        getattr(args, option, None) for option in ("input_record", "phase_scope", "adopt_workflow", "review_extension")
+    ]
+    if any(value is not None for value in special):
+        if (
+            sum(value is not None for value in special) != 1
+            or key is not None
+            or value is not None
+            or decision_text is not None
+        ):
+            raise ValueError("Use exactly one structured decision mode")
+        path = session_state_path(project)
+        data = read_state(path)
+        if special[2] is not None:
+            report = adoption_report(data)
+            if getattr(args, "dry_run", False):
+                print(json.dumps(report))
+                return 0
+            if not rationale or not rationale.strip():
+                raise ValueError("Explicit owner adoption rationale required; dry-run grants nothing")
+            if not report["already_adopted"]:
+                data.setdefault("decisions", {})["workflow_contract"] = CONTRACT
+                data.setdefault("decision_log", []).append(
+                    {
+                        "decision": "Adopt practical workflow without resetting history or allowance",
+                        "rationale": rationale,
+                        "timestamp": _iso_now(),
+                    }
+                )
+        elif getattr(args, "dry_run", False):
+            raise ValueError("--dry-run is supported only for adoption")
+        elif special[0] is not None:
+            record_input(data, json.loads(special[0].read_text(encoding="utf-8")))
+        elif special[1] is not None:
+            if step not in ("1", "2", "3", "3_5", "4", "5", "6", "7"):
+                raise ValueError("A valid --step is required")
+            grant_phase(data, step, json.loads(special[1].read_text(encoding="utf-8")))
+        else:
+            from ..practical import extend_cycle
+
+            extend_cycle(data, json.loads(special[3].read_text(encoding="utf-8")))
+        write_state(project, data)
+        print(json.dumps({"project": project, "outcome": "recorded", "permission_granted": False}))
+        return 0
+    if getattr(args, "dry_run", False):
+        raise ValueError("--dry-run requires --adopt-workflow")
+
+    # Validate: must provide exactly one mode
+    has_kv = key is not None
+    has_decision = decision_text is not None
+
+    if has_kv and has_decision:
+        msg = "Cannot use both --key/--value (Mode A) and --decision (Mode B) at the same time."
+        if as_json:
+            print(json.dumps({"error": msg}))
+        else:
+            print(f"Error: {msg}", file=sys.stderr)
+        return 1
+
+    if not has_kv and not has_decision:
+        msg = "Provide either --key/--value for decisions or --decision for decision_log."
+        if as_json:
+            print(json.dumps({"error": msg}))
+        else:
+            print(f"Error: {msg}", file=sys.stderr)
+        return 1
+
+    if has_kv and value is None:
+        msg = "--key requires --value."
+        if as_json:
+            print(json.dumps({"error": msg}))
+        else:
+            print(f"Error: {msg}", file=sys.stderr)
+        return 1
+
+    path = session_state_path(project)
+    data = read_state(path)
+    data = migrate_to_v3(data)
+
+    if has_kv:
+        if key == "workflow_mode":
+            raise ValueError("Workflow mode changes require the assessment lifecycle; generic decide cannot change it")
+        # Mode A: key-value in decisions object
+        data.setdefault("decisions", {})[key] = value
+        if key in ("iac_tool", "region"):
+            data[key] = value
+        if rationale or step:
+            entry = {"decision": f"{key}={value}", "timestamp": _iso_now()}
+            if rationale:
+                entry["rationale"] = rationale
+            if step:
+                entry["step"] = step
+            data.setdefault("decision_log", []).append(entry)
+        write_state(project, data)
+        result = {"project": project, "key": key, "value": value}
+        if as_json:
+            print(json.dumps(result))
+        else:
+            print(f"Decision: {project} {key}={value}")
+    else:
+        # Mode B: append to decision_log
+        entry = {
+            "decision": decision_text,
+            "timestamp": _iso_now(),
+        }
+        if rationale:
+            entry["rationale"] = rationale
+        if step:
+            entry["step"] = step
+        data.setdefault("decision_log", []).append(entry)
+        write_state(project, data)
+        result = {"project": project, "decision": decision_text, "timestamp": entry["timestamp"]}
+        if step:
+            result["step"] = step
+        if as_json:
+            print(json.dumps(result))
+        else:
+            print(f"Decision logged: {decision_text}")
+
+    return 0

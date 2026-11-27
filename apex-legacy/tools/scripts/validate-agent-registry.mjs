@@ -1,0 +1,148 @@
+#!/usr/bin/env node
+/**
+ * Agent Registry Validator
+ *
+ * Validates tools/registry/agent-registry.json:
+ * - All referenced .agent.md files exist
+ * - Cross-checks optional legacy registry model pins against agent frontmatter
+ *
+ * Skill wiring is no longer carried by the registry — it is discovered at
+ * runtime via the orphan-content validator's regex sweep over agent bodies
+ * (`Read .github/skills/{name}/SKILL[.digest|.minimal].md`). See
+ * tools/scripts/validate-orphaned-content.mjs.
+ *
+ * Active production definitions omit model pins. Optional legacy pins must
+ * agree between the registry and frontmatter; validate-models.mjs enforces this.
+ *
+ * @example
+ * node tools/scripts/validate-agent-registry.mjs
+ */
+
+import fs from "node:fs";
+import { getAgents, getPromptFiles } from "./_lib/workspace-index.mjs";
+import { Reporter } from "./_lib/reporter.mjs";
+import { REGISTRY_PATH } from "./_lib/paths.mjs";
+import { readJsonCached } from "./_lib/json.mjs";
+
+const r = new Reporter("Agent Registry Validator");
+
+function validateAgentEntry(key, entry) {
+  // Handle IaC-conditional entries (bicep/terraform variants)
+  if (entry.bicep || entry.terraform) {
+    for (const variant of ["bicep", "terraform"]) {
+      if (entry[variant]) {
+        validateAgentFile(key, entry[variant].agent);
+      }
+    }
+    return;
+  }
+
+  validateAgentFile(key, entry.agent);
+}
+
+function validateAgentFile(key, agentPath) {
+  if (!agentPath) {
+    r.error(`Agent "${key}"`, "missing agent file path");
+    return;
+  }
+  if (!fs.existsSync(agentPath)) {
+    r.error(`Agent "${key}"`, `file not found: ${agentPath}`);
+  }
+}
+
+console.log("\n📋 Validating agent registry...\n");
+
+if (!fs.existsSync(REGISTRY_PATH)) {
+  r.error(`Agent registry not found at ${REGISTRY_PATH}`);
+  process.exit(1);
+}
+
+let registry;
+try {
+  registry = readJsonCached(REGISTRY_PATH);
+} catch (e) {
+  r.error(`Cannot parse ${REGISTRY_PATH}: ${e.message}`);
+  process.exit(1);
+}
+
+// Validate agents
+let agentCount = 0;
+if (registry.agents) {
+  for (const [key, entry] of Object.entries(registry.agents)) {
+    validateAgentEntry(key, entry);
+    agentCount++;
+  }
+}
+
+// Validate subagents
+let subagentCount = 0;
+if (registry.subagents) {
+  for (const [key, entry] of Object.entries(registry.subagents)) {
+    validateAgentEntry(key, entry);
+    subagentCount++;
+  }
+}
+
+// Cross-check registry models against YAML frontmatter
+const agentMap = new Map();
+for (const [file, agent] of getAgents()) {
+  const name = agent.frontmatter?.name?.trim();
+  if (name) agentMap.set(file, agent.frontmatter);
+}
+
+function crossCheckModel(registryKey, registryModel, agentFilePath) {
+  if (!agentFilePath) return;
+  for (const [file, fm] of agentMap) {
+    if (agentFilePath.endsWith(file) || file.endsWith(agentFilePath.replace(/^\.github\/agents\//, ""))) {
+      const yamlModel = Array.isArray(fm.model) ? fm.model[0] : fm.model;
+      if (Boolean(yamlModel) !== Boolean(registryModel)) {
+        r.warn(`Agent "${registryKey}"`, "legacy model pin is present in only one of frontmatter and registry");
+      } else if (yamlModel && registryModel) {
+        const cleanYaml = yamlModel.replace(/ \(copilot\)$/, "");
+        const cleanRegistry = registryModel.replace(/ \(copilot\)$/, "");
+        if (cleanYaml !== cleanRegistry) {
+          r.warn(
+            `Agent "${registryKey}"`,
+            `registry model "${registryModel}" differs from YAML frontmatter "${yamlModel}"`,
+          );
+        }
+      }
+      break;
+    }
+  }
+}
+
+const allEntries = [...Object.entries(registry.agents || {}), ...Object.entries(registry.subagents || {})];
+for (const [key, entry] of allEntries) {
+  if (entry.bicep || entry.terraform) {
+    if (entry.bicep) crossCheckModel(`${key} (bicep)`, entry.bicep.model, entry.bicep.agent);
+    if (entry.terraform) crossCheckModel(`${key} (terraform)`, entry.terraform.model, entry.terraform.agent);
+  } else {
+    crossCheckModel(key, entry.model, entry.agent);
+  }
+}
+
+r.ok(`Validated ${agentCount} agents and ${subagentCount} subagents`);
+
+const prompts = new Map([...getPromptFiles().values()].map((prompt) => [prompt.path, prompt]));
+for (const [key, entry] of Object.entries(registry.prompts ?? {})) {
+  r.tick();
+  const prompt = prompts.get(entry.prompt);
+  if (!prompt) {
+    r.error(`Prompt "${key}"`, `undiscovered or missing prompt: ${entry.prompt}`);
+    continue;
+  }
+  if (entry.model !== (prompt.frontmatter?.model ?? null)) {
+    r.error(`Prompt "${key}"`, "registry model must mirror prompt frontmatter, or null for agent inheritance");
+  }
+  if (typeof entry.invokable !== "boolean") r.error(`Prompt "${key}"`, "invokable must be boolean");
+}
+
+console.log(`\n📊 Results: ${r.errors} error(s), ${r.warnings} warning(s)\n`);
+
+if (r.errors > 0) {
+  console.error("❌ Agent registry validation failed\n");
+  process.exit(1);
+}
+
+console.log("✅ Agent registry validation passed\n");

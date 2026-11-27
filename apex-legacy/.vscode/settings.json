@@ -1,0 +1,78 @@
+{
+  "chat.useAgentsMdFile": true,
+  "chat.useNestedAgentsMdFiles": true,
+  "chat.useClaudeMdFile": false,
+  "chat.customAgentInSubagent.enabled": true,
+  "chat.useAgentSkills": true,
+  "json.schemas": [
+    {
+      "fileMatch": ["tools/registry/agent-registry.json"],
+      "url": "./tools/schemas/agent-registry.schema.json"
+    },
+    {
+      "fileMatch": [".github/data/governance-policy-baseline.fixture.json"],
+      "url": "./tools/schemas/governance-baseline.schema.json"
+    },
+    {
+      "fileMatch": [".github/skills/apex-vendor-prompting/rules.json"],
+      "url": "./tools/schemas/vendor-prompting-rules.schema.json"
+    },
+    {
+      "fileMatch": ["agent-output/*/09-lessons-learned.json"],
+      "url": "./tools/schemas/lesson-log.schema.json"
+    },
+    {
+      "fileMatch": ["agent-output/*/04-governance-constraints.json"],
+      "url": "./tools/schemas/governance-constraints.schema.json"
+    },
+    {
+      "fileMatch": [
+        "agent-output/*/sku-manifest.json",
+        ".github/skills/apex-azure-artifacts/templates/sku-manifest.template.json"
+      ],
+      "url": "./tools/schemas/sku-manifest.schema.json"
+    },
+    {
+      "fileMatch": ["tools/registry/upstream-skill-pins.json"],
+      "url": "./tools/schemas/upstream-skill-pins.schema.json"
+    },
+    {
+      "fileMatch": ["tools/registry/npm-audit-exceptions.json"],
+      "url": "./tools/schemas/npm-audit-exceptions.schema.json"
+    },
+    {
+      "fileMatch": ["**/*.topology.json"],
+      "url": "./tools/schemas/diagram-topology.schema.json"
+    }
+  ],
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.rulers": [120],
+  "editor.wordWrap": "wordWrapColumn",
+  "editor.wordWrapColumn": 120,
+  "terminal.integrated.defaultProfile.linux": "bash",
+  "files.eol": "\n",
+  "editor.tabSize": 2,
+  "[markdown]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.rulers": [120],
+    "editor.wordWrap": "wordWrapColumn",
+    "editor.wordWrapColumn": 120
+  },
+  "[bicep]": {
+    "editor.tabSize": 2
+  },
+  "[terraform]": {
+    "editor.tabSize": 2,
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "hashicorp.terraform"
+  },
+  "[powershell]": {
+    "editor.tabSize": 4
+  },
+  "[python]": {
+    "editor.tabSize": 4
+  },
+  "python.terminal.useEnvFile": true,
+  "chat.mcp.workspaceRootConfig.enabled": true
+}

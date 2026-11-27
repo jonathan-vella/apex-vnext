@@ -1,0 +1,37 @@
+---
+description: "IaC planning best practices for implementation plans. Policy compliance, cost monitoring, repeatability."
+applyTo: "**/04-implementation-plan.md"
+---
+
+# IaC Planning Best Practices
+
+These rules apply when generating or reviewing implementation plans,
+regardless of whether the target IaC track is Bicep or Terraform.
+
+## Policy, Cost and Repeatability
+
+Azure Policy always wins. Cross-reference `04-governance-constraints.md` and `.json` before
+writing the plan; tags come from governance constraints, not hardcoded defaults
+(`references/iac-policy-compliance.md`). Every plan includes budget resources, governed
+notifications, Action Group routing and anomaly detection (`references/iac-cost-monitoring.md`).
+Templates deploy to any tenant, region, subscription or customer without source changes;
+`projectName`/`project_name` has no default.
+
+## Diagram Artifacts
+
+If the plan references a `.png` diagram (e.g. `04-dependency-diagram.png`,
+`04-runtime-diagram.png`), the corresponding `.py` source MUST exist
+**and** the `.png` MUST be rendered from it before `apex-recall
+complete-step 4`. Do not defer rendering to Step 5 — `validate-artifacts.mjs`
+hard-fails on dangling references. Render with:
+
+```bash
+for py in agent-output/<project>/04-*-diagram.py; do
+  [ -f "${py%.py}.png" ] || python3 "$py"
+done
+```
+
+## Cross-References
+
+- Security baseline: `references/iac-security-baseline.md`
+- Governance discovery: `.github/instructions/governance-discovery.instructions.md`
